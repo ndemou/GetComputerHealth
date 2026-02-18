@@ -9,20 +9,37 @@ The toolkit operates on a **Controller-Agent** model (though agentless via Power
 ## **Relationship Diagram**
 
 ```mermaid
-graph TD
-    subgraph Controller [Controller]
-        Entry[Invoke-GetHealthDomainComputers.ps1] --> Orchestrator[Invoke-GetComputerHealth.ps1]
-        Orchestrator -- "1. Connects via WinRM" --> Target[Target Servers]
-        Orchestrator -- "4. Aggregates results" --> Report[Excel files]
-        Report -- "5. emails results using" --> Mailer[Send-Message.ps1]
-    end
+---
+config:
+  look: neo
+  theme: redux
+---
+flowchart TB
+ subgraph Controller["Controller"]
+        Orchestrator["Invoke-GetComputerHealth.ps1"]
+        Entry["Invoke-GetHealthDomainComputers.ps1"]
+        Target["Target Servers"]
+        Report["Excel files"]
+        Mailer["Send-Message.ps1"]
+  end
+ subgraph Target["Target Computer"]
+        LocalRunner["Get-ComputerHealth.ps1"]
+        Updater["Update-GetHealthCode.ps1"]
+        Tests["lib-health-tests.ps1"]
+        Config["Suppression File"]
+  end
+    Entry --> Orchestrator
+    Orchestrator -- "1. Connects via WinRM" --> Target
+    Orchestrator -- "4. Aggregates results" --> Report
+    Report -- "5. emails results using" --> Mailer
+    Updater -- "2. Updates Scripts" --> LocalRunner
+    LocalRunner -- "3. Executes" --> Tests
+    Config -.-> LocalRunner
 
-    subgraph Target [Target Computer]
-        Updater[Update-GetHealthCode.ps1] -- "2. Updates Scripts" --> LocalRunner
-        LocalRunner[Get-ComputerHealth.ps1] -- "3. Executes" --> Tests[lib-health-tests.ps1]
-        Config[Suppression File] -.-> LocalRunner
-    end
-
+     Report:::Rose
+     Config:::Rose
+    classDef Rose stroke-width:1px, stroke-dasharray:none, stroke:#FF5978, fill:#FFDFE5, color:#8E2236
+    style Target fill:#FFF9C4
 ```
 
 ---
