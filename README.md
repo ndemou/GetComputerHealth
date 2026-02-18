@@ -99,15 +99,8 @@ These scripts run locally on the servers being checked.
 
 # 3. Admin Guide: Installation
 
-Change the obvious placeholders (CAPITAL LETTERS) and then run:
+Change the obvious PLACE HOLDERS at the top, and then run:
 ```PowerShell
-# Create C:\IT\bin and download installer/updater script
-mkdir C:\it\bin -force > $null; 
-Invoke-WebRequest -useb "https://raw.githubusercontent.com/ndemou/GetComputerHealth/refs/heads/main/Update-GetHealthCode.ps1" -OutFile c:\it\bin\Update-GetHealthCode.ps1
-
-# Download all other scripts & installs some modules
-c:\it\bin\Update-GetHealthCode.ps1 
-
 # Setup email delivery
 $text = @'
 {"Server":  "MAIL.SERVER.COM",
@@ -115,6 +108,13 @@ $text = @'
 "To":  "TO@DOMAIN.COM", "Port":  25, "UseSsl":  false}
 '@
 ($text -replace '__pc_name__',$env:COMPUTERNAME)|Out-File "C:\it\config\Send-Message.conf" -Encoding utf8 -Force
+
+# Create C:\IT\bin and download installer/updater script
+mkdir C:\it\bin -force > $null; 
+Invoke-WebRequest -useb "https://raw.githubusercontent.com/ndemou/GetComputerHealth/refs/heads/main/Update-GetHealthCode.ps1" -OutFile c:\it\bin\Update-GetHealthCode.ps1
+
+# Download all other scripts & installs some modules
+c:\it\bin\Update-GetHealthCode.ps1 
 
 # Test email delivery
 C:\it\bin\Send-Message.ps1 -Subject "1st test from $($env:computername)" -ConfigFile C:\it\config\Send-Message.conf -Verbose
