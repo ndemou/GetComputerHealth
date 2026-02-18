@@ -198,13 +198,13 @@ C:\IT\bin\Get-ComputerHealth.ps1 -OutputConsoleMessages -OutputObjects -Hide DIP
 You do not need to modify the core library.
 
 1. Create the folder `C:\IT\config\Custom-HealthTests\` on the target.
-2. Add a `.ps1` file containing functions named `CustomHealthTest-SomethingDescriptive`.
-3. Use `Log-Pass`, `Log-Notice`, `Log-Warning`, or `Log-Failure` to report results.
-* **Note:** If you include variable text (like the current date) in the main message, the signature will change, and whitelisting will break. Use the `-Comment` parameter for variable data instead.
-
-
-4. The runner automatically detects and executes any function starting with `CustomHealthTest-`.
-
+2. Add one or more `.ps1` files containing one or more functions named like `CustomHealthTest-...`; e.g. `CustomHealthTest-VeeamBackupsOk`. These files will be dot-sourced and these functions will be executed automatically. Any other functions will be ignored.
+3. In your  `CustomHealthTest-...`, use `Log-Pass`, `Log-Notice`, `Log-Warning`, or `Log-Failure` to report the result(s); e.g. `Log-Pass "Veeam backups appear OK"` or `Log-Failure "Last full backup has suspiciously low size" -comment "Last full backup was $mBytes MBytes"`
+   * **Note:** Avoid including any variables in the message text. You can use the `-Comment` parameter for these. *(Rationale: If even one character of a whitelisted message changes, the code will consider it a different issue and will not suppress it.)*
+      * **Good:** `Log-Failure "No recent full backup" -comment "Last full backup was at $dateOfLastFullBackup"`
+      * **Bad:** `Log-Failure "Last full backup $days days ago"`
+   * **Note:** Avoid writting any code except functions. Any code you write will be executed by `Get-ComputerHealth.ps1`.
+     
 ---
 
 # 5. Directory Structure Reference
