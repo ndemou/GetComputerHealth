@@ -1,5 +1,9 @@
 # GetComputerHealth
-An extendable PowerShell framework designed to automate server and workstation health monitoring. It operates on a controller-agent model using PowerShell Remoting to execute more than a hundred tests (see List of tests below) on each computer.
+Stop wondering if your disks have free space, if Windows is up-to-date, if critical services are running, or if your DCs are replicating. This extensible, **open-source** toolkit automates over a hundred daily health checks you know you should be doing but don't have time for. It’s a **free**, set-and-forget health monitor that gives you **near enterprise-grade visibility** without the usual complexity, overhead, or cost.
+
+Designed as a **lightweight** alternative to heavy monitoring suites, the framework uses native PowerShell Remoting to perform deep analysis on your infrastructure without installing a single agent. It’s perfect for a single workstation or server, but also works great for domains with a few dozen servers that you already manage via PowerShell (`Enter-PSSession`/`Invoke-Command`). It generates clean terminal output, concise Excel reports, and actionable email alerts that highlight risks before they become disasters.
+
+Installation is extremely easy. Once you spend a few minutes getting familiar with it, you'll rarely need more than a minute or two per server to review the findings of the first run. If you have even a little bit of PowerShell fluency, you can easily add your own custom health tests to the mix.
 
 # 1. Architecture Overview
 
@@ -214,28 +218,28 @@ function CustomHealthTest-NetworkHealth(){
 
 This is a list of tests as of version 1.3.0. Run `Get-ComputerHealth.ps1 -ListAllBuiltInTests` to get an up-to-date list.
 
-  1. **HealthTest-AdminSDHolderCoverage**: Checks AdminSDHolder applied to protected groups reasonably. OnlyForDomainServers
+  1. **HealthTest-AdminSDHolderCoverage**: Checks AdminSDHolder applied to protected groups reasonably. (only for DCs)
   1. **HealthTest-ADReplication**: Quick AD replication check for this DC using RSAT cmdlets.
   1. **HealthTest-ADViewConsistency**: Cross-checks AD "view" consistency across DCs (DC list and all FSMO holders).
   1. **HealthTest-AutoStartServicesRunning**: Checks for services set to start automatically but are not currently running.
-  1. **HealthTest-BitLockerStatus**: HealthTest-BitLockerStatus
+  1. **HealthTest-BitLockerStatus**
   1. **HealthTest-CertExpiry**: Alerts on soon-to-expire or expired machine certificates (LocalMachine\My).
   1. **HealthTest-ConnectivityToDCs**: Connectivity health check for all Domain Controllers.
-  1. **HealthTest-CrashDumpSignals**: HealthTest-CrashDumpSignals [[-Hours] <int>]
+  1. **HealthTest-CrashDumpSignals**
   1. **HealthTest-Dcdiag**: Runs DCDIAG (/c /v) and reports any failing tests; classifies basic vs extra tests.
   1. **HealthTest-DcDnsARecords**: Checks for stale/mismatched DC DNS A records vs. AD DC IPs. OnlyForDCs
   1. **HealthTest-DcDnsServerForwarder**: Checks that this domain controller is not using public DNS forwarders.
   1. **HealthTest-DefaultLocale**: Checks if the system default locale (ACP/OEMCP) matches expected values.
   1. **HealthTest-DefenderStatus**: Checks Microsoft Defender signature freshness and reports status.
   1. **HealthTest-DfsDiagTestDCs**: Smoke-tests DFSDIAG /TestDCs output for unexpected lines.
-  1. **HealthTest-DfsNamespaceEnumerate**: Verifies DFS Namespace (domain-based) objects enumerate without error. OnlyForDomainServers
+  1. **HealthTest-DfsNamespaceEnumerate**: Verifies DFS Namespace (domain-based) objects enumerate without error. (only for DCs)
   1. **HealthTest-DfsrBacklog**: Flag high DFS-R backlog for a replication group.
-  1. **HealthTest-DfsrBacklogSysvol**: HealthTest-DfsrBacklogSysvol [[-MaxBacklog] <int>] [<CommonParameters>]
+  1. **HealthTest-DfsrBacklogSysvol**
   1. **HealthTest-DfsReplicationState**: Validates DFS Replication (DFSR) state across replicated folders.
-  1. **HealthTest-DhcpDnsCredential**: Validates DHCP DNS update credential account health. OnlyForDomainServers
-  1. **HealthTest-DhcpInAd**: Ensures DHCP server presence/authorization sane if role installed. OnlyForDomainServers
-  1. **HealthTest-DhcpScopeUtilization**: HealthTest-DhcpScopeUtilization
-  1. **HealthTest-DisabledGpoLinksAtDomainRoot**: Detects disabled GPO links at domain root (policy choice). OnlyForDomainServers
+  1. **HealthTest-DhcpDnsCredential**: Validates DHCP DNS update credential account health. (only for DCs)
+  1. **HealthTest-DhcpInAd**: Ensures DHCP server presence/authorization sane if role installed. (only for DCs)
+  1. **HealthTest-DhcpScopeUtilization**
+  1. **HealthTest-DisabledGpoLinksAtDomainRoot**: Detects disabled GPO links at domain root (policy choice). (only for DCs)
   1. **HealthTest-DisksHaveFreeSpace**: Checks if any fixed, removable, or network drives are low on free space.
   1. **HealthTest-DnsClientService**: Verifies DNS Client service is running.
   1. **HealthTest-DnsForwarders**: Validates DNS forwarders reachability and forbids loopback.
@@ -247,15 +251,15 @@ This is a list of tests as of version 1.3.0. Run `Get-ComputerHealth.ps1 -ListAl
   1. **HealthTest-DnsZoneTransfers**: Verifies DNS zone transfers are restricted. OnlyForDCs
   1. **HealthTest-DomainARecordPointsToDcIp**: Checks that the domain DNS name A record points to at least one DC IP. OnlyForDomain,NotForDCs
   1. **HealthTest-DuplicateSpn**: Detects duplicate SPNs by querying AD directly (no setspn parsing).
-  1. **HealthTest-EfsRecoveryAgents**: Checks presence of EFS Data Recovery Agents policy/certs. OnlyForDomainServers
-  1. **HealthTest-EventLogMaxSizes**: Ensures event log max sizes meet baseline without reading events. OnlyForDomainServers
+  1. **HealthTest-EfsRecoveryAgents**: Checks presence of EFS Data Recovery Agents policy/certs. (only for DCs)
+  1. **HealthTest-EventLogMaxSizes**: Ensures event log max sizes meet baseline without reading events. (only for DCs)
   1. **HealthTest-ExploitProtectionBaseline**: Baseline check for key Windows Exploit Protection (system) mitigations.
   1. **HealthTest-FirewallEnabled**: Checks if the firewall service is running and enabled for all profiles.
   1. **HealthTest-GcPlacement**: Checks GC placement (at least one per site or per-domain policy). OnlyForDCs
-  1. **HealthTest-GpoVersionConsistency**: Validates GPT vs GPC version numbers for GPO consistency. OnlyForDomainServers
+  1. **HealthTest-GpoVersionConsistency**: Validates GPT vs GPC version numbers for GPO consistency. (only for DCs)
   1. **HealthTest-GpupdatePolicyApply**: Runs gpupdate and validates computer and user policy application. OnlyForDomain,NotForDCs
-  1. **HealthTest-GpWmiFiltersNamespaces**: Validates GP WMI filters use namespaces that exist on this host. OnlyForDomainServers
-  1. **HealthTest-HotfixBaseline**: Verifies required hotfix baseline is present. OnlyForDomainServers
+  1. **HealthTest-GpWmiFiltersNamespaces**: Validates GP WMI filters use namespaces that exist on this host. (only for DCs)
+  1. **HealthTest-HotfixBaseline**: Verifies required hotfix baseline is present. (only for DCs)
   1. **HealthTest-HyperVRunningVMs**: Checks if any Hyper-V VMs that should auto-start are not currently running.
   1. **HealthTest-HyperVVMProperties**: Checks running Hyper-V VMs for unexpected property values.
   1. **HealthTest-IisBindings**: Sanity-check IIS site bindings for common misconfigurations.
@@ -264,14 +268,14 @@ This is a list of tests as of version 1.3.0. Run `Get-ComputerHealth.ps1 -ListAl
   1. **HealthTest-IPv6Binding**: Verifies IPv6 binding state per policy (PS5.1-safe).
   1. **HealthTest-IsTPMActivated**: Checks if TPM is activated. OnlyForMobile
   1. **HealthTest-KccConnectivity**: Ensures KCC created inbound connections for every DC. OnlyForDCs
-  1. **HealthTest-KerberosEncryptionTypes**: Reports accounts permitting RC4 via msDS-SupportedEncryptionTypes. OnlyForDomainServers
-  1. **HealthTest-KrbtgtAge**: Flags stale krbtgt (pwdLastSet age above threshold). OnlyForDomainServers
+  1. **HealthTest-KerberosEncryptionTypes**: Reports accounts permitting RC4 via msDS-SupportedEncryptionTypes. (only for DCs)
+  1. **HealthTest-KrbtgtAge**: Flags stale krbtgt (pwdLastSet age above threshold). (only for DCs)
   1. **HealthTest-LdapSigningChannelBinding**: Ensures LDAP signing and channel binding settings are enforced.
   1. **HealthTest-LocalAcntRequirePass**: Checks if any local user accounts have PasswordRequired set to False.
-  1. **HealthTest-LocalAdminsBaseline**: HealthTest-LocalAdminsBaseline [[-Allowed] <string[]>]
+  1. **HealthTest-LocalAdminsBaseline**
   1. **HealthTest-MalwareProtectionFeatures**: Checks if all Microsoft Defender (Malware Protection) features are enabled.
-  1. **HealthTest-NetworkInterfaceMetrics**: Checks active interface metrics for sane binding preference. OnlyForDomainServers
-  1. **HealthTest-Nic**: HealthTest-Nic
+  1. **HealthTest-NetworkInterfaceMetrics**: Checks active interface metrics for sane binding preference. (only for DCs)
+  1. **HealthTest-Nic**
   1. **HealthTest-NltestSiteDiscovery**: Verifies NLTEST /dsgetsite can determine the client AD site. OnlyForDomain,NotForDCs
   1. **HealthTest-NonDefaultShares**: Checks if there are any non-default file or print shares on this machine.
   1. **HealthTest-NonMicrosoftServices**: Reports a warning for any non Microsoft service it finds
@@ -281,10 +285,10 @@ This is a list of tests as of version 1.3.0. Run `Get-ComputerHealth.ps1 -ListAl
   1. **HealthTest-NtlmHardening**: Checks NTLM hardening and emits an advisory when the default (3) is in effect.
   1. **HealthTest-PagefileSanity**: Checks that a pagefile exists and meets a minimum size.
   1. **HealthTest-PendingReboot**: Detects whether a reboot is pending on this host.
-  1. **HealthTest-PreWin2000Group**: Reports members of 'Pre-Windows 2000 Compatible Access' (should be empty). OnlyForDomainServers
+  1. **HealthTest-PreWin2000Group**: Reports members of 'Pre-Windows 2000 Compatible Access' (should be empty). (only for DCs)
   1. **HealthTest-RamPressure**: Snapshot test for low free RAM.
-  1. **HealthTest-RdpHardening**: Checks RDP hardening (NLA enabled and cert bound). OnlyForDomainServers
-  1. **HealthTest-RecentDiskErrors**: HealthTest-RecentDiskErrors [[-Hours] <int>]
+  1. **HealthTest-RdpHardening**: Checks RDP hardening (NLA enabled and cert bound). (only for DCs)
+  1. **HealthTest-RecentDiskErrors**
   1. **HealthTest-RecentWindowsScan**: Checks if Windows Defender performed a quick scan recently
   1. **HealthTest-RecycleBinEnabled**: Confirms AD Recycle Bin is enabled.
   1. **HealthTest-ReplicationLatency**: Checks replication latency on schema/config partitions.
@@ -292,16 +296,16 @@ This is a list of tests as of version 1.3.0. Run `Get-ComputerHealth.ps1 -ListAl
   1. **HealthTest-RestrictAnonymous**: Checks anonymous access hardening against modern baselines.
   1. **HealthTest-ReverseZonesPresent**: Confirms reverse lookup zones exist for known subnets. OnlyForDCs
   1. **HealthTest-RidManager**: Runs DCDIAG RIDManager and checks for failures or low pool signals. OnlyForDCs
-  1. **HealthTest-RodcPrp**: Reviews RODC PRP (allow/deny) presence where RODCs exist. OnlyForDomainServers
-  1. **HealthTest-SchanelBaseline**: Basic Schannel hardening**: SSL3/TLS1.0 disabled, TLS1.2 enabled. OnlyForDomainServers
-  1. **HealthTest-ScheduledTasks**: HealthTest-ScheduledTasks
+  1. **HealthTest-RodcPrp**: Reviews RODC PRP (allow/deny) presence where RODCs exist. (only for DCs)
+  1. **HealthTest-SchanelBaseline**: Basic Schannel hardening: SSL3/TLS1.0 disabled, TLS1.2 enabled. (only for DCs)
+  1. **HealthTest-ScheduledTasks**
   1. **HealthTest-ScheduledTasksLastResult**: Evaluates scheduled task "Last Result" codes on the local host, suppressing informational values, and reports only meaningful warnings and failures.
   1. **HealthTest-SchemaVersionConsistency**: Ensures AD schema objectVersion matches across all DCs.
   1. **HealthTest-ServiceAccountsPwdNeverExpires**: Flags service accounts with PasswordNeverExpires.
   1. **HealthTest-ShadowStorage**: Checks shadow storage presence and size info.
   1. **HealthTest-ShareReasonableness**: Audits SMB shares for broad access and hygiene issues.
   1. **HealthTest-SingleDefaultGateway**: Ensures the host does not have multiple default gateways.
-  1. **HealthTest-Smb1Disabled**: HealthTest-Smb1Disabled
+  1. **HealthTest-Smb1Disabled**
   1. **HealthTest-SmbSigningRequired**: Requires SMB signing on the server.
   1. **HealthTest-SoftwareLicensing**: Verifies Windows are Licensed.
   1. **HealthTest-StartupItems**: Scrapes common auto-start locations for rogues.
@@ -315,10 +319,9 @@ This is a list of tests as of version 1.3.0. Run `Get-ComputerHealth.ps1 -ListAl
   1. **HealthTest-TombstoneLifetime**: Checks tombstoneLifetime and links interval sanity.
   1. **HealthTest-TrustsVerify**: Verifies domain trusts and performs netdom /verify.
   1. **HealthTest-UnconstrainedDelegationAccounts**: Finds accounts with unconstrained delegation (excludes DCs by default).
-  1. **HealthTest-UnexpectedListeningPorts**: Flags unexpected listening TCP ports; ignores 49152-65535 and notes optional baseline ports (3389, 47001, 593). OnlyForDomainServers
-  1. **HealthTest-UnsignedDrivers**: Flags unsigned PnP drivers, ignoring common false positives from core system components.
-  1. **  OnlyForDomainServers
-  1. **HealthTest-UnusedEnabledAdapters**: Flags enabled NICs that are disconnected (cleanup). OnlyForDomainServers
+  1. **HealthTest-UnexpectedListeningPorts**: Flags unexpected listening TCP ports; ignores 49152-65535 and notes optional baseline ports (3389, 47001, 593). (only for DCs)
+  1. **HealthTest-UnsignedDrivers**: Flags unsigned PnP drivers, ignoring common false positives from core system components. (only for DCs)
+  1. **HealthTest-UnusedEnabledAdapters**: Flags enabled NICs that are disconnected (cleanup). (only for DCs)
   1. **HealthTest-UpdateAge**: Flags stale Windows Update posture based on last successful install date.
   1. **HealthTest-VssWriters**: Lists VSS writers and flags non-stable states.
   1. **HealthTest-WinRMListening**: Confirms WinRM is running and responsive.
