@@ -25,7 +25,7 @@ config:
   look: neo
   theme: redux
 ---
-flowchart TB
+flowchart BT
  subgraph Controller["Controller"]
         Orchestrator["Invoke-GetComputerHealth.ps1"]
         Entry["Invoke-GetHealthDomainComputers.ps1"]
