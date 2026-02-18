@@ -32,14 +32,15 @@ Dependencies & execution context:
 (Parameter set: Run) If set, outputs structured objects produced by the health tests to the pipeline.
 
 .PARAMETER Hide
-(Parameter set: Run) Message visibility filter. String containing only letters from `DIPNCH`.
-Default: empty (show all). Typical value: `DIP` (hide Debug/Info/Pass).
-  D = hide Debug
-  I = hide Info
-  P = hide Pass
-  N = hide Notice
-  C = hide Comments attached to messages
-  H = hide user guidance/help messages
+(Parameter set: Run) Message visibility filter. String containing only letters from `DIPNWFC`.
+Default: empty (show all). Typical value: `DIP`
+  D = hide Debug messages
+  I = hide Info messages
+  P = hide Pass messages
+  N = hide Notice messages
+  W = hide Warning messages
+  F = hide Failure messages
+  C = hide Comments (messages still print, but without their Comment lines)
 
 .PARAMETER WhitelistSigs
 (Parameter set: Run) One or more 8-hex signatures to suppress for this run only (merged into the loaded suppression set).
@@ -116,7 +117,7 @@ param(
   [switch]$OutputObjects,
 
   [Parameter(ParameterSetName='Run')]
-  [ValidatePattern('^[DIPNCH]*$')]
+  [ValidatePattern('^[DIPNWFC]*$')]
   [string]$Hide = '',
 
   [Parameter(ParameterSetName='Run')]
@@ -220,12 +221,6 @@ $VERSION="1.3.0"
 #
 
 $global:SUPPRESS_SIGNATURES_PATH = 'C:\it\config\Get-ComputerHealth.sigs-to-suppress.txt'
-
-#------------------------------------------
-# Global/Script variables
-#
-$global:WLO_SuppressedSignatures = $null        # populated by Initialize-SignatureSuppression
-
 
 #------------------------------------------
 # GENERIC TUI Helper functions
@@ -439,66 +434,6 @@ FunctionName, Time, ElapsedMilliseconds, Output, Success, Error, Category, Reaso
   Log-debug "Done with test $FunctionName in $([int]$sw.ElapsedMilliseconds) ms"
 }
 
-function Initialize-SignatureSuppression{
-<#
-.SYNOPSIS
- Load suppressed message signatures from file.
-.PARAMETER Path  File path.
-.NOTES
-Lines: are like this:
-    hash
-or like this:
-    hash until YYYY-MM-DD
-and may contain a comment after an # character which is ignored
-Hash is an 8-character hex string optionaly enclosed in [].
-If there are multiple lines for the same hash, the last line wins.
-
-Examples of config lines:
-    a1b3c5d7 # some comment
-    [a1b3c5d7] # some comment
-    a1b3c5d7 until 2025-01-01
-    [a1b3c5d7] until 2025-01-01 # some comment
-#>
-  param(
-    [Parameter(Mandatory)][string]$Path
-  )
-
-  $global:WLO_SuppressedSignatures = New-Object 'System.Collections.Generic.HashSet[string]'
-  if([string]::IsNullOrWhiteSpace($Path)){ return }
-  if(-not (Test-Path -LiteralPath $Path)){ return }
-
-  $today = (Get-Date).Date
-  $lines = Get-Content -Encoding utf8 -LiteralPath $Path -ErrorAction SilentlyContinue
-  foreach($line in $lines){
-    if($null -eq $line){ continue }
-    $line = ($line -replace '\s+#.*$','').Trim()           # strip trailing comments; trim
-    if([string]::IsNullOrWhiteSpace($line)){ continue }
-
-    if($line -match '^\[?([0-9A-Fa-f]{8})\]?(?:\s+until\s+(\d{4}-\d{2}-\d{2}))?$'){
-      $hash8 = $Matches[1].ToLowerInvariant()
-
-      if($Matches[2]){
-          # until YYYY-MM-DD
-          try{
-            $expiry = [datetime]::ParseExact($Matches[2], 'yyyy-MM-dd', [Globalization.CultureInfo]::InvariantCulture).Date
-          } catch { continue }  # bad date; skip line
-          if($today -le $expiry){
-            [void]$global:WLO_SuppressedSignatures.Add($hash8)
-          } else {
-            # this line is only here to enforce the last line wins:
-            # Imagine a file with 2 lines for the same hash
-            # If the first adds the hash, the second will remove it
-            # if necessary.
-            [void]$global:WLO_SuppressedSignatures.Remove($hash8)
-          }
-      } else {
-          # plain exception without until
-          [void]$global:WLO_SuppressedSignatures.Add($hash8)
-      }
-    }
-  }
-}
-
 function Get-HealthTests {
 <#
 .SYNOPSIS
@@ -638,15 +573,6 @@ if ($AddWhitelisting ){
     return
 }
 
-#+-----------------------------------------------------------
-#| Initialize globals that lib-generic-tui needs
-#|
-    $global:WLO_OutputConsoleMessages = $OutputConsoleMessages
-    $global:WLO_HideStr               = $Hide
-    Initialize-SignatureSuppression $global:SUPPRESS_SIGNATURES_PATH
-#|
-#|
-#+-----------------------------------------------------------
 if ($DoNothing){return}
 
 if (!$OutputConsoleMessages -and !$OutputObjects) {
@@ -657,9 +583,18 @@ if (!$OutputConsoleMessages -and !$OutputObjects) {
 # To reach this line either one or both of these switches where passed: 
 # -OutputConsoleMessages -OutputObjects
 
-if ($WhitelistSigs) {
-    $WhitelistSigs -replace '\[' -replace ']' -replace '\s+',' ' -replace '^ *' -replace ' *$' -split ' *, *' -split ' ' | ?{$_}| sort -Unique | % { [void]$global:WLO_SuppressedSignatures.Add($_) }
-}
+#+-----------------------------------------------------------
+#| Initialize globals that lib-generic-tui needs
+#|
+Initialize-LogSystem `
+  -OutputConsoleMessages $OutputConsoleMessages.IsPresent `
+  -HideStr $Hide `
+  -SuppressionFilePath $global:SUPPRESS_SIGNATURES_PATH `
+  -AdditionalSuppressedSignatures $WhitelistSigs
+#|
+#|
+#+-----------------------------------------------------------
+
 Log-info "$((Split-Path $PSCommandPath -Leaf) -replace '.ps1'), ver.$VERSION, Nick Demou, enLogic"
 Log-info "$(Get-Date -format yyyy-MM-dd` HH:mm:ss), Host: $($env:COMPUTERNAME), S/N: $((Get-CimInstance win32_bios).serialnumber)"
 Log-Debug "-Hide '$Hide'"
@@ -668,7 +603,9 @@ Log-Debug "-ExcludeTests (semicolon separated): $($ExcludeTests -join ';')"
 [array]$OnlyTheseTests=$OnlyTheseTests | %{ $_ -split '[,\s]+'} | %{$_.trim()} | ?{ $_ }
 Log-Debug "-OnlyTheseTests (semicolon separated): $($OnlyTheseTests -join ';')"
 Log-Debug "-WhitelistSigs '$WhitelistSigs'"
-Log-debug "Final list of supressed signatures: $((($global:WLO_SuppressedSignatures | sort -Unique)) -join ', ')"
+$cfg = Get-LogConfig
+Log-debug "Final list of suppressed signatures: $((@($cfg.SuppressedSignatures) | Sort-Object -Unique) -join ', ')"
+
 
 if ($OnlyTheseTests) {
     $valid_cmdlet_name_regex = '^ *[A-Za-z][A-Za-z0-9_-]*[A-Za-z0-9]+ *$'

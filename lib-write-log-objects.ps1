@@ -1,60 +1,115 @@
 <# 
-Helper functions that return AND display Log Objects.
-Messages are returned (write-output) as CustomPSObjects like this:
-  Host       : "PC01"
-  Level      : "warning"     # (debug, info, pass, notice, warning, failure)
-  Message    : "Computer and user policy updates failed to complet (gpupdate)"
-  Hash       : "61811b52"
-  Suppressed : $true      
-  Comment    : "gpupdate execution failed with error 3"
+Helper functions that create, return, and optionally display structured Log Objects.
 
-They are also optionally color-printed on screen (Write-Host).
+Messages are emitted (Write-Output) as PSCustomObjects with the following properties:
+  Host       : string   # Computer name that generated the message
+  Level      : string   # debug, info, pass, notice, warning, failure
+  Message    : string   # Primary human-readable message
+  Hash       : string   # 8-character message signature (MD5 prefix); empty for debug
+  Suppressed : bool     # True if message signature is configured as suppressed
+  Comment    : string   # Optional additional information
 
-Use it to output log messages (debug,info,pass,notice,warning & failure).
-You can also export such messages to Excel.
+These objects are suitable for filtering, aggregation, and export (e.g. Excel).
 
-Functions you are supposed to use:
-   * Log-Msg     -Level "Info" -Msg "Something happened" -Comment <OPTIONAL>
-   * Log-Debug   "Something happened under the hood" -Comment <OPTIONAL>
-   * Log-Pass    "Something good happened" -Comment <OPTIONAL>
-   * Log-Info    "Something happened" -Comment <OPTIONAL>
-   * Log-Notice  "Something noticable happened" -Comment <OPTIONAL>
-   * Log-Warning "Something bad happened" -Comment <OPTIONAL>
-   * Log-Failure "Something very bad happened" -Comment <OPTIONAL>
-Also (less often):
-   * Write-BasedOnTestResult  -Title $TestTitle -Test $TestResultTrueFalse -Comment "Comment if test failed"
-        (convenience function to avoid a lot of if($test){log-pass "..."}else{log-failure "..."}
-   * Get-StringSignature "Some text" 
-        (returns the signature/hash of the string you pass)
-   * Export-HealthMessagesToExcel $Data $FileName 
-        ($Data is an array of Log Objects. Needs module ImportExcel)
+Optionally, messages are also color-printed to the console (Write-Host).
 
-Configure behavior by setting these global variables:
+------------------------------------------------------------------------------
+INTENDED USAGE
+------------------------------------------------------------------------------
 
-  $global:WLO_SuppressedSignatures  
-    An array of signatures that will not be printed in the console 
-    (and will have their .suppressed property set to $true).
+This is the primary function that this library provides:
 
-  $global:WLO_OutputConsoleMessages 
-    True if you want these functions to also show collored messages 
-    to the console (write-host).
+  Log-Msg     -Level "Info" -Msg "Something happened" -Comment <OPTIONAL>
 
-  $global:WLO_HideStr
-    A string with characters that denote which type of messages to NOT show
-    on the console. e.g. "DIP" will hide Debug, Info & Pass messages.
-    Valid chars: D,I,P,N,W,F.
+But these convenience wrappers are easier to type:
 
-***********
-* CAUTION *
-***********
-You must set the $Global: variables before calling the functions.
+  Log-Debug   "Diagnostic detail"        -Comment <OPTIONAL>
+  Log-Pass    "Successful outcome"       -Comment <OPTIONAL>
+  Log-Info    "Informational message"    -Comment <OPTIONAL>
+  Log-Notice  "Notable condition"        -Comment <OPTIONAL>
+  Log-Warning "Problem detected"         -Comment <OPTIONAL>
+  Log-Failure "Serious problem detected" -Comment <OPTIONAL>
 
-EXAMPLE GLOBAL VARIABLES INITIALIZATION
----------------------------------------
-    $global:WLO_SuppressedSignatures = @()    # Don't suppress any message.
-    $global:WLO_OutputConsoleMessages = $True # Show nice colored output on the console.
-    $global:WLO_HideStr = "DIP"               # Hide Debug, Info & Pass messages.
+Additional utilities:
+
+  Write-BasedOnTestResult
+      Convenience function that logs Pass or Failure based on a boolean test.
+
+  Get-StringSignature "Some text"
+      Returns the 8-character signature associated with the message text.
+
+  Export-HealthMessagesToExcel $Data $FileName
+      Exports Log Objects to Excel (requires ImportExcel module).
+
+------------------------------------------------------------------------------
+CONFIGURATION MODEL
+------------------------------------------------------------------------------
+
+Default behavior requires no configuration. These are the default values:
+
+  SuppressedSignatures  : @()   # No messages are suppressed
+  OutputConsoleMessages : True  # Messages are also printed on the console with nice colors
+  HideStr               : ""    # *All* message levels are printed, including debug, info and pass
+
+To change & inspect configuration, call Set-LogConfig & Get-LogConfig. Example:
+
+  Set-LogConfig -HideStr "DIP" -SuppressedSignatures @('12345678','abcd1234')
+
+This hides Debug, Info, and Pass messages from console and whitelists(suppresses) 2 specific messages.
+
+Valid letters for HideStr are these:
+    D : Debug
+	P : Pass
+	I : Info
+	N : Notice
+	W : Warning
+	F : Failure
+	C : Comment (messages are printed but without their comments)
+
+------------------------------------------------------------------------------
+SUPPRESSION MODEL
+------------------------------------------------------------------------------
+
+Each non-debug message has a stable signature derived from its Message text.
+
+If a signature is included in SuppressedSignatures:
+
+  * Message object is still returned but with Suppressed property set to True.
+  * Message is not printed on the Console.
+
+Confusion alert: Why we use the terms "suppress a message" and "whitelist a message" as synonymous:
+This library was created to support Get-ComputerHealth. That code generates messages to flag 
+percieved "issues". If a message describes something that is not really an issue the administrator
+whitelists this false alarm thus suppressing the message about it.
+
+------------------------------------------------------------------------------
+OUTPUT CONTRACT
+------------------------------------------------------------------------------
+
+All Log-* functions ALWAYS emit exactly one PSCustomObject per call.
+
+Consumers SHOULD rely on returned objects, not console output, for automation.
+
+------------------------------------------------------------------------------
+EXCEL EXPORT SUPPORT
+------------------------------------------------------------------------------
+
+Export-HealthMessagesToExcel exports structured log data and includes a
+prebuilt suppression command for each non-suppressed message. This is
+specific to the Get-ComputerHealth consumer of this library.
+
+Requires ImportExcel module.
+
+------------------------------------------------------------------------------
 #>
+
+#=============================================================
+# Default configuration if the caller doesn't call Set-LogConfig
+#
+#
+$script:cfgSuppressedSignatures=@()
+$script:cfgOutputConsoleMessages=$true
+$script:cfgHideStr=""
 
 #=============================================================
 # START OF Low level functions
@@ -81,11 +136,210 @@ function Get-LeftString {
 # END OF Low level functions 
 #=============================================================
 
-# Get an 8-char signature for a string (MD5 prefix) 
+<#
+.SYNOPSIS
+Returns a stable 8-character signature for a string after canonicalization.
+
+.DESCRIPTION
+Returns a short, deterministic signature derived from the provided text,
+intended for message deduplication, suppression, or correlation.
+Before hashing, the input text is canonicalized to reduce noise from
+cosmetic differences. Two input strings that differ only in case, punctuation,
+or spacing will therefore produce the same signature.
+#> 
 function Get-StringSignature {
   param([Parameter(Mandatory)][string]$InputString)
-  $hash = Get-StringHash -InputString $InputString -Algorithm MD5
+  $s=$InputString.ToLowerInvariant().Trim()
+  $s=$s -replace "[\.,;:!\?\-_/\\\(\)\[\]\{\}']+", ' '
+  $s=$s -replace '\s+',' '
+  $hash=Get-StringHash -InputString $s -Algorithm MD5
   Get-LeftString -String $hash -Count 8
+}
+
+<#
+.SYNOPSIS
+Normalizes arbitrary input into a distinct list of 8-hex message signatures.
+
+.DESCRIPTION
+Accepts strings, arrays, or other enumerable inputs and extracts valid
+hexadecimal signature tokens. Non-hex characters (except comma/whitespace)
+are discarded. Brackets surrounding signatures are ignored.
+
+Returns lowercase, unique values only.
+
+.NOTES
+Invalid tokens are silently ignored.
+#>
+function ConvertTo-SignatureList {
+  [CmdletBinding()]
+  param([AllowNull()][object]$InputObject)
+
+  if($null -eq $InputObject){ return @() }
+
+  $items=@()
+  if($InputObject -is [string[]]){ $items=@($InputObject) }
+  elseif($InputObject -is [System.Collections.IEnumerable] -and -not ($InputObject -is [string])){ $items=@($InputObject) }
+  else{ $items=@([string]$InputObject) }
+
+  $flat = ($items | ForEach-Object { [string]$_ }) -join ' '
+  $flat = $flat -replace '\[|\]',''
+  $flat = $flat -replace '[^0-9A-Fa-f,\s]',' '
+  $flat -split '[,\s]+' | Where-Object { $_ } | ForEach-Object { $_.ToLowerInvariant() } | Sort-Object -Unique
+}
+
+<#
+Normalizes the provided input into valid 8-hex signatures and merges them
+with the currently configured suppressed signatures. Existing entries are
+preserved. Duplicate values are removed.
+This affects only in-memory configuration.
+#>
+function Add-LogSuppressedSignatures {
+  [CmdletBinding()]
+  param([Parameter(Mandatory)][object]$Signatures)
+
+  $extra = ConvertTo-SignatureList $Signatures
+  if(-not $extra){ return }
+
+  $cfg = Get-LogConfig
+  $merged = @($cfg.SuppressedSignatures) + @($extra) | Sort-Object -Unique
+  Set-LogConfig -SuppressedSignatures $merged
+}
+
+<#
+.SYNOPSIS
+Initializes logging configuration and suppression state.
+
+.DESCRIPTION
+Configures console output behavior and visibility filtering, optionally
+loads suppressed signatures from a file, and optionally merges additional
+suppression entries for the current run.
+
+.PARAMETER OutputConsoleMessages
+Controls whether messages are printed to the console.
+
+.PARAMETER HideStr
+Console visibility filter (letters from DIPNWFC).
+
+.PARAMETER SuppressionFilePath
+Path to a suppression configuration file to load.
+
+.PARAMETER AdditionalSuppressedSignatures
+Extra signatures to suppress for this run only.
+#>
+function Initialize-LogSystem {
+  [CmdletBinding()]
+  param(
+    [bool]$OutputConsoleMessages=$true,
+    [string]$HideStr="",
+    [string]$SuppressionFilePath,
+    [object]$AdditionalSuppressedSignatures
+  )
+
+  Set-LogConfig -OutputConsoleMessages $OutputConsoleMessages -HideStr $HideStr
+
+  if($SuppressionFilePath){
+    Initialize-SignatureSuppression -Path $SuppressionFilePath
+  }
+
+  if($PSBoundParameters.ContainsKey('AdditionalSuppressedSignatures')){
+    Add-LogSuppressedSignatures $AdditionalSuppressedSignatures
+  }
+}
+
+<#
+Reads a suppression file containing 8-hex signatures (optionally enclosed
+in brackets) with optional expiry dates in the form:
+    hash
+    hash until yyyy-MM-dd
+
+Expired entries are ignored. If multiple entries exist for the same
+signature, the last applicable entry determines its state.
+
+Replaces the current in-memory suppression set.
+#>
+function Initialize-SignatureSuppression {
+  [CmdletBinding()]
+  param([Parameter(Mandatory)][string]$Path)
+
+  $set = New-Object 'System.Collections.Generic.HashSet[string]'
+  if([string]::IsNullOrWhiteSpace($Path)){ return }
+
+  if(-not (Test-Path -LiteralPath $Path)){ return }
+
+  $today = (Get-Date).Date
+  $lines = Get-Content -Encoding utf8 -LiteralPath $Path -ErrorAction SilentlyContinue
+
+  foreach($line in $lines){
+    if($null -eq $line){ continue }
+
+    $line = ($line -replace '\s+#.*$','').Trim()
+    if([string]::IsNullOrWhiteSpace($line)){ continue }
+
+    if($line -match '^\[?([0-9A-Fa-f]{8})\]?(?:\s+until\s+(\d{4}-\d{2}-\d{2}))?$'){
+      $hash8 = $Matches[1].ToLowerInvariant()
+
+      if($Matches[2]){
+        try{
+          $expiry = [datetime]::ParseExact($Matches[2],'yyyy-MM-dd',[Globalization.CultureInfo]::InvariantCulture).Date
+        } catch { continue }
+
+        if($today -le $expiry){
+          [void]$set.Add($hash8)
+        } else {
+          [void]$set.Remove($hash8)
+        }
+      } else {
+        [void]$set.Add($hash8)
+      }
+    }
+  }
+
+  Set-LogConfig -SuppressedSignatures @($set)
+}
+
+<#
+.SYNOPSIS
+Updates one or more logging configuration values. Only parameters explicitly supplied are modified.
+
+.PARAMETER SuppressedSignatures
+Complete list of 8-hex signatures to treat as suppressed.
+
+.PARAMETER OutputConsoleMessages
+Controls whether messages are written to the console.
+
+.PARAMETER HideStr
+Console visibility filter (letters from DIPNWFC).
+#>
+function Set-LogConfig {
+  [CmdletBinding()]
+  param(
+    [string[]]$SuppressedSignatures,
+    [bool]$OutputConsoleMessages,
+    [string]$HideStr
+  )
+  if($PSBoundParameters.ContainsKey('SuppressedSignatures')){ $script:cfgSuppressedSignatures=@($SuppressedSignatures) }
+  if($PSBoundParameters.ContainsKey('OutputConsoleMessages')){ $script:cfgOutputConsoleMessages=$OutputConsoleMessages }
+  if($PSBoundParameters.ContainsKey('HideStr')){ $script:cfgHideStr=[string]$HideStr }
+}
+
+<#
+.SYNOPSIS
+Provides the active in-memory logging settings.
+
+.OUTPUTS
+PSCustomObject with:
+  SuppressedSignatures
+  OutputConsoleMessages
+  HideStr
+#>
+function Get-LogConfig {
+  [CmdletBinding()]
+  param()
+  [pscustomobject]@{
+    SuppressedSignatures  = @($script:cfgSuppressedSignatures)
+    OutputConsoleMessages = [bool]$script:cfgOutputConsoleMessages
+    HideStr               = [string]$script:cfgHideStr
+  }
 }
 
 function Log-Msg {
@@ -99,37 +353,37 @@ function Log-Msg {
   [string]$SigColor = 'DarkGray'
     switch ($Level) {
     'debug' {
-      $Hide       = ($global:WLO_HideStr -like '*D*') 
+      $Hide       = ($script:cfgHideStr -like '*D*') 
       $LabelText  = 'DEBUG  :' 
       $LabelColor = 'DarkGray' 
       $MsgColor   = 'DarkGray'
     }
     'pass' {
-      $Hide       = ($global:WLO_HideStr -like '*P*') 
+      $Hide       = ($script:cfgHideStr -like '*P*') 
       $LabelText  = 'PASS   :' 
       $LabelColor = 'Green' 
       $MsgColor   = 'DarkGray'
     }
     'info' {
-      $Hide       = ($global:WLO_HideStr -like '*I*') 
+      $Hide       = ($script:cfgHideStr -like '*I*') 
       $LabelText  = 'INFO   :' 
       $LabelColor = 'Cyan' 
       $MsgColor   = 'DarkGray'
     }
     'notice' {
-      $Hide       = ($global:WLO_HideStr -like '*N*') 
+      $Hide       = ($script:cfgHideStr -like '*N*') 
       $LabelText  = 'NOTICE :' 
       $LabelColor = 'DarkYellow' 
       $MsgColor   = 'Gray'
     }
     'warning' {
-      $Hide       = ($global:WLO_HideStr -like '*W*') 
+      $Hide       = ($script:cfgHideStr -like '*W*') 
       $LabelText  = 'WARNING:' 
       $LabelColor = 'Yellow' 
       $MsgColor   = 'White'
     }
     'failure' {
-      $Hide       = ($global:WLO_HideStr -like '*F*') 
+      $Hide       = ($script:cfgHideStr -like '*F*') 
       $LabelText  = 'FAILURE:' 
       $LabelColor = 'Red' 
       $MsgColor   = 'White'
@@ -139,8 +393,8 @@ function Log-Msg {
   if ($Level -ne 'debug') { $sig = Get-StringSignature $Msg } else { $sig = '' }
 
   $must_suppress_sig = $false
-  if ($global:WLO_SuppressedSignatures -and $sig) {
-    $must_suppress_sig = $sig -in $global:WLO_SuppressedSignatures
+  if ($script:cfgSuppressedSignatures -and $sig) {
+    $must_suppress_sig = $sig -in $script:cfgSuppressedSignatures
   }
 
   $out = [pscustomobject]@{
@@ -153,7 +407,7 @@ function Log-Msg {
   }
   Write-Output $out
 
-  if ((-not $OutputConsoleMessages) -or $Hide -or $must_suppress_sig) { return }
+  if ((-not $script:cfgOutputConsoleMessages) -or $Hide -or $must_suppress_sig) { return }
   #------------------------------------------------------------------
   # Console output below -- if you edit me put nothing else here
   #
@@ -161,7 +415,7 @@ function Log-Msg {
   Write-Host -ForegroundColor $SigColor   -NoNewline (" [{0}] " -f $sig)
   Write-Host -ForegroundColor $MsgColor    $Msg
 
-  if ($Comment -and ($global:WLO_HideStr -notlike '*C*')) {
+  if ($Comment -and ($script:cfgHideStr -notlike '*C*')) {
     if ($Comment -match '\n') {
       ($Comment -replace '^(?:\s*\r?\n)+|(?:\s*\r?\n)+$', '') -split '\n' | %{ Write-Host -ForegroundColor DarkGray "  #       $_" }
     } else {
