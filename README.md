@@ -29,7 +29,7 @@ flowchart TB
  subgraph Controller["Controller"]
         Orchestrator["Invoke-GetComputerHealth.ps1"]
         Entry["Invoke-GetHealthDomainComputers.ps1"]
-        Target_Ref["Target Servers"]
+        Target["Target Servers"]
         Report["Excel files"]
         Mailer["Send-Message.ps1"]
   end
@@ -40,9 +40,9 @@ flowchart TB
         Config["Suppression File"]
   end
     Entry --> Orchestrator
-    Orchestrator -- "1. Connects via WinRM" --> Target_Ref
+    Orchestrator -- "1. Connects via WinRM" --> Target
     Orchestrator -- "4. Aggregates results" --> Report
-    Report -- "5. Emails results using" --> Mailer
+    Report -- "5. emails results using" --> Mailer
     Updater -- "2. Updates Scripts" --> LocalRunner
     LocalRunner -- "3. Executes" --> Tests
     Config -.-> LocalRunner
@@ -50,8 +50,7 @@ flowchart TB
      Report:::Rose
      Config:::Rose
     classDef Rose stroke-width:1px, stroke-dasharray:none, stroke:#FF5978, fill:#FFDFE5, color:#8E2236
-    style Target_Ref fill:#FFF9C4
-
+    style Target fill:#FFF9C4
 ```
 
 ---
