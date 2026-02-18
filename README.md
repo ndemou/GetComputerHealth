@@ -57,25 +57,25 @@ flowchart BT
 
 # 2. Script Components Breakdown
 
-This section explains the role of each file in your `C:\it\bin` directory.
+This section explains the role of each file in your `C:\IT\bin` directory.
 
 ## A. The Orchestrators (Run these)
 
 These are the scripts you actually execute.
 
-* **`Invoke-GetHealthDomainComputers.ps1`**
+### `Invoke-GetHealthDomainComputers.ps1` (for multiple computers; e.g. all domain Servers) 
 * **Role:** The "Easy Button" wrapper for testing all domain servers.
 * **Function:** By default, it scans all computers running a Windows Server OS, but you are encouraged to edit it to add extra hosts or exclude others.
 * **Usage:** Run this manually or schedule it to run daily (e.g., via the SYSTEM account) to check the entire domain.
 
 
-* **`Invoke-GetComputerHealth.ps1`**
+### `Invoke-GetComputerHealth.ps1` (for one computer) 
 * **Role:** The Engine/Orchestrator. It tests the local host by default or the computers you specify.
 * **Function:** It manages the workflow:
 1. Connects to the local host or one or more remote computers.
 2. Triggers the self-update on the remote target.
 3. Runs the health checks remotely.
-4. Collects output, saves it in Excel format (`C:\it\temp\`), and emails "Notable" (non-success) messages.
+4. Collects output, saves it in Excel format (`C:\IT\temp\`), and emails "Notable" (non-success) messages.
 
 
 * **Key Parameters:** `-Computers` (list of targets), `-ExcludeServers`, `-Hide` (filters output levels).
@@ -99,7 +99,7 @@ These scripts run locally on the servers being checked.
 
 * **`Update-GetHealthCode.ps1`**
 * **Role:** The Updater.
-* **Function:** Ensures the local `C:\it\bin` folder has the latest version of all scripts by downloading them from a central repository. It runs automatically before tests begin.
+* **Function:** Ensures the local `C:\IT\bin` folder has the latest version of all scripts by downloading them from a central repository. It runs automatically before tests begin.
 
 
 
@@ -111,33 +111,41 @@ These scripts run locally on the servers being checked.
 
 # 3. Admin Guide: Installation
 
-Replace the **PLACEHOLDERS** at the top with your actual details, then run:
+Replace the *PLACEHOLDERS* at the top with your actual configuration, then run:
 
 ```powershell
-# Setup email delivery
-$text = @'
-{"Server":  "MAIL.SERVER.COM",
-"From":  "__pc_name__+FROM@DOMAIN.COM",
-"To":  "TO@DOMAIN.COM", "Port":  25, "UseSsl":  false}
-'@
-($text -replace '__pc_name__',$env:COMPUTERNAME) | Out-File "C:\it\config\Send-Message.conf" -Encoding utf8 -Force
+#--------- CHANGE THIS PART ---------
+$mailServer="SMTP_SERVER.CONTOSO.COM"
+$mailServer="SMTP_SERVER.CONTOSO.COM"
+$fromAddress="SENDER@CONTOSO.COM"
+$toAddress="RECIPIENT@CONTOSO.COM"
+#------------------------------------
 
 # Create C:\IT\bin and download installer/updater script
-if (-not (Test-Path "C:\it\bin")) { New-Item -Path "C:\it\bin" -ItemType Directory -Force }
-Invoke-WebRequest -useb "https://raw.githubusercontent.com/ndemou/GetComputerHealth/refs/heads/main/Update-GetHealthCode.ps1" -OutFile "C:\it\bin\Update-GetHealthCode.ps1"
+if (-not (Test-Path "C:\IT\bin")) { New-Item -Path "C:\IT\bin" -ItemType Directory -Force }
+Invoke-WebRequest -useb "https://raw.githubusercontent.com/ndemou/GetComputerHealth/refs/heads/main/Update-GetHealthCode.ps1" -OutFile "C:\IT\bin\Update-GetHealthCode.ps1"
 
 # Download all other scripts & install required modules
-C:\it\bin\Update-GetHealthCode.ps1 
+C:\IT\bin\Update-GetHealthCode.ps1 
+
+# Setup email delivery
+@"
+{"Server":  "$mailServer",
+"From":  "$($env:COMPUTERNAME)+$fromAddress",
+"To":  "$toAddress",
+"Port":  25,
+"UseSsl":  false}
+"@ | Out-File "C:\IT\config\Send-Message.conf" -Encoding utf8 -Force
 
 # Test email delivery
-C:\it\bin\Send-Message.ps1 -Subject "First test from $($env:COMPUTERNAME)" -ConfigFile "C:\it\config\Send-Message.conf" -Verbose
+C:\IT\bin\Send-Message.ps1 -Subject "First test from $($env:COMPUTERNAME)" -ConfigFile "C:\IT\config\Send-Message.conf" -Verbose
 
 # Perform your first health test manually
-C:\it\bin\Invoke-GetComputerHealth.ps1
+C:\IT\bin\Invoke-GetComputerHealth.ps1
 
 # Schedule the check to run automatically every day
-. C:\it\bin\helpers-processes.ps1 # Imports the New-ScheduledTaskForPSScript command
-New-ScheduledTaskForPSScript -ScriptPath "C:\it\bin\Invoke-GetComputerHealth.ps1" -ScheduleType Daily -Time 07:12
+. C:\IT\bin\helpers-processes.ps1 # Imports the New-ScheduledTaskForPSScript command
+New-ScheduledTaskForPSScript -ScriptPath "C:\IT\bin\Invoke-GetComputerHealth.ps1" -ScheduleType Daily -Time 07:12
 
 ```
 
@@ -148,18 +156,18 @@ New-ScheduledTaskForPSScript -ScriptPath "C:\it\bin\Invoke-GetComputerHealth.ps1
 Open PowerShell as Administrator and run:
 
 ```powershell
-C:\it\bin\Invoke-GetComputerHealth.ps1
+C:\IT\bin\Invoke-GetComputerHealth.ps1
 
 ```
 
-* **Result:** This scans the local machine, saves an Excel report to `C:\it\temp\`, and emails you any "Notable" issues (Notices/Warnings/Failures).
+* **Result:** This scans the local machine, saves an Excel report to `C:\IT\temp\`, and emails you any "Notable" issues (Notices/Warnings/Failures).
 
 ## How to Run a Full Domain Health Check
 
 Open PowerShell as Administrator and run:
 
 ```powershell
-C:\it\bin\Invoke-GetHealthDomainComputers.ps1
+C:\IT\bin\Invoke-GetHealthDomainComputers.ps1
 
 ```
 
@@ -172,14 +180,14 @@ By default, the health tests will flag any deviation from a pristine Windows ins
 1. **Identify the whitelisting command:** Open the generated Excel report. Every message includes a column containing the exact command needed to whitelist that entry.
 2. **Apply Whitelist:** Run that command on the **target machine** (or via a remote shell).
 
-* **Under the hood:** This adds the unique signature to `C:\it\config\Get-ComputerHealth.sigs-to-suppress.txt`. Future runs will mark this specific issue as "Suppressed" and will not consider it "Notable."
+* **Under the hood:** This adds the unique signature to `C:\IT\config\Get-ComputerHealth.sigs-to-suppress.txt`. Future runs will mark this specific issue as "Suppressed" and will not consider it "Notable."
 
 ## How to Check a Single Server Interactively
 
 To debug a specific server locally:
 
 ```powershell
-C:\it\bin\Get-ComputerHealth.ps1 -OutputConsoleMessages -OutputObjects -Hide DIP
+C:\IT\bin\Get-ComputerHealth.ps1 -OutputConsoleMessages -OutputObjects -Hide DIP
 
 ```
 
@@ -189,7 +197,7 @@ C:\it\bin\Get-ComputerHealth.ps1 -OutputConsoleMessages -OutputObjects -Hide DIP
 
 You do not need to modify the core library.
 
-1. Create the folder `C:\it\config\Custom-HealthTests\` on the target.
+1. Create the folder `C:\IT\config\Custom-HealthTests\` on the target.
 2. Add a `.ps1` file containing functions named `CustomHealthTest-SomethingDescriptive`.
 3. Use `Log-Pass`, `Log-Notice`, `Log-Warning`, or `Log-Failure` to report results.
 * **Note:** If you include variable text (like the current date) in the main message, the signature will change, and whitelisting will break. Use the `-Comment` parameter for variable data instead.
@@ -203,10 +211,10 @@ You do not need to modify the core library.
 
 | Path | Purpose |
 | --- | --- |
-| `C:\it\bin\` | Contains all script files (`.ps1`). |
-| `C:\it\config\` | Contains configuration files (`Send-Message.conf`) and the suppression list (`Get-ComputerHealth.sigs-to-suppress.txt`). |
-| `C:\it\temp\` | Staging area for downloads and location of generated Excel reports. |
-| `C:\it\log\` | Stores transcript logs of script execution. |
+| `C:\IT\bin\` | Contains all script files (`.ps1`). |
+| `C:\IT\config\` | Contains configuration files (`Send-Message.conf`) and the suppression list (`Get-ComputerHealth.sigs-to-suppress.txt`). |
+| `C:\IT\temp\` | Staging area for downloads and location of generated Excel reports. |
+| `C:\IT\log\` | Stores transcript logs of script execution. |
 
 # 6. List of Available Tests
 
