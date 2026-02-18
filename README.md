@@ -197,14 +197,33 @@ C:\IT\bin\Get-ComputerHealth.ps1 -OutputConsoleMessages -OutputObjects -Hide DIP
 
 You do not need to modify the core library.
 
+**TLDR**: `.ps1` files in `C:\IT\config\Custom-HealthTests\` are dot-sourced and all functions named like `CustomHealthTest-...` are executed.
+
+**CAUTION: Any code you write will be executed with high priviledges**.
+
 1. Create the folder `C:\IT\config\Custom-HealthTests\` on the target.
-2. Add one or more `.ps1` files containing one or more functions named like `CustomHealthTest-...`; e.g. `CustomHealthTest-VeeamBackupsOk`. These files will be dot-sourced and these functions will be executed automatically. Any other functions will be ignored.
-3. In your  `CustomHealthTest-...`, use `Log-Pass`, `Log-Notice`, `Log-Warning`, or `Log-Failure` to report the result(s); e.g. `Log-Pass "Veeam backups appear OK"` or `Log-Failure "Last full backup has suspiciously low size" -comment "Last full backup was $mBytes MBytes"`
-   * **Note:** Avoid including any variables in the message text. You can use the `-Comment` parameter for these. *(Rationale: If even one character of a whitelisted message changes, the code will consider it a different issue and will not suppress it.)*
-      * **Good:** `Log-Failure "No recent full backup" -comment "Last full backup was at $dateOfLastFullBackup"`
-      * **Bad:** `Log-Failure "Last full backup $days days ago"`
-   * **Note:** Avoid writting any code except functions. Any code you write will be executed by `Get-ComputerHealth.ps1`.
-     
+2. Create a `.ps1` file with a nice name and this line near the top:
+   ```
+   if(Get-Command Log-Pass -CommandType Function -ErrorAction SilentlyContinue){. C:\it\bin\lib-write-log-objects.ps1}
+   ```
+   (It's not required, but it helps with debuging by allowing you to run the code manualy)
+3. Add at least one functions named like `CustomHealthTest-...` and inside it use `Log-Pass`, `Log-Notice`, `Log-Warning`, or `Log-Failure` to report your result(s). Example:
+   ```
+   function CustomHealthTest-VeeamBackupsOk() {
+     if ($condition) {
+       Log-Pass "Veeam backups appear OK"
+     } else {
+       Log-Failure "Last full backup has suspiciously low size" -comment "Last full backup was $mBytes MBytes"
+     }
+   }
+   ```
+
+ * **Note:** Avoid including any variables in the message text. You can use the `-Comment` parameter for these. *(Rationale: If even one character of a whitelisted message changes, the code will consider it a different issue and will not suppress it.)*
+    * **Good:** `Log-Failure "No recent full backup" -comment "Last full backup was at $dateOfLastFullBackup"`
+    * **Bad:** `Log-Failure "Last full backup $days days ago"`
+ * **Note:** Avoid writting any code except functions. Any code you write will be executed by Get-ComputerHalth.
+
+
 ---
 
 # 5. Directory Structure Reference
