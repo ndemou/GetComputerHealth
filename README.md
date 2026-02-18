@@ -220,111 +220,121 @@ You do not need to modify the core library.
 
 This is a list of tests as of version 1.3.0. Run `Get-ComputerHealth.ps1 -ListAllBuiltInTests` to get an up-to-date list.
 
-  1. **HealthTest-AdminSDHolderCoverage**: Checks AdminSDHolder applied to protected groups reasonably. (only for DCs)
-  1. **HealthTest-ADReplication**: Quick AD replication check for this DC using RSAT cmdlets.
-  1. **HealthTest-ADViewConsistency**: Cross-checks AD "view" consistency across DCs (DC list and all FSMO holders).
-  1. **HealthTest-AutoStartServicesRunning**: Checks for services set to start automatically but are not currently running.
-  1. **HealthTest-BitLockerStatus**
-  1. **HealthTest-CertExpiry**: Alerts on soon-to-expire or expired machine certificates (LocalMachine\My).
-  1. **HealthTest-ConnectivityToDCs**: Connectivity health check for all Domain Controllers.
-  1. **HealthTest-CrashDumpSignals**
-  1. **HealthTest-Dcdiag**: Runs DCDIAG (/c /v) and reports any failing tests; classifies basic vs extra tests.
-  1. **HealthTest-DcDnsARecords**: Checks for stale/mismatched DC DNS A records vs. AD DC IPs. OnlyForDCs
-  1. **HealthTest-DcDnsServerForwarder**: Checks that this domain controller is not using public DNS forwarders.
-  1. **HealthTest-DefaultLocale**: Checks if the system default locale (ACP/OEMCP) matches expected values.
-  1. **HealthTest-DefenderStatus**: Checks Microsoft Defender signature freshness and reports status.
-  1. **HealthTest-DfsDiagTestDCs**: Smoke-tests DFSDIAG /TestDCs output for unexpected lines.
-  1. **HealthTest-DfsNamespaceEnumerate**: Verifies DFS Namespace (domain-based) objects enumerate without error. (only for DCs)
-  1. **HealthTest-DfsrBacklog**: Flag high DFS-R backlog for a replication group.
-  1. **HealthTest-DfsrBacklogSysvol**
-  1. **HealthTest-DfsReplicationState**: Validates DFS Replication (DFSR) state across replicated folders.
-  1. **HealthTest-DhcpDnsCredential**: Validates DHCP DNS update credential account health. (only for DCs)
-  1. **HealthTest-DhcpInAd**: Ensures DHCP server presence/authorization sane if role installed. (only for DCs)
-  1. **HealthTest-DhcpScopeUtilization**
-  1. **HealthTest-DisabledGpoLinksAtDomainRoot**: Detects disabled GPO links at domain root (policy choice). (only for DCs)
-  1. **HealthTest-DisksHaveFreeSpace**: Checks if any fixed, removable, or network drives are low on free space.
-  1. **HealthTest-DnsClientService**: Verifies DNS Client service is running.
-  1. **HealthTest-DnsForwarders**: Validates DNS forwarders reachability and forbids loopback.
-  1. **HealthTest-DnsRecursionConfig**: Validates DNS recursion configuration (enabled/forwarders/EDNS). OnlyForDCs
-  1. **HealthTest-DnsScavenging**: Checks DNS scavenging/aging configuration (server + per-zone).
-  1. **HealthTest-DnsSuffixBaseline**: Verifies key DNS suffix/devolution/registration settings for a small, single-domain AD.
-  1. **HealthTest-DnsSuffixMatchesDomain**: Checks DNS suffix for the AD domain. OnlyForDomain,NotForDCs
-  1. **HealthTest-DnsZoneReplicationScope**: Validates DNS zone replication scope for AD-integrated zones.
-  1. **HealthTest-DnsZoneTransfers**: Verifies DNS zone transfers are restricted. OnlyForDCs
-  1. **HealthTest-DomainARecordPointsToDcIp**: Checks that the domain DNS name A record points to at least one DC IP. OnlyForDomain,NotForDCs
-  1. **HealthTest-DuplicateSpn**: Detects duplicate SPNs by querying AD directly (no setspn parsing).
-  1. **HealthTest-EfsRecoveryAgents**: Checks presence of EFS Data Recovery Agents policy/certs. (only for DCs)
-  1. **HealthTest-EventLogMaxSizes**: Ensures event log max sizes meet baseline without reading events. (only for DCs)
-  1. **HealthTest-ExploitProtectionBaseline**: Baseline check for key Windows Exploit Protection (system) mitigations.
-  1. **HealthTest-FirewallEnabled**: Checks if the firewall service is running and enabled for all profiles.
-  1. **HealthTest-GcPlacement**: Checks GC placement (at least one per site or per-domain policy). OnlyForDCs
-  1. **HealthTest-GpoVersionConsistency**: Validates GPT vs GPC version numbers for GPO consistency. (only for DCs)
-  1. **HealthTest-GpupdatePolicyApply**: Runs gpupdate and validates computer and user policy application. OnlyForDomain,NotForDCs
-  1. **HealthTest-GpWmiFiltersNamespaces**: Validates GP WMI filters use namespaces that exist on this host. (only for DCs)
-  1. **HealthTest-HotfixBaseline**: Verifies required hotfix baseline is present. (only for DCs)
-  1. **HealthTest-HyperVRunningVMs**: Checks if any Hyper-V VMs that should auto-start are not currently running.
-  1. **HealthTest-HyperVVMProperties**: Checks running Hyper-V VMs for unexpected property values.
-  1. **HealthTest-IisBindings**: Sanity-check IIS site bindings for common misconfigurations.
-  1. **HealthTest-InstalledRolesFeatures**: Reviews installed roles/features against policy.
-  1. **HealthTest-InterfaceDnsServersUseDcs**: Ensures each interface DNS server list contains only DC IPs. OnlyForDomain,NotForDCs
-  1. **HealthTest-IPv6Binding**: Verifies IPv6 binding state per policy (PS5.1-safe).
-  1. **HealthTest-IsTPMActivated**: Checks if TPM is activated. OnlyForMobile
-  1. **HealthTest-KccConnectivity**: Ensures KCC created inbound connections for every DC. OnlyForDCs
-  1. **HealthTest-KerberosEncryptionTypes**: Reports accounts permitting RC4 via msDS-SupportedEncryptionTypes. (only for DCs)
-  1. **HealthTest-KrbtgtAge**: Flags stale krbtgt (pwdLastSet age above threshold). (only for DCs)
-  1. **HealthTest-LdapSigningChannelBinding**: Ensures LDAP signing and channel binding settings are enforced.
-  1. **HealthTest-LocalAcntRequirePass**: Checks if any local user accounts have PasswordRequired set to False.
-  1. **HealthTest-LocalAdminsBaseline**
-  1. **HealthTest-MalwareProtectionFeatures**: Checks if all Microsoft Defender (Malware Protection) features are enabled.
-  1. **HealthTest-NetworkInterfaceMetrics**: Checks active interface metrics for sane binding preference. (only for DCs)
-  1. **HealthTest-Nic**
-  1. **HealthTest-NltestSiteDiscovery**: Verifies NLTEST /dsgetsite can determine the client AD site. OnlyForDomain,NotForDCs
-  1. **HealthTest-NonDefaultShares**: Checks if there are any non-default file or print shares on this machine.
-  1. **HealthTest-NonMicrosoftServices**: Reports a warning for any non Microsoft service it finds
-  1. **HealthTest-NtdsLogVolumeFree**: Ensures NTDS log volume free space above threshold. OnlyForDCs
-  1. **HealthTest-NtdsPathsLocation**: Verifies NTDS.dit and log paths are on intended volumes.
-  1. **HealthTest-NtfsDirtyBit**: Check NTFS volumes for the "dirty" bit.
-  1. **HealthTest-NtlmHardening**: Checks NTLM hardening and emits an advisory when the default (3) is in effect.
-  1. **HealthTest-PagefileSanity**: Checks that a pagefile exists and meets a minimum size.
-  1. **HealthTest-PendingReboot**: Detects whether a reboot is pending on this host.
-  1. **HealthTest-PreWin2000Group**: Reports members of 'Pre-Windows 2000 Compatible Access' (should be empty). (only for DCs)
-  1. **HealthTest-RamPressure**: Snapshot test for low free RAM.
-  1. **HealthTest-RdpHardening**: Checks RDP hardening (NLA enabled and cert bound). (only for DCs)
-  1. **HealthTest-RecentDiskErrors**
-  1. **HealthTest-RecentWindowsScan**: Checks if Windows Defender performed a quick scan recently
-  1. **HealthTest-RecycleBinEnabled**: Confirms AD Recycle Bin is enabled.
-  1. **HealthTest-ReplicationLatency**: Checks replication latency on schema/config partitions.
-  1. **HealthTest-RequiredSrvRecords**: Confirms required SRV records exist in _msdcs.
-  1. **HealthTest-RestrictAnonymous**: Checks anonymous access hardening against modern baselines.
-  1. **HealthTest-ReverseZonesPresent**: Confirms reverse lookup zones exist for known subnets. OnlyForDCs
-  1. **HealthTest-RidManager**: Runs DCDIAG RIDManager and checks for failures or low pool signals. OnlyForDCs
-  1. **HealthTest-RodcPrp**: Reviews RODC PRP (allow/deny) presence where RODCs exist. (only for DCs)
-  1. **HealthTest-SchanelBaseline**: Basic Schannel hardening: SSL3/TLS1.0 disabled, TLS1.2 enabled. (only for DCs)
-  1. **HealthTest-ScheduledTasks**
-  1. **HealthTest-ScheduledTasksLastResult**: Evaluates scheduled task "Last Result" codes on the local host, suppressing informational values, and reports only meaningful warnings and failures.
-  1. **HealthTest-SchemaVersionConsistency**: Ensures AD schema objectVersion matches across all DCs.
-  1. **HealthTest-ServiceAccountsPwdNeverExpires**: Flags service accounts with PasswordNeverExpires.
-  1. **HealthTest-ShadowStorage**: Checks shadow storage presence and size info.
-  1. **HealthTest-ShareReasonableness**: Audits SMB shares for broad access and hygiene issues.
-  1. **HealthTest-SingleDefaultGateway**: Ensures the host does not have multiple default gateways.
-  1. **HealthTest-Smb1Disabled**
-  1. **HealthTest-SmbSigningRequired**: Requires SMB signing on the server.
-  1. **HealthTest-SoftwareLicensing**: Verifies Windows are Licensed.
-  1. **HealthTest-StartupItems**: Scrapes common auto-start locations for rogues.
-  1. **HealthTest-Storage**: Performs a comprehensive health check of all local physical disks using Windows Storage APIs.
-  1. **HealthTest-SystemScheduledTasks**: Lists SYSTEM-scheduled tasks that are disabled, stale, or failing.
-  1. **HealthTest-SysvolAclHygiene**: Checks SYSVOL NTFS ACLs do not grant write to broad principals. OnlyForDCs
-  1. **HealthTest-SysvolContentConsistency**: Compares SYSVOL policy tree manifest across DCs (count+hash). OnlyForDCs
-  1. **HealthTest-SysvolNetlogonAccessible**: Tests SYSVOL/NETLOGON accessibility across DCs.
-  1. **HealthTest-TimeSyncAccuracy**: Measures time offset vs. a time source and compares against thresholds.
-  1. **HealthTest-TimeSyncPolicy**: Validates that the host's time sync topology matches AD/NTP best practices.
-  1. **HealthTest-TombstoneLifetime**: Checks tombstoneLifetime and links interval sanity.
-  1. **HealthTest-TrustsVerify**: Verifies domain trusts and performs netdom /verify.
-  1. **HealthTest-UnconstrainedDelegationAccounts**: Finds accounts with unconstrained delegation (excludes DCs by default).
-  1. **HealthTest-UnexpectedListeningPorts**: Flags unexpected listening TCP ports; ignores 49152-65535 and notes optional baseline ports (3389, 47001, 593). (only for DCs)
-  1. **HealthTest-UnsignedDrivers**: Flags unsigned PnP drivers, ignoring common false positives from core system components. (only for DCs)
-  1. **HealthTest-UnusedEnabledAdapters**: Flags enabled NICs that are disconnected (cleanup). (only for DCs)
-  1. **HealthTest-UpdateAge**: Flags stale Windows Update posture based on last successful install date.
-  1. **HealthTest-VssWriters**: Lists VSS writers and flags non-stable states.
-  1. **HealthTest-WinRMListening**: Confirms WinRM is running and responsive.
-  1. **HealthTest-WmiRepository**: Verifies WMI repository consistency.
+### Tier 1: The "Server Down" Signals
+
+1. **HealthTest-DisksHaveFreeSpace**: Checks if any fixed, removable, or network drives are low on free space.
+2. **HealthTest-AutoStartServicesRunning**: Checks for services set to start automatically but are not currently running.
+3. **HealthTest-ADReplication**: Quick AD replication check for this DC using RSAT cmdlets.
+4. **HealthTest-ConnectivityToDCs**: Connectivity health check for all Domain Controllers.
+5. **HealthTest-TimeSyncAccuracy**: Measures time offset vs. a time source and compares against thresholds.
+6. **HealthTest-Storage**: Performs a comprehensive health check of all local physical disks using Windows Storage APIs.
+7. **HealthTest-CrashDumpSignals**: Checks for recent system crashes by finding new minidump files or BugCheck events in the logs.
+8. **HealthTest-Dcdiag**: Runs DCDIAG (/c /v) and reports any failing tests; classifies basic vs extra tests.
+9. **HealthTest-DnsClientService**: Verifies DNS Client service is running.
+10. **HealthTest-CertExpiry**: Alerts on soon-to-expire or expired machine certificates (LocalMachine\My).
+11. **HealthTest-DfsrBacklog**: Flag high DFS-R backlog for a replication group.
+12. **HealthTest-SysvolNetlogonAccessible**: Tests SYSVOL/NETLOGON accessibility across DCs.
+13. **HealthTest-RecentDiskErrors**: Scans the System log for critical disk, NTFS, and storage errors from the last 48 hours.
+
+### Tier 2: Security & Stability Risks
+
+14. **HealthTest-DefenderStatus**: Checks Microsoft Defender signature freshness and reports status.
+15. **HealthTest-MalwareProtectionFeatures**: Checks if all Microsoft Defender (Malware Protection) features are enabled.
+16. **HealthTest-UpdateAge**: Flags stale Windows Update posture based on last successful install date.
+17. **HealthTest-PendingReboot**: Detects whether a reboot is pending on this host.
+18. **HealthTest-BitLockerStatus**: Verifies that BitLocker encryption protection is fully active on all local volumes.
+19. **HealthTest-FirewallEnabled**: Checks if the firewall service is running and enabled for all profiles.
+20. **HealthTest-DnsZoneTransfers**: Verifies DNS zone transfers are restricted (Only for DCs).
+21. **HealthTest-ShadowStorage**: Checks shadow storage presence and size info.
+22. **HealthTest-TimeSyncPolicy**: Validates that the host's time sync topology matches AD/NTP best practices.
+23. **HealthTest-DfsrBacklogSysvol**: Warns if the SYSVOL replication backlog between Domain Controllers exceeds 100 pending files.
+24. **HealthTest-SysvolContentConsistency**: Compares SYSVOL policy tree manifest across DCs (count+hash) (Only for DCs).
+25. **HealthTest-WinRMListening**: Confirms WinRM is running and responsive.
+26. **HealthTest-DhcpScopeUtilization**: Alerts if any IPv4 DHCP scope usage exceeds 80% (warning) or 90% (critical failure).
+27. **HealthTest-Smb1Disabled**: Confirms that the insecure SMBv1 protocol feature is disabled or removed from the OS.
+28. **HealthTest-SmbSigningRequired**: Requires SMB signing on the server.
+
+### Tier 3: Configuration Hygiene & Best Practices
+
+29. **HealthTest-DnsForwarders**: Validates DNS forwarders reachability and forbids loopback.
+30. **HealthTest-DnsScavenging**: Checks DNS scavenging/aging configuration (server + per-zone).
+31. **HealthTest-DnsSuffixMatchesDomain**: Checks DNS suffix for the AD domain. (Only for Domains, not for DCs)
+32. **HealthTest-InterfaceDnsServersUseDcs**: Ensures each interface DNS server list contains only DC IPs. (Only for Domains, not for DCs)
+33. **HealthTest-DomainARecordPointsToDcIp**: Checks that the domain DNS name A record points to at least one DC IP. (Only for Domains, not for DCs)
+34. **HealthTest-RequiredSrvRecords**: Confirms required SRV records exist in _msdcs.
+35. **HealthTest-DcDnsARecords**: Checks for stale/mismatched DC DNS A records vs. AD DC IPs (Only for DCs).
+36. **HealthTest-RidManager**: Runs DCDIAG RIDManager and checks for failures or low pool signals (Only for DCs).
+37. **HealthTest-ADViewConsistency**: Cross-checks AD "view" consistency across DCs (DC list and all FSMO holders).
+38. **HealthTest-NtdsLogVolumeFree**: Ensures NTDS log volume free space above threshold (Only for DCs).
+39. **HealthTest-NtdsPathsLocation**: Verifies NTDS.dit and log paths are on intended volumes.
+40. **HealthTest-DuplicateSpn**: Detects duplicate SPNs by querying AD directly (no setspn parsing).
+41. **HealthTest-KccConnectivity**: Ensures KCC created inbound connections for every DC (Only for DCs).
+42. **HealthTest-ReplicationLatency**: Checks replication latency on schema/config partitions.
+43. **HealthTest-DfsReplicationState**: Validates DFS Replication (DFSR) state across replicated folders.
+44. **HealthTest-GpupdatePolicyApply**: Runs gpupdate and validates computer and user policy application. (Only for Domains, not for DCs)
+45. **HealthTest-NltestSiteDiscovery**: Verifies NLTEST /dsgetsite can determine the client AD site. (Only for Domains, not for DCs)
+46. **HealthTest-DhcpDnsCredential**: Validates DHCP DNS update credential account health (Only for DCs).
+47. **HealthTest-DfsNamespaceEnumerate**: Verifies DFS Namespace (domain-based) objects enumerate without error (Only for DCs).
+48. **HealthTest-HyperVRunningVMs**: Checks if any Hyper-V VMs that should auto-start are not currently running.
+49. **HealthTest-HyperVVMProperties**: Checks running Hyper-V VMs for unexpected property values.
+50. **HealthTest-DfsDiagTestDCs**: Smoke-tests DFSDIAG /TestDCs output for unexpected lines.
+51. **HealthTest-ScheduledTasksLastResult**: Evaluates scheduled task "Last Result" codes on the local host, suppressing informational values, and reports only meaningful warnings and failures.
+52. **HealthTest-SystemScheduledTasks**: Lists SYSTEM-scheduled tasks that are disabled, stale, or failing.
+53. **HealthTest-VssWriters**: Lists VSS writers and flags non-stable states.
+
+### Tier 4: Auditing, Compliance & "Nice to Have"
+
+54. **HealthTest-LocalAdminsBaseline**: Flags any account in the local Administrators group that is not on the strict default allow-list.
+55. **HealthTest-UnconstrainedDelegationAccounts**: Finds accounts with unconstrained delegation (excludes DCs by default).
+56. **HealthTest-KerberosEncryptionTypes**: Reports accounts permitting RC4 via msDS-SupportedEncryptionTypes (Only for DCs).
+57. **HealthTest-NtlmHardening**: Checks NTLM hardening and emits an advisory when the default (3) is in effect.
+58. **HealthTest-LdapSigningChannelBinding**: Ensures LDAP signing and channel binding settings are enforced.
+59. **HealthTest-RdpHardening**: Checks RDP hardening (NLA enabled and cert bound) (Only for DCs).
+60. **HealthTest-SchanelBaseline**: Basic Schannel hardening: SSL3/TLS1.0 disabled, TLS1.2 enabled (Only for DCs).
+61. **HealthTest-ExploitProtectionBaseline**: Baseline check for key Windows Exploit Protection (system) mitigations.
+62. **HealthTest-KrbtgtAge**: Flags stale krbtgt (pwdLastSet age above threshold) (Only for DCs).
+63. **HealthTest-ServiceAccountsPwdNeverExpires**: Flags service accounts with PasswordNeverExpires.
+64. **HealthTest-LocalAcntRequirePass**: Checks if any local user accounts have PasswordRequired set to False.
+65. **HealthTest-RestrictAnonymous**: Checks anonymous access hardening against modern baselines.
+66. **HealthTest-NonMicrosoftServices**: Reports a warning for any non Microsoft service it finds
+67. **HealthTest-StartupItems**: Scrapes common auto-start locations for rogues.
+68. **HealthTest-InstalledRolesFeatures**: Reviews installed roles/features against policy.
+69. **HealthTest-SoftwareLicensing**: Verifies Windows are Licensed.
+70. **HealthTest-SysvolAclHygiene**: Checks SYSVOL NTFS ACLs do not grant write to broad principals (Only for DCs).
+71. **HealthTest-GpoVersionConsistency**: Validates GPT vs GPC version numbers for GPO consistency (Only for DCs).
+72. **HealthTest-DnsSuffixBaseline**: Verifies key DNS suffix/devolution/registration settings for a small, single-domain AD.
+73. **HealthTest-DnsRecursionConfig**: Validates DNS recursion configuration (enabled/forwarders/EDNS) (Only for DCs).
+74. **HealthTest-DnsZoneReplicationScope**: Validates DNS zone replication scope for AD-integrated zones.
+75. **HealthTest-ReverseZonesPresent**: Confirms reverse lookup zones exist for known subnets (Only for DCs).
+76. **HealthTest-IisBindings**: Sanity-check IIS site bindings for common misconfigurations.
+77. **HealthTest-ShareReasonableness**: Audits SMB shares for broad access and hygiene issues.
+78. **HealthTest-NonDefaultShares**: Checks if there are any non-default file or print shares on this machine.
+79. **HealthTest-Nic**: Flags physical NICs with high error rates (>0.01%) or enabled adapters that are disconnected.
+80. **HealthTest-IPv6Binding**: Verifies IPv6 binding state per policy (PS5.1-safe).
+81. **HealthTest-NetworkInterfaceMetrics**: Checks active interface metrics for sane binding preference (Only for DCs).
+82. **HealthTest-UnusedEnabledAdapters**: Flags enabled NICs that are disconnected (cleanup) (Only for DCs).
+83. **HealthTest-UnsignedDrivers**: Flags unsigned PnP drivers, ignoring common false positives from core system components (Only for DCs).
+84. **HealthTest-IsTPMActivated**: Checks if TPM is activated. (Only for Laptops)
+85. **HealthTest-DefaultLocale**: Checks if the system default locale (ACP/OEMCP) matches expected values.
+86. **HealthTest-DcDnsServerForwarder**: Checks that this domain controller is not using public DNS forwarders.
+87. **HealthTest-DhcpInAd**: Ensures DHCP server presence/authorization sane if role installed (Only for DCs).
+88. **HealthTest-EfsRecoveryAgents**: Checks presence of EFS Data Recovery Agents policy/certs (Only for DCs).
+89. **HealthTest-EventLogMaxSizes**: Ensures event log max sizes meet baseline without reading events (Only for DCs).
+90. **HealthTest-GcPlacement**: Checks GC placement (at least one per site or per-domain policy) (Only for DCs).
+91. **HealthTest-GpWmiFiltersNamespaces**: Validates GP WMI filters use namespaces that exist on this host (Only for DCs).
+92. **HealthTest-HotfixBaseline**: Verifies required hotfix baseline is present (Only for DCs).
+93. **HealthTest-PreWin2000Group**: Reports members of 'Pre-Windows 2000 Compatible Access' (should be empty) (Only for DCs).
+94. **HealthTest-RodcPrp**: Reviews RODC PRP (allow/deny) presence where RODCs exist (Only for DCs).
+95. **HealthTest-DisabledGpoLinksAtDomainRoot**: Detects disabled GPO links at domain root (policy choice) (Only for DCs).
+96. **HealthTest-RecentWindowsScan**: Checks if Windows Defender performed a quick scan recently
+97. **HealthTest-RecycleBinEnabled**: Confirms AD Recycle Bin is enabled.
+98. **HealthTest-SchemaVersionConsistency**: Ensures AD schema objectVersion matches across all DCs.
+99. **HealthTest-TombstoneLifetime**: Checks tombstoneLifetime and links interval sanity.
+100. **HealthTest-TrustsVerify**: Verifies domain trusts and performs netdom /verify.
+101. **HealthTest-WmiRepository**: Verifies WMI repository consistency.
+102. **HealthTest-PagefileSanity**: Checks that a pagefile exists and meets a minimum size.
+103. **HealthTest-RamPressure**: Snapshot test for low free RAM.
+104. **HealthTest-ScheduledTasks**: Checks non-Microsoft scheduled tasks for recent failures or missed execution schedules.
+105. **HealthTest-AdminSDHolderCoverage**: Checks AdminSDHolder applied to protected groups reasonably (Only for DCs).
+106. **HealthTest-UnexpectedListeningPorts**: Flags unexpected listening TCP ports; ignores 49152-65535 and notes optional baseline ports (3389, 47001, 593) (Only for DCs).
+107. **HealthTest-NtfsDirtyBit**: Check NTFS volumes for the "dirty" bit.
