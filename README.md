@@ -6,6 +6,8 @@ Designed as a **lightweight** alternative to heavy monitoring suites, the framew
 
 Installation is extremely easy. Once you spend a few minutes getting familiar with it, you'll rarely need more than two minutes per server. If you have even a little bit of PowerShell fluency, you can easily add your own custom health tests to the mix.
 
+<img width="1247" height="251" alt="Example of the report you receive via email" src="https://github.com/user-attachments/assets/227c03c8-da05-456f-9d4c-ade3eaf80bc6" />
+
 # 0. Prerequisites
 
 **For a single server or workstation:** none if you run this script manualy; a mail server that permits unauthenticated delivery if you wish to receive emails with results/alerts.
