@@ -2806,7 +2806,7 @@ function HealthTest-DcDnsServerForwarder {
   }
 }
 
-
+function HealthTest-TimeSyncPolicy {
 <#
 .SYNOPSIS
 Validates that the host's time sync topology matches AD/NTP best practices.
@@ -2825,7 +2825,6 @@ Log-objects regarding findings.
 .NOTES
 Reads w32tm /query /source and registry VMICTimeProvider; uses Log-pass/Failure/Notice.
 #>
-function HealthTest-TimeSyncPolicy {
     [CmdletBinding()]
     param()
 
@@ -2835,7 +2834,7 @@ function HealthTest-TimeSyncPolicy {
     # Checks if the provided time source matches a known Domain Controller 
     # (from the provided list)
     # or implies the internal AD hierarchy based on the domain suffix.
-    function Is-DCSource([string]$timeSource, [string[]]$dcNameSet, $domainInfo) {
+    function Is-DCSource([string]$timeSource, [string[]]$dcNameSet, [string]$domainName) {
         if (-not $timeSource) { return $false }
         
         $normalizedSource = $timeSource.Trim().ToLowerInvariant()
@@ -2850,8 +2849,8 @@ function HealthTest-TimeSyncPolicy {
             if ($dcNameSet -contains $shortHostName) { return $true }
         }
 
-        if ($domainInfo) {
-            $domainNameLower = $domainInfo.Name.ToLowerInvariant()
+        if ($domainName) {
+            $domainNameLower = $domainName.ToLowerInvariant()
             if ($normalizedSource -like "*.$domainNameLower") { return $true }
         }
         
@@ -2881,8 +2880,6 @@ function HealthTest-TimeSyncPolicy {
         param($DomainName)
         $names = @()
         try {
-            # We query the _ldap SRV record. This is what Windows uses to find DCs.
-            # We filter specifically for Type=SRV to avoid the "Select-Object" error you saw earlier.
             $records = Resolve-DnsName -Name "_ldap._tcp.dc._msdcs.$DomainName" -Type SRV -ErrorAction Stop | 
                         Where-Object { $_.Type -eq 'SRV' }
             
@@ -2902,38 +2899,39 @@ function HealthTest-TimeSyncPolicy {
     }
     
     # --- Step 1: Role Detection ---
-    $domainRole = (Get-CimInstance Win32_ComputerSystem).DomainRole
+    $compSystem = Get-CimInstance Win32_ComputerSystem
+    $domainRole = $compSystem.DomainRole
+    $domainName = $compSystem.Domain
+    
     $isHostDC = ($domainRole -in 4, 5)
     $isHostDomainJoined = ($domainRole -in 1, 3, 4, 5)
     $isHostPDC = $false
-    $domainInfo = $null
     $dcNameSet = @()
     
-    $msg = "Role Detection: DomainJoined=$isHostDomainJoined, IsDC=$isHostDC (Role ID: $domainRole)"
+    $msg = "Role Detection: DomainJoined=$isHostDomainJoined, IsDC=$isHostDC (Role ID: $domainRole), Domain=$domainName"
     Write-Verbose $msg
     $evidences += $msg
 
-    if ($isHostDomainJoined) { 
-        try { 
-            $domainInfo = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain() 
-        }
-        catch {
-            Log-Warning "HealthTest-TimeSyncPolicy: Unable to determine Current Domain: $_"
-        }
-        $dcNameSet = Get-DnsDomainControllers -DomainName $domainInfo.Name
+    if ($isHostDomainJoined -and $domainName) { 
+        $dcNameSet = Get-DnsDomainControllers -DomainName $domainName
         $msg = "Found $($dcNameSet.Count) known DC names: $($dcNameSet -join ', ')"
         Write-Verbose $msg
         $evidences += $msg
         
-        if ($isHostDC -and $domainInfo) {
+        if ($isHostDC) {
             try { 
-                $isHostPDC = (($domainInfo.PdcRoleOwner.Name -replace '[.].*') -eq $env:COMPUTERNAME) 
-                $msg = "PDC Detection: IsPDC=$isHostPDC"
-                Write-Verbose $msg
-                $evidences += $msg
+                $pdcRecord = Resolve-DnsName -Name "_ldap._tcp.pdc._msdcs.$domainName" -Type SRV -ErrorAction Stop | 
+                             Where-Object { $_.Type -eq 'SRV' }
+                
+                if ($pdcRecord.NameTarget) {
+                    $isHostPDC = (($pdcRecord.NameTarget -replace '[.].*') -eq $env:COMPUTERNAME) 
+                    $msg = "PDC Detection: IsPDC=$isHostPDC (PDC Record: $($pdcRecord.NameTarget))"
+                    Write-Verbose $msg
+                    $evidences += $msg
+                }
             }
             catch {
-                Log-Warning "HealthTest-TimeSyncPolicy: Unable to determine PDC Role Owner: $_"
+                Log-Warning "HealthTest-TimeSyncPolicy: Unable to determine PDC Role via DNS SRV record: $_"
             }
         }
     }
@@ -2947,7 +2945,7 @@ function HealthTest-TimeSyncPolicy {
     Write-Verbose $msg
     $evidences += $msg
 
-    # --- Step 3: Current Source (Replacing Get-W32TimeStatus) ---
+    # --- Step 3: Current Source ---
     $currentTimeSource = (w32tm /query /source 2>$null).Trim()
     
     $msg = "Current Time Source: '$currentTimeSource'"
@@ -2969,7 +2967,7 @@ function HealthTest-TimeSyncPolicy {
     # --- Step 5: Only for domain joined except PDC: is source a DC? ---
     $isSourceDC = $null
     if ($isHostDomainJoined -and (-not $isHostPDC)) {
-      $isSourceDC = (Is-DCSource $currentTimeSource $dcNameSet $domainInfo)
+      $isSourceDC = (Is-DCSource $currentTimeSource $dcNameSet $domainName)
       if ($isSourceDC) {
         $msg = "$currentTimeSource is a known DC"
       } else {
