@@ -4709,10 +4709,13 @@ function HealthTest-DnsZoneReplicationScope{
 
 <#
 .SYNOPSIS
-Confirms required SRV records exist in _msdcs.
+Confirms some important SRV records exist:
+_ldap._tcp.dc._msdcs.<domain> = where are the Domain Controllers (LDAP over TCP)?
+_kerberos._tcp.<domain> = where are Kerberos KDCs over TCP?
+_kerberos._udp.<domain> = where are Kerberos KDCs over UDP?
 #>
 function HealthTest-RequiredSrvRecords{
-  $dom=(Get-ADDomain).DNSRoot
+  $dom=(Get-CimInstance Win32_ComputerSystem).Domain
   $labels=@("_ldap._tcp.dc._msdcs.$dom","_kerberos._tcp.$dom","_kerberos._udp.$dom")
   $missing=$false
   foreach($q in $labels){
@@ -5787,45 +5790,53 @@ function HealthTest-NetworkInterfaceMetrics{
 
 <#
 .SYNOPSIS
-Detects disabled GPO links at domain root (policy choice). OnlyForDomainServers
+Detects disabled GPO links at domain root (policy choice). OnlyForDCs
 #>
 function HealthTest-DisabledGpoLinksAtDomainRoot{
-  # Preconditions
   if(-not (Get-Command Get-GPO -ErrorAction SilentlyContinue)){
     Log-Warning "GroupPolicy cmdlets not available; install RSAT/GPMC (GroupPolicy module)."
     return
   }
 
-  # Resolve domain DN even if AD module is missing
-  $root = $null
+  $root=$null
   if(Get-Command Get-ADDomain -ErrorAction SilentlyContinue){
-    try{ $root = (Get-ADDomain).DistinguishedName }catch{}
+    try{ $root=(Get-ADDomain).DistinguishedName }catch{}
   }
   if(-not $root){
     try{
-      $dns  = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain().Name
-      $root = ($dns -split '\.') | ForEach-Object { "DC=$_" } -join ','
+      $dns=(Get-CimInstance Win32_ComputerSystem).Domain
+      if(-not $dns -or $dns -eq 'WORKGROUP'){ throw "Not on a domain" }
+      $root=($dns -split '\.')|ForEach-Object{"DC=$_"} -join ','
     }catch{
       Log-Warning "Cannot resolve domain root DN (need AD or machine joined to a domain)."
       return
     }
   }
 
-  # Collect links at domain root by parsing GPO reports (no Get-GPLink dependency)
-  $links = foreach($g in (Get-GPO -All -ErrorAction Stop)){
+  $parseFailures=0
+  $links=@()
+  foreach($g in (Get-GPO -All -ErrorAction Stop)){
     try{
-      $xml = [xml](Get-GPOReport -Guid $g.Id -ReportType Xml -ErrorAction Stop)
+      $xml=[xml](Get-GPOReport -Guid $g.Id -ReportType Xml -ErrorAction Stop)
       foreach($lnk in @($xml.GPO.LinksTo.LinkTo)){
         if($lnk.SOMPath -eq $root){
-          [pscustomobject]@{
-            DisplayName = $xml.GPO.Name
-            Enabled     = if($lnk.Enabled    -eq 'true'){ 1 } else { 0 }
-            Enforced    = if($lnk.NoOverride -eq 'true'){ 1 } else { 0 }
-            Order       = [int]$lnk.Order
+          $links += [pscustomobject]@{
+            DisplayName=$xml.GPO.Name
+            Enabled= if($lnk.Enabled -eq 'true'){1}else{0}
+            Enforced=if($lnk.NoOverride -eq 'true'){1}else{0}
+            Order=[int]$lnk.Order
           }
         }
       }
-    }catch{}
+    }catch{
+      $parseFailures++
+      $msg=($_.Exception.Message -replace '\s+',' ').Trim()
+      Log-Warning "Failed to parse GPO report; skipping GPO: $($g.DisplayName) ($($g.Id)) - $msg"
+    }
+  }
+
+  if($parseFailures -gt 0){
+    Log-Warning "One or more GPO reports could not be read/parsed ($parseFailures). Results may be incomplete."
   }
 
   if(-not $links){
@@ -5833,10 +5844,10 @@ function HealthTest-DisabledGpoLinksAtDomainRoot{
     return
   }
 
-  $flagged = $false
+  $flagged=$false
   foreach($l in $links){
-    if($l.Enabled  -eq 0){ $flagged = $true; Log-Warning "Domain-root GPO link is disabled: $($l.DisplayName)" }
-    if($l.Enforced -eq 0){ $flagged = $true; Log-Warning "Domain-root GPO link is not enforced: $($l.DisplayName)" }
+    if($l.Enabled -eq 0){ $flagged=$true; Log-Warning "Domain-root GPO link is disabled: $($l.DisplayName)" }
+    if($l.Enforced -eq 0){ $flagged=$true; Log-Warning "Domain-root GPO link is not enforced: $($l.DisplayName)" }
   }
 
   if(-not $flagged){ Log-pass "All domain-root GPO links are enabled (and enforced per policy)" }
@@ -5995,7 +6006,7 @@ Validates GPT vs GPC version numbers for GPO consistency. OnlyForDomainServers
 #>
 function HealthTest-GpoVersionConsistency{
 
-    $dom=(Get-ADDomain).DNSRoot
+    $dom=(Get-CimInstance Win32_ComputerSystem).Domain
     $base="\\$dom\SYSVOL\$dom\Policies"
     $bad=$false
     foreach($g in Get-GPO -All){
@@ -6018,7 +6029,7 @@ Compares SYSVOL policy tree manifest across DCs (count+hash). OnlyForDCs
 Stresses Network: SMB directory tree walks to each DC's SYSVOL\Policies across sites.
 #>
 function HealthTest-SysvolContentConsistency{
-    $dom=(Get-ADDomain).DNSRoot
+    $dom=(Get-CimInstance Win32_ComputerSystem).Domain
     $dcs=Get-ADDomainController -Filter * | Select-Object -ExpandProperty HostName
 
     $sigs = foreach($dc in $dcs){

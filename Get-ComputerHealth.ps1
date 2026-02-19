@@ -698,6 +698,7 @@ Invoke-HealthTest "HealthTest-Nic"
 Invoke-HealthTest "HealthTest-EventLogMaxSizes"
 Invoke-HealthTest "HealthTest-HotfixBaseline"
 Invoke-HealthTest "HealthTest-RdpHardening"
+Invoke-HealthTest "HealthTest-RequiredSrvRecords"
 # Invoke-HealthTest "HealthTest-ExploitProtectionBaseline"
 
 if (-not $isHostVM) {
@@ -762,10 +763,10 @@ if ($isHostDC) {
     Invoke-HealthTest "HealthTest-LdapSigningChannelBinding"
     Invoke-HealthTest "HealthTest-UnusedEnabledAdapters"
     Invoke-HealthTest "HealthTest-NetworkInterfaceMetrics"
+    Invoke-HealthTest "HealthTest-DisabledGpoLinksAtDomainRoot"
 
     # TODO: some of these below are maybe for all member servers
     Invoke-HealthTest "HealthTest-SchanelBaseline"
-    Invoke-HealthTest "HealthTest-DisabledGpoLinksAtDomainRoot"
     Invoke-HealthTest "HealthTest-EfsRecoveryAgents"
     Invoke-HealthTest "HealthTest-GpWmiFiltersNamespaces"
     #---END TODO---------------------
@@ -777,7 +778,6 @@ if ($isHostDC) {
     Invoke-HealthTest "HealthTest-RecycleBinEnabled"
     Invoke-HealthTest "HealthTest-TrustsVerify"
     Invoke-HealthTest "HealthTest-ReplicationLatency"
-    Invoke-HealthTest "HealthTest-RequiredSrvRecords"
     Invoke-HealthTest "HealthTest-UnconstrainedDelegationAccounts"
     Invoke-HealthTest "HealthTest-DuplicateSpn"
     Invoke-HealthTest "HealthTest-ServiceAccountsPwdNeverExpires"
