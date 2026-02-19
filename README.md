@@ -8,10 +8,12 @@ Installation is extremely easy. Once you spend a few minutes getting familiar wi
 
 # 0. Prerequisites
 
-**For a single server or workstation:** A mail server that permits unauthenticated delivery (this is only to allow you to receive emails with results/alerts; you can always run the script manually).
+**For a single server or workstation:** none if you run this script manualy; a mail server that permits unauthenticated delivery if you wish to receive emails with results/alerts.
 
-**For a domain:** 1. The ability to administer servers via PowerShell Remoting (`Enter-PSSession`/`Invoke-Command`).
+**For a small to medium domain (a few dozen servers, all DCs connected via LAN):** 1. The ability to administer servers via PowerShell Remoting (`Enter-PSSession`/`Invoke-Command`).
 2. A mail server that permits unauthenticated delivery.
+
+**For a large domain (more than a few dozen servers, some DCs via WAN):** I wouldn't use my code for this scenario. I haven't tested it and I worry about some of the DC related tests causing excesive WAN traffic.
 
 # 1. Architecture Overview
 
