@@ -1,4 +1,4 @@
-# GetComputerHealth
+# Get-ComputerHealth
 
 Stop wondering if your disks have free space, if Windows is up to date, if critical services are running, or if your DCs are replicating. This extensible, **open-source** toolkit automates over a hundred daily health checks you know you should be doing but don't have time for. It’s a **free**, set-and-forget health monitor that gives you **near enterprise-grade visibility** without the usual complexity, overhead, or cost.
 
