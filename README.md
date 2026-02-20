@@ -71,6 +71,7 @@ These are the scripts you actually execute.
 * **Role:** The "Easy Button" wrapper for testing all domain servers.
 * **Function:** By default, it scans all computers running a Windows Server OS, but you are encouraged to edit it to add extra hosts or exclude others.
 * **Usage:** Run this manually or schedule it to run daily (e.g., via the SYSTEM account) to check the entire domain.
+* **Note:** You need to create this script yourself. It's just one command and you'll find an example below.
 
 
 ### `Invoke-GetComputerHealth.ps1` (for one computer) 
@@ -167,7 +168,7 @@ New-ScheduledTaskForPSScript -ScriptPath "C:\IT\bin\Invoke-GetComputerHealth.ps1
 
 ## Installaiton plus automatic daily monitoring of multiple Domain joined computers
 
-Follow the instructions for monitoring of one computer. If all goes well create a script `C:\IT\bin\Invoke-GetHealthDomainComputers.ps1` and change the scheduled task to execute it instead of `C:\IT\bin\Invoke-GetComputerHealth.ps1`. Here's an example. Change or remove workstation1,2 and server1,2:
+Follow the instructions for monitoring of one computer. If all goes well create a script `C:\IT\bin\Invoke-GetHealthDomainComputers.ps1` and change the scheduled task to execute that instead of `C:\IT\bin\Invoke-GetComputerHealth.ps1`. Here's an example. Change or remove workstation1,2 and server1,2:
 ```powershell
 # Executes Invoke-GetComputerHealth.ps1 with proper arguments to select all domain joined servers
 param([string]$Hide="DIP",[string]$OnlyTheseTests,[switch]$DebugSkipSlowTests,[switch]$NoSendMessage)
