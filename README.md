@@ -115,11 +115,23 @@ These scripts run locally on the servers being checked.
 
 # 3. Admin Guide: Installation
 
+## Installation plus a quick run
+```powershell
+# Create C:\IT\bin and download installer/updater script
+if (-not (Test-Path "C:\IT\bin")) { New-Item -Path "C:\IT\bin" -ItemType Directory -Force }
+Invoke-WebRequest -useb "https://raw.githubusercontent.com/ndemou/GetComputerHealth/refs/heads/main/Update-GetHealthCode.ps1" -OutFile "C:\IT\bin\Update-GetHealthCode.ps1"
+
+# Download all other scripts & install required modules
+C:\IT\bin\Update-GetHealthCode.ps1 
+
+# Perform your first health test manually
+C:\IT\bin\Invoke-GetComputerHealth.ps1
+```
+## Installation plus automatic daily monitoring of one computer
 Replace the *PLACEHOLDERS* at the top with your actual configuration, then run:
 
 ```powershell
 #--------- CHANGE THIS PART ---------
-$mailServer="SMTP_SERVER.CONTOSO.COM"
 $mailServer="SMTP_SERVER.CONTOSO.COM"
 $fromAddress="SENDER@CONTOSO.COM"
 $toAddress="RECIPIENT@CONTOSO.COM"
@@ -147,15 +159,25 @@ C:\IT\bin\Send-Message.ps1 -Subject "First test from $($env:COMPUTERNAME)" -Conf
 # Perform your first health test manually
 C:\IT\bin\Invoke-GetComputerHealth.ps1
 
-# Schedule the check to run automatically every day
+# Schedule automatic execution of daily health tests
 . C:\IT\bin\helpers-processes.ps1 # Imports the New-ScheduledTaskForPSScript command
 New-ScheduledTaskForPSScript -ScriptPath "C:\IT\bin\Invoke-GetComputerHealth.ps1" -ScheduleType Daily -Time 07:12
 
 ```
 
+## Installaiton plus automatic daily monitoring of multiple Domain joined computers
+
+Follow the instructions for monitoring of one computer. If all goes well create a script `C:\IT\bin\Invoke-GetHealthDomainComputers.ps1` and change the scheduled task to execute it instead of `C:\IT\bin\Invoke-GetComputerHealth.ps1`. Here's an example. Change or remove workstation1,2 and server1,2:
+```powershell
+# Executes Invoke-GetComputerHealth.ps1 with proper arguments to select all domain joined servers
+param([string]$Hide="DIP",[string]$OnlyTheseTests,[switch]$DebugSkipSlowTests,[switch]$NoSendMessage)
+
+& c:\it\bin\Invoke-GetComputerHealth.ps1 -Computers "ALL_DOMAIN_SERVERS,workstation1,workstation2" -ExcludeServers "server1,server2" -Hide:$Hide -OnlyTheseTests $OnlyTheseTests -DebugSkipSlowTests:$DebugSkipSlowTests -NoSendMessage:$NoSendMessage
+```
+ 
 # 4. Admin Guide: Common Tasks
 
-## How to Run a Health Check for one computer
+## How to manualy perform a Health Check for one computer
 
 Open PowerShell as Administrator and run:
 
@@ -171,11 +193,8 @@ C:\IT\bin\Invoke-GetComputerHealth.ps1
 Open PowerShell as Administrator and run:
 
 ```powershell
-C:\IT\bin\Invoke-GetHealthDomainComputers.ps1
-
+& c:\it\bin\Invoke-GetComputerHealth.ps1 -Computers "ALL_DOMAIN_SERVERS,workstation1,workstation2" -ExcludeServers "server1,server2"
 ```
-
-* **Tip:** Edit the script to add non-Server OS computers or to exclude specific servers.
 
 ## How to Suppress a False Positive (Whitelisting)
 
@@ -207,12 +226,12 @@ You do not need to modify the core library.
 
 1. Create the folder `C:\IT\config\Custom-HealthTests\` on the target.
 2. Create a `.ps1` file with a nice name and this line near the top:
-   ```
+   ```powershell
    if(Get-Command Log-Pass -CommandType Function -ErrorAction SilentlyContinue){. C:\it\bin\lib-write-log-objects.ps1}
    ```
    (It's not required, but it helps with debuging by allowing you to run the code manualy)
 3. Add at least one functions named like `CustomHealthTest-...` and inside it use `Log-Pass`, `Log-Notice`, `Log-Warning`, or `Log-Failure` to report your result(s). Example:
-   ```
+   ```powershell
    function CustomHealthTest-VeeamBackupsOk() {
      if ($condition) {
        Log-Pass "Veeam backups appear OK"
