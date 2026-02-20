@@ -1,25 +1,27 @@
 # Get-ComputerHealth
 
-Stop wondering if your disks have free space, if Windows is up to date, if critical services are running, or if your DCs are replicating. This extensible, **open-source** toolkit automates over a hundred daily health checks you know you should be doing but don't have time for. It’s a **free**, set-and-forget health monitor that gives you **near enterprise-grade visibility** without the usual complexity, overhead, or cost.
+Stop wondering whether your disks have free space, whether Windows is up to date, whether critical services are running, or whether your DCs are replicating. This extensible, **open-source** toolkit automates over a hundred daily health checks you know you should be doing but don’t have time for. It’s a **free**, set-and-forget health monitor that gives you **near enterprise-grade visibility** without the usual complexity, overhead, or cost.
 
-Designed as a **lightweight** alternative to heavy monitoring suites, the framework uses native PowerShell Remoting to perform deep analysis on your infrastructure without installing a single agent. It’s perfect for a single workstation or server, but also works great for domains with a few dozen servers that you already manage via PowerShell (`Enter-PSSession`/`Invoke-Command`). It generates clean terminal output, concise Excel reports, and actionable email alerts that highlight risks before they become disasters.
+Designed as a **lightweight** alternative to heavy monitoring suites, the framework uses native PowerShell Remoting to perform deep analysis of your infrastructure without installing a single agent. It’s perfect for a single workstation or server, but it also works great for domains with a few dozen servers that you already manage via PowerShell (`Enter-PSSession`/`Invoke-Command`). It generates clean terminal output, concise Excel reports, and actionable email alerts that highlight risks before they become disasters.
 
-Installation is extremely easy. Once you spend a few minutes getting familiar with it, you'll rarely need more than two minutes per server. If you have even a little bit of PowerShell fluency, you can easily add your own custom health tests to the mix.
+Installation is extremely easy. Once you spend a few minutes getting familiar with it, you’ll rarely need more than two minutes per server. If you have even a little PowerShell fluency, you can easily add your own custom health tests.
 
 <img width="1086" height="251" alt="Example of the report you receive via email" src="https://github.com/user-attachments/assets/9da7e7f7-c1ef-4f3e-9d47-d164a96b2d4f" />
 
 # 0. Prerequisites
 
-**For a single server or workstation:** none if you run this script manualy; a mail server that permits unauthenticated delivery if you wish to receive emails with results/alerts.
+**For a single server or workstation:** None if you run this script manually; a mail server that permits unauthenticated delivery if you wish to receive emails with results or alerts.
 
-**For a small to medium domain (a few dozen servers, all DCs connected via LAN):** 1. The ability to administer servers via PowerShell Remoting (`Enter-PSSession`/`Invoke-Command`).
+**For a small to medium domain (a few dozen servers, all DCs connected via LAN):**
+
+1. The ability to administer servers via PowerShell Remoting (`Enter-PSSession`/`Invoke-Command`).
 2. A mail server that permits unauthenticated delivery.
 
-**For a large domain (more than a few dozen servers, some DCs via WAN):** I wouldn't use my code for this scenario. I haven't tested it and I worry about some of the DC related tests causing excesive WAN traffic.
+**For a large domain (more than a few dozen servers, some DCs connected via WAN):** I would not use this code for that scenario. I have not tested it, and I am concerned about some of the DC-related tests causing excessive WAN traffic.
 
 # 1. Architecture Overview
 
-The toolkit operates on a **Controller-Agent** model (though agentless via PowerShell Remoting). You run the orchestration script on your management machine (the Controller), which executes tests on your servers/workstations (the Targets), then aggregates the results into Excel reports and emails them.
+The toolkit operates on a **Controller–Agent** model (though agentless via PowerShell Remoting). You run the orchestration script on your management machine (the Controller), which executes tests on your servers/workstations (the Targets), then aggregates the results into Excel reports and emails them.
 
 ## Relationship Diagram
 
@@ -63,50 +65,49 @@ flowchart BT
 
 This section explains the role of each file in your `C:\IT\bin` directory.
 
-## A. The Orchestrators (Run these)
+## A. The Orchestrators (Run These)
 
 These are the scripts you actually execute.
 
-### `Invoke-GetHealthDomainComputers.ps1` (for multiple computers; e.g. all domain Servers) 
-* **Role:** The "Easy Button" wrapper for testing all domain servers.
+### `Invoke-GetHealthDomainComputers.ps1` (for multiple computers; e.g., all domain servers)
+
+* **Role:** The “Easy Button” wrapper for testing all domain servers.
 * **Function:** By default, it scans all computers running a Windows Server OS, but you are encouraged to edit it to add extra hosts or exclude others.
 * **Usage:** Run this manually or schedule it to run daily (e.g., via the SYSTEM account) to check the entire domain.
-* **Note:** You need to create this script yourself. It's just one command and you'll find an example below.
+* **Note:** You need to create this script yourself. It’s just one command, and you’ll find an example below.
 
+### `Invoke-GetComputerHealth.ps1` (for one computer)
 
-### `Invoke-GetComputerHealth.ps1` (for one computer) 
 * **Role:** The Engine/Orchestrator. It tests the local host by default or the computers you specify.
-* **Function:** It manages the workflow:
-1. Connects to the local host or one or more remote computers.
-2. Triggers the self-update on the remote target.
-3. Runs the health checks remotely.
-4. Collects output, saves it in Excel format (`C:\IT\temp\`), and emails "Notable" (non-success) messages.
 
+* **Function:** It manages the workflow:
+
+  1. Connects to the local host or one or more remote computers.
+  2. Triggers the self-update on the remote target.
+  3. Runs the health checks remotely.
+  4. Collects output, saves it in Excel format (`C:\IT\temp\`), and emails “Notable” (non-success) messages.
 
 * **Key Parameters:** `-Computers` (list of targets), `-ExcludeServers`, `-Hide` (filters output levels).
-
-
 
 ## B. The Worker (Runs on Targets)
 
 These scripts run locally on the servers being checked.
 
 * **`Get-ComputerHealth.ps1`**
-* **Role:** The Local Runner.
-* **Function:** It loads the test library and executes the tests. It handles the logic for **Whitelisting** (suppressing known failures) and generates clean, colorized console output.
-* **Usage:** Can be run interactively on a specific server for troubleshooting (e.g., `.\Get-ComputerHealth.ps1 -OutputConsoleMessages`).
 
+  * **Role:** The Local Runner.
+  * **Function:** It loads the test library and executes the tests. It handles the logic for **whitelisting** (suppressing known failures) and generates clean, colorized console output.
+  * **Usage:** Can be run interactively on a specific server for troubleshooting (e.g., `.\Get-ComputerHealth.ps1 -OutputConsoleMessages`).
 
 * **`lib-health-tests.ps1`**
-* **Role:** The Logic Library.
-* **Function:** Contains the actual code for checks like `HealthTest-DiskSpace` and `HealthTest-TimeSyncPolicy`. It is a library and does not run on its own; it is loaded by the Runner.
 
+  * **Role:** The Logic Library.
+  * **Function:** Contains the actual code for checks like `HealthTest-DiskSpace` and `HealthTest-TimeSyncPolicy`. It is a library and does not run on its own; it is loaded by the Runner.
 
 * **`Update-GetHealthCode.ps1`**
-* **Role:** The Updater.
-* **Function:** Ensures the local `C:\IT\bin` folder has the latest version of all scripts by downloading them from a central repository. It runs automatically before tests begin.
 
-
+  * **Role:** The Updater.
+  * **Function:** Ensures the local `C:\IT\bin` folder has the latest version of all scripts by downloading them from a central repository. It runs automatically before tests begin.
 
 ## C. Utilities
 
@@ -116,7 +117,18 @@ These scripts run locally on the servers being checked.
 
 # 3. Admin Guide: Installation
 
-## Installation plus a quick run
+## OPTION 1: Installation Plus a Quick Run
+
+* **Note:** Installation and execution need to populate these folders with files — make sure this does not interfere with anything else:
+
+  * C:\IT\bin
+  * C:\IT\config
+  * C:\IT\log
+  * C:\IT\temp
+* **Security Note:** Each time you run `Invoke-GetComputerHealth`, it will call `Update-GetHealthCode.ps1` and fetch code from this repository.
+
+Run these commands from an elevated PowerShell terminal:
+
 ```powershell
 # Create C:\IT\bin and download installer/updater script
 if (-not (Test-Path "C:\IT\bin")) { New-Item -Path "C:\IT\bin" -ItemType Directory -Force }
@@ -128,8 +140,20 @@ C:\IT\bin\Update-GetHealthCode.ps1
 # Perform your first health test manually
 C:\IT\bin\Invoke-GetComputerHealth.ps1
 ```
-## Installation plus automatic daily monitoring of one computer
-Replace the *PLACEHOLDERS* at the top with your actual configuration, then run:
+
+## OPTION 2: Installation Plus Automatic Daily Monitoring of One Computer
+
+* **Note:** Installation and execution need to populate these folders with files — make sure this does not interfere with anything else:
+
+  * C:\IT\bin
+  * C:\IT\config
+  * C:\IT\log
+  * C:\IT\temp
+* **Security Note:** Each time you run `Invoke-GetComputerHealth`, it will call `Update-GetHealthCode.ps1` and fetch code from this repository.
+
+1. Copy the commands below into Notepad.
+2. Replace the *PLACEHOLDERS* at the top with your actual configuration.
+3. Run all commands from an elevated PowerShell terminal.
 
 ```powershell
 #--------- CHANGE THIS PART ---------
@@ -163,31 +187,32 @@ C:\IT\bin\Invoke-GetComputerHealth.ps1
 # Schedule automatic execution of daily health tests
 . C:\IT\bin\helpers-processes.ps1 # Imports the New-ScheduledTaskForPSScript command
 New-ScheduledTaskForPSScript -ScriptPath "C:\IT\bin\Invoke-GetComputerHealth.ps1" -ScheduleType Daily -Time 07:12
-
 ```
 
-## Installaiton plus automatic daily monitoring of multiple Domain joined computers
+## OPTION 3: Installation Plus Automatic Daily Monitoring of Multiple Domain-Joined Computers
 
-Follow the instructions for monitoring of one computer. If all goes well create a script `C:\IT\bin\Invoke-GetHealthDomainComputers.ps1` and change the scheduled task to execute that instead of `C:\IT\bin\Invoke-GetComputerHealth.ps1`. Here's an example. Change or remove workstation1,2 and server1,2:
+Follow the instructions for monitoring one computer. If everything works well, create a script `C:\IT\bin\Invoke-GetHealthDomainComputers.ps1` and change the scheduled task to execute that instead of `C:\IT\bin\Invoke-GetComputerHealth.ps1`. Here is an example. Change or remove workstation1, workstation2, and server1, server2:
+
 ```powershell
 # Executes Invoke-GetComputerHealth.ps1 with proper arguments to select all domain joined servers
 param([string]$Hide="DIP",[string]$OnlyTheseTests,[switch]$DebugSkipSlowTests,[switch]$NoSendMessage)
 
 & c:\it\bin\Invoke-GetComputerHealth.ps1 -Computers "ALL_DOMAIN_SERVERS,workstation1,workstation2" -ExcludeServers "server1,server2" -Hide:$Hide -OnlyTheseTests $OnlyTheseTests -DebugSkipSlowTests:$DebugSkipSlowTests -NoSendMessage:$NoSendMessage
 ```
- 
+
+---
+
 # 4. Admin Guide: Common Tasks
 
-## How to manualy perform a Health Check for one computer
+## How to Manually Perform a Health Check for One Computer
 
 Open PowerShell as Administrator and run:
 
 ```powershell
 C:\IT\bin\Invoke-GetComputerHealth.ps1
-
 ```
 
-* **Result:** This scans the local machine, saves an Excel report to `C:\IT\temp\`, and emails you any "Notable" issues (Notices/Warnings/Failures).
+* **Result:** This scans the local machine, saves an Excel report to `C:\IT\temp\`, and emails you any “Notable” issues (Notices/Warnings/Failures).
 
 ## How to Run a Full Domain Health Check
 
@@ -202,9 +227,9 @@ Open PowerShell as Administrator and run:
 By default, the health tests will flag any deviation from a pristine Windows installation (e.g., a custom service, an extra member in the Administrators group, or an additional listening TCP port). If this is expected, you should whitelist it.
 
 1. **Identify the whitelisting command:** Open the generated Excel report. Every message includes a column containing the exact command needed to whitelist that entry.
-2. **Apply Whitelist:** Run that command on the **target machine** (or via a remote shell).
+2. **Apply the whitelist:** Run that command on the **target machine** (or via a remote shell).
 
-* **Under the hood:** This adds the unique signature to `C:\IT\config\Get-ComputerHealth.sigs-to-suppress.txt`. Future runs will mark this specific issue as "Suppressed" and will not consider it "Notable."
+* **Under the hood:** This adds the unique signature to `C:\IT\config\Get-ComputerHealth.sigs-to-suppress.txt`. Future runs will mark this specific issue as “Suppressed” and will not consider it “Notable.”
 
 ## How to Check a Single Server Interactively
 
@@ -212,7 +237,6 @@ To debug a specific server locally:
 
 ```powershell
 C:\IT\bin\Get-ComputerHealth.ps1 -OutputConsoleMessages -OutputObjects -Hide DIP
-
 ```
 
 * **Tip:** `-Hide DIP` hides **D**ebug, **I**nfo, and **P**ass messages, showing only Notices, Warnings, and Failures.
@@ -221,17 +245,20 @@ C:\IT\bin\Get-ComputerHealth.ps1 -OutputConsoleMessages -OutputObjects -Hide DIP
 
 You do not need to modify the core library.
 
-**TLDR**: `.ps1` files in `C:\IT\config\Custom-HealthTests\` are dot-sourced and all functions named like `CustomHealthTest-...` are executed.
+**TL;DR:** `.ps1` files in `C:\IT\config\Custom-HealthTests\` are dot-sourced, and all functions named like `CustomHealthTest-...` are executed.
 
-**CAUTION: Any code you write will be executed with high priviledges**.
+**CAUTION: Any code you write will be executed with high privileges.**
 
 1. Create the folder `C:\IT\config\Custom-HealthTests\` on the target.
-2. Create a `.ps1` file with a nice name and this line near the top:
+2. Create a `.ps1` file with a descriptive name and include this line near the top:
+
    ```powershell
    if(Get-Command Log-Pass -CommandType Function -ErrorAction SilentlyContinue){. C:\it\bin\lib-write-log-objects.ps1}
    ```
-   (It's not required, but it helps with debuging by allowing you to run the code manualy)
-3. Add at least one functions named like `CustomHealthTest-...` and inside it use `Log-Pass`, `Log-Notice`, `Log-Warning`, or `Log-Failure` to report your result(s). Example:
+
+   (This is not required, but it helps with debugging by allowing you to run the code manually.)
+3. Add at least one function named like `CustomHealthTest-...` and inside it use `Log-Pass`, `Log-Notice`, `Log-Warning`, or `Log-Failure` to report your results. Example:
+
    ```powershell
    function CustomHealthTest-VeeamBackupsOk() {
      if ($condition) {
@@ -242,11 +269,11 @@ You do not need to modify the core library.
    }
    ```
 
- * **Note:** Avoid including any variables in the message text. You can use the `-Comment` parameter for these. *(Rationale: If even one character of a whitelisted message changes, the code will consider it a different issue and will not suppress it.)*
-    * **Good:** `Log-Failure "No recent full backup" -comment "Last full backup was at $dateOfLastFullBackup"`
-    * **Bad:** `Log-Failure "Last full backup $days days ago"`
- * **Note:** Avoid writting any code except functions. Any code you write will be executed by Get-ComputerHalth.
+* **Note:** Avoid including variables in the message text. You can use the `-Comment` parameter instead. *(Rationale: If even one character of a whitelisted message changes, the code will treat it as a different issue and will not suppress it.)*
 
+  * **Good:** `Log-Failure "No recent full backup" -comment "Last full backup was at $dateOfLastFullBackup"`
+  * **Bad:** `Log-Failure "Last full backup $days days ago"`
+* **Note:** Avoid writing any code outside of functions. Any code you write will be executed by Get-ComputerHealth.
 
 ---
 
