@@ -64,7 +64,7 @@ Default: empty (show all). Typical value: `DIP`
 (Parameter set: AddWhitelist) Appends a suppression entry for a specific signature to the suppression file and exits (does not run health tests).
 
 .PARAMETER ComputerName
-(Parameter set: AddWhitelist; Mandatory) Target computer name for the suppression entry. Must match the current host's `$env:COMPUTERNAME`.
+(Parameter set: AddWhitelist; Mandatory) Target computer name for the suppression entry. Must match the current computer `$env:COMPUTERNAME`.
 
 .PARAMETER Signature
 (Parameter set: AddWhitelist; Mandatory) 8-hex signature to suppress (case-insensitive). Alias: `-Sig`.
@@ -96,7 +96,7 @@ $out | Out-GridView
 .\Get-ComputerHealth.ps1 -OutputConsoleMessages -WhitelistSigs 1a2b3c4d,deadbeef
 
 .EXAMPLE
-# Permanently suppress a known-expected signature on this host (optionally with expiry):
+# Permanently suppress a known-expected signature on this computer (optionally with expiry):
 .\Get-ComputerHealth.ps1 -AddWhitelisting -ComputerName CONTOSO-SRV01 -Signature 1a2b3c4d -Comment "Known baseline deviation" -Until 2026-12-31
 
 .NOTES
@@ -246,7 +246,7 @@ function Add-AsciiLine {
 }
 
 function Test-IsVirtualMachine {
-# returns $true if it guesses the host is VM
+# returns $true if it guesses the computer is VM
     [CmdletBinding()]
     param()
 
@@ -286,7 +286,7 @@ function Test-IsVirtualMachine {
 }
 
 function Test-IsLaptopOrMobile {
-# returns $true if it guesses the host is laptop/mobile
+# returns $true if it guesses the computer is laptop/mobile
 
     $cs  = Get-CimInstance Win32_ComputerSystem     -ErrorAction SilentlyContinue
     $enc = Get-CimInstance Win32_SystemEnclosure    -ErrorAction SilentlyContinue
@@ -360,13 +360,13 @@ FunctionName, Time, ElapsedMilliseconds, Output, Success, Error, Category, Reaso
     $ErrorActionPreference = 'Stop'
 
     if ($PSBoundParameters.ContainsKey('Argument')) {
-      # write-host -for yellow '$result = & $target $Argument'
+      # write-verbose '$result = & $target $Argument'
       $result = & $target $Argument
     } else {
-      # write-host -for yellow '$result = & $target'
+      # write-verbose '$result = & $target'
       $result = & $target
     }
-    # write-host -for yellow "`$result = $result"
+    # write-verbose "`$result = $result"
     $result | %{
         if($_ -and $_.PSObject.Properties['Hash'] -and $_.PSObject.Properties['Message'] -ne $null -and $_.PSObject.Properties['level']){
             $cntProperRecord += 1
@@ -557,7 +557,7 @@ if ($AddWhitelisting ){
         throw "Invalid -Signature: $Signature"
     }
     if ($ComputerName -ne $env:COMPUTERNAME) {
-        throw "This is host $($env:COMPUTERNAME) but suppression is for $ComputerName"
+        throw "Running on $($env:COMPUTERNAME) but suppression is for $ComputerName"
     }
     if ($Until) {
         $dt=[datetime]::MinValue
@@ -596,7 +596,7 @@ Initialize-LogSystem `
 #+-----------------------------------------------------------
 
 Log-info "$((Split-Path $PSCommandPath -Leaf) -replace '.ps1'), ver.$VERSION, Nick Demou, enLogic"
-Log-info "$(Get-Date -format yyyy-MM-dd` HH:mm:ss), Host: $($env:COMPUTERNAME), S/N: $((Get-CimInstance win32_bios).serialnumber)"
+Log-info "$(Get-Date -format yyyy-MM-dd` HH:mm:ss), Computer: $($env:COMPUTERNAME), S/N: $((Get-CimInstance win32_bios).serialnumber)"
 Log-Debug "-Hide '$Hide'"
 [array]$ExcludeTests=$ExcludeTests | %{ $_ -split '[,\s]+'} | %{$_.trim()} | ?{ $_ } | sort -uniq
 Log-Debug "-ExcludeTests (semicolon separated): $($ExcludeTests -join ';')"
@@ -660,7 +660,7 @@ if ($isHostMobile) {
 #=============================================================================
 
 #--------------------------------------------------------
-# For any host (Generic)
+# For any computer (Generic)
 Invoke-HealthTest "HealthTest-PendingReboot"
 Invoke-HealthTest "HealthTest-MalwareProtectionFeatures"
 Invoke-HealthTest "HealthTest-DefaultLocale"

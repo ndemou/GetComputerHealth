@@ -2,7 +2,7 @@
 Helper functions that create, return, and optionally display structured Log Objects.
 
 Messages are emitted (Write-Output) as PSCustomObjects with the following properties:
-  Host       : string   # Computer name that generated the message
+  Computer   : string   # Computer name that generated the message
   Level      : string   # debug, info, pass, notice, warning, failure
   Message    : string   # Primary human-readable message
   Hash       : string   # 8-character message signature (MD5 prefix); empty for debug
@@ -397,13 +397,24 @@ function Log-Msg {
     $must_suppress_sig = $sig -in $script:cfgSuppressedSignatures
   }
 
+  # The name of the HealthTest function that emitted this log object
+  # (look up the call stack to find a function named HealthTest-* that called us)
+  $logEmitter = $null
+  foreach ($frame in (Get-PSCallStack | Select-Object -Skip 1 -First 5)) {
+      if ($frame.FunctionName -like 'HealthTest-*') {
+          $logEmitter = $frame.FunctionName
+          break
+      }
+  }
+
   $out = [pscustomobject]@{
-    Host       = $env:COMPUTERNAME
+    Computer   = $env:COMPUTERNAME
     Level      = $Level
     Hash       = $sig
     Suppressed = $must_suppress_sig
     Message    = $Msg
     Comment    = $Comment
+    Emitter    = $logEmitter
   }
   Write-Output $out
 
@@ -461,15 +472,15 @@ function Export-HealthMessagesToExcel {
 
   # export the requested columns
   $Data |
-    Select-Object Host, Suppressed, Level, Message, Comment, Hash | %{
+    Select-Object Computer, Suppressed, Level, Message, Comment, Hash | %{
 		$safe_quotes_msg = $_.Message -replace '"',"''"
 		if ($_.Suppressed) {
 			$command = "" 
 		} else {
-			$command = "Invoke-Command $($_.host) {c:\it\bin\Get-ComputerHealth.ps1 -AddWhitelisting -until 2999-12-31 -sig '$($_.hash)' -ComputerName $($_.Host) -comment ""$($_.level) - $safe_quotes_msg""}"
+			$command = "Invoke-Command $($_.Computer) {c:\it\bin\Get-ComputerHealth.ps1 -AddWhitelisting -until 2999-12-31 -sig '$($_.hash)' -ComputerName $($_.Computer) -comment ""$($_.level) - $safe_quotes_msg""}"
 		}
 		[pscustomobject]@{
-			Host = $_.Host
+			Computer = $_.Computer
 			Suppressed = $_.Suppressed
 			Level = $_.Level
 			Message = $_.Message

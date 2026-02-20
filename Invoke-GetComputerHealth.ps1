@@ -272,7 +272,7 @@ foreach ($target in $targets) {
     Write-host -for darkgray " at $(get-date -Format 'yyyy-MM-dd HH:mm:ss')" 
   }
 
-  # The code to run on the target host
+  # The code to run on the target Computer
   $healthCheckBlock = {
       param(
           $Hide,
@@ -291,7 +291,7 @@ foreach ($target in $targets) {
           -IncludeTestsFromFolder C:\it\config\Custom-HealthTests\ `
           -SuppressSigs $WhitelistSigs `
           -DebugSkipSlowTests:$DebugSkipSlowTests | 
-          Select-Object -Property Host,Level,Hash,Suppressed,Message,Comment
+          Select-Object -Property Computer,Level,Hash,Suppressed,Message,Comment,Emitter
   }
   
   if ($target -eq $env:COMPUTERNAME) {
@@ -305,16 +305,17 @@ foreach ($target in $targets) {
         Remove-PSSession $session
       } else {
           if ($target -in $domain_servers) {
-              $comment =" (either it is down or you have a stale entry in your AD)"} else {$comment ="(are you sure a host with that name exists?)"
+              $comment =" (either it is down or you have a stale entry in your AD)"} else {$comment ="(are you sure a computer with that name exists?)"
           }
-          $_ = Log-failure "Host $target is unreachable $comment"
+          $_ = Log-failure "Target $target is unreachable $comment"
           $all_messages += [pscustomobject]@{
-              Host       = $target
+              Computer   = $target
               Level      = 'failure'
               Hash       = '00000000'
               Suppressed = $false
-              Message    = "Host is unreachable $comment"
+              Message    = "Target is unreachable $comment"
               Comment    = ""
+			  Emitter    = $null
             }
           continue
       }
@@ -331,7 +332,7 @@ if ($all_messages){
   $notable_msgs = (`
     $all_messages `
         | Where-Object { -not($_.Suppressed) -and $_.level -notin @('debug','help','pass','info') } `
-        | Sort-Object -Property @{ Expression = { $SortOrder[$_.Level] } }, Host `
+        | Sort-Object -Property @{ Expression = { $SortOrder[$_.Level] } }, Computer `
   )
   if ($notable_msgs) {
       Export-HealthMessagesToExcel -Data $notable_msgs -FileName "C:\it\temp\notable-messages-$($timestamp).xlsx" 
@@ -356,7 +357,7 @@ if ($all_messages){
       Write-host -for gray   "Open them on Excel or if you prefer PowerShell load them like this:"
       Write-host -for gray   "    `$data = Import-Excel C:\it\temp\notable-messages-$($timestamp).xlsx"
       Write-host -for gray   '    $data|ogv # GUI review'
-      Write-host -for gray   '    $data|select -Property Host,Level,Message # Console review'
+      Write-host -for gray   '    $data|select -Property Computer,Level,Message # Console review'
 
       Write-host -for gray   ""
       Write-host -for gray   "Emailing notable messages"
@@ -368,9 +369,9 @@ if ($all_messages){
       }
       $body += `
           ($notable_msgs |
-              Sort-Object -Property @{ Expression = { $SortOrder[$_.Level] } }, Host |
+              Sort-Object -Property @{ Expression = { $SortOrder[$_.Level] } }, Computer |
               ForEach-Object {
-                  "$($_.Host.PadRight(15)) $($_.Level.PadRight(8)) $($_.Message)"
+                  "$($_.Computer.PadRight(15)) $($_.Level.PadRight(8)) $($_.Message)"
               } | Out-String `
           )
     
