@@ -3,28 +3,28 @@
 Runs Get-ComputerHealth locally and/or via PowerShell remoting across multiple target computers, exports Excel reports, and emails a summary.
 
 .DESCRIPTION
-Wraps `C:\it\bin\Get-ComputerHealth.ps1` to support multiple targets (including an AD-derived "all domain servers" set), then collects all returned health messages into Excel workbooks and optionally emails "notable" (non-suppressed, non-pass/info/debug/help) messages.
+Wraps `C:\IT\bin\Get-ComputerHealth.ps1` to support multiple targets (including an AD-derived "all domain servers" set), then collects all returned health messages into Excel workbooks and optionally emails "notable" (non-suppressed, non-pass/info/debug/help) messages.
 
 Per target:
-- Runs `C:\it\bin\Update-GetHealthCode.ps1` then executes `C:\it\bin\Get-ComputerHealth.ps1` with `-OutputObjects -OutputConsoleMessages`, plus the provided filters and optional custom tests folder (`C:\it\config\Custom-HealthTests\`).
+- Runs `C:\IT\bin\Update-GetHealthCode.ps1` then executes `C:\IT\bin\Get-ComputerHealth.ps1` with `-OutputObjects -OutputConsoleMessages`, plus the provided filters and optional custom tests folder (`C:\IT\config\Custom-HealthTests\`).
 - For remote targets, checks basic TCP reachability and if reachable, uses `New-PSSession` to run the tests.
 
 After collection:
-- Exports all messages to `C:\it\temp\all-messages-<timestamp>.xlsx`
-- Exports notable messages (if any) to `C:\it\temp\notable-messages-<timestamp>.xlsx`
-- Sends email via `C:\it\bin\Send-Message.ps1` (with attachment when notable messages exist)
+- Exports all messages to `C:\IT\temp\all-messages-<timestamp>.xlsx`
+- Exports notable messages (if any) to `C:\IT\temp\notable-messages-<timestamp>.xlsx`
+- Sends email via `C:\IT\bin\Send-Message.ps1` (with attachment when notable messages exist)
 
 Other effects:
 - Installs the PowerShell module `ImportExcel` from PSGallery if missing (may register PSGallery and set it to Trusted; uses `Install-Module`).
-- Starts a transcript at `C:\it\log\Invoke-GetHealthDomainComputers-<timestamp>.log`.
+- Starts a transcript at `C:\IT\log\Invoke-GetHealthDomainComputers-<timestamp>.log`.
 - Sends email and may attach the notable-messages workbook.
 
 Dependencies & execution context:
-- Requires `C:\it\bin\lib-write-log-objects.ps1` (dot-sourced) for logging/Excel export helper(s).
+- Requires `C:\IT\bin\lib-write-log-objects.ps1` (dot-sourced) for logging/Excel export helper(s).
 - Requires these local scripts to exist and be runnable (locally and on remotes):
-  - `C:\it\bin\Update-GetHealthCode.ps1`
-  - `C:\it\bin\Get-ComputerHealth.ps1`
-  - `C:\it\bin\Send-Message.ps1` and `C:\it\config\Send-Message.conf`
+  - `C:\IT\bin\Update-GetHealthCode.ps1`
+  - `C:\IT\bin\Get-ComputerHealth.ps1`
+  - `C:\IT\bin\Send-Message.ps1` and `C:\IT\config\Send-Message.conf`
 - Remote execution requires WinRM / PowerShell remoting connectivity and permissions sufficient to create sessions and run the above scripts remotely.
 
 .PARAMETER Computers
@@ -61,10 +61,10 @@ Passed through to Get-ComputerHealth as `-ExcludeTests` (skips selected tests).
 
 .NOTES
 - AD enumeration for `ALL_DOMAIN_SERVERS` uses `System.DirectoryServices` (LDAP/GC) and DNS SRV lookup to choose a DC if needed.
-- Remote targets are executed via PowerShell remoting sessions; ensure WinRM is enabled and reachable (5985/5986) and that `C:\it\bin\` and `C:\it\config\` content exists on the remote machines as referenced.
+- Remote targets are executed via PowerShell remoting sessions; ensure WinRM is enabled and reachable (5985/5986) and that `C:\IT\bin\` and `C:\IT\config\` content exists on the remote machines as referenced.
 - Output paths used:
-  - Transcript: `C:\it\log\Invoke-GetHealthDomainComputers-<timestamp>.log`
-  - Excel: `C:\it\temp\all-messages-<timestamp>.xlsx`, `C:\it\temp\notable-messages-<timestamp>.xlsx`
+  - Transcript: `C:\IT\log\Invoke-GetHealthDomainComputers-<timestamp>.log`
+  - Excel: `C:\IT\temp\all-messages-<timestamp>.xlsx`, `C:\IT\temp\notable-messages-<timestamp>.xlsx`
 #>
 
 param(
@@ -84,7 +84,7 @@ param(
 $OutputConsoleMessages = $true
 $SmtpSubject = 'Notable Messages from Get-ComputerHealth of LIST_OF_COMPUTERS'
 $SmtpSubjectAllGood = 'RELAX. No notable Messages from Get-ComputerHealth of LIST_OF_COMPUTERS'
-$SmtpConfig = "C:\it\config\Send-Message.conf"
+$SmtpConfig = "C:\IT\config\Send-Message.conf"
 #------------------------------------------------------------------------
 # Functions
 #------------------------------------------------------------------------
@@ -115,7 +115,7 @@ function Invoke-HealthEmail {
   if ($BodyAsHtml) { $mailParams['BodyAsHtml'] = $true }
   if ($Attachments -and $Attachments.Count) { $mailParams['Attachments'] = $Attachments }
   Write-host -for gray   "Sending email... " -NoNewLine
-  & 'C:\it\bin\Send-Message.ps1' @mailParams
+  & 'C:\IT\bin\Send-Message.ps1' @mailParams
   Write-host -for gray   "email sent."
 }
 
@@ -235,8 +235,8 @@ function Ensure-ModuleInstalled {
 #------------------------------------------------------------------------
 
 $timestamp = $(get-date -Format 'yyyy-MM-dd_HH.mm')
-Start-Transcript "c:\it\log\Invoke-GetHealthDomainComputers-$timestamp.log"
-. "c:\it\bin\lib-write-log-objects.ps1"
+Start-Transcript "C:\IT\log\Invoke-GetHealthDomainComputers-$timestamp.log"
+. "C:\IT\bin\lib-write-log-objects.ps1"
 
 Ensure-ModuleInstalled ImportExcel
 
@@ -281,14 +281,18 @@ foreach ($target in $targets) {
           $WhitelistSigs,
           $DebugSkipSlowTests
       )
-  
-      & C:\it\bin\Update-GetHealthCode.ps1
-      & C:\it\bin\Get-ComputerHealth.ps1 `
+
+      if (-not (Test-Path "C:\IT\bin\Update-GetHealthCode.ps1")){
+          if (-not (Test-Path "C:\IT\bin")) { New-Item -Path "C:\IT\bin" -ItemType Directory -Force }
+          Invoke-WebRequest -useb "https://raw.githubusercontent.com/ndemou/GetComputerHealth/refs/heads/main/Update-GetHealthCode.ps1" -OutFile "C:\IT\bin\Update-GetHealthCode.ps1"
+	  }
+      & C:\IT\bin\Update-GetHealthCode.ps1
+      & C:\IT\bin\Get-ComputerHealth.ps1 `
           -OutputObjects -OutputConsoleMessages `
           -Hide $Hide `
           -OnlyTheseTests $OnlyTheseTests `
           -ExcludeTests $ExcludeTests `
-          -IncludeTestsFromFolder C:\it\config\Custom-HealthTests\ `
+          -IncludeTestsFromFolder C:\IT\config\Custom-HealthTests\ `
           -SuppressSigs $WhitelistSigs `
           -DebugSkipSlowTests:$DebugSkipSlowTests | 
           Select-Object -Property Computer,Level,Hash,Suppressed,Message,Comment,Emitter
@@ -328,14 +332,14 @@ $SortOrder = @{'failure' = 1; 'warning' = 2; 'notice' = 3; 'info'=4; 'pass'=5; '
 $notable_msgs = @()
 if ($all_messages){
   # save
-  Export-HealthMessagesToExcel -Data $all_messages -FileName "C:\it\temp\all-messages-$($timestamp).xlsx"
+  Export-HealthMessagesToExcel -Data $all_messages -FileName "C:\IT\temp\all-messages-$($timestamp).xlsx"
   $notable_msgs = (`
     $all_messages `
         | Where-Object { -not($_.Suppressed) -and $_.level -notin @('debug','help','pass','info') } `
         | Sort-Object -Property @{ Expression = { $SortOrder[$_.Level] } }, Computer `
   )
   if ($notable_msgs) {
-      Export-HealthMessagesToExcel -Data $notable_msgs -FileName "C:\it\temp\notable-messages-$($timestamp).xlsx" 
+      Export-HealthMessagesToExcel -Data $notable_msgs -FileName "C:\IT\temp\notable-messages-$($timestamp).xlsx" 
   }
 
   $synopsis = " " +($notable_msgs | Where-Object {$_.Level} |
@@ -352,10 +356,10 @@ if ($all_messages){
   write-host ""
   if ($notable_msgs) {
       Write-host -for yellow "Found notable messages. I have saved them in these files:"
-      Write-host -for yellow "    C:\it\temp\notable-messages-$($timestamp).xlsx"
-      Write-host -for gray   "    C:\it\temp\all-messages-$($timestamp).xlsx"
+      Write-host -for yellow "    C:\IT\temp\notable-messages-$($timestamp).xlsx"
+      Write-host -for gray   "    C:\IT\temp\all-messages-$($timestamp).xlsx"
       Write-host -for gray   "Open them on Excel or if you prefer PowerShell load them like this:"
-      Write-host -for gray   "    `$data = Import-Excel C:\it\temp\notable-messages-$($timestamp).xlsx"
+      Write-host -for gray   "    `$data = Import-Excel C:\IT\temp\notable-messages-$($timestamp).xlsx"
       Write-host -for gray   '    $data|ogv # GUI review'
       Write-host -for gray   '    $data|select -Property Computer,Level,Message # Console review'
 
@@ -378,10 +382,10 @@ if ($all_messages){
       $encoded = [System.Net.WebUtility]::HtmlEncode($body)
       $html = "<pre style='font-family: Consolas, ""Courier New"", monospace; white-space:pre-wrap; margin:0; font-size:12px; line-height:1.35'>$encoded</pre>"
 
-      Invoke-HealthEmail -Subject $SmtpSubject -Body $html -BodyAsHtml -Attachments "C:\it\temp\notable-messages-$($timestamp).xlsx" -ConfigFile $SmtpConfig -NoSendMessage:$NoSendMessage
+      Invoke-HealthEmail -Subject $SmtpSubject -Body $html -BodyAsHtml -Attachments "C:\IT\temp\notable-messages-$($timestamp).xlsx" -ConfigFile $SmtpConfig -NoSendMessage:$NoSendMessage
   } else {
     Write-host -for green    "GOOD, Nothing notable to record. I have saved less notable messages here:"
-    Write-host -for gray     "    C:\it\temp\all-messages-$($timestamp).xlsx"
+    Write-host -for gray     "    C:\IT\temp\all-messages-$($timestamp).xlsx"
     Invoke-HealthEmail -Subject $SmtpSubjectAllGood -Body 'Relax :-)' -ConfigFile $SmtpConfig -NoSendMessage:$NoSendMessage
   }
 } else {
