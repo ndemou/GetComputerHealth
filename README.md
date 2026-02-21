@@ -191,14 +191,15 @@ New-ScheduledTaskForPSScript -ScriptPath "C:\IT\bin\Invoke-GetComputerHealth.ps1
 
 ## OPTION 3: Installation Plus Automatic Daily Monitoring of Multiple Domain-Joined Computers
 
-Follow the instructions for monitoring one computer. If everything works well, create a script `C:\IT\bin\Invoke-GetHealthDomainComputers.ps1` and change the scheduled task to execute that instead of `C:\IT\bin\Invoke-GetComputerHealth.ps1`. Here is an example. Change or remove workstation1, workstation2, and server1, server2:
-
+1. Follow the instructions for monitoring one computer on the master computer (the controller). If everything works well, create a script `C:\IT\bin\Invoke-GetHealthDomainComputers.ps1`. Here is an example; change or remove workstation1, workstation2, and server1, server2:
 ```powershell
 # Executes Invoke-GetComputerHealth.ps1 with proper arguments to select all domain joined servers
 param([string]$Hide="DIP",[string]$OnlyTheseTests,[switch]$DebugSkipSlowTests,[switch]$NoSendMessage)
 
 & c:\it\bin\Invoke-GetComputerHealth.ps1 -Computers "ALL_DOMAIN_SERVERS,workstation1,workstation2" -ExcludeServers "server1,server2" -Hide:$Hide -OnlyTheseTests $OnlyTheseTests -DebugSkipSlowTests:$DebugSkipSlowTests -NoSendMessage:$NoSendMessage
 ```
+
+2. Edit the scheduled task to execute the script you created instead of `C:\IT\bin\Invoke-GetComputerHealth.ps1`. 
 
 ---
 
