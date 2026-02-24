@@ -270,7 +270,7 @@ You do not need to modify the core library.
    }
    ```
 
-* **Note:** Avoid including variables in the message text. You can use the `-Comment` parameter instead. *(Rationale: If even one character of a whitelisted message changes, the code will treat it as a different issue and will not suppress it.)*
+* **Note:** in notices, warnings and failures include variables in their message text if a different value represents a different warning/failure. You can include any variables you like in the `-Comment` parameter. *(Rationale: If even one character of a suppressed message changes, the code will treat it as a different issue and will not suppress it.)*
 
   * **Good:** `Log-Failure "No recent full backup" -comment "Last full backup was at $dateOfLastFullBackup"`
   * **Bad:** `Log-Failure "Last full backup $days days ago"`
