@@ -8,6 +8,20 @@ Installation is extremely easy. Once you spend a few minutes getting familiar wi
 
 <img width="1086" height="251" alt="Example of the report you receive via email" src="https://github.com/user-attachments/assets/9da7e7f7-c1ef-4f3e-9d47-d164a96b2d4f" />
 
+# Status / Who this code is for
+
+This code is actively used in production across several environments (multiple servers), but as far as I know, only by me (the author). 
+
+Although everything seems to work, I'm still at an early stage and thus, large refactoring of code and new tests are expected.
+
+I’m happy to help when I can, but "when I can" is not much. So, **if you want to use it, you must assume you are alone**. You should be comfortable with PowerShell and prepared to invest your time and LLM tokens. The good news is that the codebase is very simple. The only reason it's large is because there are a lot of tests.
+
+# Security
+
+The installer(`Update-GetHealthCode.ps1`), downloads and updates files from this GitHub. It does so *every* time you call `Invoke-GetComputerHealth.ps1`. It's strongly recomended that you clone this repo, audit it and then change the `$URI=` line of `Update-GetHealthCode.ps1` to point to your copy. Besides installation this code should not change the state of the system it runs on in any way. So autiting with a modern LLM is in fact quite easy. 
+
+The installer also registers and sets PSGallery as Trusted, and installs PS module `ImportExcel`.
+
 # 0. Prerequisites
 
 **For a single server or workstation:** None if you run this script manually; a mail server that permits unauthenticated delivery if you wish to receive emails with results or alerts.
@@ -18,6 +32,7 @@ Installation is extremely easy. Once you spend a few minutes getting familiar wi
 2. A mail server that permits unauthenticated delivery.
 
 **For a large domain (more than a few dozen servers, some DCs connected via WAN):** I would not use this code for that scenario. I have not tested it, and I am concerned about some of the DC-related tests causing excessive WAN traffic.
+
 
 # 1. Architecture Overview
 
