@@ -276,12 +276,13 @@ You do not need to modify the core library.
 3. Add at least one function named like `CustomHealthTest-...` and inside it use `Log-Pass`, `Log-Notice`, `Log-Warning`, or `Log-Failure` to report your results. Example:
 
    ```powershell
-   function CustomHealthTest-VeeamBackupsOk() {
-     if ($condition) {
-       Log-Pass "Veeam backups appear OK"
-     } else {
-       Log-Failure "Last full backup has suspiciously low size" -comment "Last full backup was $mBytes MBytes"
-     }
+   function CustomHealthTest-LargeDirectories {
+       $found = $false
+       foreach ($dir in Find-LargeDirectory -Path 'C:\' -Threshold 10000) {
+           $found = $true
+           Log-Warning "Directory $($dir.Path) has more than 10000 child items" -Comment "$($dir.ItemsCount) items"
+       }
+       if (-not $found) {Log-pass 'No directories found with >10000 items'}
    }
    ```
 
