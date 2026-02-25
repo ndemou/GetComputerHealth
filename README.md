@@ -515,3 +515,4 @@ This is a list of tests as of version 1.3.0. Run `Get-ComputerHealth.ps1 -ListAl
 105. **HealthTest-AdminSDHolderCoverage**: Checks AdminSDHolder applied to protected groups reasonably (Only for DCs).
 106. **HealthTest-UnexpectedListeningPorts**: Flags unexpected listening TCP ports; ignores 49152-65535 and notes optional baseline ports (3389, 47001, 593) (Only for DCs).
 107. **HealthTest-NtfsDirtyBit**: Check NTFS volumes for the "dirty" bit.
+108. **HealthTest-LargeDirectories**: Warns for every directory under `C:\` that has more than 10,000 immediate child items.

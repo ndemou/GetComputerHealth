@@ -736,6 +736,7 @@ if (!$DebugSkipSlowTests) {
     Invoke-HealthTest "HealthTest-UnexpectedListeningPorts"
     Invoke-HealthTest "HealthTest-IPv6Binding"
     Invoke-HealthTest "HealthTest-NonMicrosoftServices"
+    Invoke-HealthTest "HealthTest-LargeDirectories"
 }
 
 if ($isHostServer) {
