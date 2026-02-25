@@ -291,17 +291,29 @@ You do not need to modify the core library.
   * **Bad:** `Log-Failure "Last full backup $days days ago"`
 * **Note:** Avoid writing any code outside of functions. Any code you write will be executed by Get-ComputerHealth.
 
-## How to Create a Built-In `HealthTest-*` Function (Contributor How-To)
+# 5. Directory Structure Reference
+
+| Path | Purpose |
+| --- | --- |
+| `C:\IT\bin\` | Contains all script files (`.ps1`). |
+| `C:\IT\config\` | Contains configuration files (`Send-Message.conf`) and the suppression list (`Get-ComputerHealth.sigs-to-suppress.txt`). |
+| `C:\IT\temp\` | Staging area for downloads and location of generated Excel reports. |
+| `C:\IT\log\` | Stores transcript logs of script execution. |
+
+
+# 6. Contributing
+
+## 6.1. How to Create a Built-In `HealthTest-*` Function
 
 If you want to contribute a new **built-in** check (one that ships in `lib-health-tests.ps1` and appears in `-ListAllBuiltInTests`), follow this mini playbook.
 
-### 1) Copy the structure of existing tests
+### 6.1.1) Copy the structure of existing tests
 
 Open `lib-health-tests.ps1` and model your function after nearby tests:
 
 ```powershell
 function HealthTest-YourTestName {
-    # optional: params with safe defaults
+    # no params or params with defaults
     # gather data
     # evaluate data
     # emit one or more Log-* messages
@@ -310,14 +322,14 @@ function HealthTest-YourTestName {
 
 Use **PascalCase** after the `HealthTest-` prefix (example: `HealthTest-PagefileSanity`).
 
-### 2) Keep side effects at zero
+### 6.1.2) Keep side effects at zero
 
 Health tests should inspect and report, not change system state. In other words:
 
 * Do: read registry, services, event logs, AD, WMI/CIM, file metadata.
 * Do not: modify config, restart services, install anything, delete files.
 
-### 3) Report through `Log-Pass` / `Log-Notice` / `Log-Warning` / `Log-Failure`
+### 6.1.3) Report through `Log-Pass` / `Log-Notice` / `Log-Warning` / `Log-Failure`
 
 Do not use `Write-Host` as the final output channel. The framework expects `Log-*` records.
 
@@ -335,7 +347,7 @@ else {
 }
 ```
 
-### 4) Keep message text suppression-friendly
+### 6.1.4) Keep message text suppression-friendly
 
 Suppression is signature-based. If message text changes every run, suppression becomes noisy.
 
@@ -347,7 +359,7 @@ Example:
 * Good: `Log-Failure "Windows Update is stale" -Comment "Last install date: $lastInstall"`
 * Bad: `Log-Failure "Windows Update is stale by $days days"`
 
-### 5) Be explicit about scope and prerequisites
+### 6.1.5) Be explicit about scope and prerequisites
 
 If your test only makes sense for DCs, domain-joined machines, laptops, etc., short-circuit early with a pass/notice (or return silently, following surrounding style).
 
@@ -360,11 +372,11 @@ if (-not (Get-Command Some-Cmdlet -ErrorAction SilentlyContinue)) {
 }
 ```
 
-### 6) Handle errors defensively
+### 6.1.6) Handle errors defensively
 
 Wrap risky calls with `try { } catch { }` and convert unexpected failures into useful health output (usually a warning/failure with the exception summary in `-Comment`).
 
-### 7) Validate locally before committing
+### 6.1.7) Validate locally before committing
 
 Useful contributor loop:
 
@@ -376,22 +388,12 @@ C:\IT\bin\Get-ComputerHealth.ps1 -OnlyTheseTests HealthTest-YourTestName -Output
 C:\IT\bin\Get-ComputerHealth.ps1 -ListAllBuiltInTests
 ```
 
-### 8) Add your test to the README catalog
+### 6.1.8) Add your test to the README catalog
 
 After the function works, add a one-line description in **"List of Available Tests"** so users discover it quickly.
 
----
 
-# 5. Directory Structure Reference
-
-| Path | Purpose |
-| --- | --- |
-| `C:\IT\bin\` | Contains all script files (`.ps1`). |
-| `C:\IT\config\` | Contains configuration files (`Send-Message.conf`) and the suppression list (`Get-ComputerHealth.sigs-to-suppress.txt`). |
-| `C:\IT\temp\` | Staging area for downloads and location of generated Excel reports. |
-| `C:\IT\log\` | Stores transcript logs of script execution. |
-
-# 6. List of Available Tests
+# 7. List of Available Tests
 
 This is a list of tests as of version 1.3.0. Run `Get-ComputerHealth.ps1 -ListAllBuiltInTests` to get an up-to-date list.
 
