@@ -4320,6 +4320,71 @@ function HealthTest-DisksHaveFreeSpace {
 
 <#
 .SYNOPSIS
+Returns directories under Path whose observed child-item count is greater
+than Threshold.
+
+.OUTPUTS
+Produces a psCustomObject for each qualifying directory:
+  Path       : Full directory path
+  ItemsCount : Observed count of immediate child items
+
+.DESCRIPTION
+Recursively scans the directory tree rooted at Path.
+Directories that cannot be enumerated or read are skipped without a
+terminating error, and results may be incomplete for that reason.
+#>
+function Find-LargeDirectory {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory = $false)]
+        [ValidateScript({ Test-Path $_ })]
+        [string]$Path = 'C:\',
+
+        [Parameter(Mandatory = $false)]
+        [int]$Threshold = 10000
+    )
+
+    Write-Verbose "Scanning '$Path' for directories with > $Threshold items..."
+
+    $directories = Get-ChildItem -Path $Path -Recurse -Directory -ErrorAction SilentlyContinue
+
+    foreach ($dir in $directories) {
+        try {
+            $count = (Get-ChildItem -Path $dir.FullName -ErrorAction SilentlyContinue | Measure-Object).Count
+            if ($count -gt $Threshold) {
+                [PSCustomObject]@{
+                    Path       = $dir.FullName
+                    ItemsCount = $count
+                }
+            }
+        }
+        catch {}
+    }
+}
+
+<#
+.SYNOPSIS
+Warns for every directory that has more than 10,000 immediate child items.
+
+.DESCRIPTION
+Uses Find-LargeDirectory to locate directories with high item counts under C:\.
+Each matching directory is logged as a warning with the item count in -Comment.
+#>
+function HealthTest-LargeDirectories {
+    $foundLargeDirectory = $false
+
+    foreach ($dir in Find-LargeDirectory -Path 'C:\' -Threshold 10000) {
+        $foundLargeDirectory = $true
+        Log-Warning "Directory $($dir.Path) has more than 10000 child items" -Comment "$($dir.ItemsCount) items found"
+    }
+
+    if (-not $foundLargeDirectory) {
+        Log-pass 'No large directories found over threshold'
+    }
+}
+
+<#
+.SYNOPSIS
 Reports a warning for any non Microsoft service it finds
 #>
 function HealthTest-NonMicrosoftServices {
