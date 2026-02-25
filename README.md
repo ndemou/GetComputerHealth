@@ -291,6 +291,95 @@ You do not need to modify the core library.
   * **Bad:** `Log-Failure "Last full backup $days days ago"`
 * **Note:** Avoid writing any code outside of functions. Any code you write will be executed by Get-ComputerHealth.
 
+## How to Create a Built-In `HealthTest-*` Function (Contributor How-To)
+
+If you want to contribute a new **built-in** check (one that ships in `lib-health-tests.ps1` and appears in `-ListAllBuiltInTests`), follow this mini playbook.
+
+### 1) Copy the structure of existing tests
+
+Open `lib-health-tests.ps1` and model your function after nearby tests:
+
+```powershell
+function HealthTest-YourTestName {
+    # optional: params with safe defaults
+    # gather data
+    # evaluate data
+    # emit one or more Log-* messages
+}
+```
+
+Use **PascalCase** after the `HealthTest-` prefix (example: `HealthTest-PagefileSanity`).
+
+### 2) Keep side effects at zero
+
+Health tests should inspect and report, not change system state. In other words:
+
+* Do: read registry, services, event logs, AD, WMI/CIM, file metadata.
+* Do not: modify config, restart services, install anything, delete files.
+
+### 3) Report through `Log-Pass` / `Log-Notice` / `Log-Warning` / `Log-Failure`
+
+Do not use `Write-Host` as the final output channel. The framework expects `Log-*` records.
+
+Typical pattern:
+
+```powershell
+if ($healthy) {
+    Log-Pass "Short success message"
+}
+elseif ($riskyButNotBroken) {
+    Log-Warning "Stable message text" -Comment "volatile details go here"
+}
+else {
+    Log-Failure "Stable message text" -Comment "volatile details go here"
+}
+```
+
+### 4) Keep message text suppression-friendly
+
+Suppression is signature-based. If message text changes every run, suppression becomes noisy.
+
+* Put **stable identity** in the message.
+* Put **changing values** (timestamps, counts, free-form output) in `-Comment`.
+
+Example:
+
+* Good: `Log-Failure "Windows Update is stale" -Comment "Last install date: $lastInstall"`
+* Bad: `Log-Failure "Windows Update is stale by $days days"`
+
+### 5) Be explicit about scope and prerequisites
+
+If your test only makes sense for DCs, domain-joined machines, laptops, etc., short-circuit early with a pass/notice (or return silently, following surrounding style).
+
+Also guard optional commands/features:
+
+```powershell
+if (-not (Get-Command Some-Cmdlet -ErrorAction SilentlyContinue)) {
+    Log-Notice "Some-Cmdlet not available; skipping check"
+    return
+}
+```
+
+### 6) Handle errors defensively
+
+Wrap risky calls with `try { } catch { }` and convert unexpected failures into useful health output (usually a warning/failure with the exception summary in `-Comment`).
+
+### 7) Validate locally before committing
+
+Useful contributor loop:
+
+```powershell
+# Run only your test while iterating
+C:\IT\bin\Get-ComputerHealth.ps1 -OnlyTheseTests HealthTest-YourTestName -OutputConsoleMessages -OutputObjects -Hide DIP
+
+# See complete built-in test list after adding your function
+C:\IT\bin\Get-ComputerHealth.ps1 -ListAllBuiltInTests
+```
+
+### 8) Add your test to the README catalog
+
+After the function works, add a one-line description in **"List of Available Tests"** so users discover it quickly.
+
 ---
 
 # 5. Directory Structure Reference
