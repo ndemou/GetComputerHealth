@@ -5,6 +5,284 @@ TODO
 
 The function HealthTest-SysvolContentConsistency calculates the size and file count of the entire `\\SYSVOL\...\Policies` tree across **all** Domain Controllers over the network. In a production environment with branch offices or many GPOs, this is dangerous. It generates massive WAN traffic. Since Health Tests are already running on every single DC you could in theory compute the hashes localy on each DC (and compute real hashes instead of the pseudo sigs that this function computes) and then exchange and compare them. This will be super fast even over WAN.
 
+
+==============================================================
+TODO 2: List installed SW
+==============================================================
+(Get-InstalledSoftware).name | %{Get-NormalizedSoftwareName $_}
+(Get-InstalledWindowsFeatures).name
+
+function Get-InstalledSoftware {
+    #.SYNOPSIS
+    # Gets an exhaustive list of all installed software, avoiding WMI/Win32_Product.
+    #
+    # .DESCRIPTION
+    # Uses .NET Registry classes to explicitly query 64-bit, 32-bit, and User registry hives,
+    # bypassing PowerShell provider bitness redirection. Queries Appx packages safely.
+    # Leaves deduplication to the caller to prevent data loss.
+    # Everything that would show up in the "Add or Remove Programs" control panel should be listed.
+    [CmdletBinding()]
+    param ()
+
+    $installedSoftware = [System.Collections.Generic.List[PSCustomObject]]::new()
+
+    # 1. .NET Registry Scrape (Fast, Bitness-Aware)
+    $registryTargets = @(
+        @{ Hive = [Microsoft.Win32.RegistryHive]::LocalMachine; View = [Microsoft.Win32.RegistryView]::Registry64; Scope = 'Machine'; Arch = '64-bit' },
+        @{ Hive = [Microsoft.Win32.RegistryHive]::LocalMachine; View = [Microsoft.Win32.RegistryView]::Registry32; Scope = 'Machine'; Arch = '32-bit' },
+        @{ Hive = [Microsoft.Win32.RegistryHive]::CurrentUser;  View = [Microsoft.Win32.RegistryView]::Default;    Scope = 'User';    Arch = 'Native' }
+    )
+
+    $baseKeyPath = "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"
+
+    Write-Verbose "Scanning Registry for desktop applications via .NET..."
+    
+    foreach ($target in $registryTargets) {
+        try {
+            $baseKey = [Microsoft.Win32.RegistryKey]::OpenBaseKey($target.Hive, $target.View)
+            $uninstallKey = $baseKey.OpenSubKey($baseKeyPath)
+
+            if ($uninstallKey) {
+                foreach ($subKeyName in $uninstallKey.GetSubKeyNames()) {
+                    $appKey = $uninstallKey.OpenSubKey($subKeyName)
+                    if (-not $appKey) { continue }
+
+                    $displayName = $appKey.GetValue("DisplayName") -as [string]
+                    
+                    # Skip if it doesn't have a name (not a real tracked install)
+                    if ([string]::IsNullOrWhiteSpace($displayName)) { 
+                        $appKey.Close()
+                        continue 
+                    }
+
+                    # Attempt to parse YYYYMMDD into a DateTime object
+                    $rawDate = $appKey.GetValue("InstallDate") -as [string]
+                    $parsedDate = $null
+                    if ($rawDate -match '^\d{8}$') {
+                        try { $parsedDate = [datetime]::ParseExact($rawDate, 'yyyyMMdd', $null) } catch { }
+                    }
+
+                    $installedSoftware.Add([PSCustomObject]@{
+                        Name              = $displayName.Trim()
+                        Version           = $appKey.GetValue("DisplayVersion") -as [string]
+                        Publisher         = $appKey.GetValue("Publisher") -as [string]
+                        InstallDate       = $parsedDate
+                        UninstallString   = $appKey.GetValue("UninstallString") -as [string]
+                        RegistryKeyName   = $subKeyName
+                        AppxPackageName   = $null
+                        Source            = "Registry"
+                        Scope             = $target.Scope
+                        Architecture      = $target.Arch
+                        IsSystemComponent = ($appKey.GetValue("SystemComponent") -eq 1)
+                        IsFramework       = $null
+                    })
+                    $appKey.Close()
+                }
+                $uninstallKey.Close()
+            }
+            $baseKey.Close()
+        }
+        catch {
+            Write-Warning "Failed to read registry target $($target.Hive) ($($target.Arch)): $_"
+        }
+    }
+
+    # 2. AppxPackage Scrape (Safe, Cmdlet-Aware)
+    Write-Verbose "Scanning Appx packages..."
+    
+    if (Get-Command Get-AppxPackage -ErrorAction SilentlyContinue) {
+        $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+        
+        try {
+            if ($isAdmin) {
+                $appxPackages = Get-AppxPackage -AllUsers -ErrorAction Stop
+                $appxScope = "Machine (All Users)"
+            } else {
+                Write-Verbose "Running without Administrator rights. Appx packages limited to current user."
+                $appxPackages = Get-AppxPackage -ErrorAction Stop
+                $appxScope = "User"
+            }
+
+            foreach ($app in $appxPackages) {
+                $installedSoftware.Add([PSCustomObject]@{
+                    Name              = $app.Name
+                    Version           = $app.Version
+                    Publisher         = $app.Publisher
+                    InstallDate       = $null # Appx doesn't expose standard install dates to this cmdlet
+                    UninstallString   = $null # Removed fake string per critique
+                    RegistryKeyName   = $null
+                    AppxPackageName   = $app.PackageFullName
+                    Source            = "Appx"
+                    Scope             = $appxScope
+                    Architecture      = $app.Architecture.ToString()
+                    IsSystemComponent = $null
+                    IsFramework       = $app.IsFramework
+                })
+            }
+        }
+        catch {
+            Write-Warning "Failed to query Appx Packages: $_"
+        }
+    } else {
+        Write-Verbose "Get-AppxPackage cmdlet not found. Skipping Appx scan (expected on Server Core)."
+    }
+
+    # Output the raw array (Deduplication / Filtering is left to the caller)
+    $installedSoftware
+}
+
+function Get-NormalizedSoftwareName {
+    #.SYNOPSIS
+    # Simplifies software names to their core product identifier to prevent false positives from minor version or date updates.
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
+        [string]$Name
+    )
+
+    process {
+        $cleanName = $Name
+
+        # 1. Replace Standard GUIDs with [GUID]
+        $cleanName = $cleanName -replace '\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b', '[GUID]'
+
+        # 2. Replace Dates (YYYYMMDD, YYYY-MM-DD, MM/DD/YYYY) with DATE
+        # Matches formats like 20240203, 01/28/2016, 2024-02-03
+        $cleanName = $cleanName -replace '\b(20\d{2}[-./]?\d{2}[-./]?\d{2}|\d{2}[-./]\d{2}[-./]20\d{2})\b', 'DATE'
+
+        # 3. Handle AppX / Vendor Hashes (e.g., 3EA2211E.RICOH or MicrosoftWindows.54792954.)
+        $cleanName = $cleanName -replace '^[0-9a-fA-F]{8}\.', 'HASH.'
+        $cleanName = $cleanName -replace '(?<=MicrosoftWindows\.)\d{8}(?=\.)', 'HASH'
+
+        # 4. Replace Minor Versions but keep Major (e.g., 4.6.2 -> 4.VERSION)
+        # Looks for a number followed by one or more dot-number sequences
+        $cleanName = $cleanName -replace '\b(\d+)\.\d+(\.\d+)*\b', '$1.VERSION'
+
+        # 5. Remove Bitness Indicators (x64, x86, amd64, 64-bit, 32-bit)
+        $cleanName = $cleanName -replace '(?i)\b(x64|x86|amd64|64-bit|32-bit)\b', ' '
+
+        # 6. Remove Noise Words (version, release, Preview)
+        $cleanName = $cleanName -replace '(?i)\b(version|release|preview)\b', ' '
+
+        # 7. Replace brackets and commas with spaces
+        $cleanName = $cleanName -replace '[\(\)\{\}\[\],]', ' '
+
+        # 8. Clean up hanging dashes/dots often left behind by removed versions
+        $cleanName = $cleanName -replace '\s-\s', ' '
+
+        # 9. Condense multiple spaces into a single space and trim edges
+        $cleanName = $cleanName -replace '\s+', ' '
+        
+        return $cleanName.Trim()
+    }
+}
+
+function Get-InstalledWindowsFeatures {
+    # .SYNOPSIS
+    # Gets enabled/installed feature states across Server Roles, Optional Features, and Capabilities.
+    # 
+    # .DESCRIPTION
+    # Dynamically attempts to use ServerManager and DISM modules if available, regardless of OS type. 
+    # Captures fully installed as well as pending (reboot required) states.
+    # 
+    # .EXAMPLE
+    # Get-InstalledWindowsFeatures -IncludeOptionalFeatures $false
+    [CmdletBinding()]
+    param (
+        [switch]$IncludeServerRoles = $true,
+        [switch]$IncludeOptionalFeatures = $true,
+        [switch]$IncludeCapabilities = $true
+    )
+
+    $results = [System.Collections.Generic.List[PSCustomObject]]::new()
+
+    # 1. Admin Check (Warn, but do not block)
+    $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+    if (-not $isAdmin) {
+        Write-Warning "Running without Administrator privileges. Some read operations may result in Access Denied."
+    }
+
+    # 2. Server Roles & Features (ServerManager)
+    if ($IncludeServerRoles) {
+        try {
+            $null = Import-Module ServerManager -ErrorAction Stop
+            Write-Verbose "Querying Server Roles and Features..."
+            
+            # Catch Installed and Pending states
+            $serverFeatures = Get-WindowsFeature -ErrorAction Stop | 
+                Where-Object { $_.InstallState -in @('Installed', 'InstallPending', 'RemovalPending') }
+            
+            foreach ($feature in $serverFeatures) {
+                $results.Add([PSCustomObject]@{
+                    Id            = "ServerManager::$($feature.Name)"
+                    Name          = $feature.Name
+                    DisplayName   = $feature.DisplayName
+                    FeatureType   = $feature.FeatureType.ToString()
+                    State         = $feature.InstallState.ToString()
+                    RestartNeeded = if ($feature.InstallState -match 'Pending') { $true } else { $false }
+                    Source        = "ServerManager"
+                })
+            }
+        } catch [System.Management.Automation.ActionPreferenceStopException], [System.IO.FileNotFoundException] {
+            Write-Verbose "ServerManager module not available (expected on Client OS)."
+        } catch {
+            Write-Warning "Failed to query ServerManager: $_"
+        }
+    }
+
+    # 3. DISM Optional Features & Capabilities
+    if ($IncludeOptionalFeatures -or $IncludeCapabilities) {
+        try {
+            $null = Import-Module Dism -ErrorAction Stop
+            
+            if ($IncludeOptionalFeatures) {
+                Write-Verbose "Querying DISM Optional Features (This may take a moment)..."
+                # State is an Enum: Microsoft.Dism.Commands.FeatureState
+                $optFeatures = Get-WindowsOptionalFeature -Online -ErrorAction Stop | 
+                    Where-Object { $_.State -in 'Enabled', 'EnablePending', 'DisablePending' }
+                
+                foreach ($feature in $optFeatures) {
+                    $results.Add([PSCustomObject]@{
+                        Id            = "DISM_Optional::$($feature.FeatureName)"
+                        Name          = $feature.FeatureName
+                        DisplayName   = $null # Client Optional Features lack a localized friendly name
+                        FeatureType   = "OptionalFeature"
+                        State         = $feature.State.ToString()
+                        RestartNeeded = if ($feature.State -match 'Pending') { $true } else { $false }
+                        Source        = "DISM"
+                    })
+                }
+            }
+
+            if ($IncludeCapabilities) {
+                Write-Verbose "Querying DISM Capabilities (This may take a moment)..."
+                # State is an Enum: Microsoft.Dism.Commands.CapabilityState
+                $capabilities = Get-WindowsCapability -Online -ErrorAction Stop | 
+                    Where-Object { $_.State -in 'Installed', 'InstallPending', 'Staged' }
+                
+                foreach ($cap in $capabilities) {
+                    $results.Add([PSCustomObject]@{
+                        Id            = "DISM_Capability::$($cap.Name)"
+                        Name          = $cap.Name
+                        DisplayName   = $cap.Name
+                        FeatureType   = "Capability"
+                        State         = $cap.State.ToString()
+                        RestartNeeded = if ($cap.State -match 'Pending') { $true } else { $false }
+                        Source        = "DISM"
+                    })
+                }
+            }
+        } catch [System.Management.Automation.ActionPreferenceStopException], [System.IO.FileNotFoundException] {
+            Write-Warning "DISM module is missing or cannot be loaded in this environment."
+        } catch {
+            Write-Warning "Failed to query DISM components: $_"
+        }
+    }
+
+    # Return the structured data
+    $results | Sort-Object FeatureType, Name
+}
+
 ==============================================================
 TODO 2: Fix suggestions from Gemini
 ==============================================================
