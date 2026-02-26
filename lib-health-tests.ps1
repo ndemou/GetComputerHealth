@@ -4615,26 +4615,85 @@ function Find-LargeDirectory {
     [CmdletBinding()]
     param (
         [Parameter(Mandatory = $false)]
-        [ValidateScript({ Test-Path $_ })]
-        [string]$Path = 'C:\',
+        [string[]]$Path = @('C:\'),
 
         [Parameter(Mandatory = $false)]
-        [int]$Threshold = 10000
+        [int]$Threshold = 10000,
+
+        [Parameter(Mandatory = $false)]
+        [string[]]$SkipPaths = @()
     )
 
-    Write-Verbose "Scanning '$Path' for directories with > $Threshold items..."
+    function Normalize-DirectoryPath {
+        param(
+            [Parameter(Mandatory)]
+            [string]$CandidatePath
+        )
 
-    $directories = Get-ChildItem -Path $Path -Recurse -Directory -ErrorAction SilentlyContinue
+        if ($CandidatePath -match '^[a-zA-Z]:\\$') {
+            return $CandidatePath
+        }
 
-    foreach ($dir in $directories) {
+        return $CandidatePath.TrimEnd('\\')
+    }
+
+    $normalizedSkipPaths = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::OrdinalIgnoreCase)
+
+    foreach ($skipPath in $SkipPaths) {
+        if ([string]::IsNullOrWhiteSpace($skipPath)) { continue }
+
         try {
-            $count = (Get-ChildItem -Path $dir.FullName -ErrorAction SilentlyContinue | Measure-Object).Count
-            if ($count -gt $Threshold) {
-                [PSCustomObject]@{
-                    Path       = $dir.FullName
-                    ItemsCount = $count
-                }
+            $resolvedSkipPath = Normalize-DirectoryPath -CandidatePath (Resolve-Path -LiteralPath $skipPath -ErrorAction Stop | Select-Object -First 1 -ExpandProperty Path)
+            [void]$normalizedSkipPaths.Add($resolvedSkipPath)
+        }
+        catch {}
+    }
+
+    function Visit-DirectoryForLargeCount {
+        param (
+            [Parameter(Mandatory)]
+            [string]$CurrentPath
+        )
+
+        $normalizedCurrentPath = Normalize-DirectoryPath -CandidatePath $CurrentPath
+        if ($normalizedSkipPaths.Contains($normalizedCurrentPath)) {
+            return
+        }
+
+        try {
+            $children = @(Get-ChildItem -LiteralPath $CurrentPath -ErrorAction Stop)
+        }
+        catch {
+            return
+        }
+
+        $count = ($children | Measure-Object).Count
+        if ($count -gt $Threshold) {
+            [PSCustomObject]@{
+                Path       = $CurrentPath
+                ItemsCount = $count
             }
+        }
+
+        foreach ($childDir in $children) {
+            if (-not $childDir.PSIsContainer) { continue }
+
+            $childPath = Normalize-DirectoryPath -CandidatePath $childDir.FullName
+            if ($normalizedSkipPaths.Contains($childPath)) {
+                continue
+            }
+
+            Visit-DirectoryForLargeCount -CurrentPath $childDir.FullName
+        }
+    }
+
+    foreach ($rootPath in $Path) {
+        if ([string]::IsNullOrWhiteSpace($rootPath)) { continue }
+
+        try {
+            $resolvedRootPath = Normalize-DirectoryPath -CandidatePath (Resolve-Path -LiteralPath $rootPath -ErrorAction Stop | Select-Object -First 1 -ExpandProperty Path)
+            Write-Verbose "Scanning '$resolvedRootPath' for directories with > $Threshold items..."
+            Visit-DirectoryForLargeCount -CurrentPath $resolvedRootPath
         }
         catch {}
     }
@@ -4651,7 +4710,7 @@ Each matching directory is logged as a warning with the item count in -Comment.
 function HealthTest-LargeDirectories {
     $foundLargeDirectory = $false
 
-    foreach ($dir in Find-LargeDirectory -Path 'C:\' -Threshold 10000) {
+    foreach ($dir in Find-LargeDirectory -Path 'C:\' -Threshold 10000 -SkipPaths @("C:\windows\servicing","C:\windows\WinSxS")) {
         $foundLargeDirectory = $true
         Log-Warning "Directory $($dir.Path) has more than 10000 child items" -Comment "$($dir.ItemsCount) items found"
     }
