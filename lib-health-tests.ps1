@@ -470,6 +470,157 @@ public static class Win32SvcPath {
 ############################################################
 ############################################################
 
+<# 
+.SYNOPSIS
+Builds a time-bucketed profile of files in a directory.
+
+.OUTPUTS
+Produces a psCustomObject for each time period bucket:
+  period   : Period key as a string (YYYY, YYYY-MM, or YYYY-MM-DD)
+  count    : Number of files in the period
+  total_mb : Total size (MB) of files in the period
+  top_exts : Text summary of the most common extensions in the period
+  oldest   : Oldest LastWriteTime observed in the input set
+  newest   : Newest LastWriteTime observed in the input set
+
+.DESCRIPTION
+Enumerates files under the provided directory and groups them by a
+computed period derived from LastWriteTime. The grouping granularity
+depends on the time span between the oldest and newest file:
+- < 15 days: group by YYYY-MM-DD
+- >= 15 days and < 12 months: group by YYYY-MM
+- >= 12 months: group by YYYY
+
+May throw on invalid paths, access failures, or file enumeration errors.
+#>
+function Get-DirFileProfile {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory=$true, Position=0)]
+    [string]$Path
+  )
+
+  $files = Get-ChildItem -LiteralPath $Path -File -ErrorAction Stop
+  if (-not $files) { return @() }
+
+  $oldest = ($files | Sort-Object LastWriteTime | Select-Object -First 1).LastWriteTime
+  $newest = ($files | Sort-Object LastWriteTime | Select-Object -Last 1).LastWriteTime
+
+  $spanDays = [math]::Abs((New-TimeSpan -Start $oldest -End $newest).TotalDays)
+
+  if ($spanDays -lt 15) { $fmt = 'yyyy-MM-dd' }
+  elseif ($spanDays -lt 365) { $fmt = 'yyyy-MM' }
+  else { $fmt = 'yyyy' }
+
+  function _FormatTopExts {
+    param([object[]]$GroupFiles)
+
+    $extGroups =
+      $GroupFiles |
+      Group-Object { if ($_.Extension) { $_.Extension.ToLowerInvariant() } else { '(noext)' } } |
+      Sort-Object Count,Name -Descending
+
+    if (-not $extGroups -or $extGroups.Count -eq 0) { return "" }
+
+    if ($extGroups.Count -eq 1) {
+      $only = $extGroups[0].Name
+      if ($only -eq '(noext)') { return "all (noext)" }
+      return "all $only"
+    }
+
+    $top3 = $extGroups | Select-Object -First 3
+    $s = ($top3 | ForEach-Object { "$($_.Count) $($_.Name)" }) -join ', '
+    if ($extGroups.Count -gt 3) { $s += ", ..." }
+    $s
+  }
+
+  $files |
+    Group-Object { $_.LastWriteTime.ToString($fmt) } |
+    ForEach-Object {
+      $sum = ($_.Group | Measure-Object Length -Sum).Sum
+      [pscustomobject]@{
+        period   = $_.Name
+        count    = $_.Count
+        total_mb = [math]::Round($sum / 1MB, 2)
+        top_exts = _FormatTopExts -GroupFiles $_.Group
+        oldest   = $oldest
+        newest   = $newest
+      }
+    } |
+    Sort-Object Count,Name -Descending
+}
+
+
+<#
+.SYNOPSIS
+Formats a directory file profile into a concise narrative string.
+
+.OUTPUTS
+Produces a string containing:
+- Oldest and newest timestamps taken from the provided profile objects
+- One sentence per included period with size, file count, and top_exts
+
+.DESCRIPTION
+May throw if the pipeline input cannot be enumerated or if required
+fields are not present.
+
+.INPUTS
+Accepts profile objects from the pipeline.
+
+.PARAMETER Profile
+The profile objects to summarize. Each object should include:
+period, count, total_mb, top_exts, oldest, newest.
+
+.PARAMETER MaxPeriods
+When greater than 0, limits the number of period sentences emitted.
+
+.PARAMETER SingleLine
+When set, emits a single-line narrative; otherwise emits multiple lines.
+
+.EXAMPLE
+Get-DirFileProfile C:\WINDOWS | Format-DirFileProfileNarrative
+#>
+function Format-DirFileProfileNarrative {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory=$true, ValueFromPipeline=$true)]
+    [object[]]$Profile,
+
+    [int]$MaxPeriods = 0,
+
+    [switch]$SingleLine
+  )
+
+  begin { $all = New-Object System.Collections.Generic.List[object] }
+  process { foreach ($p in $Profile) { [void]$all.Add($p) } }
+  end {
+    if ($all.Count -eq 0) { return "" }
+
+    $oldest = ($all | Select-Object -First 1).oldest
+    $newest = ($all | Select-Object -First 1).newest
+
+    $periods = $all | Sort-Object period
+    if ($MaxPeriods -gt 0 -and $periods.Count -gt $MaxPeriods) {
+      $periods = $periods | Select-Object -First $MaxPeriods
+    }
+
+    $parts = New-Object System.Collections.Generic.List[string]
+    $parts.Add("Oldest file at $oldest. Newest at $newest.")
+
+    foreach ($p in $periods) {
+      $mb = $p.total_mb
+      $cnt = $p.count
+      $per = $p.period
+      $exts = $p.top_exts
+      if ($exts) { $parts.Add("$mb MB in $cnt files during $per ($exts).") }
+      else { $parts.Add("$mb MB in $cnt files during $per.") }
+    }
+
+    if ($SingleLine) { return ($parts -join ' ') }
+    ($parts -join [Environment]::NewLine)
+  }
+}
+
 function Get-AllDCIPs {
 <#
 .SYNOPSIS
@@ -4712,7 +4863,16 @@ function HealthTest-LargeDirectories {
 
     foreach ($dir in Find-LargeDirectory -Path 'C:\' -Threshold 10000 -SkipPaths @("C:\windows\servicing","C:\windows\WinSxS")) {
         $foundLargeDirectory = $true
-        Log-Warning "Directory $($dir.Path) has more than 10000 child items" -Comment "$($dir.ItemsCount) items found"
+        $comment = "$($dir.ItemsCount) items found"
+        try {
+            $profileComment = Get-DirFileProfile $dir.Path | Format-DirFileProfileNarrative -SingleLine -ErrorAction Stop
+            if (-not [string]::IsNullOrWhiteSpace($profileComment)) {
+                $comment = $profileComment
+            }
+        }
+        catch {}
+
+        Log-Warning "Directory $($dir.Path) has more than 10000 child items" -Comment $comment
     }
 
     if (-not $foundLargeDirectory) {
