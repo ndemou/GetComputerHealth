@@ -8,9 +8,9 @@ Installation is extremely easy. Once you spend a few minutes getting familiar wi
 
 <img width="1086" height="251" alt="Example of the report you receive via email" src="https://github.com/user-attachments/assets/9da7e7f7-c1ef-4f3e-9d47-d164a96b2d4f" />
 
-# Status / Who this code is for
+# Status & Is this code for you?
 
-This code is actively used in production across several environments (multiple servers), but as far as I know, only by me (the author). 
+This code is actively used in production across several domains (multiple servers), but as far as I know, only by me (the author). 
 
 Although everything seems to work, I'm still at an early stage and thus, large refactoring of code and new tests are expected.
 
