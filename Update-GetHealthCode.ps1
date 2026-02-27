@@ -214,6 +214,7 @@ Write-Host -for DarkGray "Checking for code updates (I will backup local files b
 $tmdDir = New-EmptyTempDirectory -Name "Update-GetHealthCode"
 $_=Sync-WebFile -FileName 'lib-write-log-objects.ps1'    -BaseUri $URI -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
 $_=Sync-WebFile -FileName 'lib-health-tests.ps1'         -BaseUri $URI -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+$_=Sync-WebFile -FileName 'lib-helpers-for-health-tests.ps1' -BaseUri $URI -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
 $_=Sync-WebFile -FileName 'Get-ComputerHealth.ps1'       -BaseUri $URI -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
 $_=Sync-WebFile -FileName 'Invoke-GetComputerHealth.ps1' -BaseUri $URI -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
 $_=Sync-WebFile -FileName 'Send-Message.ps1'             -BaseUri $URI -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
@@ -224,3 +225,4 @@ if ($updated) {
     & c:\it\bin\Update-GetHealthCode.ps1
     return
 }
+
