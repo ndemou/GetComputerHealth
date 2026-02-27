@@ -2353,7 +2353,7 @@ function HealthTest-SysvolNetlogonAccessible{
       $ok1 = Test-Path "\\$dc\SYSVOL"
       if (!$ok1) {Log-failure "'\\$dc\SYSVOL' not reachable"}
       $ok2 = Test-Path "\\$dc\NETLOGON"
-      if (!$ok1) {Log-failure "'\\$dc\NETLOGON' not reachable"}
+      if (!$ok2) {Log-failure "'\\$dc\NETLOGON' not reachable"}
       if(-not($ok1 -and $ok2)){ $bad += $dc.HostName }
     }
     $pass = ($bad.Count -eq 0)
