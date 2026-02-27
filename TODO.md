@@ -339,3 +339,45 @@ $names_of_inst_sw|%{echo "$_ ~ $($env:computername)"}
 }
 
 ```
+
+## Other
+
+  * Config files should be in ProgramData instead of c:\it\config
+  * Use [string[]]$Arg1 everywhere for arguments that expect string arrays
+    This style works like this:
+         -Arg1 test,foo,bar             --> @("test","foo","bar")
+         -Arg1 test -Arg1 foo -Arg1 bar --> @("test","foo","bar")
+         -Arg1 @("test","foo","bar")    --> @("test","foo","bar")
+         -Arg1 "test,foo,bar"           --> "test,foo,bar" 
+         -Arg1 "test foo bar"           --> "test foo bar" 
+    If I don't expect the values to have spaces or commas I could fix the last 2 cases manually
+  * Implement -RemoveWhitelisting -ComputerName -Signature
+  * Some health tests like these:
+      - HealthTest-UnexpectedListeningPorts
+      - HealthTest-NonMicrosoftServices
+      - HealthTest-InstalledRolesFeatures
+      - HealthTest-InstalledPrograms (TODO)
+      - HealthTest-EnabledScheduledTasks (TODO)(I should include a hash of the action and the file(s) it runs)
+    are only meaningful if you have first established a baseline by
+    running them on an known good state. I should have an option
+    to exclude them from running (maybe -ExcludeTestsThatNeedBaseline)
+  * Add new baseline test: HealthTest-InstalledPrograms
+    See audit2 file C:\it\bin\old\Get-RemoteProgram.ps1
+  * If a HealthTest-... function name ends with _Tag like "_TagWJ" then 
+    it has a special meaning that dictates on which types of computers
+    it should run. Tags: 
+       D:domain joined 
+       W:workstation S:server C:domain controller 
+       H:hypervisor V:virtual machine L:laptop/mobile
+       T:slow test
+       F:needs the switch -Force to be invoked
+  * I could be monitoring the CPU and memory pressure *while* running all/most 
+    other tests. This has pros and cons so I can make it a separate check 
+    (e.g. some tests *do* streess the CPU (maybe RAM also). I wonder if I could
+    tag them so that they do not run while measuring CPU or RAM)
+  * Also measure CPU, board temperature.
+  * -AddWhitelisting should not be appending a line for an already existing 
+    signature but should rather be replacing the existing line (just in case the 
+    user changed the comment).
+    Note that everything works OK without this fix because the last config 
+    line wins. But it will make the exceptions file cleaner.
