@@ -429,82 +429,6 @@ function HealthTest-DfsReplicationState {
 
 <#
 .SYNOPSIS
-Runs key repadmin health checks and flags replication issues.
-
-.DESCRIPTION
-Executes:
-1) repadmin /replsum -- ensures all "fails" counters are 0 per DSA
-2) repadmin /showreps -- ensures each "Last attempt" was successful
-Emits Log-pass/Log-Warning/Log-Failure and returns $true only if both checks are clean.
-
-.OUTPUTS
-[bool] $true if both checks pass; otherwise $false, with per-issue messages.
-
-.EXAMPLE
-HealthTest-ADReplication
-Quick replication summary suitable for automation or CI-style health probes.
-
-.NOTES
-Relies on repadmin.exe availability and AD connectivity.
-#>
-function HealthTest-ADReplication {
-  $ok = $true
-
-  $repadminCmd = Get-Command repadmin.exe -ErrorAction SilentlyContinue
-  if ($repadminCmd) { $repadmin = $repadminCmd.Source } else { $repadmin = "$env:windir\system32\repadmin.exe" }
-  if (-not (Test-Path $repadmin)) {
-    Log-failure "repadmin.exe not found."
-  }
-
-  # --- Test 1: repadmin /replsum -> ensure all 'fails' are 0
-  $sumOut = & $repadmin /replsum 2>&1 | Out-String
-  if (-not $sumOut) {
-    Log-failure "No output from 'repadmin /replsum'."
-    $ok = $false
-  } else {
-    $bad = @()
-    $lines = $sumOut -split '\r?\n'
-    foreach ($ln in $lines) {
-      if ($ln -match '^\s*(?<DSA>\S+)\s+(?<Delta>(?:\d+d:)?(?:\d+h:)?\d+m:\d+s|\d+s)\s+(?<Fails>\d+)\s*/\s*(?<Total>\d+)\b') {
-        $dsa = $Matches.DSA; $fails = [int]$Matches.Fails; $total = [int]$Matches.Total
-        if ($fails -gt 0) { $bad += [pscustomobject]@{ DSA=$dsa; Fails=$fails; Total=$total } }
-      }
-    }
-    if ($bad.Count -gt 0) {
-      foreach ($b in $bad) {
-        Log-failure "Replication failures found on '$($b.DSA)'" -comment ("repadmin /replsum shows {0} fail(s) out of {1} total neighbors for this DSA." -f $b.Fails,$b.Total)
-      }
-      $ok = $false
-    } else {
-      Log-pass "repadmin /replsum: all DSAs report 0 fails."
-    }
-  }
-
-  # --- Test 2: repadmin /showreps -> all latest attempts 'was successful.'
-  $showOut = & $repadmin /showreps 2>&1 | Out-String
-  if (-not $showOut) {
-    Log-failure "No output from 'repadmin /showreps'."
-    $ok = $false
-  } else {
-    $attemptLines = ($showOut -split '\r?\n') | Where-Object { $_ -match 'Last attempt @' }
-    if (-not $attemptLines -or $attemptLines.Count -eq 0) {
-      Log-Warning "repadmin /showreps: no 'Last attempt' lines found." -comment "Execute 'repadmin /showreps' manually and diagnose."
-    } else {
-      $notOk = $attemptLines | Where-Object { $_ -notmatch 'was successful\.$' }
-      if ($notOk.Count -gt 0) {
-        foreach ($ln in $notOk) {
-          Log-Warning "repadmin /showreps: Found unsuccessful replication attempt" -comment ($ln.Trim())
-        }
-        $ok = $false
-      } else {
-        Log-pass "repadmin /showreps: all last attempts were successful."
-      }
-    }
-  }
-}
-
-<#
-.SYNOPSIS
 Smoke-tests DFSDIAG /TestDCs output for unexpected lines.
 
 .DESCRIPTION
@@ -1539,45 +1463,6 @@ function HealthTest-IisBindings {
     }
     if ($problem_found) {return}
     Log-pass "IIS bindings look sane"
-}
-
-<#
-.SYNOPSIS
-Quick AD replication check for this DC using RSAT cmdlets.
-.DESCRIPTION
-If the host is a Domain Controller and AD RSAT is available, queries
-Get-ADReplicationPartnerMetadata for LastReplicationResult across partners. Fails if any partner
-reports non-zero result; otherwise reports success. On non-DC hosts, returns $true (skips).
-.OUTPUTS
-[bool] $true if replication appears healthy for this DC; $false if errors or on query failure.
-.EXAMPLE
-HealthTest-ADReplication
-.NOTES
-Distinct from the repadmin-based variant; this version uses AD Web Services/RSAT.
-#>
-function HealthTest-ADReplication {
-  # 0(Workstation standalone),  1(Workstation domain joined), 2(Server standalone), 3(Server joined), 4(DC non-FSMO), 5(DC with FSMO role)
-  $domainRole = (Get-CimInstance Win32_ComputerSystem).DomainRole
-  $isHostDC = ($domainRole -in 4,5)
-
-  if ($isHostDC) {
-        $me = Get-ADDomainController -ErrorAction SilentlyContinue
-        if (-not $me -or -not $me.HostName) {
-            Log-Debug "Not a Domain Controller; skipping HealthTest-ADReplication."
-            return
-        }
-        if (-not (Get-ADDomain -ErrorAction SilentlyContinue)) { Log-notice "AD RSAT not available or not a DC"; return }
-        $md = Get-ADReplicationPartnerMetadata -Target $me.HostName -ErrorAction SilentlyContinue
-        $bad = @($md | Where-Object { $_.LastReplicationResult -ne 0 })
-        if ($bad.Count -gt 0) {
-          $details = $bad | ForEach-Object { "$($_.Partner) rc=$($_.LastReplicationResult) at $($_.LastSuccessfulSync)" }
-          Log-failure "AD replication errors: $($details -join ' | ')"; return
-        }
-        Log-pass "AD replication healthy for $($me.HostName)"; return
-  } else {
-      return # nothing to do -- not a DC
-  }
-
 }
 
 <#
@@ -4607,4 +4492,161 @@ function HealthTest-DnsSuffixBaseline {
     }
 }
 
+<#
+.SYNOPSIS
+HealthTest-ADReplicationDomainRepadmin: Domain-wide AD replication health using repadmin.exe (replsum + showreps). DC-only; fails if repadmin or AD DS prerequisites are missing.
+#>
+function HealthTest-ADReplicationDomainRepadmin {
+  $domainRole = (Get-CimInstance Win32_ComputerSystem -ErrorAction Stop).DomainRole
+  $isHostDC = ($domainRole -in 4,5)
 
+  if (-not $isHostDC) { return }
+
+  $repadminCmd = Get-Command repadmin.exe -ErrorAction SilentlyContinue
+  $repadmin = if ($repadminCmd -and $repadminCmd.Source) { $repadminCmd.Source } else { "$env:windir\system32\repadmin.exe" }
+
+  if (-not (Test-Path -LiteralPath $repadmin)) {
+    Log-failure "AD replication (repadmin): repadmin.exe not found; cannot run domain-wide checks."
+    return
+  }
+
+  $ok = $true
+
+  # --- Test 1: repadmin /replsum -> ensure all 'fails' are 0
+  try {
+    $sumOut = (& $repadmin /replsum 2>&1 | Out-String)
+  } catch {
+    Log-failure "AD replication (repadmin): failed to execute 'repadmin /replsum'." -comment $_.Exception.Message
+    return
+  }
+
+  if (-not $sumOut) {
+    Log-failure "AD replication (repadmin): no output from 'repadmin /replsum'."
+    $ok = $false
+  } else {
+    $bad = @()
+    foreach ($ln in ($sumOut -split '\r?\n')) {
+      if ($ln -match '^\s*(?<DSA>\S+)\s+(?<Delta>(?:\d+d:)?(?:\d+h:)?\d+m:\d+s|\d+s)\s+(?<Fails>\d+)\s*/\s*(?<Total>\d+)\b') {
+        $dsa = $Matches.DSA
+        $fails = [int]$Matches.Fails
+        $total = [int]$Matches.Total
+        if ($fails -gt 0) { $bad += [pscustomobject]@{ DSA=$dsa; Fails=$fails; Total=$total } }
+      }
+    }
+
+    if ($bad.Count -gt 0) {
+      foreach ($b in $bad) {
+        Log-failure "AD replication (repadmin): replsum reports failures on '$($b.DSA)'" -comment ("{0} fail(s) out of {1} neighbors." -f $b.Fails,$b.Total)
+      }
+      $ok = $false
+    } else {
+      Log-pass "AD replication (repadmin): replsum shows 0 fails for all DSAs."
+    }
+  }
+
+  # --- Test 2: repadmin /showreps -> all latest attempts 'was successful.'
+  try {
+    $showOut = (& $repadmin /showreps 2>&1 | Out-String)
+  } catch {
+    Log-failure "AD replication (repadmin): failed to execute 'repadmin /showreps'." -comment $_.Exception.Message
+    return
+  }
+
+  if (-not $showOut) {
+    Log-failure "AD replication (repadmin): no output from 'repadmin /showreps'."
+    $ok = $false
+  } else {
+    $attemptLines = ($showOut -split '\r?\n') | Where-Object { $_ -match 'Last attempt @' }
+    if (-not $attemptLines -or $attemptLines.Count -eq 0) {
+      Log-Warning "AD replication (repadmin): showreps produced no 'Last attempt' lines." -comment "Run 'repadmin /showreps' manually to inspect output."
+      $ok = $false
+    } else {
+      $notOk = @($attemptLines | Where-Object { $_ -notmatch 'was successful\.$' })
+      if ($notOk.Count -gt 0) {
+        foreach ($ln in $notOk) {
+          Log-failure "AD replication (repadmin): showreps has unsuccessful last attempt" -comment ($ln.Trim())
+        }
+        $ok = $false
+      } else {
+        Log-pass "AD replication (repadmin): showreps indicates all last attempts were successful."
+      }
+    }
+  }
+
+  if (-not $ok) {
+    Log-notice "AD replication (repadmin): issues detected."
+  }
+}
+
+
+<#
+.SYNOPSIS
+HealthTest-ADReplicationLocalRSAT: Local DC AD replication partner health using RSAT AD cmdlets (Get-ADReplicationPartnerMetadata). DC-only; fails if AD module/ADWS prerequisites are missing.
+#>
+function HealthTest-ADReplicationLocalRSAT {
+  $domainRole = (Get-CimInstance Win32_ComputerSystem -ErrorAction Stop).DomainRole
+  $isHostDC = ($domainRole -in 4,5)
+
+  if (-not $isHostDC) { return }
+
+  $adModuleOk = $true
+  try {
+    if (-not (Get-Module -ListAvailable -Name ActiveDirectory)) { $adModuleOk = $false }
+  } catch {
+    $adModuleOk = $false
+  }
+
+  if (-not $adModuleOk) {
+    Log-failure "AD replication (RSAT): ActiveDirectory module not available; cannot query replication partner metadata."
+    return
+  }
+
+  try {
+    Import-Module ActiveDirectory -ErrorAction Stop
+  } catch {
+    Log-failure "AD replication (RSAT): failed to import ActiveDirectory module." -comment $_.Exception.Message
+    return
+  }
+
+  $me = $null
+  try {
+    $me = Get-ADDomainController -ErrorAction Stop
+  } catch {
+    Log-failure "AD replication (RSAT): failed to identify local domain controller." -comment $_.Exception.Message
+    return
+  }
+
+  if (-not $me -or -not $me.HostName) {
+    Log-failure "AD replication (RSAT): could not determine local DC hostname."
+    return
+  }
+
+  try {
+    [void](Get-ADDomain -ErrorAction Stop)
+  } catch {
+    Log-failure "AD replication (RSAT): cannot query domain info (ADWS/permissions/connectivity issue)." -comment $_.Exception.Message
+    return
+  }
+
+  $md = $null
+  try {
+    $md = Get-ADReplicationPartnerMetadata -Target $me.HostName -ErrorAction Stop
+  } catch {
+    Log-failure "AD replication (RSAT): failed to query replication partner metadata for $($me.HostName)." -comment $_.Exception.Message
+    return
+  }
+
+  if (-not $md) {
+    Log-failure "AD replication (RSAT): no partner metadata returned for $($me.HostName)."
+    return
+  }
+
+  $bad = @($md | Where-Object { $_.LastReplicationResult -ne 0 })
+  if ($bad.Count -gt 0) {
+    $details = $bad | ForEach-Object { "$($_.Partner) rc=$($_.LastReplicationResult) at $($_.LastSuccessfulSync)" }
+    Log-failure "AD replication (RSAT): replication partner errors for $($me.HostName)." -comment ($details -join " | ")
+    return
+  }
+
+  Log-pass "AD replication (RSAT): replication partner results healthy for $($me.HostName)."
+}

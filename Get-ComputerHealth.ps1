@@ -710,7 +710,8 @@ if ($isHostDC) {
 	}
     Invoke-HealthTest "HealthTest-ADViewConsistency"
     Invoke-HealthTest "HealthTest-DfsReplicationState"
-    Invoke-HealthTest "HealthTest-ADReplication"
+    Invoke-HealthTest "HealthTest-ADReplicationLocalRSAT"
+    Invoke-HealthTest "HealthTest-ADReplicationDomainRepadmin"
     Invoke-HealthTest "HealthTest-DcDnsServerForwarder"
     Invoke-HealthTest "HealthTest-NtdsPathsLocation"
     Invoke-HealthTest "HealthTest-LdapSigningChannelBinding"
