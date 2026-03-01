@@ -1830,69 +1830,6 @@ function Test-IsRdsLicensingServer {
   return $false
 }
 
-function Get-SchannelProtocolState {
-  [CmdletBinding()]
-  param(
-    [ValidateSet('Server','Client')] [string]$Role='Server',
-    [string[]]$Protocol=@('SSL 3.0','TLS 1.0','TLS 1.1','TLS 1.2','TLS 1.3'),
-    [switch]$Detailed
-  )
-
-  $base='HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols'
-  $results=@()
-
-  $v=[Environment]::OSVersion.Version
-  $isServer=$env:ProductName -like '*Server*' -or (Get-Item 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion').GetValue('InstallationType') -like '*Server*'
-  $tls13Supported = ($isServer -and ($v.Major -ge 10 -and $v.Build -ge 20348)) -or ((-not $isServer) -and ($v.Major -ge 10 -and $v.Build -ge 22000))
-
-  function Get-EffectiveState($keyPath){
-    $enabled=$null; $disabledByDefault=$null; $src='OS default'; $state='Enabled'
-    if(Test-Path $keyPath){
-      try{
-        $props=Get-ItemProperty -Path $keyPath -ErrorAction Stop
-        if($props.PSObject.Properties.Name -contains 'Enabled'){ $enabled=[uint32]$props.Enabled }
-        if($props.PSObject.Properties.Name -contains 'DisabledByDefault'){ $disabledByDefault=[uint32]$props.DisabledByDefault }
-      }catch{}
-    }
-    if($enabled -ne $null){
-      if($enabled -eq 0){ $state='Disabled'; $src='Enabled=0' } else { $state='Enabled'; $src='Enabled=1/FFFF' }
-    } else {
-      if($disabledByDefault -ne $null -and $disabledByDefault -eq 1){ $state='Disabled'; $src='DisabledByDefault=1' } else { $state='Enabled'; $src='OS default' }
-    }
-    ,@($state,$src,$enabled,$disabledByDefault)
-  }
-
-  foreach($proto in $Protocol){
-    $key=Join-Path (Join-Path $base $proto) $Role
-    $eff = Get-EffectiveState $key
-    $current=$eff[0]; $source=$eff[1]; $enabledRaw=$eff[2]; $disabledRaw=$eff[3]
-
-    $rec='No requirement'; $note=''
-    if($proto -in 'SSL 3.0','TLS 1.0','TLS 1.1'){ $rec='Disabled'; $note='Disable legacy protocols' }
-    elseif($proto -eq 'TLS 1.2'){ $rec='Enabled'; $note='Keep TLS 1.2 enabled' }
-    elseif($proto -eq 'TLS 1.3'){
-      if($tls13Supported){ $rec='Enabled'; $note='OS supports TLS 1.3: enable it' }
-      else { $rec='No requirement'; $note='TLS 1.3 not required on this OS' }
-    }
-
-    $results += [pscustomobject]@{
-      Computer=$env:COMPUTERNAME
-      Protocol=$proto
-      Role=$Role
-      CurrentState=$current
-      Source=$source
-      RecomendedState=$rec
-      Note=$note
-      Key=$key
-      EnabledRaw=$enabledRaw
-      DisabledByDefaultRaw=$disabledRaw
-    }
-  }
-
-  if($Detailed){ $results }
-  else { $results | Select-Object Computer,Protocol,Role,CurrentState,Source,RecomendedState,Note }
-}
-
 <#
 .SYNOPSIS  Check a drive/path and emit a status; returns an object with details.
 .PARAMETER PathOrDrive  Drive letter or any path.
