@@ -8,11 +8,11 @@ Executes many health-test functions (named `HealthTest-*`) and emits their resul
 Supports:
 - Listing available built-in tests (`-ListAllBuiltInTests`).
 - Running only selected tests (`-OnlyTheseTests`) and/or skipping specific tests (`-ExcludeTests`).
-- Loading and running custom tests by dot-sourcing `.ps1` files from a folder or a single `.ps1` path (`-IncludeTestsFromFolder`) and invoking any `CustomHealthTest-*` functions they define.
+- Loading and running custom tests from `.ps1` files in an isolated module scope (`-IncludeTestsFromFolder`) and invoking any `CustomHealthTest-*` functions they define.
 - Suppressing expected notices/warnings/failures by 8-hex "signature" hashes, either temporarily for the current run (`-WhitelistSigs`) or by appending a permanent suppression entry (`-AddWhitelisting`) to a suppression file.
 
 Notable side effects:
-- When `-IncludeTestsFromFolder` is used, dot-sources scripts (executes their top-level code) from the provided location.
+- When `-IncludeTestsFromFolder` is used, custom scripts are loaded in a temporary module scope (top-level code still executes, but does not run in this script's scope/function table).
 - The health tests themselves may perform read/write operations depending on their implementation (this script invokes them; it does not enforce read-only behavior).
 
 Idempotency:
@@ -52,7 +52,7 @@ Default: empty (show all). Typical value: `DIP`
 (Parameter set: Run) One or more function names to skip (treated as a list; values may be space/comma separated).
 
 .PARAMETER IncludeTestsFromFolder
-(Parameter set: Run) Path to a folder containing `.ps1` files (or a single `.ps1` path). Files are dot-sourced; any functions named `CustomHealthTest-*` discovered are invoked.
+(Parameter set: Run) Path to a folder containing `.ps1` files (or a single `.ps1` path). Files are loaded in an isolated module scope; any functions named `CustomHealthTest-*` discovered are invoked.
 
 .PARAMETER DebugSkipSlowTests
 (Parameter set: Run) Skips a predefined subset of "slow" built-in tests (those gated by the script's `$DebugSkipSlowTests` check).
@@ -102,7 +102,7 @@ $out | Out-GridView
 .NOTES
 - Elevation is enforced for normal runs and for whitelisting operations.
 - Permanent suppression file: `C:\it\config\Get-ComputerHealth.sigs-to-suppress.txt`.
-- Custom tests: dot-sourced scripts may execute arbitrary code on import; only functions named `CustomHealthTest-*` are invoked automatically.
+- Custom tests: scripts may execute arbitrary code on import; files are loaded in temporary module scope and only functions named `CustomHealthTest-*` are invoked automatically.
 #>
 
 [CmdletBinding(DefaultParameterSetName='Run')]
@@ -415,11 +415,8 @@ function Invoke-HealtTestsFromFolder {
     return
   }
 
-  $before = @{}
-  Get-ChildItem Function:\ -ErrorAction SilentlyContinue | ForEach-Object { $before[$_.Name] = $true }
-
   if(-not (Test-Path -LiteralPath $resolved -PathType Container)){
-    if ($resolved -like ".ps1") {
+    if ($resolved -like "*.ps1") {
         $files = @($resolved)
     } else {
         Log-debug "Path -IncludeTestsFromFolder $FolderPath was ignored because it's neither a folder nor a ps1 script"
@@ -433,34 +430,42 @@ function Invoke-HealtTestsFromFolder {
   foreach($f in $files){
     Log-debug "Found script $($f.name) in custom tests folder $resolved"
     try {
-      . $f.FullName
+      $m = New-Module -ArgumentList $f.FullName -ScriptBlock {
+        param($Path)
+        . $Path
+      }
+
+      $custom = & $m {
+        Get-Command -CommandType Function -Name 'CustomHealthTest-*' -ErrorAction SilentlyContinue
+      }
+
+      if (-not $custom) {
+        Log-debug "No CustomHealthTest-* functions found in $($f.FullName)"
+        continue
+      }
+
       $fileImported = $true
+
+      foreach($fn in $custom){
+        $existing = Get-Item -Path ("Function:\{0}" -f $fn.Name) -ErrorAction SilentlyContinue
+        try {
+          Set-Item -Path ("Function:\{0}" -f $fn.Name) -Value $fn.ScriptBlock -Force
+          Invoke-HealthTest $fn.Name
+        } finally {
+          if ($existing) {
+            Set-Item -Path ("Function:\{0}" -f $fn.Name) -Value $existing.ScriptBlock -Force
+          } else {
+            Remove-Item -Path ("Function:\{0}" -f $fn.Name) -ErrorAction SilentlyContinue
+          }
+        }
+      }
     } catch {
-      Log-failure "Dot-source failed for $($f.FullName): $($_.Exception.Message)"
+      Log-failure "Custom test import failed for $($f.FullName): $($_.Exception.Message)"
     }
   }
   if (!$fileImported) {return}
-  
-  log-info "Invoke-HealtTestsFromFolder imported at least one file. Will invoke custom health tests."
 
-  $after = @{}
-  Get-ChildItem Function:\ -ErrorAction SilentlyContinue | ForEach-Object { $after[$_.Name] = $true }
-
-  $foundExtraFunction = $false
-  $added = New-Object System.Collections.Generic.List[string]
-  foreach($name in $after.Keys){
-    if(-not $before.ContainsKey($name)){
-        $foundExtraFunction = $true
-        if ($name -like "CustomHealthTest-*") {
-            Invoke-HealthTest $name
-        } else {
-            log-debug "Ignoring function $name (doesn't start with 'CustomHealthTest-')"
-        }
-    }
-  }
-  if (!$foundExtraFunction) {
-    Log-warning "Found no extra function in $FolderPath."
-  }
+  log-info "Invoke-HealtTestsFromFolder imported at least one file with CustomHealthTest-* functions."
 }
 
 function Write-UsageHelp {
