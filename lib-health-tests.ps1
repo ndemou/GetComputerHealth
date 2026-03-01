@@ -4632,7 +4632,7 @@ function HealthTest-ADReplicationLocalRSAT {
   try {
     $md = Get-ADReplicationPartnerMetadata -Target $me.HostName -ErrorAction Stop
   } catch {
-    Log-failure "AD replication (RSAT): failed to query replication partner metadata for $($me.HostName)." -comment $_.Exception.Message
+    Log-failure "Exception from: Get-ADReplicationPartnerMetadata -Target $($me.HostName)" -comment $_.Exception.Message
     return
   }
 
