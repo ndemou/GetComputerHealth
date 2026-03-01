@@ -174,7 +174,9 @@ $VERSION="1.4.0"
 # Configuration
 #
 
-$global:SUPPRESS_SIGNATURES_PATH = 'C:\it\config\Get-ComputerHealth.sigs-to-suppress.txt'
+$script:Config = [pscustomobject]@{
+  SuppressSignaturesPath = 'C:\it\config\Get-ComputerHealth.sigs-to-suppress.txt'
+}
 
 #------------------------------------------
 # Dot source libraries of functions
@@ -522,10 +524,10 @@ if ($AddWhitelisting ){
         if(-not $ok){$ok=[DateTime]::TryParse($Until,[System.IFormatProvider]$Culture,[System.Globalization.DateTimeStyles]::None,[ref]$dt)}
         if(-not $ok){throw "Invalid date: `$Until"}
         $line='{0} UNTIL {1:yyyy-MM-dd} # {2:yyyy-MM-dd HH:mm} # {3}' -f $Signature,$dt,(Get-Date),$Comment
-        Add-AsciiLine -Line $line -Path $global:SUPPRESS_SIGNATURES_PATH
+        Add-AsciiLine -Line $line -Path $script:Config.SuppressSignaturesPath
     } else {
         $line = "$Signature # $(Get-Date -format yyyy-MM-dd` HH:mm) # $Comment"
-        Add-AsciiLine -Line $line -Path $global:SUPPRESS_SIGNATURES_PATH
+        Add-AsciiLine -Line $line -Path $script:Config.SuppressSignaturesPath
     }
     return
 }
@@ -546,7 +548,7 @@ if (!$OutputConsoleMessages -and !$OutputObjects) {
 Initialize-LogSystem `
   -OutputConsoleMessages $OutputConsoleMessages.IsPresent `
   -HideStr $Hide `
-  -SuppressionFilePath $global:SUPPRESS_SIGNATURES_PATH `
+  -SuppressionFilePath $script:Config.SuppressSignaturesPath `
   -AdditionalSuppressedSignatures $WhitelistSigs
 #|
 #|
