@@ -711,7 +711,6 @@ if ($isHostDC) {
     Invoke-HealthTest "HealthTest-ADViewConsistency"
     Invoke-HealthTest "HealthTest-DfsReplicationState"
     Invoke-HealthTest "HealthTest-ADReplicationLocalRSAT"
-    Invoke-HealthTest "HealthTest-ADReplicationDomainRepadmin"
     Invoke-HealthTest "HealthTest-DcDnsServerForwarder"
     Invoke-HealthTest "HealthTest-NtdsPathsLocation"
     Invoke-HealthTest "HealthTest-LdapSigningChannelBinding"
@@ -726,6 +725,7 @@ if ($isHostDC) {
     #---END TODO---------------------
 
     # TODO: These tests are domain-wide and there's no need to execute them from all DCs -- if they get executed by one DC we are OK
+    Invoke-HealthTest "HealthTest-ADReplicationDomainRepadmin"
     Invoke-HealthTest "HealthTest-SysvolNetlogonAccessible"
     Invoke-HealthTest "HealthTest-SchemaVersionConsistency"
     Invoke-HealthTest "HealthTest-TombstoneLifetime"
