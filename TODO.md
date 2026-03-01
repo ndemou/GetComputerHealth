@@ -326,11 +326,11 @@ function Get-NormalizedSoftwareName {
 $installed=Get-InstalledSoftware
 
 $filtered = ($installed | ?{
-	-not(
-		$_.Publisher -like '*Microsoft Windows*' `
-		-or ($_.Publisher -like '*Microsoft*' -and ($_.name -match '^Microsoft (Visual C\+\+|Windows desktop runtime|.NET Host|.NET Runtime|Edge)(\b| |$)')) `
-		-or ($_.Publisher -eq 'CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US' -and $_.Source -eq 'appx')
-	)
+    -not(
+        $_.Publisher -like '*Microsoft Windows*' `
+        -or ($_.Publisher -like '*Microsoft*' -and ($_.name -match '^Microsoft (Visual C\+\+|Windows desktop runtime|.NET Host|.NET Runtime|Edge)(\b| |$)')) `
+        -or ($_.Publisher -eq 'CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US' -and $_.Source -eq 'appx')
+    )
 })
 
 $names_of_inst_sw=($filtered.name | %{Get-NormalizedSoftwareName $_} | sort -unique)
@@ -339,6 +339,263 @@ $names_of_inst_sw|%{echo "$_ ~ $($env:computername)"}
 }
 
 ```
+
+## New test: Evaluate secure communication configurations
+
+Most of the servers will emit these failures:
+    > FAILURE: [337007c8] .NET 4.x (64-bit) expected Enabled; got SchUseStrongCrypto=1; SystemDefaultTlsVersions=<missing>
+    >        Applies to: Client+Server.
+    >        Key: HKLM:\SOFTWARE\Microsoft\.NETFramework\v4.0.30319.
+    > FAILURE: [9045cbcf] .NET 4.x (32-bit) expected Enabled; got SchUseStrongCrypto=1; SystemDefaultTlsVersions=<missing>
+    >        Applies to: Client+Server.
+    >        Key: HKLM:\SOFTWARE\WOW6432Node\Microsoft\.NETFramework\v4.0.30319.
+
+```
+<#
+.SYNOPSIS
+Evaluates the configured state of secure communication protocols against
+target security states.
+
+.OUTPUTS
+Produces a custom object for each evaluated configuration component:
+  AuditType            : The category of the evaluation.
+  Computer             : The local machine name.
+  Protocol_Component   : The evaluated protocol or framework.
+  CurrentState         : The active operational state.
+  Source               : The origin of the current state.
+  RecommendedState     : The target security state.
+  Note                 : Context regarding the recommendation.
+  Key                  : The evaluated registry path.
+  EnabledRaw           : The raw numerical enabled value.
+  DisabledByDefaultRaw : The raw numerical disabled value.
+
+.DESCRIPTION
+Reads configuration data for secure communication protocols and application
+framework settings. The effective state accounts for explicit values and
+default behaviors tied to the operating system version. Recommendations
+reflect the capability of the host operating system to support specific
+protocols. Read operations encountering access issues may result in
+terminating errors.
+
+.PARAMETER IncludeDotNetCheck
+When set, also evaluates .NET framework cryptography settings
+#>
+function Get-SchannelProtocolState {
+    [CmdletBinding()]
+    param(
+        [ValidateSet('Server','Client')] [string]$Role = 'Server',
+        [string[]]$Protocol = @('SSL 3.0','TLS 1.0','TLS 1.1','TLS 1.2','TLS 1.3'),
+        [switch]$IncludeDotNetCheck = $true
+    )
+
+    $base = 'HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols'
+
+    $v = [Environment]::OSVersion.Version
+    $installType = (Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion' -Name 'InstallationType' -ErrorAction SilentlyContinue).InstallationType
+    $isServer = $false
+    if ($installType -like '*Server*') { $isServer = $true }
+
+    $tls13Supported = $false
+    if ($isServer) {
+        if ($v.Major -ge 10 -and $v.Build -ge 20348) { $tls13Supported = $true }
+    } else {
+        if ($v.Major -ge 10 -and $v.Build -ge 22000) { $tls13Supported = $true }
+    }
+
+    function Get-EffectiveState {
+        param([string]$KeyPath, [string]$ProtocolName)
+
+        $enabled = $null
+        $disabledByDefault = $null
+        $src = 'OS default'
+        $state = 'Enabled'
+
+        if (Test-Path $KeyPath) {
+            try {
+                $props = Get-ItemProperty -Path $KeyPath -ErrorAction Stop
+                if ($null -ne $props.Enabled) { $enabled = [uint32]$props.Enabled }
+                if ($null -ne $props.DisabledByDefault) { $disabledByDefault = [uint32]$props.DisabledByDefault }
+            } catch {
+            }
+        }
+
+        if ($null -ne $enabled) {
+            if ($enabled -eq 0) { $state = 'Disabled'; $src = 'Enabled=0' }
+            else { $state = 'Enabled'; $src = 'Enabled=1/FFFF' }
+        }
+        elseif ($null -ne $disabledByDefault) {
+            if ($disabledByDefault -eq 1) { $state = 'Disabled'; $src = 'DisabledByDefault=1' }
+            else { $state = 'Enabled'; $src = 'DisabledByDefault=0' }
+        }
+        else {
+            if ($ProtocolName -in 'SSL 3.0','TLS 1.0','TLS 1.1') { $state = 'Disabled'; $src = 'OS default' }
+            else { $state = 'Enabled'; $src = 'OS default' }
+        }
+
+        ,@($state, $src, $enabled, $disabledByDefault)
+    }
+
+    foreach ($proto in $Protocol) {
+        $key = Join-Path (Join-Path $base $proto) $Role
+        $eff = Get-EffectiveState -KeyPath $key -ProtocolName $proto
+        $current = $eff[0]; $source = $eff[1]; $enabledRaw = $eff[2]; $disabledRaw = $eff[3]
+
+        $rec = 'No requirement'
+        $note = ''
+        $fix = $null
+
+        if ($proto -in 'SSL 3.0','TLS 1.0','TLS 1.1') {
+            $rec = 'Disabled'
+            $note = 'Disable legacy protocol.'
+            $fix = @"
+Set: Enabled=0 (DWORD) and DisabledByDefault=1 (DWORD)
+Example:
+  New-Item -Path '$key' -Force | Out-Null
+  New-ItemProperty -Path '$key' -Name Enabled -PropertyType DWord -Value 0 -Force | Out-Null
+  New-ItemProperty -Path '$key' -Name DisabledByDefault -PropertyType DWord -Value 1 -Force | Out-Null
+"@
+        }
+        elseif ($proto -eq 'TLS 1.2') {
+            $rec = 'Enabled'
+            $note = 'Keep TLS 1.2 enabled.'
+            $fix = @"
+Set: Enabled=1 (DWORD) and DisabledByDefault=0 (DWORD)
+Example:
+  New-Item -Path '$key' -Force | Out-Null
+  New-ItemProperty -Path '$key' -Name Enabled -PropertyType DWord -Value 1 -Force | Out-Null
+  New-ItemProperty -Path '$key' -Name DisabledByDefault -PropertyType DWord -Value 0 -Force | Out-Null
+"@
+        }
+        elseif ($proto -eq 'TLS 1.3') {
+            if ($tls13Supported) {
+                $rec = 'Enabled'
+                $note = 'OS supports TLS 1.3; enable it.'
+                $fix = @"
+Set: Enabled=1 (DWORD) and DisabledByDefault=0 (DWORD)
+Example:
+  New-Item -Path '$key' -Force | Out-Null
+  New-ItemProperty -Path '$key' -Name Enabled -PropertyType DWord -Value 1 -Force | Out-Null
+  New-ItemProperty -Path '$key' -Name DisabledByDefault -PropertyType DWord -Value 0 -Force | Out-Null
+"@
+            } else {
+                $rec = 'No requirement'
+                $note = 'TLS 1.3 not required on this OS.'
+                $fix = $null
+            }
+        }
+
+        [pscustomobject]@{
+            AuditType  = 'Schannel'
+            AppliesTo  = $Role
+            Name       = "$proto"
+            Current    = $current
+            Expected   = $rec
+            Evidence   = "Source=$source"
+            Key        = $key
+            EnabledRaw = $enabledRaw
+            DisabledByDefaultRaw = $disabledRaw
+            Note       = $note
+            Fix        = $fix
+        }
+    }
+
+    if ($IncludeDotNetCheck) {
+        $dotNetPaths = @(
+            @{ Arch = '64-bit'; Path = 'HKLM:\SOFTWARE\Microsoft\.NETFramework\v4.0.30319' },
+            @{ Arch = '32-bit'; Path = 'HKLM:\SOFTWARE\WOW6432Node\Microsoft\.NETFramework\v4.0.30319' }
+        )
+
+        foreach ($d in $dotNetPaths) {
+            $path = $d.Path
+            $arch = $d.Arch
+
+            $strongCrypto = $null
+            $systemTls = $null
+
+            if (Test-Path $path) {
+                $props = Get-ItemProperty -Path $path -ErrorAction SilentlyContinue
+                if ($null -ne $props.SchUseStrongCrypto) { $strongCrypto = $props.SchUseStrongCrypto }
+                if ($null -ne $props.SystemDefaultTlsVersions) { $systemTls = $props.SystemDefaultTlsVersions }
+            }
+
+            $scText = '<missing>'
+            $stText = '<missing>'
+            if ($null -ne $strongCrypto) { $scText = [string]$strongCrypto }
+            if ($null -ne $systemTls) { $stText = [string]$systemTls }
+
+            $isCompliant = $false
+            if ($strongCrypto -eq 1 -and $systemTls -eq 1) { $isCompliant = $true }
+
+            $fix = @"
+New-Item -Path '$path' -Force | Out-Null
+New-ItemProperty -Path '$path' -Name SchUseStrongCrypto -PropertyType DWord -Value 1 -Force | Out-Null
+New-ItemProperty -Path '$path' -Name SystemDefaultTlsVersions -PropertyType DWord -Value 1 -Force | Out-Null
+"@
+
+            [pscustomobject]@{
+                AuditType = '.NET'
+                AppliesTo = 'Client+Server'
+                Name      = ".NET 4.x ($arch)"
+                Current   = if ($isCompliant) { 'Enabled' } else { 'Noncompliant' }
+                Expected  = 'Enabled'
+                Evidence  = "SchUseStrongCrypto=$scText; SystemDefaultTlsVersions=$stText"
+                Key       = $path
+                Note      = 'Both DWORD values must be 1.'
+                Fix       = $fix
+            }
+        }
+    }
+}
+
+<#
+.SYNOPSIS
+Evaluates secure communication configurations against target states.
+#>
+function HealthTest-SchannelCompliance {
+    [CmdletBinding()]
+    param()
+
+    foreach ($role in @('Server','Client')) {
+        $results = Get-SchannelProtocolState -Role $role -IncludeDotNetCheck:$false
+
+        foreach ($item in $results) {
+            if ($item.Expected -eq 'No requirement') { continue }
+
+            $subject = "Schannel $($item.Name) $role"
+
+            if ($item.Current -eq $item.Expected) {
+                log-pass "$subject = $($item.Current)" -comment "Evidence: $($item.Evidence). Key: $($item.Key)."
+            }
+            else {
+                $raw = @()
+                if ($null -ne $item.EnabledRaw) { $raw += "Enabled=$($item.EnabledRaw)" }
+                if ($null -ne $item.DisabledByDefaultRaw) { $raw += "DisabledByDefault=$($item.DisabledByDefaultRaw)" }
+                $rawText = ''
+                if ($raw.Count -gt 0) { $rawText = " Raw: " + ($raw -join ', ') + "." }
+
+                $msg = "$subject expected $($item.Expected); got $($item.Current)"
+                $c = "Evidence: $($item.Evidence).$rawText`nKey: $($item.Key).`nNote: $($item.Note)"
+                if ($item.Fix) { $c = $c + "`n`nFix (example):`n$($item.Fix)" }
+                log-failure $msg -comment $c
+            }
+        }
+    }
+
+    $dotNet = Get-SchannelProtocolState -Role 'Server' -IncludeDotNetCheck:$true | Where-Object { $_.AuditType -eq '.NET' }
+    foreach ($item in $dotNet) {
+        $subject = "$($item.Name)"
+        if ($item.Current -eq $item.Expected) {
+            log-pass "$subject = Enabled" -comment "Applies to: $($item.AppliesTo). Evidence: $($item.Evidence). Key: $($item.Key)."
+        }
+        else {
+            $msg = "$subject expected Enabled; got $($item.Evidence)"
+            $c = "Applies to: $($item.AppliesTo).`nKey: $($item.Key).`nNote: $($item.Note)`n`nFix (copy/paste):`n$($item.Fix)"
+            log-failure $msg -comment $c
+        }
+    }
+}
+```
+
 
 ## Other
 
