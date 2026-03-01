@@ -8,12 +8,10 @@ The function HealthTest-SysvolContentConsistency calculates the size and file co
 
 ### 1. Minor Logical Errors (`Test-NetConnectionFast` & `TimeSync`)
 
-**The Fix: Enforce IPv4 and Registry-Based Time Checks**
-
 **A. `Test-NetConnectionFast` (DNS ordering bug)**
 The original code fetches all IP addresses and arbitrarily picks the first one or filters clumsily. If a host has IPv6 but the network doesn't route it, the test fails even if IPv4 works.
 
-**Modified Logic:**
+**The Fix: Enforce IPv4 and Registry-Based Time Checks**
 
 ```powershell
     # Inside Test-NetConnectionFast process block:
@@ -37,7 +35,7 @@ The check `$currentTimeSource -eq 'Local CMOS Clock'` fails on non-English Windo
 
 **Suggestion:** Instead of parsing the localized text output of `w32tm /query /source`, check the **Registry** configuration, which is language-neutral.
 
-**Modified Logic:**
+**The Fix: **
 
 ```powershell
     # Replace the text comparison with a check on the configuration type
@@ -55,8 +53,6 @@ The check `$currentTimeSource -eq 'Local CMOS Clock'` fails on non-English Windo
 ---
 
 ### 2: False Positives in Driver Signing
-
-**The Fix: Use AppLocker or Catalog-Aware Classes**
 
 `Win32_PnPSignedDriver` and `Get-AuthenticodeSignature` are unreliable for modern drivers because they often look for an embedded signature in the `.sys` file. Many valid Microsoft/Intel/Realtek drivers are unsigned binary files whose signature lives in an external `.cat` (Catalog) file.
 
@@ -162,7 +158,7 @@ function Test-BitLockerRecoveryInAD($computerName){
 
 ```
 c:\it\bin\run-script-on-allDomainServers.ps1 -SkipHosts ac2,epsilonnet -code {
-function Get-InstalledSoftware {
+function Get-InstalledSW {
     #.SYNOPSIS
     # Gets an exhaustive list of all installed software, avoiding WMI/Win32_Product.
     #
@@ -258,8 +254,8 @@ function Get-InstalledSoftware {
                     Name              = $app.Name
                     Version           = $app.Version
                     Publisher         = $app.Publisher
-                    InstallDate       = $null # Appx doesn't expose standard install dates to this cmdlet
-                    UninstallString   = $null # Removed fake string per critique
+                    InstallDate       = $null # not exposed by Appx
+                    UninstallString   = $null # not exposed by Appx
                     RegistryKeyName   = $null
                     AppxPackageName   = $app.PackageFullName
                     Source            = "Appx"
@@ -323,19 +319,11 @@ function Get-NormalizedSoftwareName {
     }
 }
 
-$installed=Get-InstalledSoftware
-
-$filtered = ($installed | ?{
-    -not(
-        $_.Publisher -like '*Microsoft Windows*' `
-        -or ($_.Publisher -like '*Microsoft*' -and ($_.name -match '^Microsoft (Visual C\+\+|Windows desktop runtime|.NET Host|.NET Runtime|Edge)(\b| |$)')) `
-        -or ($_.Publisher -eq 'CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US' -and $_.Source -eq 'appx')
-    )
-})
-
-$names_of_inst_sw=($filtered.name | %{Get-NormalizedSoftwareName $_} | sort -unique)
-
-$names_of_inst_sw|%{echo "$_ ~ $($env:computername)"}
+function HealthTest-InstalledSW {
+    Get-InstalledSW | %{ 
+        $normalizedName = Get-NormalizedSoftwareName $_.Name
+        Log-Notice "Found this program installed: $normalizedName" -Comment "Full program name: $($_.Name); Publisher: $($_.Publisher); Installation Date: $($_.InstallDate)"
+    }
 }
 
 ```
@@ -599,7 +587,67 @@ function HealthTest-SchannelCompliance {
 
 ## Other
 
-  * Config files should be in ProgramData instead of c:\it\config
+  * Allow users to install somewhere besides C:\IT
+    Also, maybe config files should be in ProgramData instead of c:\IT\config
+    (but not readable by anyone except Admins)
+
+  * Implement -RemoveWhitelisting -ComputerName -Signature
+
+  * Some health tests like these:
+      - HealthTest-UnexpectedListeningPorts
+      - HealthTest-NonMicrosoftServices
+      - HealthTest-InstalledRolesFeatures
+      - HealthTest-InstalledSW (TODO)
+      - HealthTest-EnabledScheduledTasks (TODO)(I should include a hash of the action and the file(s) it runs)
+    are only meaningful if you have first established a baseline by
+    running them on an known good state. I should have an option
+    to exclude them from running (maybe -ExcludeTestsThatNeedBaseline)
+
+  * Allow tags in HealthTest- function names
+    E.g. "HealthTest-CheckSomething__sD-V__tS" means:
+      - Only perform this test on a system(s) that is 
+        domain joined(D) but not a VM (-V)
+      - This test is of type(t) slow(S)
+    Possible systems: 
+       D: domain joined 
+       W: workstation 
+       S: server 
+       C: domain controller 
+       H: hypervisor 
+       V: virtual machine 
+       L: laptop/mobile
+    Possible types: 
+       S: Slow
+       B: Baseline[1]
+    
+	**About Baseline Tests**
+	Baseline tests don't produce definitive pass/fail results.
+    Rather, they warn for everything they detect as if it's a failure 
+	and the user is responsible to suppress results that *are* accepted.
+    Examples of Baseline tests are those that list open ports or installed SW.
+    The first time a baseline test is run it automatically 
+    supresses all findings (except if -DontRecordBaseline is passed)
+    and appends a line to Get-ComputerHealth.sigs-to-suppress.txt to
+    note that the first-time supression was performed.
+    E.g. for a function named HealthTest-CheckSomething__s_D-V__t_S
+       `BASELINE_RECORDED_FOR: HealthTest-CheckSomething`
+	This allows you to add baseline tests to the library without
+	anoying the administrator with warnings. Code could be emmiting a Notice
+	for the suppressions it is adding:
+	  `Automatically suppressed this finding from new test 'HealthTest-OpenPorts': Found unexpected open port TCP:3389`
+
+  * I could be monitoring the CPU and memory pressure *while* running all/most 
+    other tests. This has pros and cons so I can make it a separate check 
+    (e.g. some tests *do* streess the CPU (maybe RAM also). I wonder if I could
+    tag them so that they do not run while measuring CPU or RAM)
+
+  * Also measure CPU, board temperature.
+
+  * -AddWhitelisting should be deleting any existing line for the signature.
+    Note that even without this fix, everything works as it should 
+    (because the last config line wins), but it's confusing to have
+    conflicting lines.
+
   * Use [string[]]$Arg1 everywhere for arguments that expect string arrays
     This style works like this:
          -Arg1 test,foo,bar             --> @("test","foo","bar")
@@ -608,33 +656,4 @@ function HealthTest-SchannelCompliance {
          -Arg1 "test,foo,bar"           --> "test,foo,bar" 
          -Arg1 "test foo bar"           --> "test foo bar" 
     If I don't expect the values to have spaces or commas I could fix the last 2 cases manually
-  * Implement -RemoveWhitelisting -ComputerName -Signature
-  * Some health tests like these:
-      - HealthTest-UnexpectedListeningPorts
-      - HealthTest-NonMicrosoftServices
-      - HealthTest-InstalledRolesFeatures
-      - HealthTest-InstalledPrograms (TODO)
-      - HealthTest-EnabledScheduledTasks (TODO)(I should include a hash of the action and the file(s) it runs)
-    are only meaningful if you have first established a baseline by
-    running them on an known good state. I should have an option
-    to exclude them from running (maybe -ExcludeTestsThatNeedBaseline)
-  * Add new baseline test: HealthTest-InstalledPrograms
-    See audit2 file C:\it\bin\old\Get-RemoteProgram.ps1
-  * If a HealthTest-... function name ends with _Tag like "_TagWJ" then 
-    it has a special meaning that dictates on which types of computers
-    it should run. Tags: 
-       D:domain joined 
-       W:workstation S:server C:domain controller 
-       H:hypervisor V:virtual machine L:laptop/mobile
-       T:slow test
-       F:needs the switch -Force to be invoked
-  * I could be monitoring the CPU and memory pressure *while* running all/most 
-    other tests. This has pros and cons so I can make it a separate check 
-    (e.g. some tests *do* streess the CPU (maybe RAM also). I wonder if I could
-    tag them so that they do not run while measuring CPU or RAM)
-  * Also measure CPU, board temperature.
-  * -AddWhitelisting should not be appending a line for an already existing 
-    signature but should rather be replacing the existing line (just in case the 
-    user changed the comment).
-    Note that everything works OK without this fix because the last config 
-    line wins. But it will make the exceptions file cleaner.
+
