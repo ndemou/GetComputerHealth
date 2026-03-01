@@ -1,5 +1,54 @@
 # TODO
 
+## Allow tags in HealthTest- function names and split lib-health-tests to mutiple files
+
+### Tags
+E.g. "HealthTest-CheckSomething__sD-V__tS" means:
+  - Only perform this test on a system(s) that is 
+    domain joined(D) but not a VM (-V)
+  - This test is of type(t) slow(S)
+```
+Possible systems: 
+   D: domain joined 
+   W: workstation 
+   S: server 
+   C: domain controller 
+   H: hypervisor 
+   V: virtual machine 
+   L: laptop/mobile
+Possible types: 
+   S: Slow
+   B: Baseline (see below)
+```
+
+### split lib-health-tests to mutiple files
+
+Split health tests logically in separate files (e.g. all DC tests together). 
+Allow Get-ComputerHealth to detect and import them automatically.
+Move helper functions and HealthTest- functions in the same file.
+
+### End game
+
+With these changes in place I can greatly simplify the main code of 
+Get-ComputerHealth.
+
+**About Baseline Tests**
+Baseline tests don't produce definitive pass/fail results.
+Rather, they warn for everything they detect as if it's a failure 
+and the user is responsible to suppress results that *are* accepted.
+Examples of Baseline tests are those that list open ports or installed SW.
+The first time a baseline test is run it automatically 
+supresses all findings (except if -DontRecordBaseline is passed)
+and appends a line to Get-ComputerHealth.sigs-to-suppress.txt to
+note that the first-time supression was performed.
+E.g. for a function named HealthTest-CheckSomething__s_D-V__t_S
+   `BASELINE_RECORDED_FOR: HealthTest-CheckSomething`
+This allows you to add baseline tests to the library without
+anoying the administrator with warnings. Code could be emmiting a Notice
+for the suppressions it is adding:
+  `Automatically suppressed this finding from new test 'HealthTest-OpenPorts': Found unexpected open port TCP:3389`
+
+
 ## HealthTest-SysvolContentConsistency
 The function HealthTest-SysvolContentConsistency calculates the size and file count of the entire `\\SYSVOL\...\Policies` tree across **all** Domain Controllers over the network. In a production environment with branch offices or many GPOs, this is dangerous. It generates massive WAN traffic. Since Health Tests are already running on every single DC you could in theory compute the hashes localy on each DC (and compute real hashes instead of the pseudo sigs that this function computes) and then exchange and compare them. This will be super fast even over WAN.
 
@@ -87,9 +136,8 @@ The check `$currentTimeSource -eq 'Local CMOS Clock'` fails on non-English Windo
 
 ```
 
-##  Consider if the following health tests are useful
+##  Consider if the following health tests are useful (GPT inspired)
 ```
-# GPT inspired. I'm not sure of whether it's OK
 # Run it and in about half the servers it complained it found "no backup signals"
 # .SYNOPSIS Looks for recent backup-related events and highlights failures or missing success signals.
 function HealthTest-BackupSignals {
@@ -141,7 +189,6 @@ function HealthTest-BackupSignals {
     Log-Warning "No clear successful backup signals within last $WarnHours h (but older backup activity exists)"
 }
 
-# GPT inspired. I'm not sure of whether it's OK
 # Verify BitLocker recovery objects for specific computer exists in AD
 function Test-BitLockerRecoveryInAD($computerName){
   $cn="$($computerName)$"
@@ -602,39 +649,6 @@ function HealthTest-SchannelCompliance {
     are only meaningful if you have first established a baseline by
     running them on an known good state. I should have an option
     to exclude them from running (maybe -ExcludeTestsThatNeedBaseline)
-
-  * Allow tags in HealthTest- function names
-    E.g. "HealthTest-CheckSomething__sD-V__tS" means:
-      - Only perform this test on a system(s) that is 
-        domain joined(D) but not a VM (-V)
-      - This test is of type(t) slow(S)
-    Possible systems: 
-       D: domain joined 
-       W: workstation 
-       S: server 
-       C: domain controller 
-       H: hypervisor 
-       V: virtual machine 
-       L: laptop/mobile
-    Possible types: 
-       S: Slow
-       B: Baseline[1]
-    
-	**About Baseline Tests**
-	Baseline tests don't produce definitive pass/fail results.
-    Rather, they warn for everything they detect as if it's a failure 
-	and the user is responsible to suppress results that *are* accepted.
-    Examples of Baseline tests are those that list open ports or installed SW.
-    The first time a baseline test is run it automatically 
-    supresses all findings (except if -DontRecordBaseline is passed)
-    and appends a line to Get-ComputerHealth.sigs-to-suppress.txt to
-    note that the first-time supression was performed.
-    E.g. for a function named HealthTest-CheckSomething__s_D-V__t_S
-       `BASELINE_RECORDED_FOR: HealthTest-CheckSomething`
-	This allows you to add baseline tests to the library without
-	anoying the administrator with warnings. Code could be emmiting a Notice
-	for the suppressions it is adding:
-	  `Automatically suppressed this finding from new test 'HealthTest-OpenPorts': Found unexpected open port TCP:3389`
 
   * I could be monitoring the CPU and memory pressure *while* running all/most 
     other tests. This has pros and cons so I can make it a separate check 
