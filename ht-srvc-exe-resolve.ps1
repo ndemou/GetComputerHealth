@@ -2931,7 +2931,7 @@ function Resolve-ServiceExecutable {
 #>
   [CmdletBinding()]
   param(
-    [Parameter(Mandatory)][string]$LaunchCommand,
+    [Parameter(Mandatory)][AllowEmptyString()][string]$LaunchCommand,
     [Parameter(Mandatory)][string]$ServiceName
   )
   
@@ -2955,6 +2955,21 @@ function Resolve-ServiceExecutable {
   $san = Normalize-CommandText $raw -NoDequote
   Write-Verbose "[Resolve-ServiceExecutable] OriginalLaunchCommand=<$raw>"
   Write-Verbose "[Resolve-ServiceExecutable] SanitizedCommandLine=<$san>"
+
+  if ([string]::IsNullOrWhiteSpace($san)) {
+    $warnings.Add("LaunchCommand is empty; cannot determine launcher or payload.")
+    return [pscustomobject]@{
+      OriginalLaunchCommand = $raw
+      ServiceName          = $ServiceName
+      SanitizedCommandLine = $san
+      LauncherExe          = $null
+      LauncherArgs         = ''
+      PayloadType          = 'Unknown'
+      PayloadPath          = $null
+      PayloadDetails       = $null
+      Warnings             = @($warnings)
+    }
+  }
 
   $extsExe = Get-PathExtList
 
@@ -3057,7 +3072,9 @@ function Resolve-ServiceExecutable {
         $payloadPath = $dllPath
         $payloadDetails = [pscustomobject]@{ ServiceDll=$svcDllNorm; Registry=$svcDllWhere }
       } else {
-        $warnings.Add("svchost.exe detected but ServiceDll/ServiceDllEx not found for '$ServiceName' (checked service key + Parameters, and base service if applicable).")
+        $warnings.Add("svchost.exe detected but ServiceDll/ServiceDllEx not found for '$ServiceName' (checked service key + Parameters, and base service if applicable). Falling back to launcher executable as payload path.")
+        $payloadPath = $launcherPath
+        $payloadDetails = [pscustomobject]@{ Fallback='LauncherExe'; Reason='No ServiceDll/ServiceDllEx found' }
       }
     } else {
       $payloadType='Exe'; $payloadPath=$launcherPath
