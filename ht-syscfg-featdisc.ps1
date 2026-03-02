@@ -1774,6 +1774,8 @@ function HealthTest-UnexpectedListeningPorts {
         }
     }
 
+    if (-not $bad) { Log-pass "Listening ports are within baseline" }
+}
 
 function HealthTest-SmbSigningRequired{
   if ((Get-PropValue -obj (Get-Service -Name LanmanServer) -name Status) -ne 'running') {
