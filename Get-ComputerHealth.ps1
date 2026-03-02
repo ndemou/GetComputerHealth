@@ -20,9 +20,7 @@ Idempotency:
 
 Dependencies & execution context:
 - Requires elevation.
-- Relies on two companion library scripts:
-  - `lib-write-log-objects.ps1`
-  - `lib-health-tests.ps1`
+- Relies on companion scripts: `lib-write-log-objects.ps1` and themed `ht-*.ps1` modules dot-sourced below.
 - Uses a suppression config file at `C:\it\config\Get-ComputerHealth.sigs-to-suppress.txt`.
 
 .PARAMETER OutputConsoleMessages
@@ -182,7 +180,17 @@ $script:Config = [pscustomobject]@{
 # Dot source libraries of functions
 #
 . (Join-Path -Path $PSScriptRoot -ChildPath "lib-write-log-objects.ps1")
-. (Join-Path -Path $PSScriptRoot -ChildPath "lib-health-tests.ps1")
+. (Join-Path -Path $PSScriptRoot -ChildPath "ht-AD-GPO-mgmt.ps1")
+. (Join-Path -Path $PSScriptRoot -ChildPath "ht-DNS-DHCP-srvc.ps1")
+. (Join-Path -Path $PSScriptRoot -ChildPath "ht-syscfg-featdisc.ps1")
+. (Join-Path -Path $PSScriptRoot -ChildPath "ht-srvc-exe-resolve.ps1")
+. (Join-Path -Path $PSScriptRoot -ChildPath "ht-file-dir-anlz.ps1")
+. (Join-Path -Path $PSScriptRoot -ChildPath "ht-schtasks-master.ps1")
+. (Join-Path -Path $PSScriptRoot -ChildPath "ht-net-conn.ps1")
+. (Join-Path -Path $PSScriptRoot -ChildPath "ht-os-perf-hw.ps1")
+. (Join-Path -Path $PSScriptRoot -ChildPath "ht-win-os-hyg.ps1")
+. (Join-Path -Path $PSScriptRoot -ChildPath "ht-hyperv-mgmt.ps1")
+. (Join-Path -Path $PSScriptRoot -ChildPath "ht-special.ps1")
 
 #------------------------------------------
 # Helper functions specific to this script except tests

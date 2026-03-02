@@ -213,8 +213,17 @@ if (-not (Test-Path $p)) {
 Write-Host -for DarkGray "Checking for code updates (I will backup local files before update)"
 $tmdDir = New-EmptyTempDirectory -Name "Update-GetHealthCode"
 $_=Sync-WebFile -FileName 'lib-write-log-objects.ps1'    -BaseUri $URI -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
-$_=Sync-WebFile -FileName 'lib-health-tests.ps1'         -BaseUri $URI -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
-$_=Sync-WebFile -FileName 'lib-helpers-for-health-tests.ps1' -BaseUri $URI -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+$_=Sync-WebFile -FileName 'ht-AD-GPO-mgmt.ps1'        -BaseUri $URI -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+$_=Sync-WebFile -FileName 'ht-DNS-DHCP-srvc.ps1'       -BaseUri $URI -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+$_=Sync-WebFile -FileName 'ht-syscfg-featdisc.ps1'     -BaseUri $URI -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+$_=Sync-WebFile -FileName 'ht-srvc-exe-resolve.ps1'    -BaseUri $URI -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+$_=Sync-WebFile -FileName 'ht-file-dir-anlz.ps1'       -BaseUri $URI -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+$_=Sync-WebFile -FileName 'ht-schtasks-master.ps1'     -BaseUri $URI -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+$_=Sync-WebFile -FileName 'ht-net-conn.ps1'            -BaseUri $URI -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+$_=Sync-WebFile -FileName 'ht-os-perf-hw.ps1'          -BaseUri $URI -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+$_=Sync-WebFile -FileName 'ht-win-os-hyg.ps1'          -BaseUri $URI -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+$_=Sync-WebFile -FileName 'ht-hyperv-mgmt.ps1'         -BaseUri $URI -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+$_=Sync-WebFile -FileName 'ht-special.ps1'             -BaseUri $URI -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
 $_=Sync-WebFile -FileName 'Get-ComputerHealth.ps1'       -BaseUri $URI -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
 $_=Sync-WebFile -FileName 'Invoke-GetComputerHealth.ps1' -BaseUri $URI -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
 $_=Sync-WebFile -FileName 'Send-Message.ps1'             -BaseUri $URI -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
