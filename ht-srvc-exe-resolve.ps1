@@ -2,6 +2,29 @@
 Service & Executable Resolution
 #>
 
+# Win32 interop used by helper functions (documented APIs)
+if (-not ('Win32SvcPath' -as [type])) {
+Add-Type @"
+using System;
+using System.Text;
+using System.Runtime.InteropServices;
+
+public static class Win32SvcPath {
+  [DllImport("kernel32.dll", CharSet=CharSet.Unicode, SetLastError=true)]
+  public static extern uint SearchPathW(string lpPath,string lpFileName,string lpExtension,uint nBufferLength,StringBuilder lpBuffer, IntPtr lpFilePart);
+
+  [DllImport("kernel32.dll", CharSet=CharSet.Unicode, SetLastError=true)]
+  public static extern uint ExpandEnvironmentStringsW(string lpSrc, StringBuilder lpDst, uint nSize);
+
+  [DllImport("shell32.dll", CharSet=CharSet.Unicode, SetLastError=false)]
+  public static extern IntPtr CommandLineToArgvW(string lpCmdLine, out int pNumArgs);
+
+  [DllImport("kernel32.dll", SetLastError=false)]
+  public static extern IntPtr LocalFree(IntPtr hMem);
+}
+"@
+}
+
 function HealthTest-NonMicrosoftServices {
     $ok = $true
     $CORE_MICROSOFT_VENDORS = @('Microsoft Windows','Microsoft Windows Publisher','Microsoft Corporation','Microsoft Windows Hardware Compatibility Publisher')
