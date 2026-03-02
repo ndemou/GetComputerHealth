@@ -235,3 +235,8 @@ if ($updated) {
     return
 }
 
+# cleanups:
+if ((Get-Date) -le [datetime]'2026-04-30') {
+	if (test-path $DEST_DIR\lib-health-tests.ps1) {rm $DEST_DIR\lib-health-tests.ps1}
+	if (test-path $DEST_DIR\lib-helpers-for-health-tests.ps1) {rm $DEST_DIR\lib-helpers-for-health-tests.ps1}
+}
