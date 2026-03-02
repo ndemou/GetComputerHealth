@@ -1,6 +1,17 @@
 # TODO
 
-## Allow tags in HealthTest- function names and split lib-health-tests to mutiple files
+## Fix typo: Invoke-HealtTestsFromFolder (Note the missing 'h' in 'Healt')
+
+## Review the hundrends of warnings from Invoke-ScriptAnalyzer (and 3 errors)
+
+See also : .\tests\script-analysis.ps1
+
+## How can I automate tests in GitHub?
+
+ChatGPT saidL: GitHub Actions can run Windows PowerShell 5.1 by using the powershell shell (which invokes powershell.exe on Windows runners).
+See also: https://docs.github.com/actions/automating-builds-and-tests/building-and-testing-powershell
+
+## Allow tags in HealthTest- function names 
 
 ### Tags
 E.g. "HealthTest-CheckSomething__sD-V__tS" means:
@@ -20,12 +31,6 @@ Possible types:
    S: Slow
    B: Baseline (see below)
 ```
-
-### split lib-health-tests to mutiple files
-
-Split health tests logically in separate files (e.g. all DC tests together). 
-Allow Get-ComputerHealth to detect and import them automatically.
-Move helper functions and HealthTest- functions in the same file.
 
 ### End game
 
@@ -634,13 +639,13 @@ function HealthTest-SchannelCompliance {
 
 ## Other
 
-  * Allow users to install somewhere besides C:\IT
+  - Allow users to install somewhere besides C:\IT
     Also, maybe config files should be in ProgramData instead of c:\IT\config
     (but not readable by anyone except Admins)
 
-  * Implement -RemoveWhitelisting -ComputerName -Signature
+  - Implement -RemoveWhitelisting -ComputerName -Signature
 
-  * Some health tests like these:
+  - Some health tests like these:
       - HealthTest-UnexpectedListeningPorts
       - HealthTest-NonMicrosoftServices
       - HealthTest-InstalledRolesFeatures
@@ -650,19 +655,19 @@ function HealthTest-SchannelCompliance {
     running them on an known good state. I should have an option
     to exclude them from running (maybe -ExcludeTestsThatNeedBaseline)
 
-  * I could be monitoring the CPU and memory pressure *while* running all/most 
+  - I could be monitoring the CPU and memory pressure *while* running all/most 
     other tests. This has pros and cons so I can make it a separate check 
     (e.g. some tests *do* streess the CPU (maybe RAM also). I wonder if I could
     tag them so that they do not run while measuring CPU or RAM)
 
-  * Also measure CPU, board temperature.
+  - Also measure CPU, board temperature.
 
-  * -AddWhitelisting should be deleting any existing line for the signature.
+  - -AddWhitelisting should be deleting any existing line for the signature.
     Note that even without this fix, everything works as it should 
     (because the last config line wins), but it's confusing to have
     conflicting lines.
 
-  * Use [string[]]$Arg1 everywhere for arguments that expect string arrays
+  - Use [string[]]$Arg1 everywhere for arguments that expect string arrays
     This style works like this:
          -Arg1 test,foo,bar             --> @("test","foo","bar")
          -Arg1 test -Arg1 foo -Arg1 bar --> @("test","foo","bar")
@@ -671,3 +676,7 @@ function HealthTest-SchannelCompliance {
          -Arg1 "test foo bar"           --> "test foo bar" 
     If I don't expect the values to have spaces or commas I could fix the last 2 cases manually
 
+  - `Start-HealthTestVeeamRecentBackupsExist` expects to read a text 
+    in clear text from a file. Maybe use credentials manager (note that
+	the credentials manager stores passwords per user which complicates
+	stuff -- you run it from your account and works but not from SYSTEM)
