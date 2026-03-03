@@ -439,6 +439,7 @@ function Invoke-HealtTestsFromFolder {
   $fileImported = $false
   foreach($f in $files){
     Log-debug "Found script $($f.name) in custom tests folder $resolved"
+    $m = $null
     try {
       $m = New-Module -ArgumentList $f.FullName -ScriptBlock {
         param($Path)
@@ -446,7 +447,7 @@ function Invoke-HealtTestsFromFolder {
       }
 
       $custom = & $m {
-        Get-Command -CommandType Function -Name 'CustomHealthTest-*' -ErrorAction SilentlyContinue
+        Get-Command -CommandType Function -Name 'CustomHealthTest-*' -Module $ExecutionContext.SessionState.Module -ErrorAction SilentlyContinue
       }
 
       if (-not $custom) {
@@ -471,6 +472,10 @@ function Invoke-HealtTestsFromFolder {
       }
     } catch {
       Log-failure "Custom test import failed for $($f.FullName): $($_.Exception.Message)"
+    } finally {
+      if ($m) {
+        Remove-Module -ModuleInfo $m -Force -ErrorAction SilentlyContinue
+      }
     }
   }
   if (!$fileImported) {return}
