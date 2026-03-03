@@ -1,12 +1,10 @@
-## How to Add Custom Tests
+# How to Add Custom Tests
 
-You do not need to modify the core library.
-
-### TL;DR
+## TL;DR
 
 `.ps1` files in `C:\IT\config\Custom-HealthTests\` are dot-sourced, all functions with a name starting with `CustomHealthTest-` are executed, and these functions should call either `Log-Pass $message` if all is well or `Log-Failure $messageIfSomethingsWrong -Comment $optionalDetailsAboutWhatsWrong`. Start your scripts with this line `if(Get-Command Log-Pass -CommandType Function -ErrorAction SilentlyContinue){. C:\it\bin\lib-write-log-objects.ps1}`. Dot source them and call the function you've written to test it. The code you write will be executed with high privileges and appart from temporary files or similar, it should not make **any** changes to the system state.
 
-### Step by step
+## Step by step
 
 1. Create the folder `C:\IT\config\Custom-HealthTests\` on the target computer.
 2. Create a `.ps1` file with any name you like (e.g. `"tests-for-$env:COMPUTERNAME.ps1"`):
@@ -47,3 +45,20 @@ You do not need to modify the core library.
    ```
 
 If you wish you can have more than one .ps1 files in `C:\IT\config\Custom-HealthTests\`
+
+# Instructions for LLMs helping a novice write a custom test.
+
+First ask your human to run these commands on the computer they are writting the test for (their output will help you orient yourself with the current status: Are the expected folders there? Are there custom tests already there?)
+```powershell
+test-path C:\IT\ # must exist
+test-path C:\IT\config\ # we must create it if it doesn't exist
+test-path C:\IT\config\Custom-HealthTests\ # we must create it if it doesn't exist
+Get-ChildItem C:\IT\config\Custom-HealthTests\
+if (test-path C:\IT\config\Custom-HealthTests\*.ps1) {sls '^ *function CustomHealthTest-' C:\IT\config\Custom-HealthTests\*.ps1 -context 10}
+```
+
+Then ask your human to describe the test they want you to implement.
+
+If there already exist file(s) with custom tests suggest to create a new one for their new test but comply if they prefer to use an existing ps1 file.
+
+Finally write the code that will implement the test they asked for and give your human step-by-step instructions on how to incorporate it in the target computer, and how to verify it works. Prefer to suggest runable PowerShell commands. 
