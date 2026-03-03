@@ -47,6 +47,9 @@ Passed through to Get-ComputerHealth as `-OnlyTheseTests` (limits which tests ru
 .PARAMETER ExcludeTests
 Passed through to Get-ComputerHealth as `-ExcludeTests` (skips selected tests).
 
+.PARAMETER NoUpdate
+Skips execution of `C:\IT\bin\Update-GetHealthCode.ps1` before running `Get-ComputerHealth.ps1` on each target.
+
 .EXAMPLE
 # Run against the local computer, export Excel, and email if notable messages exist:
 .\Invoke-GetComputerHealth.ps1
@@ -74,6 +77,7 @@ param(
     [string]$ExcludeTests,
     [string[]]$ExcludeServers = @(),
     [switch]$DebugSkipSlowTests,
+    [switch]$NoUpdate,
     [switch]$NoSendMessage,
     [string[]]$Computers
 )
@@ -279,14 +283,17 @@ foreach ($target in $targets) {
           $OnlyTheseTests,
           $ExcludeTests,
           $WhitelistSigs,
-          $DebugSkipSlowTests
+          $DebugSkipSlowTests,
+          $NoUpdate
       )
 
       if (-not (Test-Path "C:\IT\bin\Update-GetHealthCode.ps1")){
           if (-not (Test-Path "C:\IT\bin")) { New-Item -Path "C:\IT\bin" -ItemType Directory -Force }
           Invoke-WebRequest -useb "https://raw.githubusercontent.com/ndemou/GetComputerHealth/refs/heads/main/Update-GetHealthCode.ps1" -OutFile "C:\IT\bin\Update-GetHealthCode.ps1"
 	  }
-      & C:\IT\bin\Update-GetHealthCode.ps1
+      if (-not $NoUpdate) {
+          & C:\IT\bin\Update-GetHealthCode.ps1
+      }
       & C:\IT\bin\Get-ComputerHealth.ps1 `
           -OutputObjects -OutputConsoleMessages `
           -Hide $Hide `
@@ -299,13 +306,13 @@ foreach ($target in $targets) {
   }
   
   if ($target -eq $env:COMPUTERNAME) {
-      $output = & $healthCheckBlock $Hide $OnlyTheseTests $ExcludeTests $WhitelistSigs $DebugSkipSlowTests
+      $output = & $healthCheckBlock $Hide $OnlyTheseTests $ExcludeTests $WhitelistSigs $DebugSkipSlowTests $NoUpdate
   } 
   else {
       if (Get-TcpPortStateFast $target @(5985, 5986, 80, 443, 88, 135, 389, 636, 445, 3268, 3269) | ?{$_.open}) {
         Write-Progress -Activity "Checking $target" -Status "Phase #2 (running Get-ComputerHealth.ps1)"
         $session = New-PSSession -ComputerName $target
-        $output = Invoke-Command -Session $session -ScriptBlock $healthCheckBlock -ArgumentList $Hide, $OnlyTheseTests, $ExcludeTests, $WhitelistSigs, $DebugSkipSlowTests
+        $output = Invoke-Command -Session $session -ScriptBlock $healthCheckBlock -ArgumentList $Hide, $OnlyTheseTests, $ExcludeTests, $WhitelistSigs, $DebugSkipSlowTests, $NoUpdate
         Remove-PSSession $session
       } else {
           if ($target -in $domain_servers) {

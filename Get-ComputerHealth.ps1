@@ -657,10 +657,10 @@ Invoke-HealthTest "HealthTest-WmiRepository"
 Invoke-HealthTest "HealthTest-StartupItems"
 Invoke-HealthTest "HealthTest-RamPressure"
 Invoke-HealthTest "HealthTest-UpdateAge"
-Invoke-HealthTest "HealthTest-SingleDefaultGateway"
+if (!$DebugSkipSlowTests) { Invoke-HealthTest "HealthTest-SingleDefaultGateway" }
 Invoke-HealthTest "HealthTest-ScheduledTasks"
 Invoke-HealthTest "HealthTest-SystemScheduledTasks"
-Invoke-HealthTest "HealthTest-VssWriters"
+if (!$DebugSkipSlowTests) { Invoke-HealthTest "HealthTest-VssWriters" }
 Invoke-HealthTest "HealthTest-TimeSyncAccuracy"
 Invoke-HealthTest "HealthTest-TimeSyncPolicy"
 Invoke-HealthTest "HealthTest-UnsignedDrivers"
@@ -736,7 +736,7 @@ if ($isHostDC) {
     Invoke-HealthTest "HealthTest-LdapSigningChannelBinding"
     Invoke-HealthTest "HealthTest-UnusedEnabledAdapters"
     Invoke-HealthTest "HealthTest-NetworkInterfaceMetrics"
-    Invoke-HealthTest "HealthTest-DisabledGpoLinksAtDomainRoot"
+    if (!$DebugSkipSlowTests) { Invoke-HealthTest "HealthTest-DisabledGpoLinksAtDomainRoot" }
 
     # TODO: some of these below are maybe for all member servers
     Invoke-HealthTest "HealthTest-SchanelBaseline"
@@ -773,7 +773,7 @@ if ($isHostDC) {
     Invoke-HealthTest "HealthTest-RidManager"
     Invoke-HealthTest "HealthTest-DnsZoneTransfers"
     Invoke-HealthTest "HealthTest-NtdsLogVolumeFree"
-    Invoke-HealthTest "HealthTest-SysvolContentConsistency"
+    if (!$DebugSkipSlowTests) { Invoke-HealthTest "HealthTest-SysvolContentConsistency" }
     Invoke-HealthTest "HealthTest-DfsrBacklogSysvol"
     Invoke-HealthTest "HealthTest-GpoVersionConsistency"
     Invoke-HealthTest "HealthTest-AdminSDHolderCoverage"
