@@ -2,6 +2,49 @@
 
 ## Fix typo: Invoke-HealtTestsFromFolder (Note the missing 'h' in 'Healt')
 
+## All HealthTest- functions must use `Write-Warning` instead of `Log-*`
+
+Currently `log-pass,failure,warning,etc` functions use the standard output. As a result developers of HealthTest- function must be very carefull not to use the standard output stream anywhere in their functions. That's a burden. This alternative method uses the Write-Warning stream. We need to keep supporting `log-*` functions for the few Custom Health Tests that use them (but we will emmit warnings when we detect such cases).
+
+Here's an example HealthTest- function using the new style:
+```powershell
+function HealthTest-Func {
+    Write-Warning @"
+[pass] 1st line with the "message".
+All other lines comprise the comment.
+The square-bracketed "pass" (or failure,warning,...) at the start is essential. 
+It is used as the <Level> of the message.
+We are only hashing the first line, and only after the "\[[a-z]+\] *" prefix.
+"@
+    Write-Warning "[failure] this is also fine when no comments are needed"
+    # It's recomended to use Write-Verbose for debuging messages
+    # You can use Write-Output and it will be ignored from Invoke-HealtTest
+}
+```
+
+Here's how to capture the messages:
+```PowerShell
+& {
+    $WarningPreference = 'Continue'
+    HealthTest-Func -WarningAction Continue 3>&1
+} 2>&1 | ForEach-Object {
+  if ($_ -is [System.Management.Automation.WarningRecord]) {
+      # $_.message contains a string from the Warning stream
+	  # Code that reads $_ and calls:
+	  #  Log-Msg -Level "<Level>" -Msg "<rest of 1st line>" -Comment "<all other lines>"
+  } else { 
+      # $_ contains an object from the standard output stream
+	  # if this object is a pscustomobject that looks like it's comming from
+	  # lib-write-log-objects I will re-emmit it along with a warning so that
+	  # I can fix the HealthTest-function that emmits it (best way is to check 
+	  # it it has .Level,.Hash,.Suppressed properties)
+	  # Everything else I supress with a debug message notting that Some
+	  # std-output was generated from this HealthTest- function
+  }
+}
+```
+
+
 ## Review the hundrends of warnings from Invoke-ScriptAnalyzer (and 3 errors)
 
 See also : .\tests\script-analysis.ps1
