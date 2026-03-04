@@ -1,5 +1,13 @@
 # TODO
 
+## Stop using C:\it\config\ips-of-all-DCs.conf
+
+Instead add parameter -IpsOfAllDcs to `\Invoke-GetComputerHealth.ps1`.
+It will be used by `Invoke-GetHealthDomainComputers.ps1` (document it).
+This array along with the values of the following variables will be added to `$Global:GetComputerHealthDataQMTA` so that they are accessible to all functions:
+   - `$isHostVM, $isHostMobile, $isHostDomainJoined, $isHostServer, $isHostDC, $isHostPDC`
+   - `GetCurrentDomain = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain()`
+
 ## Fix typo: Invoke-HealtTestsFromFolder (Note the missing 'h' in 'Healt')
 
 ## Review the hundrends of warnings from Invoke-ScriptAnalyzer (and 3 errors)
