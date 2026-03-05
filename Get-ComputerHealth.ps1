@@ -399,7 +399,7 @@ FunctionName, Time, ElapsedMilliseconds, Output, Success, Error, Category, Reaso
     }
 
     if ($legacyLogDetected) {
-      Log-Notice "$FunctionName is using the legacy Log-* output style."
+      Log-Notice "Consider modernizing the code of $FunctionName to use Write-Warning instead of Log-Pass/Log-Failure/..."
     }
 
     if ($cntProperRecord -eq 0 -and $cntImproperRecord -eq 0) {
