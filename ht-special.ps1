@@ -47,7 +47,7 @@ param(
 )
 
     if (-not (Test-Path -LiteralPath $ConfigPath)) {
-        Log-notice "Not running HealthTest-RecentBackupsExist because settings file does not exist: $ConfigPath"
+        Write-Warning "[notice] Not running HealthTest-RecentBackupsExist because settings file does not exist: $ConfigPath"
         return
     }
 
@@ -71,7 +71,7 @@ param(
             $cred      = New-Object System.Management.Automation.PSCredential($username, $securePwd)
 
             $driveName = "UNC$(Get-Random -Minimum 1000 -Maximum 9999)"
-            Log-Debug "Creating temporary PSDrive $driveName for $rootPath using credentials from $secretsPath"
+            Write-Output "Creating temporary PSDrive $driveName for $rootPath using credentials from $secretsPath"
             New-PSDrive -Name $driveName -PSProvider FileSystem -Root $rootPath -Credential $cred -Scope Global -ErrorAction Stop | Out-Null
 
             $root = "$driveName`:\"
@@ -79,7 +79,7 @@ param(
             try {
                 $null = Get-ChildItem $root
             } catch {
-                Log-Failure "Can't access $root (try adding a username and password to config file $ConfigPath)"
+                Write-Warning "[failure] Can't access $root (try adding a username and password to config file $ConfigPath)"
                 return
             }
         }
@@ -95,9 +95,9 @@ param(
         $atleast_one_vbk = Get-RecentFilesConditional -Path $root -Pattern '*.vbk' -MinBytes (10*1024*1024*1024) -MaxAgeHours $MaxAgeHoursForVBK 
 
         if ($fresh_vbm -and ($fresh_vib -or $fresh_vbk) -and $atleast_one_vbk) {
-            Log-Pass "Found recent Veeam backups. If you want to change the configuration edit: $ConfigPath"
+            Write-Warning "[pass] Found recent Veeam backups. If you want to change the configuration edit: $ConfigPath"
         } else {
-            Log-Failure "No recent Veeam backups found at: $rootPath" -comment ("If you want to change the configuration edit: $ConfigPath`n" + `
+            Write-Warning "[failure] No recent Veeam backups found at: $rootPath" -comment ("If you want to change the configuration edit: $ConfigPath`n" + `
                 "fresh_vbm=$fresh_vbm, fresh_vib=$fresh_vib, fresh_vbk=$fresh_vbk, atleast_one_vbk=$atleast_one_vbk`n" + `
                 "Condition for pass is: " + `
                 '($fresh_vbm -and ($fresh_vib -or $fresh_vbk) -and $atleast_one_vbk)' + `
@@ -106,7 +106,7 @@ param(
     }
     finally {
         if ($driveName) {
-            Log-Debug "Removing PSDrive $driveName"
+            Write-Output "Removing PSDrive $driveName"
             Remove-PSDrive -Name $driveName -ErrorAction SilentlyContinue
         }
     }

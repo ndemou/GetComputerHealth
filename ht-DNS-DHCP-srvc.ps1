@@ -8,25 +8,25 @@ function HealthTest-DnsScavenging{
   $comment = "Severity: Medium.`nWhat it means: Server-level scavenging is off, so stale dynamic records never age out.`nRisk: Stale A/PTR clutter, service discovery problems, and opportunities for name re-use confusion. In secure-updates AD zones, outright hijack is harder, but operational pain is real."
 
   $flagged=$false
-  if(-not $sv.ScavengingState){ $flagged=$true; Log-Warning "DNS server scavenging is disabled" -comment $comment }
+  if(-not $sv.ScavengingState){ $flagged=$true; Write-Warning "[warning] $("DNS server scavenging is disabled")`n$($comment)" }
 
   foreach($z in $zones){
     $ai = $null; try { $ai = Get-DnsServerZoneAging -Name $z.ZoneName -ErrorAction Stop } catch {}
-    if(-not ($ai -and $ai.AgingEnabled)){ $flagged=$true; Log-Warning "DNS zone aging is disabled" -Comment "zone: $($z.ZoneName) `nNote that scavenging must be enabled both at the server level and at the zone`n$comment"}
+    if(-not ($ai -and $ai.AgingEnabled)){ $flagged=$true; Write-Warning "[warning] DNS zone aging is disabled`nzone: $($z.ZoneName) `nNote that scavenging must be enabled both at the server level and at the zone`n$comment"}
   }
 
   if(-not $flagged){
     $on=@($zones | ForEach-Object { $_.ZoneName })
-    Log-pass "DNS scavenging configured on server and zones" -Comment ("Zones: " + ($on -join ', '))
+    Write-Warning "[pass] $("DNS scavenging configured on server and zones")`n$(("Zones: " + ($on -join ', ')))"
   }
 }
 
 
 function HealthTest-DnsZoneReplicationScope{
   $zones = Get-DnsServerZone -ErrorAction Stop | Where-Object { $_.IsDsIntegrated }
-  if(-not $zones){ Log-pass "No AD-integrated zones present"; return }
+  if(-not $zones){ Write-Warning "[pass] No AD-integrated zones present"; return }
   $lines = ($zones | ForEach-Object { "{0}:{1}" -f $_.ZoneName, $_.ReplicationScope })
-  Log-pass "DNS zone replication scope reviewed" -Comment ($lines -join '; ')
+  Write-Warning "[pass] DNS zone replication scope reviewed" -Comment ($lines -join '; ')
 }
 
 
@@ -34,21 +34,21 @@ function HealthTest-DnsZoneTransfers{
   $zones=Get-DnsServerZone | Where-Object { -not $_.IsAutoCreated }
   $bad=$false
   foreach($z in $zones){
-    if($z.SecureSecondaries -eq 'Any'){ $bad=$true; Log-failure "DNS zone transfer open to Any: $($z.ZoneName)" }
+    if($z.SecureSecondaries -eq 'Any'){ $bad=$true; Write-Warning "[failure] DNS zone transfer open to Any: $($z.ZoneName)" }
   }
-  if(-not $bad){ Log-pass "DNS zone transfers are restricted (not 'Any')" }
+  if(-not $bad){ Write-Warning "[pass] DNS zone transfers are restricted (not 'Any')" }
 }
 
 
 function HealthTest-ReverseZonesPresent{
   [CmdletBinding()] param([string[]]$ExpectedReverseZones)
   $zones=Get-DnsServerZone | Where-Object {$_.IsReverseLookupZone} | Select-Object -ExpandProperty ZoneName
-  if(-not $ExpectedReverseZones){ Log-pass ("Reverse zones present: "+(($zones -join ', ')-replace '^$','<none>')); return }
+  if(-not $ExpectedReverseZones){ Write-Warning "[pass] $(("Reverse zones present: "+(($zones -join ', ')-replace '^$','<none>')))"; return }
   $missing=@()
   foreach($z in $ExpectedReverseZones){
-    if($zones -notcontains $z){ $missing+=$z; Log-failure "Reverse zone missing: $z" }
+    if($zones -notcontains $z){ $missing+=$z; Write-Warning "[failure] Reverse zone missing: $z" }
   }
-  if($missing.Count -eq 0){ Log-pass "All expected reverse zones are present" }
+  if($missing.Count -eq 0){ Write-Warning "[pass] All expected reverse zones are present" }
 }
 
 
@@ -60,7 +60,7 @@ function HealthTest-DcDnsServerForwarder {
   $forwarders = Get-DnsServerForwarder
   # ($forwarders | Format-List * -Force | Out-String).Trim()|write-host -f green
   if(-not $forwarders){
-    Log-pass "No DNS forwarders configured"; # return $true
+    Write-Warning "[pass] No DNS forwarders configured"; # return $true
   }
   $ipAddresses = $forwarders | %{$_.ipaddress.tostring()}
 
@@ -75,32 +75,32 @@ function HealthTest-DcDnsServerForwarder {
   $public = $ipAddresses | Where-Object { -not (& $private $_) }
 
   if($public){
-    Log-Notice "The DNS service on this DC, will forward queries for non-local zones to specific DNS servers" `
+    Write-Warning "[notice] The DNS service on this DC, will forward queries for non-local zones to specific DNS servers" `
         -Comment "This means that these DNS servers (view them with Get-DnsServerForwarder) can inspect and log the domains your domain contact. For extra privacy, you may wish to configure the DNS service to rely on root hints instead of DNS forwarders."
     return
   } else {
-    Log-pass "All DNS forwarders are private/internal: $($ipAddresses -join ', ')"
+    Write-Warning "[pass] All DNS forwarders are private/internal: $($ipAddresses -join ', ')"
   }
 }
 
 
 function HealthTest-DnsForwarders{
   $f=Get-DnsServerForwarder -ErrorAction Stop
-  if(-not $f -or -not $f.IPAddress){ Log-pass "No DNS forwarders configured"; return }
+  if(-not $f -or -not $f.IPAddress){ Write-Warning "[pass] No DNS forwarders configured"; return }
   $ips=$f.IPAddress
   $bad=$false
   foreach($ip in $ips){
-    if(($ip -eq '127.0.0.1') -or ($ip -eq '::1')){ $bad=$true; Log-failure "Loopback address is configured as a DNS forwarder" -Comment $ip; continue }
+    if(($ip -eq '127.0.0.1') -or ($ip -eq '::1')){ $bad=$true; Write-Warning "[failure] $("Loopback address is configured as a DNS forwarder")`n$($ip)"; continue }
     $ok=(Test-Connection -ComputerName $ip -Count 1 -Quiet)
-    if(-not $ok){ $bad=$true; Log-failure "DNS forwarder not reachable" -Comment $ip }
+    if(-not $ok){ $bad=$true; Write-Warning "[failure] $("DNS forwarder not reachable")`n$($ip)" }
   }
-  if(-not $bad){ Log-pass "DNS forwarders sane & reachable" -Comment ("Forwarders: " + ($ips -join ', ')) }
+  if(-not $bad){ Write-Warning "[pass] $("DNS forwarders sane & reachable")`n$(("Forwarders: " + ($ips -join ', ')))" }
 }
 
 
 function HealthTest-DnsRecursionConfig {
     if (-not (Get-Command Get-DnsServerRecursion -ErrorAction SilentlyContinue)) {
-        Log-notice "DNS Server tools not available" -Comment "DNS role/RSAT missing?"
+        Write-Warning "[notice] DNS Server tools not available`nDNS role/RSAT missing?"
         return
     }
 
@@ -144,10 +144,10 @@ function HealthTest-DnsRecursionConfig {
     if ($ecsEnabled -ne $null) { $ecsText = [string]$ecsEnabled } else { $ecsText = 'n/a' }
 
     if ($rec -or $cache -or $edns) {
-        Log-pass "No issues found in the DNS recursion configuration" -comment ("EnableRecursion={0}; MaxTTL={1}; EDNS-ECS={2}" `
+        Write-Warning "[pass] No issues found in the DNS recursion configuration" -comment ("EnableRecursion={0}; MaxTTL={1}; EDNS-ECS={2}" `
                     -f $recText, $ttlText, $ecsText)
     } else {
-        Log-notice "Unable to read DNS recursion configuration on this host" `
+        Write-Warning "[notice] Unable to read DNS recursion configuration on this host" `
             -Comment "Host is probably not a DNS server"
     }
 }
@@ -156,18 +156,18 @@ function HealthTest-DnsRecursionConfig {
 function HealthTest-DhcpScopeUtilization {
     $svc = Get-Service -Name 'DHCPServer' -ErrorAction SilentlyContinue
     if (-not $svc) {
-        Log-debug "Host is not a DHCP server (DHCPServer service missing); skipping DHCP scope utilization test"
+        Write-Output "Host is not a DHCP server (DHCPServer service missing); skipping DHCP scope utilization test"
         return
     }
 
     if (-not (Get-Command Get-DhcpServerv4ScopeStatistics -ErrorAction SilentlyContinue)) {
-        Log-warning "DHCP server cmdlets not available on this DHCP server; skipping DHCP scope utilization test"
+        Write-Warning "[warning] DHCP server cmdlets not available on this DHCP server; skipping DHCP scope utilization test"
         return
     }
 
     $stats = Get-DhcpServerv4ScopeStatistics -ErrorAction SilentlyContinue
     if (-not $stats) {
-        Log-Warning "DHCP server role present but no DHCPv4 scopes found"
+        Write-Warning "[warning] DHCP server role present but no DHCPv4 scopes found"
         return
     }
 
@@ -175,15 +175,15 @@ function HealthTest-DhcpScopeUtilization {
     foreach ($s in $stats) {
         if ($s.PercentageInUse -ge 90) {
             $over += $s.ScopeId
-            Log-Failure "DHCP scope is >=90% used: $($s.ScopeId)"
+            Write-Warning "[failure] DHCP scope is >=90% used: $($s.ScopeId)"
         } elseif ($s.PercentageInUse -ge 80) {
             $over += $s.ScopeId
-            Log-Warning "DHCP scope is >=80% used: $($s.ScopeId)"
+            Write-Warning "[warning] DHCP scope is >=80% used: $($s.ScopeId)"
         }
     }
 
     if ($over.Count -gt 0) {
-        Log-pass "DHCP scope utilization OK (<80% in use)"
+        Write-Warning "[pass] DHCP scope utilization OK (<80% in use)"
     }
 
 }
@@ -195,9 +195,9 @@ function HealthTest-RequiredSrvRecords{
   $missing=$false
   foreach($q in $labels){
     try{ $r=Resolve-DnsName -Type SRV $q -ErrorAction Stop }catch{$r=$null}
-    if(-not $r){ $missing=$true; Log-failure "Required SRV record missing" -Comment $q }
+    if(-not $r){ $missing=$true; Write-Warning "[failure] $("Required SRV record missing")`n$($q)" }
   }
-  if(-not $missing){ Log-pass "Required AD SRV records present" }
+  if(-not $missing){ Write-Warning "[pass] Required AD SRV records present" }
 }
 
 
@@ -206,16 +206,16 @@ function HealthTest-DnsSuffixMatchesDomain {
   $cs = Get-CimInstance Win32_ComputerSystem
   $role = $cs.DomainRole
   $fn = $MyInvocation.MyCommand.Name
-  if ($role -in 0,2) { Log-Notice "This test ($fn) is not applicable to non-domain joined hosts"; return }
-  if ($role -in 4,5) { Log-Notice "This test ($fn) is not applicable to Domain Controllers"; return }
+  if ($role -in 0,2) { Write-Warning "[notice] This test ($fn) is not applicable to non-domain joined hosts"; return }
+  if ($role -in 4,5) { Write-Warning "[notice] This test ($fn) is not applicable to Domain Controllers"; return }
 
   $domain = $cs.Domain
   $out = ipconfig /all 2>&1
   $pattern = "DNS Suffix.* $domain`$"
   if ($out | Select-String -Pattern $pattern) {
-    Log-pass "Domain name appears in DNS suffix" -Comment "Domain: $domain"
+    Write-Warning "[pass] Domain name appears in DNS suffix`nDomain: $domain"
   } else {
-    Log-failure "Domain name does not appear in DNS suffix" -Comment "Expected suffix: $domain"
+    Write-Warning "[failure] Domain name does not appear in DNS suffix`nExpected suffix: $domain"
   }
 }
 
@@ -228,24 +228,24 @@ function HealthTest-DnsSuffixBaseline {
     $primarySuffix = $ipg.DomainName
 
     if ([string]::IsNullOrWhiteSpace($primarySuffix)) {
-        Log-Failure "Primary DNS suffix" "Current is empty" "Ensure the system has a primary DNS suffix (normally set by domain join)."
+        Write-Warning "[failure] Primary DNS suffix" "Current is empty" "Ensure the system has a primary DNS suffix (normally set by domain join)."
     } elseif ($primarySuffix -ieq $DomainName) {
-        Log-Pass "Primary DNS suffix" $primarySuffix
+        Write-Warning "[pass] Primary DNS suffix" $primarySuffix
     } else {
-        Log-Failure "Primary DNS suffix" ("Current='{0}' Expected='{1}'" -f $primarySuffix,$DomainName) "Ensure primary DNS suffix equals the AD DNS name (normally set by domain join)."
+        Write-Warning "[failure] Primary DNS suffix" ("Current='{0}' Expected='{1}'" -f $primarySuffix,$DomainName) "Ensure primary DNS suffix equals the AD DNS name (normally set by domain join)."
     }
 
     # 2) DNS devolution is enabled (boolean only)
     try {
         $g = Get-DnsClientGlobalSetting -ErrorAction Stop
         if ($g.UseDevolution -eq $true) {
-            Log-Pass "DNS devolution enabled" "UseDevolution=True"
+            Write-Warning "[pass] DNS devolution enabled" "UseDevolution=True"
         } else {
-            Log-Failure "DNS devolution enabled" "UseDevolution=False" "Enable devolution (GPO: Computer Configuration/Administrative Templates/Network/DNS Client/Turn off DNS devolution = Disabled)."
+            Write-Warning "[failure] DNS devolution enabled" "UseDevolution=False" "Enable devolution (GPO: Computer Configuration/Administrative Templates/Network/DNS Client/Turn off DNS devolution = Disabled)."
         }
     } catch {
         $err = $_
-        Log-Failure "DNS devolution enabled" ("Unable to query global DNS client settings: {0}" -f $err.Exception.Message) "Check OS support for Get-DnsClientGlobalSetting and that the DNS Client service is running."
+        Write-Warning "[failure] DNS devolution enabled" ("Unable to query global DNS client settings: {0}" -f $err.Exception.Message) "Check OS support for Get-DnsClientGlobalSetting and that the DNS Client service is running."
     }
 
     # 3) Per-NIC checks (only PASS/FAIL; no discovery warning if none found)
@@ -255,7 +255,7 @@ function HealthTest-DnsSuffixBaseline {
                 Where-Object { $_.InterfaceOperationalStatus -eq "Up" -and $_.ConnectionSpecificSuffix -ne "localdomain" }
     } catch {
         $err = $_
-        Log-Failure "NIC DNS settings" ("Unable to query DNS client interfaces: {0}" -f $err.Exception.Message) "Confirm OS supports Get-DnsClient and you have sufficient privileges."
+        Write-Warning "[failure] NIC DNS settings" ("Unable to query DNS client interfaces: {0}" -f $err.Exception.Message) "Confirm OS supports Get-DnsClient and you have sufficient privileges."
         $nics = @()
     }
 
@@ -264,19 +264,19 @@ function HealthTest-DnsSuffixBaseline {
 
         # 3a) Registration flags must both be True
         if ($n.RegisterThisConnectionsAddress -and $n.UseSuffixWhenRegistering) {
-            Log-Pass ("NIC '{0}' DNS registration" -f $nicName) "RegisterThisConnectionsAddress=True, UseSuffixWhenRegistering=True"
+            Write-Warning "[pass] $(("NIC '{0}' DNS registration" -f $nicName))" "RegisterThisConnectionsAddress=True, UseSuffixWhenRegistering=True"
         } else {
-            Log-Failure ("NIC '{0}' DNS registration" -f $nicName) ("RegisterThisConnectionsAddress={0}, UseSuffixWhenRegistering={1}" -f $n.RegisterThisConnectionsAddress,$n.UseSuffixWhenRegistering) "Enable both flags on important interfaces."
+            Write-Warning "[failure] $(("NIC '{0}' DNS registration" -f $nicName) ("RegisterThisConnectionsAddress={0}, UseSuffixWhenRegistering={1}" -f $n.RegisterThisConnectionsAddress,$n.UseSuffixWhenRegistering))" "Enable both flags on important interfaces."
         }
 
         # 3b) Connection-specific suffix: must be Empty OR exactly the domain
         $css = $n.ConnectionSpecificSuffix
         if ([string]::IsNullOrWhiteSpace($css)) {
-            Log-Pass ("NIC '{0}' Conn.-specific suffix" -f $nicName) "Empty"
+            Write-Warning "[pass] $(("NIC '{0}' Conn.-specific suffix" -f $nicName))" "Empty"
         } elseif ($css -ieq $DomainName) {
-            Log-Pass ("NIC '{0}' Conn.-specific suffix" -f $nicName) ("Equals {0}" -f $DomainName)
+            Write-Warning "[pass] $(("NIC '{0}' Conn.-specific suffix" -f $nicName) ("Equals {0}" -f $DomainName))"
         } else {
-            Log-Failure ("NIC '{0}' Conn.-specific suffix" -f $nicName) ("Set to '{0}'" -f $css) "Leave blank for single-domain setups unless a specific suffix is required."
+            Write-Warning "[failure] $(("NIC '{0}' Conn.-specific suffix" -f $nicName) ("Set to '{0}'" -f $css))" "Leave blank for single-domain setups unless a specific suffix is required."
         }
     }
 }
@@ -284,5 +284,5 @@ function HealthTest-DnsSuffixBaseline {
 
 function HealthTest-DnsClientService{
   $s=Get-Service Dnscache -ErrorAction Stop
-  if($s.Status -eq 'Running'){ Log-pass "DNS Client service running" } else { Log-failure "DNS Client service is not running" -Comment "Status=$($s.Status)" }
+  if($s.Status -eq 'Running'){ Write-Warning "[pass] DNS Client service running" } else { Write-Warning "[failure] DNS Client service is not running`nStatus=$($s.Status)" }
 }
