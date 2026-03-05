@@ -91,8 +91,8 @@ function Send-MailMessageWithRetry {
         if ($ex.StatusCode.ToString() -match 'MailboxBusy|ServiceNotAvailable|TransactionFailed|ClientNotPermitted') { $isTransient = $true }
       }
 
-      Write-Error ("Send-MailMessage FAILED (attempt $attempt/$MaxAttempts, {0} ms): {1}" -f ([int]$sw.Elapsed.TotalMilliseconds), $msg)
-      if ($inner) { Write-Error ("InnerException: " + $inner) }
+      Write-Warning ("Send-MailMessage FAILED (attempt $attempt/$MaxAttempts, {0} ms): {1}" -f ([int]$sw.Elapsed.TotalMilliseconds), $msg)
+      if ($inner) { Write-Verbose ("InnerException: " + $inner) }
 
       if (-not $isTransient -or $attempt -ge $MaxAttempts) { throw }
 
