@@ -7,8 +7,12 @@ function HealthTest-Dummy {
 .SYNOPSIS
 Emits sample warning-stream messages in the new [level] format for integration testing.
 #>
-    Write-Warning "[failure] Dummy failure message from HealthTest-Dummy"
-    Write-Warning "[pass] Dummy pass message from HealthTest-Dummy"
+    Write-Output "Dummy debug message"
+    Write-Warning "[info] Dummy info message"
+    Write-Warning "[pass] Dummy pass message"
+    Write-Warning "[notice] Dummy notice message"
+    Write-Warning "[warning] Dummy warning message"
+    Write-Warning "[failure] Dummy failure message"
 }
 
 function Start-HealthTestVeeamRecentBackupsExist{
@@ -56,7 +60,7 @@ param(
 )
 
     if ([string]::IsNullOrWhiteSpace($ConfigPath) -and [string]::IsNullOrWhiteSpace($RootPath)) {
-        Log-Failure "Not running HealthTest-RecentBackupsExist because neither -ConfigPath nor -RootPath was provided"
+        Write-Warning "[failure] Not running HealthTest-RecentBackupsExist because neither -ConfigPath nor -RootPath was provided"
         return
     }
 
@@ -65,7 +69,7 @@ param(
 
     if (-not [string]::IsNullOrWhiteSpace($ConfigPath)) {
         if (-not (Test-Path -LiteralPath $ConfigPath)) {
-            Log-notice "Not running HealthTest-RecentBackupsExist because settings file does not exist: $ConfigPath"
+            Write-Warning "[notice] Not running HealthTest-RecentBackupsExist because settings file does not exist: $ConfigPath"
             return
         }
 
@@ -82,7 +86,7 @@ param(
     }
 
     if ([string]::IsNullOrWhiteSpace($RootPath)) {
-        Log-Failure "Not running HealthTest-RecentBackupsExist because no RootPath could be determined"
+        Write-Warning "[failure] Not running HealthTest-RecentBackupsExist because no RootPath could be determined"
         return
     }
 
@@ -96,7 +100,7 @@ param(
             $cred      = New-Object System.Management.Automation.PSCredential($username, $securePwd)
 
             $driveName = "UNC$(Get-Random -Minimum 1000 -Maximum 9999)"
-            Log-Debug "Creating temporary PSDrive $driveName for $RootPath using credentials from $secretsPath"
+            Write-Output "Creating temporary PSDrive $driveName for $RootPath using credentials from $secretsPath"
             New-PSDrive -Name $driveName -PSProvider FileSystem -Root $RootPath -Credential $cred -Scope Global -ErrorAction Stop | Out-Null
 
             $root = "$driveName`:\"
@@ -105,7 +109,7 @@ param(
                 $null = Get-ChildItem $root
             } catch {
                 $authHint = if ($ConfigPath) { " (try adding a username and password to config file $ConfigPath)" } else { "" }
-                Log-Failure "Can't access $root$authHint"
+                Write-Warning "[failure] Can't access $root$authHint"
                 return
             }
         }
@@ -123,13 +127,13 @@ param(
         $configHint = if ($ConfigPath) { "If you want to change the configuration edit: $ConfigPath" } else { "Used -RootPath directly (no config file)." }
 
         if ($fresh_vbm -and ($fresh_vib -or $fresh_vbk) -and $atleast_one_vbk) {
-            Log-Pass "Found recent Veeam backups. $configHint"
+            Write-Warning "[pass] Found recent Veeam backups. $configHint"
         } else {
-            Log-Failure "No recent Veeam backups found at: $RootPath" -comment ("$configHint`n" + `
+            Write-Warning "[failure] No recent Veeam backups found at: $RootPath`n" + ("$configHint`n" + `
                 "fresh_vbm=$fresh_vbm, fresh_vib=$fresh_vib, fresh_vbk=$fresh_vbk, atleast_one_vbk=$atleast_one_vbk`n" + `
                 "Condition for pass is: " + `
                 '($fresh_vbm -and ($fresh_vib -or $fresh_vbk) -and $atleast_one_vbk)' + `
-                (ls $root|Out-String))
+                (Get-ChildItem $root|Out-String))
         }
     }
     finally {
