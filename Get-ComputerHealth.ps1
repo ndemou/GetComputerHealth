@@ -399,7 +399,7 @@ FunctionName, Time, ElapsedMilliseconds, Output, Success, Error, Category, Reaso
     }
 
     if ($legacyLogDetected) {
-      Log-Warning "$FunctionName is using legacy Log-* output style; prefer Write-Warning '[level] ...' in HealthTest-* code."
+      Log-Notice "$FunctionName is using the legacy Log-* output style."
     }
 
     if ($cntProperRecord -eq 0 -and $cntImproperRecord -eq 0) {
