@@ -873,8 +873,9 @@ function HealthTest-KrbtgtAge{
   $u=Get-ADUser krbtgt -Properties pwdLastSet
   $ageDays=[int]((Get-Date) - [DateTime]::FromFileTime($u.pwdLastSet)).TotalDays
   if($ageDays -le $MaxDays){
-    Write-Warning "[pass] krbtgt password age acceptable ($ageDays days <= $MaxDays)"} else {
-    Write-Warning ("[failure] " + "krbtgt password age exceeds threshold($MaxDays)" + "`n" + "The KRBTGT account key hasn't been rotated for $ageDays days. Windows keeps the previous KRBTGT key to validate existing TGTs); never rotating extends the brute force time window for an attacker. Risk: If an attacker ever accessed the KRBTGT key, they can mint TGTs and persist. Rotating twice (with replication time in between) is the standard mitigation."
+    Write-Warning "[pass] krbtgt password age acceptable ($ageDays days <= $MaxDays)"
+  } else {
+    Write-Warning "[failure] krbtgt password age exceeds threshold ($MaxDays)`nThe KRBTGT account key hasn't been rotated for $ageDays days. Windows keeps the previous KRBTGT key to validate existing TGTs; never rotating extends the attack window. Risk: if an attacker ever accessed the KRBTGT key, they can mint TGTs and persist. Rotating twice (with replication time in between) is the standard mitigation."
   }
 }
 
@@ -958,7 +959,8 @@ function HealthTest-SysvolContentConsistency{
     $sigs = foreach($dc in $dcs){
       $p="\\$dc\SYSVOL\$dom\Policies"
       if(-not (Test-Path -LiteralPath $p)){
-        Write-Warning "[failure] SYSVOL Policies path missing on ${dc}: $p"[pscustomobject]@{DC=$dc;Sig='<missing>'}
+        Write-Warning "[failure] SYSVOL Policies path missing on ${dc}: $p"
+        [pscustomobject]@{DC=$dc;Sig='<missing>'}
         continue
       }
       $files = Get-ChildItem -LiteralPath $p -Recurse -File -Force -ErrorAction SilentlyContinue
@@ -1374,18 +1376,20 @@ function HealthTest-GpupdatePolicyApply {
   }
 
   if ($compOk) {
-    Write-Warning "[pass] Computer policy update completed successfully (gpupdate)."} else {
-    Write-Warning ("[failure] " + "Computer policy update did not report success." + "`n" + ("gpupdate output:)`n" + $text)
+    Write-Warning "[pass] Computer policy update completed successfully (gpupdate)."
+  } else {
+    Write-Warning ("[failure] Computer policy update did not report success.`ngpupdate output:`n" + $text)
   }
 
   if (-not $userOk) {
     if ($isSystem) {
-      Write-Warning ("[notice] " + "User policy update did not report success (gpupdate running under SYSTEM/non-interactive)." + "`n" + ("This can be expected when no interactive user is logged on.)`nRaw gpupdate output:`n" + $text)
+      Write-Warning ("[notice] User policy update did not report success (gpupdate running under SYSTEM/non-interactive).`nThis can be expected when no interactive user is logged on.`nRaw gpupdate output:`n" + $text)
     } else {
-      Write-Warning ("[failure] " + "User policy update did not report success." + "`n" + ("Expected success for interactive user.)`nRaw gpupdate output:`n" + $text)
+      Write-Warning ("[failure] User policy update did not report success.`nExpected success for interactive user.`nRaw gpupdate output:`n" + $text)
     }
   } else {
-    Write-Warning "[pass] User policy update completed successfully (gpupdate)."}
+    Write-Warning "[pass] User policy update completed successfully (gpupdate)."
+  }
 }
 
 #--------------------------------------------------------
@@ -1410,7 +1414,7 @@ function HealthTest-RecentDiskErrors {
                     Level        = 2     # Error
                     StartTime    = $start
             } -ErrorAction SilentlyContinue | %{
-                Write-Warning ("[failure] " + "Storage($p) error in last N hours" + "`n" + "N=$Hours hours); Event: $($_.TimeCreated), $($_.LevelDisplayName), $($_.Message)"
+                Write-Warning "[failure] Storage($p) error in last N hours`nN=$Hours hours; Event: $($_.TimeCreated), $($_.LevelDisplayName), $($_.Message)"
                 $pass = $false
             }
         } catch {
