@@ -19,7 +19,11 @@ None.
 $DEST_DIR = 'C:\it\bin'
 $BAK_DIR  = 'C:\it\temp'
 $CFG_DIR  = 'c:\it\config'
-$URI      = 'https://raw.githubusercontent.com/ndemou/GetComputerHealth/refs/heads/main'
+$REPO_URL = 'https://github.com/ndemou/GetComputerHealth'
+$REPO_REF = 'main'
+$LATEST_RELEASE_MARKER_PATH = 'c:\it\config\Get-ComputerHealth-latest-release.dat'
+$repoSlug = (($REPO_URL -replace '^https?://github\.com/','') -replace '\.git$','').Trim('/')
+$URI      = "https://raw.githubusercontent.com/$repoSlug/refs/heads/$REPO_REF"
 #
 #  END OF CONFIG
 #
@@ -87,6 +91,48 @@ System.String, The full path of the created directory under $env:TEMP.
     # Create the directory
     $null = New-Item -ItemType Directory -Path $tmdDir -Force
     return $tmdDir
+}
+
+function Convert-GitHubRepoUrlToSlug {
+<#
+.SYNOPSIS
+Converts a GitHub repo URL into "owner/repo" format.
+#>
+  [CmdletBinding()]
+  param([Parameter(Mandatory)][string]$RepoUrl)
+  $slug = ($RepoUrl -replace '^https?://github\.com/','') -replace '\.git$',''
+  $slug = $slug.Trim('/')
+  if ([string]::IsNullOrWhiteSpace($slug)) {
+    throw "Invalid GitHub repository URL: $RepoUrl"
+  }
+  return $slug
+}
+function Get-GetComputerHealthLatestReleaseMarker {
+<#
+.SYNOPSIS
+Gets a stable marker string for the latest GitHub release.
+.DESCRIPTION
+Returns "owner/repo|tag|id" when available, otherwise $null on non-terminating failures.
+#>
+  [CmdletBinding()]
+  param([Parameter(Mandatory)][string]$RepositoryUrl)
+  try {
+    $slug = Convert-GitHubRepoUrlToSlug -RepoUrl $RepositoryUrl
+    $api = "https://api.github.com/repos/$slug/releases/latest"
+    $headers = @{
+      'User-Agent' = 'PowerShell'
+      'Accept'     = 'application/vnd.github+json'
+    }
+    $rel = Invoke-RestMethod -Method Get -Uri $api -Headers $headers -ErrorAction Stop
+    $tag = [string]$rel.tag_name
+    if ([string]::IsNullOrWhiteSpace($tag)) { $tag = 'untagged' }
+    $id = [string]$rel.id
+    if ([string]::IsNullOrWhiteSpace($id)) { $id = 'noid' }
+    return ("{0}|{1}|{2}" -f $slug, $tag, $id)
+  } catch {
+    Write-Warning ("Could not query latest release metadata from {0}: {1}" -f $RepositoryUrl, $_.Exception.Message)
+    return $null
+  }
 }
 
 function Sync-WebFile {
@@ -209,6 +255,23 @@ if (-not (Test-Path $p)) {
     "# $($env:COMPUTERNAME)" | Out-File $p -Encoding UTF8
 }
 
+# Check latest release marker to avoid redownloading the same release repeatedly
+$latestReleaseMarker = Get-GetComputerHealthLatestReleaseMarker -RepositoryUrl $REPO_URL
+if ($latestReleaseMarker) {
+  $storedReleaseMarker = $null
+  if (Test-Path -LiteralPath $LATEST_RELEASE_MARKER_PATH -PathType Leaf) {
+    try {
+      $storedReleaseMarker = (Get-Content -LiteralPath $LATEST_RELEASE_MARKER_PATH -ErrorAction Stop | Select-Object -First 1).Trim()
+    } catch {
+      Write-Warning ("Failed reading release marker file {0}: {1}" -f $LATEST_RELEASE_MARKER_PATH, $_.Exception.Message)
+    }
+  }
+  if ($storedReleaseMarker -and ($storedReleaseMarker -eq $latestReleaseMarker)) {
+    Write-Host -ForegroundColor DarkGray "Latest release already downloaded. Skipping update download."
+    return
+  }
+}
+
 # Download/update scripts
 Write-Host -for DarkGray "Checking for code updates (I will backup local files before update)"
 $tmdDir = New-EmptyTempDirectory -Name "Update-GetHealthCode"
@@ -230,9 +293,24 @@ $_=Sync-WebFile -FileName 'Send-Message.ps1'             -BaseUri $URI -TempPath
 $_=Sync-WebFile -FileName 'helpers-processes.ps1'        -BaseUri $URI -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
 $updated = Sync-WebFile -FileName 'Update-GetHealthCode.ps1' -BaseUri $URI -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
 if ($updated) {
+    if ($latestReleaseMarker) {
+      try {
+        $latestReleaseMarker | Out-File -LiteralPath $LATEST_RELEASE_MARKER_PATH -Encoding UTF8 -Force
+      } catch {
+        Write-Warning ("Failed writing latest release marker to {0}: {1}" -f $LATEST_RELEASE_MARKER_PATH, $_.Exception.Message)
+      }
+    }
     Write-Host -ForegroundColor White "Rerunning myself because I was updated."
     & c:\it\bin\Update-GetHealthCode.ps1
     return
+}
+
+if ($latestReleaseMarker) {
+  try {
+    $latestReleaseMarker | Out-File -LiteralPath $LATEST_RELEASE_MARKER_PATH -Encoding UTF8 -Force
+  } catch {
+    Write-Warning ("Failed writing latest release marker to {0}: {1}" -f $LATEST_RELEASE_MARKER_PATH, $_.Exception.Message)
+  }
 }
 
 # cleanups:
@@ -240,3 +318,4 @@ if ((Get-Date) -le [datetime]'2026-04-30') {
 	if (test-path $DEST_DIR\lib-health-tests.ps1) {rm $DEST_DIR\lib-health-tests.ps1}
 	if (test-path $DEST_DIR\lib-helpers-for-health-tests.ps1) {rm $DEST_DIR\lib-helpers-for-health-tests.ps1}
 }
+
