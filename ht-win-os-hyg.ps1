@@ -674,7 +674,8 @@ function HealthTest-KerberosEncryptionTypes{
         Write-Warning "[warning] RC4 permitted for $($o.objectClass): $($o.sAMAccountName)"
         $bad_count += 1
         if ($bad_count -gt 10) {
-            Write-Warning "[warning] I will not report any more 'RC4 permitted for...' warnings"break
+            Write-Warning "[warning] I will not report any more 'RC4 permitted for...' warnings"
+            break
         }
     }
   }
