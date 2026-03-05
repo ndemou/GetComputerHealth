@@ -10,61 +10,13 @@ This array along with the values of the following variables will be added to `$G
 
 ## Fix typo: Invoke-HealtTestsFromFolder (Note the missing 'h' in 'Healt')
 
-## All HealthTest- functions must use `Write-Warning` instead of `Log-*`
-
-Currently the `log-*` functions (pass,failure,warning,etc) emmit their object to the standard output. As a result developers of HealthTest- function must be very carefull not to use the standard output stream anywhere in their functions. That can sometimes create hard to debug bugs (e.g. if a function that always returns a value, sometimes also produce a `log-warning`). This alternative method uses the Write-Warning stream instead of the Write-Output one but also keeps supporting `log-*` functions for the few Custom Health Tests that use them (but emmits warnings when it detects such cases).
-
-Here's an example HealthTest- function using the new style:
-```powershell
-function HealthTest-Func {
-    Write-Warning @"
-[pass] 1st line is the .message part of the log-object.  
-(excluding the "^ *\[[a-z]+\] *" prefix).
-All other lines comprise the .comment.
-The square-bracketed "pass" (or info,notice,warning,...) is used as the .Level of the log-object
-(specifically this 1st match: "^ *\[([a-z]+\)] *").
-"@
-    # So the above Write-Warning will be converted to:
-	# Log-Msg -Level "pass" -Msg "1st line is the .message part of the log-object." -Comment "...all other lines..."
-	
-    Write-Warning "[failure] this is also fine when no comments are needed"
-    Write-Output "some debuging message" # This will be converted to a log-debug object.
-}
-```
-
-Here's how we may be able to capture the streams and convert them to log-msg calls:
-```PowerShell
-& {
-    $WarningPreference = 'Continue'
-    HealthTest-Func -WarningAction Continue 3>&1
-} 2>&1 | ForEach-Object {
-  if ($_ -is [System.Management.Automation.WarningRecord]) {
-      # $_.message contains a string from the Warning stream
-	  # Code that reads $_ and calls:
-	  #  Log-Msg -Level "<Level>" -Msg "<rest of 1st line>" -Comment "<all other lines>"
-  } else { 
-      # $_ contains an object from the standard output stream
-	  #
-	  # if it's a pscustomobject with $_.Level, $_.Message, $_.Comment
-	  #   Log-Msg -Level $_.Level -Msg $_.Message -Comment $_.Comment
-	  #
-	  # If it's a string:
-	  #   Log-Msg -Level "debug" -Msg "<rest of 1st line>" -Comment "<all other lines>"
-	  #
-	  # If it's anything else:
-	  #   Log-Msg -Level "debug" -Msg "Object of type <...>" -Comment "<object serialized to text>"
-  }
-}
-```
-
-
 ## Review the hundrends of warnings from Invoke-ScriptAnalyzer (and 3 errors)
 
 See also : .\tests\script-analysis.ps1
 
 ## How can I automate tests in GitHub?
 
-ChatGPT saidL: GitHub Actions can run Windows PowerShell 5.1 by using the powershell shell (which invokes powershell.exe on Windows runners).
+ChatGPT said: GitHub Actions can run Windows PowerShell 5.1 by using the powershell shell (which invokes powershell.exe on Windows runners).
 See also: https://docs.github.com/actions/automating-builds-and-tests/building-and-testing-powershell
 
 ## Allow tags in HealthTest- function names 
