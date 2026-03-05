@@ -405,8 +405,7 @@ function HealthTest-EventLogMaxSizes{
     if($sz -lt $minBytes){
       $bad=$true
       $currentMB=[math]::Round($sz/1MB)
-      $comment="Fix: Run  wevtutil sl $name /ms:$minBytes"
-      Write-Warning "[failure] $("$name log maximum size too small: ${currentMB}MB < ${minMB}MB")`n$($comment)"
+      Write-Warning "[failure] $name log maximum size too small`nIt's $currentMB which is less than ${minMB}MB`nFix: Run  wevtutil sl $name /ms:$minBytes"
     }
   }
 

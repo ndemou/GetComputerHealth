@@ -967,8 +967,8 @@ function HealthTest-IisBindings {
       foreach ($x in $b) {
         if ($x.protocol -eq 'http' -and ($x.bindingInformation -like '*:80:*') -and ($sites.count -gt 1)) {
             $commnet = ""
-            if ($sites.count -gt 1) {$comment = "Since multiple sites are hosted, wildcard bindins may expose unintended content"}
-            Write-Warning "[notice] $("$($s.Name): site serves plain HTTP with wildcard bindings")`n$($comment)"
+            if ($sites.count -gt 1) {$comment = "`nSince multiple sites are hosted, wildcard bindins may expose unintended content"}
+            Write-Warning "[notice] $($s.Name): site serves plain HTTP with wildcard bindings$comment"
             $problem_found = $true
         }
         if ($x.protocol -eq 'https' -and ($x.bindingInformation -like '*:443:*') -and -not $x.certificateHash) {
@@ -1510,7 +1510,8 @@ function HealthTest-LocalAcntRequirePass {
         $no_req_pass_accounts | %{
             try {$account_name = $_.name} catch {$account_name="(FAILED_TO_GET_NAME)"}
             $ok = $false
-            Write-Warning "[failure] This local account has the property PasswordRequired set to false: $account_name`nMake sure the account password is set and then run this command:`n& cmd /c 'net user `"$($_.name)`" /passwordreq:yes'"
+            $comment = "Make sure the account password is set and then run this command:`n& cmd /c 'net user `"$($_.name)`" /passwordreq:yes'"
+            Write-Warning "[failure] This local account has the property PasswordRequired set to false: $account_name`n$comment"
         }
     }
     if ($ok) {Write-Warning "[pass] All local accounts have PasswordRequired True"}
@@ -1585,16 +1586,14 @@ function HealthTest-NonMicrosoftServices {
         $TrimmdServiceName = $_.ServiceName -replace '[0-9]+[.][0-9][0-9.]*$','[VERSION]'
         $ok = $false
         if ($_.ExceptionsThrown) {
-            Write-Warning "[warning] $("Either something's wrong with service '$($_.ServiceName)' or there's a bug in Get-ServiceVendors.")`n$($_.ExceptionsThrown)"
+            Write-Warning "[warning] Either something's wrong with service '$($_.ServiceName)' or there's a bug in Get-ServiceVendors.`n$($_.ExceptionsThrown)"
         } else {
             if ($isHostServer -or ($_.Vendor -notin $COMMON_VENDORS_FOR_WORKSTATIONS)) {
-                Write-Warning "[warning] Found service that is not a core Microsoft service: Vendor='$($_.Vendor)' Name='$TrimmdServiceName'$extra_msg" `
-                    -Comment ("Admin must verify if service is legit and needed. Service Description: '$($_.DisplayName)'`n" `
-                    + "Executable: '$($_.ExePath)'.")
+                $comment = "Admin must verify if service is legit and needed. Service Description: '$($_.DisplayName)'`nExecutable: '$($_.ExePath)'."
+                Write-Warning "[warning] Found service that is not a core Microsoft service: Vendor='$($_.Vendor)' Name='$TrimmdServiceName'$extra_msg`n$comment"
             } else {
-                Write-Warning "[notice] Found service that is not a core Microsoft service: Vendor='$($_.Vendor)' Name='$TrimmdServiceName'$extra_msg" `
-                    -Comment ("It is however from a common vendor. Admin must verify if service is legit and needed. Service Description: '$($_.DisplayName)'`n" `
-                    + "Executable: '$($_.ExePath)'.")
+                $comment = "It is however from a common vendor. Admin must verify if service is legit and needed. Service Description: '$($_.DisplayName)'`nExecutable: '$($_.ExePath)'."
+                Write-Warning "[notice] Found service that is not a core Microsoft service: Vendor='$($_.Vendor)' Name='$TrimmdServiceName'$extra_msg`n$comment"
             }
         }
     }
@@ -3090,8 +3089,7 @@ function HealthTest-EventLogMaxSizes{
     if($sz -lt $minBytes){
       $bad=$true
       $currentMB=[math]::Round($sz/1MB)
-      $comment="Fix: Run  wevtutil sl $name /ms:$minBytes"
-      Write-Warning "[failure] $("$name log maximum size too small: ${currentMB}MB < ${minMB}MB")`n$($comment)"
+      Write-Warning "[failure] $name log maximum size too small`nIt's ${currentMB}MB < ${minMB}MB`nFix: Run  wevtutil sl $name /ms:$minBytes"
     }
   }
 
@@ -4468,8 +4466,7 @@ function HealthTest-EventLogMaxSizes{
     if($sz -lt $minBytes){
       $bad=$true
       $currentMB=[math]::Round($sz/1MB)
-      $comment="Fix: Run  wevtutil sl $name /ms:$minBytes"
-      Write-Warning "[failure] $("$name log maximum size too small: ${currentMB}MB < ${minMB}MB")`n$($comment)"
+      Write-Warning "[failure] $name log maximum size too small`nIt's ${currentMB}MB < ${minMB}MB`nFix: Run  wevtutil sl $name /ms:$minBytes"
     }
   }
 

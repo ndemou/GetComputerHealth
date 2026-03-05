@@ -25,11 +25,11 @@ function HealthTest-RecentWindowsScan {
     $comment = "Last scan, $days days ago. Windows installation age is $installationAge days."
 
     if ($days -lt $MAX_WARN_DAYS) {
-        Write-Warning ("[pass] " + "Did windows defender perform a quick scan recently?" + "`n" + $comment)
+        Write-Warning ("[pass] Did windows defender perform a quick scan recently?`n$comment")
     } elseif ($days -lt $MAX_FAILURE_DAYS) {
-        Write-Warning ("[warning] " + "Did windows defender perform a quick scan recently?" + "`n" + $comment)
+        Write-Warning ("[warning] Did windows defender perform a quick scan recently?`n$comment")
     } else {
-        Write-Warning ("[failure] " + "Did windows defender perform a quick scan recently?" + "`n" + $comment)
+        Write-Warning ("[failure] Did windows defender perform a quick scan recently?`n$comment")
     }
 }
 
@@ -84,7 +84,8 @@ function HealthTest-SchanelBaseline{
     Write-Warning "[pass] Schannel baseline OK (SSL3/TLS1.0/TLS1.1 disabled, TLS1.2 enabled)"
   } else {
     $why="LDAP over TLS, WinRM, ADWS, and other Schannel consumers may negotiate legacy handshakes/ciphers if enabled."
-    Write-Warning ("[failure] " + "Schannel baseline not hardened" + "`n" + ("Detected mismatches:`n"+($bad | ForEach-Object { "  - {0}: Current={1}, Recommended={2}" -f $_.Protocol,$_.CurrentState,$should[$_.Protocol] } | Out-String) + "`nRegistry snapshot:`n"+$det+$why))
+    $comment = ("Detected mismatches:`n"+($bad | ForEach-Object { "  - {0}: Current={1}, Recommended={2}" -f $_.Protocol,$_.CurrentState,$should[$_.Protocol] } | Out-String) + "`nRegistry snapshot:`n"+$det+$why)
+    Write-Warning "[failure] Schannel baseline not hardened`n$comment"
   }
 }
 
@@ -550,12 +551,12 @@ function HealthTest-UnexpectedListeningPorts {
         # If vendor is like "Microsoft Windows*" then level becomes "WARNING" for servers and "NOTICE" for workstations
         if ($vendorDescr -like "Microsoft Windows*") {
             if($isHostServer){
-                Write-Warning ("[warning] " + "Unexpected listening port: $p (Process: $procDescr, Vendor: $vendor)" + "`n" + $comment)
+                Write-Warning ("[warning] Unexpected listening port: $p (Process: $procDescr, Vendor: $vendor)`n$comment")
             } else {
-                Write-Warning ("[notice] " + "Unexpected listening port: $p (Process: $procDescr, Vendor: $vendor)" + "`n" + $comment)
+                Write-Warning ("[notice] Unexpected listening port: $p (Process: $procDescr, Vendor: $vendor)`n$comment")
             }
         } else {
-            Write-Warning ("[failure] " + "Unexpected listening port: $p (Process: $procDescr, Vendor: $vendor)" + "`n" + $comment)
+            Write-Warning ("[failure] Unexpected listening port: $p (Process: $procDescr, Vendor: $vendor)`n$comment")
         }
     }
 
@@ -670,7 +671,8 @@ function HealthTest-KerberosEncryptionTypes{
   foreach($o in $objs){
     $v=[int]$o.'msDS-SupportedEncryptionTypes'
     if(($v -band 0x4) -ne 0){
-        Write-Warning "[warning] RC4 permitted for $($o.objectClass): $($o.sAMAccountName)"$bad_count += 1
+        Write-Warning "[warning] RC4 permitted for $($o.objectClass): $($o.sAMAccountName)"
+        $bad_count += 1
         if ($bad_count -gt 10) {
             Write-Warning "[warning] I will not report any more 'RC4 permitted for...' warnings"break
         }
@@ -819,7 +821,7 @@ function HealthTest-EventLogMaxSizes{
       $bad=$true
       $currentMB=[math]::Round($sz/1MB)
       $comment="Fix: Run  wevtutil sl $name /ms:$minBytes"
-      Write-Warning ("[failure] " + "$name log maximum size too small: ${currentMB}MB < ${minMB}MB" + "`n" + $comment)
+      Write-Warning ("[failure] $name log maximum size too small: ${currentMB}MB < ${minMB}MB`n$comment")
     }
   }
 
@@ -991,11 +993,12 @@ function HealthTest-SysvolContentConsistency{
       write-verbose "  '$_'  bytes=[$([System.BitConverter]::ToString($bytes))]"
     }
 
-    if($allSame){
-      Write-Warning "[pass] SYSVOL policy tree manifests match across all DCs"} elseif($hasMissing){
-      Write-Warning ("[failure] " + "At least one DC lacks SYSVOL\Policies" + "`n" + $map)
+    if($allSame) {
+      Write-Warning "[pass] SYSVOL policy tree manifests match across all DCs"
+    } elseif($hasMissing) {
+      Write-Warning "[failure] At least one DC lacks SYSVOL\Policies`n$map"
     } else {
-      Write-Warning ("[failure] " + "SYSVOL policy manifests are not consistent across DCs" + "`n" + $map)
+      Write-Warning "[failure] SYSVOL policy manifests are not consistent across DCs`n$map"
     }
 }
 
@@ -1239,7 +1242,7 @@ function HealthTest-DomainARecordPointsToDcIp {
   $ares = $null
   try { $ares = Resolve-DnsName -Name $domain -Type A -ErrorAction Stop } catch {}
   if (-not $ares) {
-    Write-Warning ("[failure] " + "No A records found for domain DNS name." + "`n" + $domain)
+    Write-Warning "[failure] No A records found for domain DNS name.`n$domain"
     return
   }
 
@@ -1249,9 +1252,9 @@ function HealthTest-DomainARecordPointsToDcIp {
 
   $comment = "Domain=$domain; DC IPs=" + ($dcIps -join ', ') + "; Domain A IPs=" + ($aIps -join ', ')
   if ($intersection.Count -gt 0) {
-    Write-Warning ("[pass] " + "Domain DNS name resolves to at least one DC IP." + "`n" + $comment)
+    Write-Warning ("[pass] Domain DNS name resolves to at least one DC IP.`n$comment")
   } else {
-    Write-Warning ("[failure] " + "Domain DNS name does not resolve to any known DC IPv4 address." + "`n" + $comment)
+    Write-Warning ("[failure] Domain DNS name does not resolve to any known DC IPv4 address.`n$comment")
   }
 }
 
@@ -1287,7 +1290,7 @@ function HealthTest-InterfaceDnsServersUseDcs {
     $dns  = $net.DNSServerSearchOrder
     $desc = $net.Description
     if (-not $dns -or $dns.Count -eq 0) {
-      Write-Warning ("[notice] " + "Interface has no DNS servers configured." + "`n" + $desc)
+      Write-Warning "[notice] Interface has no DNS servers configured.`n$desc"
       continue
     }
 
@@ -1303,12 +1306,12 @@ function HealthTest-InterfaceDnsServersUseDcs {
 
     if ($allDomain) {
       $anyClean = $true
-      Write-Warning ("[pass] " + "Interface has only DCs as DNS servers." + "`n" + ("Interface: " + $desc + "; DNS=" + $dnsList))
+      Write-Warning "[pass] Interface has only DCs as DNS servers.`nInterface: $desc; DNS=$dnsList"
     } elseif ($allNonDomain) {
       # Ignoring this interface that only has non-domain DNS servers
     } else {
       $anyBad = $true
-      Write-Warning ("[failure] " + "Interface DNS servers include non-DC addresses." + "`n" + ("Interface: " + $desc + "; DNS=" + $dnsList + "; DC IPs=" + ($dcIps -join ', ')))
+      Write-Warning "[failure] Interface DNS servers include non-DC addresses.`nInterface: $desc; DNS=$dnsList; DC IPs=$($dcIps -join ', ')"
     }
   }
 
@@ -1343,10 +1346,10 @@ function HealthTest-NltestSiteDiscovery {
       }
     }
     if (-not $site) { $site = '(unknown)' }
-    Write-Warning ("[pass] " + "NLTEST /dsgetsite succeeded." + "`n" + ("Site: " + $site))
+    Write-Warning "[pass] NLTEST /dsgetsite succeeded.`nSite: $site"
   } else {
     $hex = '0x{0:X}' -f ($exit -band 0xFFFFFFFF)
-    Write-Warning ("[failure] " + "NLTEST /dsgetsite failed." + "`n" + ("ExitCode=" + $hex + "; Output=`n" + $txt))
+    Write-Warning "[failure] NLTEST /dsgetsite failed.`nExitCode=$hex; Output=`n$txt"
   }
 }
 
@@ -1519,7 +1522,8 @@ function HealthTest-LocalAdminsBaseline {
         }
 
         if (-not $isAllowed) {
-            Write-Warning "[warning] Unexpected Local Administrator: $full"$pass = $false
+            Write-Warning "[warning] Unexpected Local Administrator: $full"
+            $pass = $false
         }
     }
     if ($pass) {
@@ -1611,7 +1615,8 @@ function HealthTest-BitLockerStatus {
     if (-not $vols) {
         Write-Warning "[notice] No BitLocker-capable volumes found"}
     $vols | Where-Object { $_.ProtectionStatus -ne 'On' } | %{
-        Write-Warning "[failure] Volume not protected by BitLocker: $($_.MountPoint)"$pass = $false
+        Write-Warning "[failure] Volume not protected by BitLocker: $($_.MountPoint)"
+        $pass = $false
     }
     if ($pass) {
         Write-Warning "[pass] BitLocker protection is ON for all detected volumes"}
@@ -1662,9 +1667,9 @@ function HealthTest-DnsSuffixBaseline {
     $primarySuffix = $ipg.DomainName
 
     if ([string]::IsNullOrWhiteSpace($primarySuffix)) {
-        Write-Warning "[failure] Primary DNS suffix""Current is empty" "Ensure the system has a primary DNS suffix (normally set by domain join)."
+        Write-Warning "[failure] Primary DNS suffix: Current is empty" "Ensure the system has a primary DNS suffix (normally set by domain join)."
     } elseif ($primarySuffix -ieq $DomainName) {
-        Write-Warning "[pass] Primary DNS suffix"$primarySuffix
+        Write-Warning "[pass] Primary DNS suffix`n$primarySuffix"
     } else {
         Write-Warning "[failure] Primary DNS suffix"("Current='{0}' Expected='{1}'" -f $primarySuffix,$DomainName) "Ensure primary DNS suffix equals the AD DNS name (normally set by domain join)."
     }
@@ -1673,13 +1678,14 @@ function HealthTest-DnsSuffixBaseline {
     try {
         $g = Get-DnsClientGlobalSetting -ErrorAction Stop
         if ($g.UseDevolution -eq $true) {
-            Write-Warning "[pass] DNS devolution enabled""UseDevolution=True"
+            Write-Warning "[pass] DNS devolution enabled`nUseDevolution=True"
         } else {
-            Write-Warning "[failure] DNS devolution enabled""UseDevolution=False" "Enable devolution (GPO: Computer Configuration/Administrative Templates/Network/DNS Client/Turn off DNS devolution = Disabled)."
+            Write-Warning "[failure] DNS devolution enabled`nUseDevolution=False`nEnable devolution (GPO: Computer Configuration/Administrative Templates/Network/DNS Client/Turn off DNS devolution = Disabled)."
         }
     } catch {
         $err = $_
-        Write-Warning ("[failure] " + "DNS devolution enabled" + "`n" + (("Unable to query global DNS client settings: {0}" -f $err.Exception.Message) + "`n" + "Check OS support for Get-DnsClientGlobalSetting and that the DNS Client service is running."))
+        $comment = ("Unable to query global DNS client settings: {0}" -f $err.Exception.Message) + "`nCheck OS support for Get-DnsClientGlobalSetting and that the DNS Client service is running."
+        Write-Warning "[failure] DNS devolution enabled`n$comment"
     }
 
     # 3) Per-NIC checks (only PASS/FAIL; no discovery warning if none found)
@@ -1689,7 +1695,8 @@ function HealthTest-DnsSuffixBaseline {
                 Where-Object { $_.InterfaceOperationalStatus -eq "Up" -and $_.ConnectionSpecificSuffix -ne "localdomain" }
     } catch {
         $err = $_
-        Write-Warning ("[failure] " + "NIC DNS settings" + "`n" + (("Unable to query DNS client interfaces: {0}" -f $err.Exception.Message) + "`n" + "Confirm OS supports Get-DnsClient and you have sufficient privileges."))
+        $comment = "Unable to query DNS client interfaces: $($err.Exception.Message)`nConfirm OS supports Get-DnsClient and you have sufficient privileges."
+        Write-Warning "[failure] NIC DNS settings`n$comment"
         $nics = @()
     }
 
@@ -1738,12 +1745,13 @@ function HealthTest-ADReplicationDomainRepadmin {
   try {
     $sumOut = (& $repadmin /replsum 2>&1 | Out-String)
   } catch {
-    Write-Warning ("[failure] " + "AD replication (repadmin): failed to execute 'repadmin /replsum'." + "`n" + $_.Exception.Message)
+    Write-Warning "[failure] AD replication (repadmin): failed to execute 'repadmin /replsum'.`n$($_.Exception.Message)"
     return
   }
 
   if (-not $sumOut) {
-    Write-Warning "[failure] AD replication (repadmin): no output from 'repadmin /replsum'."$ok = $false
+    Write-Warning "[failure] AD replication (repadmin): no output from 'repadmin /replsum'."
+    $ok = $false
   } else {
     $bad = @()
     foreach ($ln in ($sumOut -split '\r?\n')) {
@@ -1757,7 +1765,7 @@ function HealthTest-ADReplicationDomainRepadmin {
 
     if ($bad.Count -gt 0) {
       foreach ($b in $bad) {
-        Write-Warning ("[failure] " + "AD replication (repadmin): replsum reports failures on '$($b.DSA)'" + "`n" + ("{0} fail(s) out of {1} neighbors." -f $b.Fails,$b.Total))
+        Write-Warning "[failure] AD replication (repadmin): replsum reports failures on '$($b.DSA)'`n$($b.Fails) fail(s) out of $($b.Total) neighbors."
       }
       $ok = $false
     } else {
@@ -1768,12 +1776,13 @@ function HealthTest-ADReplicationDomainRepadmin {
   try {
     $showOut = (& $repadmin /showreps 2>&1 | Out-String)
   } catch {
-    Write-Warning ("[failure] " + "AD replication (repadmin): failed to execute 'repadmin /showreps'." + "`n" + $_.Exception.Message)
+    Write-Warning "[failure] AD replication (repadmin): failed to execute 'repadmin /showreps'.`n$($_.Exception.Message)"
     return
   }
 
   if (-not $showOut) {
-    Write-Warning "[failure] AD replication (repadmin): no output from 'repadmin /showreps'."$ok = $false
+    Write-Warning "[failure] AD replication (repadmin): no output from 'repadmin /showreps'."
+    $ok = $false
   } else {
     $attemptLines = ($showOut -split '\r?\n') | Where-Object { $_ -match 'Last attempt @' }
     if (-not $attemptLines -or $attemptLines.Count -eq 0) {
@@ -1783,7 +1792,7 @@ function HealthTest-ADReplicationDomainRepadmin {
       $notOk = @($attemptLines | Where-Object { $_ -notmatch 'was successful\.$' })
       if ($notOk.Count -gt 0) {
         foreach ($ln in $notOk) {
-          Write-Warning ("[failure] " + "AD replication (repadmin): showreps has unsuccessful last attempt" + "`n" + ($ln.Trim()))
+          Write-Warning "[failure] AD replication (repadmin): showreps has unsuccessful last attempt`n$($ln.Trim())"
         }
         $ok = $false
       } else {
@@ -1820,7 +1829,7 @@ function HealthTest-ADReplicationLocalRSAT {
   try {
     Import-Module ActiveDirectory -ErrorAction Stop
   } catch {
-    Write-Warning ("[failure] " + "AD replication (RSAT): failed to import ActiveDirectory module." + "`n" + $_.Exception.Message)
+    Write-Warning "[failure] AD replication (RSAT): failed to import ActiveDirectory module.`n$($_.Exception.Message)"
     return
   }
 
@@ -1828,7 +1837,7 @@ function HealthTest-ADReplicationLocalRSAT {
   try {
     $me = Get-ADDomainController -ErrorAction Stop
   } catch {
-    Write-Warning ("[failure] " + "AD replication (RSAT): failed to identify local domain controller." + "`n" + $_.Exception.Message)
+    Write-Warning "[failure] AD replication (RSAT): failed to identify local domain controller.`n$($_.Exception.Message)"
     return
   }
 
@@ -1839,7 +1848,7 @@ function HealthTest-ADReplicationLocalRSAT {
   try {
     [void](Get-ADDomain -ErrorAction Stop)
   } catch {
-    Write-Warning ("[failure] " + "AD replication (RSAT): cannot query domain info (ADWS/permissions/connectivity issue)." + "`n" + $_.Exception.Message)
+    Write-Warning "[failure] AD replication (RSAT): cannot query domain info (ADWS/permissions/connectivity issue).`n$($_.Exception.Message)"
     return
   }
 
@@ -1847,7 +1856,7 @@ function HealthTest-ADReplicationLocalRSAT {
   try {
     $md = Get-ADReplicationPartnerMetadata -Target $me.HostName -ErrorAction Stop
   } catch {
-    Write-Warning ("[failure] " + "Exception from: Get-ADReplicationPartnerMetadata -Target $($me.HostName)" + "`n" + $_.Exception.Message)
+    Write-Warning "[failure] Exception from: Get-ADReplicationPartnerMetadata -Target $($me.HostName)`n$($_.Exception.Message)"
     return
   }
 
@@ -1858,7 +1867,7 @@ function HealthTest-ADReplicationLocalRSAT {
   $bad = @($md | Where-Object { $_.LastReplicationResult -ne 0 })
   if ($bad.Count -gt 0) {
     $details = $bad | ForEach-Object { "$($_.Partner) rc=$($_.LastReplicationResult) at $($_.LastSuccessfulSync)" }
-    Write-Warning ("[failure] " + "AD replication (RSAT): replication partner errors for $($me.HostName)." + "`n" + ($details -join " | "))
+    Write-Warning "[failure] AD replication (RSAT): replication partner errors for $($me.HostName).`n$($details -join ' | ')"
     return
   }
 
@@ -1894,7 +1903,8 @@ function HealthTest-BitLockerStatus {
     if (-not $vols) {
         Write-Warning "[notice] No BitLocker-capable volumes found"}
     $vols | Where-Object { $_.ProtectionStatus -ne 'On' } | %{
-        Write-Warning "[failure] Volume not protected by BitLocker: $($_.MountPoint)"$pass = $false
+        Write-Warning "[failure] Volume not protected by BitLocker: $($_.MountPoint)"
+        $pass = $false
     }
     if ($pass) {
         Write-Warning "[pass] BitLocker protection is ON for all detected volumes"}
@@ -1921,11 +1931,11 @@ function HealthTest-NtlmHardening {
   $details = "LmCompatibilityLevel=$level$suffix; NoLMHash=$noLM"
 
   if ($noLM -ne 1) {
-    Write-Warning ("[warning] " + "NTLM is not fully hardened (NoLMHash is not 1)" + "`n" + $details)
+    Write-Warning ("[warning] NTLM is not fully hardened (NoLMHash is not 1)`n$details")
   } elseif ($level -lt 5) {
-    Write-Warning ("[warning] " + "NTLM is not fully hardened (LmCompatibilityLevel<5)" + "`n" + $details)
+    Write-Warning ("[warning] NTLM is not fully hardened (LmCompatibilityLevel<5)`n$details")
   } else {
-    Write-Warning ("[pass] " + "NTLM is fully hardened" + "`n" + $details)
+    Write-Warning "[pass] NTLM is fully hardened`n$details"
   }
 }
 
@@ -1948,9 +1958,9 @@ function HealthTest-RdpHardening {
     $sev = "Severity: Medium. Risk: Users may click through name-mismatch warnings; increases MITM risk on first-connect or via spoofing." + $(if($isServer){ " On a DC this is sensitive." } else { "" })
     $rdpState = "NLA=$nla; CertBound=$(if($certBound){$true}else{$false})"
     if ($isServer) {
-      Write-Warning ("[warning] " + "RDP is not hardened (NLA and/or TLS certificate binding missing)" + "`n" + $rdpState + "`n$sev")
+      Write-Warning "[warning] RDP is not hardened (NLA and/or TLS certificate binding missing)`n$rdpState`n$sev"
     } else {
-      Write-Warning ("[notice] " + "RDP is not hardened (NLA and/or TLS certificate binding missing)" + "`n" + $rdpState + "`n$sev")
+      Write-Warning "[notice] RDP is not hardened (NLA and/or TLS certificate binding missing)`n$rdpState`n$sev"
     }
   }
 }
@@ -2008,7 +2018,8 @@ function HealthTest-LocalAcntRequirePass {
         $no_req_pass_accounts | %{
             try {$account_name = $_.name} catch {$account_name="(FAILED_TO_GET_NAME)"}
             $ok = $false
-            Write-Warning ("[failure] " + "This local account has the property PasswordRequired set to false: $account_name" + "`n" + "Make sure the account password is set and then run this command:`n& cmd /c 'net user `"$($_.name)`" /passwordreq:yes'")
+            $comment =  "Make sure the account password is set and then run this command:`n& cmd /c 'net user `"$($_.name)`" /passwordreq:yes'"
+            Write-Warning "[failure] This local account has the property PasswordRequired set to false: $account_name`n$comment" 
         }
     }
     if ($ok) {Write-Warning "[pass] All local accounts have PasswordRequired True"}
@@ -2025,7 +2036,7 @@ function HealthTest-RestrictAnonymous {
   $details="RestrictAnonymous=$ra; RestrictAnonymousSAM=$rs; EveryoneIncludesAnonymous=$ea"
 
   if($pass){
-    Write-Warning ("[pass] " + "Anonymous access hardening (baseline met)" + "`n" + $details)
+    Write-Warning "[pass] Anonymous access hardening (baseline met)`n$details"
   } else {
     Write-Warning "[failure] Anonymous access hardening not at baseline`n$details. Recommendation: Set RestrictAnonymousSAM=1 and EveryoneIncludesAnonymous=0 via GPO."
   }
@@ -2219,7 +2230,8 @@ function HealthTest-LocalAdminsBaseline {
         }
 
         if (-not $isAllowed) {
-            Write-Warning "[warning] Unexpected Local Administrator: $full"$pass = $false
+            Write-Warning "[warning] Unexpected Local Administrator: $full"
+            $pass = $false
         }
     }
     if ($pass) {

@@ -52,7 +52,7 @@ function HealthTest-IisBindings {
       $b = Get-WebBinding -Name $s.Name
       foreach ($x in $b) {
         if ($x.protocol -eq 'http' -and ($x.bindingInformation -like '*:80:*') -and ($sites.count -gt 1)) {
-            $commnet = ""
+            $comment = ""
             if ($sites.count -gt 1) {$comment = "Since multiple sites are hosted, wildcard bindins may expose unintended content"}
             Write-Warning "[notice] $("$($s.Name): site serves plain HTTP with wildcard bindings")`n$($comment)"
             $problem_found = $true
@@ -452,7 +452,8 @@ function HealthTest-LocalAcntRequirePass {
         $no_req_pass_accounts | %{
             try {$account_name = $_.name} catch {$account_name="(FAILED_TO_GET_NAME)"}
             $ok = $false
-            Write-Warning "[failure] This local account has the property PasswordRequired set to false: $account_name`nMake sure the account password is set and then run this command:`n& cmd /c 'net user `"$($_.name)`" /passwordreq:yes'"
+            $comment = "Make sure the account password is set and then run this command:`n& cmd /c 'net user `"$($_.name)`" /passwordreq:yes'"
+            Write-Warning "[failure] This local account has the property PasswordRequired set to false: $account_name`n$comment"
         }
     }
     if ($ok) {Write-Warning "[pass] All local accounts have PasswordRequired True"}

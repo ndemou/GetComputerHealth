@@ -451,7 +451,7 @@ function HealthTest-DuplicateSpn{
     $owners = @($map[$spn] | Sort-Object -Unique)
     if($owners.Count -gt 1){
       $dupsFound=$true
-      Write-Warning "[failure] $("Duplicate SPN detected")`n$(("$spn -> " + ($owners -join ', ')))"
+      Write-Warning "[failure] Duplicate SPN detected`n$(("$spn -> " + ($owners -join ', ')))"
     }
   }
   if(-not $dupsFound){ Write-Warning "[pass] No duplicate SPNs detected" }
