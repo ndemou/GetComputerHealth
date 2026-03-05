@@ -75,12 +75,12 @@ function HealthTest-InterfaceDnsServersUseDcs {
 
     if ($allDomain) {
       $anyClean = $true
-      Write-Warning "[pass] Interface has only DCs as DNS servers." -Comment ("Interface: " + $desc + "; DNS=" + $dnsList)
+      Write-Warning ("[pass] Interface has only DCs as DNS servers.`nInterface: " + $desc + "; DNS=" + $dnsList)
     } elseif ($allNonDomain) {
       # Ignoring this interface that only has non-domain DNS servers
     } else {
       $anyBad = $true
-      Write-Warning "[failure] Interface DNS servers include non-DC addresses." -Comment ("Interface: " + $desc + "; DNS=" + $dnsList + "; DC IPs=" + ($dcIps -join ', '))
+      Write-Warning ("[failure] Interface DNS servers include non-DC addresses.`nInterface: " + $desc + "; DNS=" + $dnsList + "; DC IPs=" + ($dcIps -join ', '))
     }
   }
 
@@ -222,7 +222,7 @@ function HealthTest-IPv6Binding{
     }
     if(-not $bad){ Write-Warning "[pass] IPv6 enabled on all adapters" }
   } else {
-    Write-Warning "[pass] $("IPv6 binding state reported")`n$((($rows | ForEach-Object { "$($_.Name)=$($_.Enabled)" }))" -join '; ')
+    Write-Warning ("[pass] IPv6 binding state reported`n" + (($rows | ForEach-Object { "$($_.Name)=$($_.Enabled)" }) -join "; "))
   }
 }
 
@@ -326,7 +326,7 @@ function HealthTest-NltestSiteDiscovery {
     Write-Warning "[pass] $("NLTEST /dsgetsite succeeded.")`n$(("Site: " + $site))"
   } else {
     $hex = '0x{0:X}' -f ($exit -band 0xFFFFFFFF)
-    Write-Warning "[failure] NLTEST /dsgetsite failed." -Comment ("ExitCode=" + $hex + "; Output=`n" + $txt)
+    Write-Warning ("[failure] NLTEST /dsgetsite failed.`nExitCode=" + $hex + "; Output=`n" + $txt)
   }
 }
 

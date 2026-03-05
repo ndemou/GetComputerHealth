@@ -886,12 +886,12 @@ function HealthTest-InterfaceDnsServersUseDcs {
 
     if ($allDomain) {
       $anyClean = $true
-      Write-Warning "[pass] Interface has only DCs as DNS servers." -Comment ("Interface: " + $desc + "; DNS=" + $dnsList)
+      Write-Warning ("[pass] Interface has only DCs as DNS servers.`nInterface: " + $desc + "; DNS=" + $dnsList)
     } elseif ($allNonDomain) {
       # Ignoring this interface that only has non-domain DNS servers
     } else {
       $anyBad = $true
-      Write-Warning "[failure] Interface DNS servers include non-DC addresses." -Comment ("Interface: " + $desc + "; DNS=" + $dnsList + "; DC IPs=" + ($dcIps -join ', '))
+      Write-Warning ("[failure] Interface DNS servers include non-DC addresses.`nInterface: " + $desc + "; DNS=" + $dnsList + "; DC IPs=" + ($dcIps -join ', '))
     }
   }
 
@@ -931,7 +931,7 @@ function HealthTest-NltestSiteDiscovery {
     Write-Warning "[pass] $("NLTEST /dsgetsite succeeded.")`n$(("Site: " + $site))"
   } else {
     $hex = '0x{0:X}' -f ($exit -band 0xFFFFFFFF)
-    Write-Warning "[failure] NLTEST /dsgetsite failed." -Comment ("ExitCode=" + $hex + "; Output=`n" + $txt)
+    Write-Warning ("[failure] NLTEST /dsgetsite failed.`nExitCode=" + $hex + "; Output=`n" + $txt)
   }
 }
 
@@ -1299,19 +1299,19 @@ function HealthTest-DnsSuffixBaseline {
 
         # 3a) Registration flags must both be True
         if ($n.RegisterThisConnectionsAddress -and $n.UseSuffixWhenRegistering) {
-            Write-Warning "[pass] $(("NIC '{0}' DNS registration" -f $nicName))" "RegisterThisConnectionsAddress=True, UseSuffixWhenRegistering=True"
+            Write-Warning ("[pass] NIC '{0}' DNS registration`nRegisterThisConnectionsAddress=True, UseSuffixWhenRegistering=True" -f $nicName)
         } else {
-            Write-Warning "[failure] $(("NIC '{0}' DNS registration" -f $nicName) ("RegisterThisConnectionsAddress={0}, UseSuffixWhenRegistering={1}" -f $n.RegisterThisConnectionsAddress,$n.UseSuffixWhenRegistering))" "Enable both flags on important interfaces."
+            Write-Warning (("[failure] NIC '{0}' DNS registration`nRegisterThisConnectionsAddress={1}, UseSuffixWhenRegistering={2}`nEnable both flags on important interfaces." -f $nicName,$n.RegisterThisConnectionsAddress,$n.UseSuffixWhenRegistering))
         }
 
         # 3b) Connection-specific suffix: must be Empty OR exactly the domain
         $css = $n.ConnectionSpecificSuffix
         if ([string]::IsNullOrWhiteSpace($css)) {
-            Write-Warning "[pass] $(("NIC '{0}' Conn.-specific suffix" -f $nicName))" "Empty"
+            Write-Warning ("[pass] NIC '{0}' Conn.-specific suffix`nEmpty" -f $nicName)
         } elseif ($css -ieq $DomainName) {
-            Write-Warning "[pass] $(("NIC '{0}' Conn.-specific suffix" -f $nicName) ("Equals {0}" -f $DomainName))"
+            Write-Warning ("[pass] NIC '{0}' Conn.-specific suffix`nEquals {1}" -f $nicName,$DomainName)
         } else {
-            Write-Warning "[failure] $(("NIC '{0}' Conn.-specific suffix" -f $nicName) ("Set to '{0}'" -f $css))" "Leave blank for single-domain setups unless a specific suffix is required."
+            Write-Warning (("[failure] NIC '{0}' Conn.-specific suffix`nSet to '{1}'`nLeave blank for single-domain setups unless a specific suffix is required." -f $nicName,$css))
         }
     }
 }
@@ -2180,7 +2180,7 @@ param(
         if ($fresh_vbm -and ($fresh_vib -or $fresh_vbk) -and $atleast_one_vbk) {
             Write-Warning "[pass] Found recent Veeam backups. If you want to change the configuration edit: $ConfigPath"
         } else {
-            Write-Warning "[failure] No recent Veeam backups found at: $rootPath" -comment ("If you want to change the configuration edit: $ConfigPath`n" + `
+            Write-Warning ("[failure] No recent Veeam backups found at: $rootPath`nIf you want to change the configuration edit: $ConfigPath`n" + `
                 "fresh_vbm=$fresh_vbm, fresh_vib=$fresh_vib, fresh_vbk=$fresh_vbk, atleast_one_vbk=$atleast_one_vbk`n" + `
                 "Condition for pass is: " + `
                 '($fresh_vbm -and ($fresh_vib -or $fresh_vbk) -and $atleast_one_vbk)' + `
@@ -3303,7 +3303,7 @@ param(
         if ($fresh_vbm -and ($fresh_vib -or $fresh_vbk) -and $atleast_one_vbk) {
             Write-Warning "[pass] Found recent Veeam backups. If you want to change the configuration edit: $ConfigPath"
         } else {
-            Write-Warning "[failure] No recent Veeam backups found at: $rootPath" -comment ("If you want to change the configuration edit: $ConfigPath`n" + `
+            Write-Warning ("[failure] No recent Veeam backups found at: $rootPath`nIf you want to change the configuration edit: $ConfigPath`n" + `
                 "fresh_vbm=$fresh_vbm, fresh_vib=$fresh_vib, fresh_vbk=$fresh_vbk, atleast_one_vbk=$atleast_one_vbk`n" + `
                 "Condition for pass is: " + `
                 '($fresh_vbm -and ($fresh_vib -or $fresh_vbk) -and $atleast_one_vbk)' + `

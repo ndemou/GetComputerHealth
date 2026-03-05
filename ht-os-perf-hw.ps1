@@ -451,7 +451,7 @@ function HealthTest-TimeSyncAccuracy {
   }
 
   if ($ok) {
-    Write-Warning "[pass] $(("Time OK (1-sample))"; source: {0}; target: {1}; offset: {2} s" -f $source,$target,$offsetSec)
+    Write-Warning ("[pass] Time OK (1-sample); source: {0}; target: {1}; offset: {2} s" -f $source,$target,$offsetSec)
   }
 }
 
@@ -661,8 +661,7 @@ function HealthTest-ScheduledTasks {
               } | out-string)
             if ($i.LastTaskResult -notin $OK_TASK_RESULTS) {
                 $meaning = Convert-TaskResultCode $i.LastTaskResult
-                Write-Warning "[warning] Scheduled Task with failures: '$($t.TaskPath)$($t.TaskName)'; Last exit code: $($i.LastTaskResult) ($meaning)" `
-                    -comment "Details about this task:`r`n$details"
+                Write-Warning "[warning] Scheduled Task with failures: '$($t.TaskPath)$($t.TaskName)'; Last exit code: $($i.LastTaskResult) ($meaning)`nDetails about this task:`r`n$details"
             }
             if ($i.NumberOfMissedRuns -gt 0) {
                 if ($i.NumberOfMissedRuns -lt 5){
@@ -1270,7 +1269,7 @@ function HealthTest-ShareReasonableness {
     } else {
       foreach($r in $report){
         if($r.Effective -eq 'Full' -or $r.Effective -eq 'Write'){
-          Write-Warning "[failure] $(("'{1}' can write share '{0}'('$path')" -f $r.Share,$r.Principal))" -Comment ("Restrict to specific groups; ensure share grants Read or None to broad principals and tighten NTFS. Path: {0}" -f $r.Path)
+          Write-Warning (("[failure] '{1}' can write share '{0}'('$path')`n" -f $r.Share,$r.Principal) + ("Restrict to specific groups; ensure share grants Read or None to broad principals and tighten NTFS. Path: {0}" -f $r.Path))
           $riskFound = $true
         } elseif($r.Effective -eq 'Read') {
             if ($r.Share -ne 'SYSVOL'){
@@ -1344,7 +1343,7 @@ function HealthTest-ShareReasonableness {
   }
 
   if ($nullPipes -and $nullPipes.Count -gt 0) {
-    Write-Warning "[notice] $(("Null session pipes (Named Pipes that can be accessed anonymously) found: {0}" -f ($nullPipes -join ', ')) -Comment "Anonymous users are allowed to open those pipes. Modern domains don't need null pipes and they increase attack surface if other policies are loose. If you don't have legacy (pre-Windows 2000-era) trusts/clients, it's recommended to keep Null session pipes empty. Change Local Security Policy > Security Options > 'Network access: Named Pipes that can be accessed anonymously' (set to None))", or the equivalent GPO."
+    Write-Warning (("[notice] Null session pipes (Named Pipes that can be accessed anonymously) found: {0}`n" -f ($nullPipes -join ', ')) + "Anonymous users are allowed to open those pipes. Modern domains don't need null pipes and they increase attack surface if other policies are loose. If you don't have legacy (pre-Windows 2000-era) trusts/clients, it's recommended to keep Null session pipes empty. Change Local Security Policy > Security Options > 'Network access: Named Pipes that can be accessed anonymously' (set to None), or the equivalent GPO.")
   }
 
   if (!$riskFound) {Write-Warning "[pass] No risks related to SMB shares were detected"}
@@ -1377,8 +1376,7 @@ function HealthTest-NonDefaultShares {
                 if ((Get-CimInstance Win32_ComputerSystem).DomainRole -ge 2) { # server
                     Write-Warning "[warning] File & print sharing is enabled. It's recomended to disable it unless you really need it`nRun this if you want to disable:`n   Set-Service -Name 'LanmanServer' -StartupType Disabled; Stop-Service -Name 'LanmanServer'"
                 } else { # workstation
-                    Write-Output "File & print sharing is enabled on a workstation." `
-                        -comment "You may consider disabling it to reduce the attack surface"
+                    Write-Output "File & print sharing is enabled on a workstation.`nYou may consider disabling it to reduce the attack surface"
                 }
             }
         }
@@ -1466,11 +1464,9 @@ function HealthTest-AutoStartServicesRunning {
                     Write-Warning "[info] This service is stoped but its last execution terminated NORMALY and it's one of the services that are often stopped: Service '$($_.Name)', StartMode=$($_.StartMode), DelayedAutoStart=$($_.DelayedAutoStart), last ExitCode=$($_.ExitCode)($exitCodeMeaning)."
             } else {
                 if ($_.ExitCode  -in (0,1077)) {
-                    Write-Warning "[notice] Service '$($_.Name)' which is set to automatically start is not running; calmingly its last execution terminated normally: ExitCode=$($_.ExitCode)($exitCodeMeaning)." `
-                        -Comment "Display name: $($_.DisplayName), StartMode=$($_.StartMode), DelayedAutoStart=$($_.DelayedAutoStart), last ExitCode=$($_.ExitCode)($exitCodeMeaning)."
+                    Write-Warning "[notice] Service '$($_.Name)' which is set to automatically start is not running; calmingly its last execution terminated normally: ExitCode=$($_.ExitCode)($exitCodeMeaning).`nDisplay name: $($_.DisplayName), StartMode=$($_.StartMode), DelayedAutoStart=$($_.DelayedAutoStart), last ExitCode=$($_.ExitCode)($exitCodeMeaning)."
                 } else {
-                    Write-Warning "[failure] Service '$($_.Name)' which is set to automatically start is not running; alarmingly its last execution terminated abnormally: ExitCode=$($_.ExitCode)($exitCodeMeaning)." `
-                        -Comment "Display name: $($_.DisplayName), StartMode=$($_.StartMode), DelayedAutoStart=$($_.DelayedAutoStart), last ExitCode=$($_.ExitCode)($exitCodeMeaning)."
+                    Write-Warning "[failure] Service '$($_.Name)' which is set to automatically start is not running; alarmingly its last execution terminated abnormally: ExitCode=$($_.ExitCode)($exitCodeMeaning).`nDisplay name: $($_.DisplayName), StartMode=$($_.StartMode), DelayedAutoStart=$($_.DelayedAutoStart), last ExitCode=$($_.ExitCode)($exitCodeMeaning)."
                 }
             }
         }
@@ -1514,8 +1510,7 @@ function HealthTest-LocalAcntRequirePass {
         $no_req_pass_accounts | %{
             try {$account_name = $_.name} catch {$account_name="(FAILED_TO_GET_NAME)"}
             $ok = $false
-            Write-Warning "[failure] This local account has the property PasswordRequired set to false: $account_name" `
-                -comment "Make sure the account password is set and then run this command:`n& cmd /c 'net user `"$($_.name)`" /passwordreq:yes'"
+            Write-Warning "[failure] This local account has the property PasswordRequired set to false: $account_name`nMake sure the account password is set and then run this command:`n& cmd /c 'net user `"$($_.name)`" /passwordreq:yes'"
         }
     }
     if ($ok) {Write-Warning "[pass] All local accounts have PasswordRequired True"}
@@ -1908,7 +1903,7 @@ function HealthTest-DnsZoneReplicationScope{
   $zones = Get-DnsServerZone -ErrorAction Stop | Where-Object { $_.IsDsIntegrated }
   if(-not $zones){ Write-Warning "[pass] No AD-integrated zones present"; return }
   $lines = ($zones | ForEach-Object { "{0}:{1}" -f $_.ZoneName, $_.ReplicationScope })
-  Write-Warning "[pass] DNS zone replication scope reviewed" -Comment ($lines -join '; ')
+  Write-Warning ("[pass] DNS zone replication scope reviewed`n" + ($lines -join '; '))
 }
 
 <#
@@ -1997,8 +1992,7 @@ function HealthTest-LdapSigningChannelBinding {
     if (($sign -ge 1) -and ($cb -ge 1)) {
         Write-Warning "[pass] LDAP signing & channel binding enforced"
     } else {
-        Write-Warning "[notice] LDAP signing and/or channel binding not enforced" `
-            -Comment "LDAPServerIntegrity=$sign; LdapEnforceChannelBinding=$cb"
+        Write-Warning "[notice] LDAP signing and/or channel binding not enforced`nLDAPServerIntegrity=$sign; LdapEnforceChannelBinding=$cb"
     }
 }
 
@@ -2182,7 +2176,7 @@ function HealthTest-PagefileSanity{
   if(-not $okSize){ Write-Warning "[failure] Total pagefile size below threshold`nTotalAllocMB=$sumAlloc; MinMB=$MinMB" }
 
   if($okSize -and $okSys){
-    Write-Warning "[pass] Paging file configured sensibly" -Comment ("Auto="+[int]$auto+"; TotalAllocMB=$sumAlloc; Entries="+(($entries | ForEach-Object {"$($_.Name):$($_.AllocMB)MB"}) -join ', '))
+    Write-Warning ("[pass] Paging file configured sensibly`n" + ("Auto="+[int]$auto+"; TotalAllocMB=$sumAlloc; Entries="+(($entries | ForEach-Object {"$($_.Name):$($_.AllocMB)MB"}) -join ', ')))
   }
 }
 
@@ -2294,8 +2288,7 @@ function HealthTest-ShadowStorage{
     if ($present.Count -gt 0) {
       Write-Warning "[pass] $("Shadow storage configured")`n$(("On: " + ((@($present.Keys) | Sort-Object) -join ', ')))"
     } else {
-      Write-Warning "[notice] Shadow storage (Volume Shadow Copies) is not enabled" -comment `
-      "Users won't see Previous Version for files/folders. (Note that this issue is UNRELATED to the VSS service that backup software use.)"
+      Write-Warning "[notice] Shadow storage (Volume Shadow Copies) is not enabled`nUsers won't see Previous Version for files/folders. (Note that this issue is UNRELATED to the VSS service that backup software use.)"
     }
   }
 }
@@ -2321,7 +2314,7 @@ function HealthTest-StartupItems{
     }
   }
   if($items.Count -gt 0){
-    Write-Warning "[pass] Startup items reviewed" -Comment ($items -join '; ')
+    Write-Warning ("[pass] Startup items reviewed`n" + ($items -join '; '))
   } else {
     Write-Warning "[pass] No startup items found in standard keys"
   }
@@ -2561,11 +2554,10 @@ function HealthTest-DnsRecursionConfig {
     if ($ecsEnabled -ne $null) { $ecsText = [string]$ecsEnabled } else { $ecsText = 'n/a' }
 
     if ($rec -or $cache -or $edns) {
-        Write-Warning "[pass] No issues found in the DNS recursion configuration" -comment ("EnableRecursion={0}; MaxTTL={1}; EDNS-ECS={2}" `
-                    -f $recText, $ttlText, $ecsText)
+        Write-Warning (("[pass] No issues found in the DNS recursion configuration`nEnableRecursion={0}; MaxTTL={1}; EDNS-ECS={2}" `
+                    -f $recText, $ttlText, $ecsText))
     } else {
-        Write-Warning "[notice] Unable to read DNS recursion configuration on this host" `
-            -Comment "Host is probably not a DNS server"
+        Write-Warning "[notice] Unable to read DNS recursion configuration on this host`nHost is probably not a DNS server"
     }
 }
 
@@ -2734,7 +2726,7 @@ function HealthTest-UnsignedDrivers {
     $ver = if($d.DriverVersion){ $d.DriverVersion } else { '' }
     $man = if($d.Manufacturer){ $d.Manufacturer } else { '' }
     $detail = [string]($d | Select-Object Description,DeviceName,DeviceID,Location,DriverVersion,DriverProviderName,InfName)
-    Write-Warning "[failure] $(("Unsigned 3rd-party driver detected: {0}{1} ver [{2}]" -f ($(if($man){"$man, "}), $d.DeviceName, $ver)) -comment ("Details: {0}" -f $detail))"
+    Write-Warning (("[failure] Unsigned 3rd-party driver detected: {0}{1} ver [{2}]`n" -f ($(if($man){"$man, "}), $d.DeviceName, $ver)) + ("Details: {0}" -f $detail))
   }
 
   if(-not $bad){ Write-Warning "[pass] All non-Microsoft PnP drivers appear signed (benign logical/child nodes and whitelisted instances excluded)." }
@@ -3579,12 +3571,12 @@ function HealthTest-InterfaceDnsServersUseDcs {
 
     if ($allDomain) {
       $anyClean = $true
-      Write-Warning "[pass] Interface has only DCs as DNS servers." -Comment ("Interface: " + $desc + "; DNS=" + $dnsList)
+      Write-Warning ("[pass] Interface has only DCs as DNS servers.`n" + ("Interface: " + $desc + "; DNS=" + $dnsList))
     } elseif ($allNonDomain) {
       # Ignoring this interface that only has non-domain DNS servers
     } else {
       $anyBad = $true
-      Write-Warning "[failure] Interface DNS servers include non-DC addresses." -Comment ("Interface: " + $desc + "; DNS=" + $dnsList + "; DC IPs=" + ($dcIps -join ', '))
+      Write-Warning ("[failure] Interface DNS servers include non-DC addresses.`n" + ("Interface: " + $desc + "; DNS=" + $dnsList + "; DC IPs=" + ($dcIps -join ', ')))
     }
   }
 
@@ -3624,7 +3616,7 @@ function HealthTest-NltestSiteDiscovery {
     Write-Warning "[pass] $("NLTEST /dsgetsite succeeded.")`n$(("Site: " + $site))"
   } else {
     $hex = '0x{0:X}' -f ($exit -band 0xFFFFFFFF)
-    Write-Warning "[failure] NLTEST /dsgetsite failed." -Comment ("ExitCode=" + $hex + "; Output=`n" + $txt)
+    Write-Warning ("[failure] NLTEST /dsgetsite failed.`n" + ("ExitCode=" + $hex + "; Output=`n" + $txt))
   }
 }
 
@@ -4236,7 +4228,7 @@ function HealthTest-TimeSyncAccuracy {
   }
 
   if ($ok) {
-    Write-Warning "[pass] $(("Time OK (1-sample))"; source: {0}; target: {1}; offset: {2} s" -f $source,$target,$offsetSec)
+    Write-Warning ("[pass] Time OK (1-sample); source: {0}; target: {1}; offset: {2} s" -f $source,$target,$offsetSec)
   }
 }
 
@@ -4279,7 +4271,7 @@ function HealthTest-PagefileSanity{
   if(-not $okSize){ Write-Warning "[failure] Total pagefile size below threshold`nTotalAllocMB=$sumAlloc; MinMB=$MinMB" }
 
   if($okSize -and $okSys){
-    Write-Warning "[pass] Paging file configured sensibly" -Comment ("Auto="+[int]$auto+"; TotalAllocMB=$sumAlloc; Entries="+(($entries | ForEach-Object {"$($_.Name):$($_.AllocMB)MB"}) -join ', '))
+    Write-Warning ("[pass] Paging file configured sensibly`n" + ("Auto="+[int]$auto+"; TotalAllocMB=$sumAlloc; Entries="+(($entries | ForEach-Object {"$($_.Name):$($_.AllocMB)MB"}) -join ', ')))
   }
 }
 

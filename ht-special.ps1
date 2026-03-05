@@ -97,7 +97,7 @@ param(
         if ($fresh_vbm -and ($fresh_vib -or $fresh_vbk) -and $atleast_one_vbk) {
             Write-Warning "[pass] Found recent Veeam backups. If you want to change the configuration edit: $ConfigPath"
         } else {
-            Write-Warning "[failure] No recent Veeam backups found at: $rootPath" -comment ("If you want to change the configuration edit: $ConfigPath`n" + `
+            Write-Warning ("[failure] No recent Veeam backups found at: $rootPath`nIf you want to change the configuration edit: $ConfigPath`n" + `
                 "fresh_vbm=$fresh_vbm, fresh_vib=$fresh_vib, fresh_vbk=$fresh_vbk, atleast_one_vbk=$atleast_one_vbk`n" + `
                 "Condition for pass is: " + `
                 '($fresh_vbm -and ($fresh_vib -or $fresh_vbk) -and $atleast_one_vbk)' + `

@@ -81,7 +81,7 @@ function HealthTest-SchanelBaseline{
   }
 
   if($bad.Count -eq 0){
-    Write-Warning ("[pass] " + ("Schannel baseline OK (SSL3/TLS1.0/TLS1.1 disabled, TLS1.2 enabled))")
+    Write-Warning "[pass] Schannel baseline OK (SSL3/TLS1.0/TLS1.1 disabled, TLS1.2 enabled)"
   } else {
     $why="LDAP over TLS, WinRM, ADWS, and other Schannel consumers may negotiate legacy handshakes/ciphers if enabled."
     Write-Warning ("[failure] " + "Schannel baseline not hardened" + "`n" + ("Detected mismatches:`n"+($bad | ForEach-Object { "  - {0}: Current={1}, Recommended={2}" -f $_.Protocol,$_.CurrentState,$should[$_.Protocol] } | Out-String) + "`nRegistry snapshot:`n"+$det+$why))
@@ -269,7 +269,7 @@ function HealthTest-Smb1Disabled{
   $f=Get-WindowsOptionalFeature -Online -FeatureName SMB1Protocol -ErrorAction SilentlyContinue
   $state=$f.State
   $disabled=($state -eq 'Disabled' -or -not $f -or $state -eq 'DisabledWithPayloadRemoved')
-  if($disabled){ Write-Warning "[pass] SMBv1 is disabled"} else { Write-Warning ("[warning] " + "SMBv1 is enabled" + "`n" + "State=$state" })
+  if($disabled){ Write-Warning "[pass] SMBv1 is disabled"} else { Write-Warning "[warning] SMBv1 is enabled`nState=$state" }
 }
 
 
@@ -277,14 +277,14 @@ function HealthTest-WinRMListening{
   $svc=Get-Service WinRM -ErrorAction Stop
   if($svc.Status -ne 'Running'){ Write-Warning "[failure] WinRM service is not running`nStatus=$($svc.Status)"; return }
   try{ $null=Test-WSMan -ErrorAction Stop; Write-Warning "[pass] WinRM running and responding"}
-  catch{ Write-Warning ("[failure] " + "WinRM not responding" + "`n" + $_.Exception.Message })
+  catch{ Write-Warning "[failure] WinRM not responding`n$($_.Exception.Message)" }
 }
 
 
 function HealthTest-WmiRepository{
   $out=& winmgmt /verifyrepository 2>&1
   $ok=($out -match 'consistent')
-  if($ok){ Write-Warning "[pass] WMI repository consistent"} else { Write-Warning ("[failure] " + "WMI repository inconsistent" + "`n" + ($out -join ' ') })
+  if($ok){ Write-Warning "[pass] WMI repository consistent"} else { Write-Warning ("[failure] WMI repository inconsistent`n" + ($out -join ' ')) }
 }
 
 
@@ -292,7 +292,7 @@ function HealthTest-VssWriters{
   $out=& vssadmin list writers 2>&1
   $bad=($out | Select-String -Pattern 'State: \d+ \((?i:Retryable error|Waiting for completion|Failed)\)')
   if($bad){
-    foreach($b in $bad){ Write-Warning ("[failure] " + "VSS writer not healthy" + "`n" + $b.Line })
+    foreach($b in $bad){ Write-Warning "[failure] VSS writer not healthy`n$($b.Line)" }
   } else {
     Write-Warning "[pass] All VSS writers report stable states"}
 }

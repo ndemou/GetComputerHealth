@@ -26,7 +26,7 @@ function HealthTest-DnsZoneReplicationScope{
   $zones = Get-DnsServerZone -ErrorAction Stop | Where-Object { $_.IsDsIntegrated }
   if(-not $zones){ Write-Warning "[pass] No AD-integrated zones present"; return }
   $lines = ($zones | ForEach-Object { "{0}:{1}" -f $_.ZoneName, $_.ReplicationScope })
-  Write-Warning "[pass] DNS zone replication scope reviewed" -Comment ($lines -join '; ')
+  Write-Warning ("[pass] DNS zone replication scope reviewed`n" + ($lines -join '; '))
 }
 
 
@@ -75,8 +75,7 @@ function HealthTest-DcDnsServerForwarder {
   $public = $ipAddresses | Where-Object { -not (& $private $_) }
 
   if($public){
-    Write-Warning "[notice] The DNS service on this DC, will forward queries for non-local zones to specific DNS servers" `
-        -Comment "This means that these DNS servers (view them with Get-DnsServerForwarder) can inspect and log the domains your domain contact. For extra privacy, you may wish to configure the DNS service to rely on root hints instead of DNS forwarders."
+    Write-Warning "[notice] The DNS service on this DC, will forward queries for non-local zones to specific DNS servers`nThis means that these DNS servers (view them with Get-DnsServerForwarder) can inspect and log the domains your domain contact. For extra privacy, you may wish to configure the DNS service to rely on root hints instead of DNS forwarders."
     return
   } else {
     Write-Warning "[pass] All DNS forwarders are private/internal: $($ipAddresses -join ', ')"
@@ -144,11 +143,10 @@ function HealthTest-DnsRecursionConfig {
     if ($ecsEnabled -ne $null) { $ecsText = [string]$ecsEnabled } else { $ecsText = 'n/a' }
 
     if ($rec -or $cache -or $edns) {
-        Write-Warning "[pass] No issues found in the DNS recursion configuration" -comment ("EnableRecursion={0}; MaxTTL={1}; EDNS-ECS={2}" `
-                    -f $recText, $ttlText, $ecsText)
+        Write-Warning (("[pass] No issues found in the DNS recursion configuration`nEnableRecursion={0}; MaxTTL={1}; EDNS-ECS={2}" `
+                    -f $recText, $ttlText, $ecsText))
     } else {
-        Write-Warning "[notice] Unable to read DNS recursion configuration on this host" `
-            -Comment "Host is probably not a DNS server"
+        Write-Warning "[notice] Unable to read DNS recursion configuration on this host`nHost is probably not a DNS server"
     }
 }
 
@@ -255,7 +253,7 @@ function HealthTest-DnsSuffixBaseline {
                 Where-Object { $_.InterfaceOperationalStatus -eq "Up" -and $_.ConnectionSpecificSuffix -ne "localdomain" }
     } catch {
         $err = $_
-        Write-Warning "[failure] NIC DNS settings" ("Unable to query DNS client interfaces: {0}" -f $err.Exception.Message) "Confirm OS supports Get-DnsClient and you have sufficient privileges."
+        Write-Warning (("[failure] NIC DNS settings`nUnable to query DNS client interfaces: {0}`nConfirm OS supports Get-DnsClient and you have sufficient privileges." -f $err.Exception.Message))
         $nics = @()
     }
 
@@ -264,19 +262,19 @@ function HealthTest-DnsSuffixBaseline {
 
         # 3a) Registration flags must both be True
         if ($n.RegisterThisConnectionsAddress -and $n.UseSuffixWhenRegistering) {
-            Write-Warning "[pass] $(("NIC '{0}' DNS registration" -f $nicName))" "RegisterThisConnectionsAddress=True, UseSuffixWhenRegistering=True"
+            Write-Warning ("[pass] NIC '{0}' DNS registration`nRegisterThisConnectionsAddress=True, UseSuffixWhenRegistering=True" -f $nicName)
         } else {
-            Write-Warning "[failure] $(("NIC '{0}' DNS registration" -f $nicName) ("RegisterThisConnectionsAddress={0}, UseSuffixWhenRegistering={1}" -f $n.RegisterThisConnectionsAddress,$n.UseSuffixWhenRegistering))" "Enable both flags on important interfaces."
+            Write-Warning (("[failure] NIC '{0}' DNS registration`nRegisterThisConnectionsAddress={1}, UseSuffixWhenRegistering={2}`nEnable both flags on important interfaces." -f $nicName,$n.RegisterThisConnectionsAddress,$n.UseSuffixWhenRegistering))
         }
 
         # 3b) Connection-specific suffix: must be Empty OR exactly the domain
         $css = $n.ConnectionSpecificSuffix
         if ([string]::IsNullOrWhiteSpace($css)) {
-            Write-Warning "[pass] $(("NIC '{0}' Conn.-specific suffix" -f $nicName))" "Empty"
+            Write-Warning ("[pass] NIC '{0}' Conn.-specific suffix`nEmpty" -f $nicName)
         } elseif ($css -ieq $DomainName) {
-            Write-Warning "[pass] $(("NIC '{0}' Conn.-specific suffix" -f $nicName) ("Equals {0}" -f $DomainName))"
+            Write-Warning ("[pass] NIC '{0}' Conn.-specific suffix`nEquals {1}" -f $nicName,$DomainName)
         } else {
-            Write-Warning "[failure] $(("NIC '{0}' Conn.-specific suffix" -f $nicName) ("Set to '{0}'" -f $css))" "Leave blank for single-domain setups unless a specific suffix is required."
+            Write-Warning (("[failure] NIC '{0}' Conn.-specific suffix`nSet to '{1}'`nLeave blank for single-domain setups unless a specific suffix is required." -f $nicName,$css))
         }
     }
 }

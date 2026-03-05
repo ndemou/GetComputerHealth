@@ -205,7 +205,7 @@ function HealthTest-ADViewConsistency {
         DNM    = ($for.DomainNamingMaster     | ForEach-Object { $_.ToLower() })
       }
     } catch {
-      Write-Warning "[failure] $(("Cannot query DC '{0}'." -f $s) -comment ("The server didn't answer AD queries (-Server {0}))". Check network/DNS, ADWS service and firewall. Try: Test-NetConnection {0} -Port 389; Get-Service ADWS -ComputerName {0}; repadmin /showrepl {0}" -f $s)
+      Write-Warning (("[failure] Cannot query DC '{0}'.`n" -f $s) + ("The server didn't answer AD queries (-Server {0}). Check network/DNS, ADWS service and firewall. Try: Test-NetConnection {0} -Port 389; Get-Service ADWS -ComputerName {0}; repadmin /showrepl {0}" -f $s))
       $ok = $false
     }
   }
@@ -221,35 +221,35 @@ function HealthTest-ADViewConsistency {
     # 1) DC list equality (order-insensitive, case-insensitive)
     $dcJoin = ($v.DCs -join ', ')
     if ($dcJoin -ne $baseDCsJoined) {
-      Write-Warning "[failure] $(("DC list mismatch on '{0}'." -f $v.Server))" -comment ("Baseline '{0}' sees DCs: [{1}] ; '{2}' sees: [{3}]. Likely replication or DNS SRV inconsistency. Run: repadmin /replsummary ; check _msdcs.{4} SRV records under _ldap._tcp.dc._msdcs and AD-integrated DNS." -f $baseline.Server, $baseDCsJoined, $v.Server, $dcJoin, $domainName)
+      Write-Warning (("[failure] DC list mismatch on '{0}'.`n" -f $v.Server) + ("Baseline '{0}' sees DCs: [{1}] ; '{2}' sees: [{3}]. Likely replication or DNS SRV inconsistency. Run: repadmin /replsummary ; check _msdcs.{4} SRV records under _ldap._tcp.dc._msdcs and AD-integrated DNS." -f $baseline.Server, $baseDCsJoined, $v.Server, $dcJoin, $domainName))
       $ok = $false
     }
 
     # 2) FSMO holders equality
     if ($v.PDC -ne $baseline.PDC) {
-      Write-Warning "[failure] $(("PDC emulator disagreement on '{0}'." -f $v.Server))" -comment ("Baseline: {0} ; {1} thinks: {2}. If a role transfer occurred, verify replication. Check: (Get-ADDomain -Server {1}).PDCEmulator; run repadmin /showrepl {1} and GPMC target DC." -f $baseline.PDC, $v.Server, $v.PDC)
+      Write-Warning (("[failure] PDC emulator disagreement on '{0}'.`n" -f $v.Server) + ("Baseline: {0} ; {1} thinks: {2}. If a role transfer occurred, verify replication. Check: (Get-ADDomain -Server {1}).PDCEmulator; run repadmin /showrepl {1} and GPMC target DC." -f $baseline.PDC, $v.Server, $v.PDC))
       $ok = $false
     }
     if ($v.RID -ne $baseline.RID) {
-      Write-Warning "[failure] $(("RID Master disagreement on '{0}'." -f $v.Server))" -comment ("Baseline: {0} ; {1} thinks: {2}. If long-standing, DCs may fail to create new SIDs when pools deplete. Check: (Get-ADDomain -Server {1}).RIDMaster; repadmin /showrepl {1}." -f $baseline.RID, $v.Server, $v.RID)
+      Write-Warning (("[failure] RID Master disagreement on '{0}'.`n" -f $v.Server) + ("Baseline: {0} ; {1} thinks: {2}. If long-standing, DCs may fail to create new SIDs when pools deplete. Check: (Get-ADDomain -Server {1}).RIDMaster; repadmin /showrepl {1}." -f $baseline.RID, $v.Server, $v.RID))
       $ok = $false
     }
     if ($v.Infra -ne $baseline.Infra) {
-      Write-Warning "[failure] $(("Infrastructure Master disagreement on '{0}'." -f $v.Server))" -comment ("Baseline: {0} ; {1} thinks: {2}. In multi-domain forests this can cause stale cross-domain group memberships. Check: (Get-ADDomain -Server {1}).InfrastructureMaster; repadmin /showrepl {1}." -f $baseline.Infra, $v.Server, $v.Infra)
+      Write-Warning (("[failure] Infrastructure Master disagreement on '{0}'.`n" -f $v.Server) + ("Baseline: {0} ; {1} thinks: {2}. In multi-domain forests this can cause stale cross-domain group memberships. Check: (Get-ADDomain -Server {1}).InfrastructureMaster; repadmin /showrepl {1}." -f $baseline.Infra, $v.Server, $v.Infra))
       $ok = $false
     }
     if ($v.Schema -ne $baseline.Schema) {
-      Write-Warning "[failure] $(("Schema Master disagreement on '{0}'." -f $v.Server))" -comment ("Baseline: {0} ; {1} thinks: {2}. Schema updates should be halted until replication converges. Check: (Get-ADForest -Server {1}).SchemaMaster; repadmin /showrepl {1}." -f $baseline.Schema, $v.Server, $v.Schema)
+      Write-Warning (("[failure] Schema Master disagreement on '{0}'.`n" -f $v.Server) + ("Baseline: {0} ; {1} thinks: {2}. Schema updates should be halted until replication converges. Check: (Get-ADForest -Server {1}).SchemaMaster; repadmin /showrepl {1}." -f $baseline.Schema, $v.Server, $v.Schema))
       $ok = $false
     }
     if ($v.DNM -ne $baseline.DNM) {
-      Write-Warning "[failure] $(("Domain Naming Master disagreement on '{0}'." -f $v.Server))" -comment ("Baseline: {0} ; {1} thinks: {2}. Avoid adding/removing domains until resolved. Check: (Get-ADForest -Server {1}).DomainNamingMaster; repadmin /showrepl {1}." -f $baseline.DNM, $v.Server, $v.DNM)
+      Write-Warning (("[failure] Domain Naming Master disagreement on '{0}'.`n" -f $v.Server) + ("Baseline: {0} ; {1} thinks: {2}. Avoid adding/removing domains until resolved. Check: (Get-ADForest -Server {1}).DomainNamingMaster; repadmin /showrepl {1}." -f $baseline.DNM, $v.Server, $v.DNM))
       $ok = $false
     }
   }
 
   if ($ok) {
-    Write-Warning "[pass] All DCs agree on DC list and FSMO role holders." -comment ("Baseline DC: {0} ; DCs: [{1}]. Cross-check is order- and case-insensitive." -f $baseline.Server, $baseDCsJoined)
+    Write-Warning (("[pass] All DCs agree on DC list and FSMO role holders.`n") + ("Baseline DC: {0} ; DCs: [{1}]. Cross-check is order- and case-insensitive." -f $baseline.Server, $baseDCsJoined))
   }
 }
 
@@ -265,15 +265,12 @@ function HealthTest-Dcdiag {
           if($_.Test -in $BasicTestResults.Test){
             $interesting_lines = (($_.BlockText -split "`n"|?{$_.trim()}|sls -NotMatch '\bno ([A-Za-z]+ )?errors?\b|\bPASS +FAIL\b|\.\.\.\.\.\..* failed test ').line|sls 'error|fail').line -replace '^ +'
             if ($testName -in @('DFSREvent','SystemLog')) {
-                Write-Warning "[notice] 'DCDIAG /v' reports a failure in this basic test that examines the event log: $testName" `
-                    -Comment "Since this test fails when warnings/errors appear in the event log, false positives are likely.`nRun DCDIAG /v, search for '$testName' and examine the detailed report above it.`nBelow are lines from that report that contain words like error/fail:`n$interesting_lines"
+                Write-Warning "[notice] 'DCDIAG /v' reports a failure in this basic test that examines the event log: $testName`nSince this test fails when warnings/errors appear in the event log, false positives are likely.`nRun DCDIAG /v, search for '$testName' and examine the detailed report above it.`nBelow are lines from that report that contain words like error/fail:`n$interesting_lines"
             } else {
-                Write-Warning "[failure] 'DCDIAG /v' reports a failure in this basic test: $testName" `
-                    -Comment "Run DCDIAG /v, search for '$testName' and examine the detailed report above it.`nBelow are lines from that report that contain words like error/fail:`n$interesting_lines"
+                Write-Warning "[failure] 'DCDIAG /v' reports a failure in this basic test: $testName`nRun DCDIAG /v, search for '$testName' and examine the detailed report above it.`nBelow are lines from that report that contain words like error/fail:`n$interesting_lines"
             }
           } else {
-            Write-Warning "[warning] 'DCDIAG /c /v' reports a failure in this extra test: $testName" `
-                -Comment "Run DCDIAG /c /v (do include the /c to run extra tests), search for '$testName' and examine the detailed report above it.`nBelow are lines from that report that contain words like error/fail:`n$interesting_lines"
+            Write-Warning "[warning] 'DCDIAG /c /v' reports a failure in this extra test: $testName`nRun DCDIAG /c /v (do include the /c to run extra tests), search for '$testName' and examine the detailed report above it.`nBelow are lines from that report that contain words like error/fail:`n$interesting_lines"
           }
       }
       return
@@ -523,7 +520,7 @@ function HealthTest-KccConnectivity{
 
     if($metaCount -eq 0 -and $enabledCount -eq 0){
       $anyFail = $true
-      Write-Warning "[failure] No inbound replication detected for $($dc.HostName)" -Comment ("PartnerMetadata=" + $metaCount + "; EnabledConnectionObjects=" + $enabledCount + "; NTDS=" + $dc.NTDSSettingsObjectDN)
+      Write-Warning ("[failure] No inbound replication detected for $($dc.HostName)`nPartnerMetadata=" + $metaCount + "; EnabledConnectionObjects=" + $enabledCount + "; NTDS=" + $dc.NTDSSettingsObjectDN)
       continue
     }
     if($metaCount -eq 0 -and $enabledCount -gt 0){
@@ -576,8 +573,7 @@ function HealthTest-LdapSigningChannelBinding {
     if (($sign -ge 1) -and ($cb -ge 1)) {
         Write-Warning "[pass] LDAP signing & channel binding enforced"
     } else {
-        Write-Warning "[notice] LDAP signing and/or channel binding not enforced" `
-            -Comment "LDAPServerIntegrity=$sign; LdapEnforceChannelBinding=$cb"
+        Write-Warning "[notice] LDAP signing and/or channel binding not enforced`nLDAPServerIntegrity=$sign; LdapEnforceChannelBinding=$cb"
     }
 }
 
