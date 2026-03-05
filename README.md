@@ -286,7 +286,7 @@ function HealthTest-YourTestName {
     # no params or params with defaults
     # gather data
     # evaluate data
-    # emit one or more Log-* messages
+    # Write-Warning "[pass] ..." or Write-Warning "[failure] ..."
 }
 ```
 
@@ -299,21 +299,23 @@ Health tests should inspect and report, not change system state. In other words:
 * Do: read registry, services, event logs, AD, WMI/CIM, file metadata.
 * Do not: modify config, restart services, install anything, delete files.
 
-### 6.1.3) Report through `Log-Pass` / `Log-Notice` / `Log-Warning` / `Log-Failure`
+### 6.1.3) Report through `Write-Warning`
 
-Do not use `Write-Host` as the final output channel. The framework expects `Log-*` records.
+The framework expects you to call `Write-Warning "[pass] ..."` or `Write-Warning "[failure] ..."` and similar.
 
 Typical pattern:
 
 ```powershell
 if ($healthy) {
-    Log-Pass "Short success message"
+    Write-Warning "[pass] Short success message"
 }
 elseif ($riskyButNotBroken) {
-    Log-Warning "Stable message text" -Comment "volatile details go here"
+    $comment = "Volatile details go here"
+    Write-Warning "[warning] Stable message text`n$comment"
 }
 else {
-    Log-Failure "Stable message text" -Comment "volatile details go here"
+    $comment = "Volatile details go here"
+    Write-Warning "[failure] Stable message text`n$comment"
 }
 ```
 
@@ -326,8 +328,8 @@ Suppression is signature-based. If message text changes every run, suppression b
 
 Example:
 
-* Good: `Log-Failure "Windows Update is stale" -Comment "Last install date: $lastInstall"`
-* Bad: `Log-Failure "Windows Update is stale by $days days"`
+* Good: `Write-Warning "[Failure] Windows Update is stale`n Last install date: $lastInstall"`
+* Bad: `Write-Warning "[Failure] Windows Update is stale by $days days"`
 
 ### 6.1.5) Be explicit about scope and prerequisites
 
@@ -337,7 +339,7 @@ Also guard optional commands/features:
 
 ```powershell
 if (-not (Get-Command Some-Cmdlet -ErrorAction SilentlyContinue)) {
-    Log-Notice "Some-Cmdlet not available; skipping check"
+    Write-Warning "[Notice] Some-Cmdlet not available; skipping check"
     return
 }
 ```
