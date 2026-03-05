@@ -330,14 +330,14 @@ function HealthTest-ShadowStorage{
     $missing = @()
     foreach($v in $RequireOnVolumes){
       $k = $v.TrimEnd('\')
-      if (-not $present.ContainsKey($k)) { $missing += $k; Write-Warning ("[failure] " + "Shadow storage not configured on required volume" + "`n" + $k })
+      if (-not $present.ContainsKey($k)) { $missing += $k; Write-Warning "[failure] Shadow storage not configured on required volume`n$k" }
     }
     if($missing.Count -eq 0){
-      Write-Warning ("[pass] " + "Shadow storage on required volumes" + "`n" + ("Configured on: " + ((@($present.Keys) | Sort-Object) -join ', ')))
+      Write-Warning ("[pass] Shadow storage on required volumes`nConfigured on: " + ((@($present.Keys) | Sort-Object) -join ', '))
     }
   } else {
     if ($present.Count -gt 0) {
-      Write-Warning ("[pass] " + "Shadow storage configured" + "`n" + ("On: " + ((@($present.Keys) | Sort-Object) -join ', ')))
+      Write-Warning ("[pass] Shadow storage configured`nOn: " + ((@($present.Keys) | Sort-Object) -join ', '))
     } else {
       Write-Warning "[notice] Shadow storage (Volume Shadow Copies) is not enabled`nUsers won't see Previous Version for files/folders. (Note that this issue is UNRELATED to the VSS service that backup software use.)"
     }
@@ -449,7 +449,7 @@ function HealthTest-UnsignedDrivers {
             }
           }
           if(-not $anyBad){
-            Write-Warning ("[notice] " + ("Win32 reports unsigned but INF-linked drivers are signed: {0} (INF={1}))" -f $d.DeviceName,(Split-Path $infPath -Leaf))
+            Write-Warning (("[notice] Win32 reports unsigned but INF-linked drivers are signed: {0} (INF={1})" -f $d.DeviceName,(Split-Path $infPath -Leaf)))
             continue
           }
         }
@@ -844,7 +844,7 @@ Checks presence of EFS Data Recovery Agents policy/certs. OnlyForDomainServers
 function HealthTest-EfsRecoveryAgents{
   $out=& certutil -recoveryagent 2>&1
   $has=($out | Select-String -Pattern 'Recovery Agent' -SimpleMatch)
-  if($has){ Write-Warning "[pass] EFS Data Recovery Agents are configured"} else { Write-Warning ("[notice] " + "No EFS Data Recovery Agents configured." + "`n" + "If anyone uses EFS (NTFS file encryption), there's no domain recovery agent to decrypt data if the user's key is lost." })
+  if($has){ Write-Warning "[pass] EFS Data Recovery Agents are configured"} else { Write-Warning "[notice] No EFS Data Recovery Agents configured.`nIf anyone uses EFS (NTFS file encryption), there's no domain recovery agent to decrypt data if the user's key is lost." }
 }
 
 <#
@@ -1517,7 +1517,8 @@ function HealthTest-LocalAdminsBaseline {
 function HealthTest-Nic {
     $nics = Get-NetAdapter -Physical -ErrorAction SilentlyContinue | Where-Object { $_.Status -eq 'Up' }
     if (-not $nics) {
-        Write-Output "No physical NICs with Status=Up; skipping NIC health check"return
+        Write-Output "No physical NICs with Status=Up; skipping NIC health check"
+        return
     }
 
     $pass = $true
@@ -1526,7 +1527,8 @@ function HealthTest-Nic {
     foreach ($n in $nics) {
         $stat = Get-NetAdapterStatistics -Name $n.Name -ErrorAction SilentlyContinue
         if (-not $stat) {
-            Write-Output "Network interface skipped due to missing stats ($($n.Name))"continue
+            Write-Output "Network interface skipped due to missing stats ($($n.Name))"
+            continue
         }
 
         $errors =
@@ -1551,7 +1553,8 @@ function HealthTest-Nic {
         }
 
         if ($totalPackets -lt $minPackets) {
-            Write-Output "Network interface skipped due to low traffic ($($n.Name))"continue
+            Write-Output "Network interface skipped due to low traffic ($($n.Name))"
+            continue
         }
 
         if ($errors -le 0) {
@@ -1605,7 +1608,8 @@ function HealthTest-BitLockerStatus {
 function HealthTest-DhcpScopeUtilization {
     $svc = Get-Service -Name 'DHCPServer' -ErrorAction SilentlyContinue
     if (-not $svc) {
-        Write-Output "Host is not a DHCP server (DHCPServer service missing); skipping DHCP scope utilization test"return
+        Write-Output "Host is not a DHCP server (DHCPServer service missing); skipping DHCP scope utilization test"
+        return
     }
 
     if (-not (Get-Command Get-DhcpServerv4ScopeStatistics -ErrorAction SilentlyContinue)) {
@@ -1681,19 +1685,19 @@ function HealthTest-DnsSuffixBaseline {
 
         # 3a) Registration flags must both be True
         if ($n.RegisterThisConnectionsAddress -and $n.UseSuffixWhenRegistering) {
-            Write-Warning ("[pass] " + ("NIC '{0}' DNS registration" -f $nicName))"RegisterThisConnectionsAddress=True, UseSuffixWhenRegistering=True"
+            Write-Warning ("[pass] NIC '{0}' DNS registration`nRegisterThisConnectionsAddress=True, UseSuffixWhenRegistering=True" -f $nicName)
         } else {
-            Write-Warning ("[failure] " + ("NIC '{0}' DNS registration" -f $nicName))("RegisterThisConnectionsAddress={0}, UseSuffixWhenRegistering={1}" -f $n.RegisterThisConnectionsAddress,$n.UseSuffixWhenRegistering) "Enable both flags on important interfaces."
+            Write-Warning (("[failure] NIC '{0}' DNS registration`nRegisterThisConnectionsAddress={1}, UseSuffixWhenRegistering={2}`nEnable both flags on important interfaces." -f $nicName,$n.RegisterThisConnectionsAddress,$n.UseSuffixWhenRegistering))
         }
 
         # 3b) Connection-specific suffix: must be Empty OR exactly the domain
         $css = $n.ConnectionSpecificSuffix
         if ([string]::IsNullOrWhiteSpace($css)) {
-            Write-Warning ("[pass] " + ("NIC '{0}' Conn.-specific suffix" -f $nicName))"Empty"
+            Write-Warning ("[pass] NIC '{0}' Conn.-specific suffix`nEmpty" -f $nicName)
         } elseif ($css -ieq $DomainName) {
-            Write-Warning ("[pass] " + ("NIC '{0}' Conn.-specific suffix" -f $nicName))("Equals {0}" -f $DomainName)
+            Write-Warning ("[pass] NIC '{0}' Conn.-specific suffix`nEquals {1}" -f $nicName,$DomainName)
         } else {
-            Write-Warning ("[failure] " + ("NIC '{0}' Conn.-specific suffix" -f $nicName))("Set to '{0}'" -f $css) "Leave blank for single-domain setups unless a specific suffix is required."
+            Write-Warning (("[failure] NIC '{0}' Conn.-specific suffix`nSet to '{1}'`nLeave blank for single-domain setups unless a specific suffix is required." -f $nicName,$css))
         }
     }
 }
@@ -1887,7 +1891,7 @@ function HealthTest-BitLockerStatus {
 function HealthTest-EfsRecoveryAgents{
   $out=& certutil -recoveryagent 2>&1
   $has=($out | Select-String -Pattern 'Recovery Agent' -SimpleMatch)
-  if($has){ Write-Warning "[pass] EFS Data Recovery Agents are configured"} else { Write-Warning ("[notice] " + "No EFS Data Recovery Agents configured." + "`n" + "If anyone uses EFS (NTFS file encryption), there's no domain recovery agent to decrypt data if the user's key is lost." })
+  if($has){ Write-Warning "[pass] EFS Data Recovery Agents are configured"} else { Write-Warning "[notice] No EFS Data Recovery Agents configured.`nIf anyone uses EFS (NTFS file encryption), there's no domain recovery agent to decrypt data if the user's key is lost." }
 }
 
 
