@@ -890,7 +890,16 @@ function HealthTest-NtdsLogVolumeFree{
   $drive=(Get-Item $logPath).PSDrive.Name+':'
   $d=Get-CimInstance Win32_LogicalDisk -Filter "DeviceID='$drive'"
   $freeGB=[math]::Round($d.FreeSpace/1GB,2)
-  if($freeGB -ge $MinFreeGB){ Write-Warning "[pass] NTDS log volume free space OK ($freeGB GB >= $MinFreeGB GB)"} else { Write-Warning ("[failure] " + "NTDS log volume low free space ($freeGB GB < $MinFreeGB GB)" + "`n" + "Log path: $logPath" })
+  if($freeGB -ge $MinFreeGB){
+    Write-Warning "[pass] NTDS log volume free space OK ($freeGB GB >= $MinFreeGB GB)"
+  } else {
+    Write-Warning (
+      "[failure] " +
+      "NTDS log volume low free space ($freeGB GB < $MinFreeGB GB)" +
+      "`n" +
+      "Log path: $logPath"
+    )
+  }
 }
 
 <#
@@ -1934,12 +1943,14 @@ function HealthTest-RdpHardening {
   try { $isServer = ((Get-CimInstance Win32_ComputerSystem -ErrorAction Stop).DomainRole -ge 2) } catch {}
 
   if ($nla -eq 1 -and $certBound) {
-    Write-Warning "[pass] RDP hardened: NLA enabled and a certificate is bound"} else {
+    Write-Warning "[pass] RDP hardened: NLA enabled and a certificate is bound"
+  } else {
     $sev = "Severity: Medium. Risk: Users may click through name-mismatch warnings; increases MITM risk on first-connect or via spoofing." + $(if($isServer){ " On a DC this is sensitive." } else { "" })
+    $rdpState = "NLA=$nla; CertBound=$(if($certBound){$true}else{$false})"
     if ($isServer) {
-      Write-Warning ("[warning] " + "RDP is not hardened (NLA and/or TLS certificate binding missing)" + "`n" + ("NLA=$nla); CertBound="+($(if($certBound){$true}else{$false}))+"`n$sev")
+      Write-Warning ("[warning] " + "RDP is not hardened (NLA and/or TLS certificate binding missing)" + "`n" + $rdpState + "`n$sev")
     } else {
-      Write-Warning ("[notice] " + "RDP is not hardened (NLA and/or TLS certificate binding missing)" + "`n" + ("NLA=$nla); CertBound="+($(if($certBound){$true}else{$false}))+"`n$sev")
+      Write-Warning ("[notice] " + "RDP is not hardened (NLA and/or TLS certificate binding missing)" + "`n" + $rdpState + "`n$sev")
     }
   }
 }
