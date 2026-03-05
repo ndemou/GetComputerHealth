@@ -32,7 +32,7 @@ function HealthTest-HyperVVMProperties {
                 $actual_value = $vm.$prop_name
             }
             if ($actual_value -notlike $expected_value) {
-                Log-Warning "VM $($vm.Name) has $prop_name='$actual_value' instead of '$expected_value'."
+                Write-Warning "[warning] VM $($vm.Name) has $prop_name='$actual_value' instead of '$expected_value'."
             }
         }
     }
@@ -43,12 +43,12 @@ function HealthTest-HyperVRunningVMs {
     $ok=$true
     $all_vm = get-vm
     $all_vm |?{$_.state -ne 'Running' -and $_.AutomaticStartAction -eq 'Start'} | %{
-        Log-failure "VM $($_.name) should be running but is not"
+        Write-Warning "[failure] VM $($_.name) should be running but is not"
         $ok=$false
     }
     if ($all_vm |?{$_.AutomaticStartAction -eq 'Start'}) {
-        if ($ok) {Log-Pass 'All VMs that are set to always auto-start are running'}
+        if ($ok) {Write-Warning "[pass] All VMs that are set to always auto-start are running"}
     } else {
-        Log-info 'No VM is set to always auto-start'
+        Write-Warning "[info] No VM is set to always auto-start"
     }
 }

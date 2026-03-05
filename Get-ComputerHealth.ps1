@@ -294,8 +294,45 @@ FunctionName, Time, ElapsedMilliseconds, Output, Success, Error, Category, Reaso
     [ValidateNotNullOrEmpty()]
     [string]$FunctionName,
 
-    [object]$Argument
+  [object]$Argument
   )
+
+  function Convert-TextToLogParts {
+    param([Parameter(Mandatory)][string]$Text)
+
+    $normalized = ($Text -replace "`r", '')
+    $lines = @($normalized -split "`n")
+    if (-not $lines -or ($lines.Count -eq 1 -and [string]::IsNullOrWhiteSpace($lines[0]))) {
+      return [pscustomobject]@{ Message=''; Comment='' }
+    }
+
+    $msg = [string]$lines[0]
+    $comment = ''
+    if ($lines.Count -gt 1) {
+      $comment = ($lines | Select-Object -Skip 1) -join "`n"
+    }
+    [pscustomobject]@{ Message=$msg.Trim(); Comment=$comment.Trim() }
+  }
+
+  function Convert-WarningRecordToLog {
+    param([Parameter(Mandatory)][System.Management.Automation.WarningRecord]$WarningRecord)
+
+    $parts = Convert-TextToLogParts ([string]$WarningRecord.Message)
+    $level = 'warning'
+    $msg = $parts.Message
+    $comment = $parts.Comment
+
+    if ($parts.Message -match '^\s*\[([a-z]+)\]\s*(.*)$') {
+      $candidate = $matches[1].ToLowerInvariant()
+      if ($candidate -in @('debug','pass','info','notice','warning','failure')) {
+        $level = $candidate
+        $msg = [string]$matches[2]
+      }
+    }
+
+    if ([string]::IsNullOrWhiteSpace($msg)) { $msg = '<empty warning message>' }
+    Log-Msg -Level $level -Msg $msg.Trim() -Comment $comment
+  }
 
   $start_time = Get-Date
 
@@ -319,26 +356,52 @@ FunctionName, Time, ElapsedMilliseconds, Output, Success, Error, Category, Reaso
     $cntProperRecord = 0
     $cntImproperRecord = 0
     $cntPassRecord = 0
+    $legacyLogDetected = $false
     $ErrorActionPreference = 'Stop'
 
-    if ($PSBoundParameters.ContainsKey('Argument')) {
-      # write-verbose '$result = & $target $Argument'
-      $result = & $target $Argument
-    } else {
-      # write-verbose '$result = & $target'
-      $result = & $target
+    $result = & {
+      $WarningPreference = 'Continue'
+      if ($PSBoundParameters.ContainsKey('Argument')) {
+        & $target $Argument 3>&1
+      } else {
+        & $target 3>&1
+      }
     }
-    # write-verbose "`$result = $result"
-    $result | %{
-        if($_ -and $_.PSObject.Properties['Hash'] -and $_.PSObject.Properties['Message'] -ne $null -and $_.PSObject.Properties['level']){
-            $cntProperRecord += 1
-            if ($_.level -eq 'pass') {$cntPassRecord += 1}
-            write-output $_
-        } else {
-            $cntImproperRecord += 1
-            Log-Warning "$FunctionName returned malformed output (this is due to a programmer's mistake)." -comment $_
-        }
+
+    $result | ForEach-Object {
+      if ($_ -is [System.Management.Automation.WarningRecord]) {
+        Convert-WarningRecordToLog $_
+        $cntProperRecord += 1
+        if (($_.Message -as [string]) -match '^\s*\[\s*pass\s*\]') { $cntPassRecord += 1 }
+        return
+      }
+
+      if($_ -and $_.PSObject.Properties['Hash'] -and $_.PSObject.Properties['Message'] -ne $null -and $_.PSObject.Properties['level']){
+        $legacyLogDetected = $true
+        $cntProperRecord += 1
+        if ($_.level -eq 'pass') {$cntPassRecord += 1}
+        Write-Output $_
+        return
+      }
+
+      if ($_ -is [string]) {
+        $parts = Convert-TextToLogParts $_
+        $cntImproperRecord += 1
+        Log-Debug $parts.Message -Comment $parts.Comment
+        return
+      }
+
+      $cntImproperRecord += 1
+      $objType = $_.GetType().FullName
+      $objText = ($_ | Out-String).Trim()
+      if ([string]::IsNullOrWhiteSpace($objText)) { $objText = '<empty object serialization>' }
+      Log-Debug "Converted output object of type $objType" -Comment $objText
     }
+
+    if ($legacyLogDetected) {
+      Log-Notice "$FunctionName is using the legacy Log-* output style."
+    }
+
     if ($cntProperRecord -eq 0 -and $cntImproperRecord -eq 0) {
         Log-notice "$FunctionName returned no output (this is due to a programmer's mistake; the test may or may not have passed)"
     }

@@ -36,20 +36,20 @@ function HealthTest-NonMicrosoftServices {
         $TrimmdServiceName = $_.ServiceName -replace '[0-9]+[.][0-9][0-9.]*$','[VERSION]'
         $ok = $false
         if ($_.ExceptionsThrown) {
-            Log-Warning "Either something's wrong with service '$($_.ServiceName)' or there's a bug in Get-ServiceVendors." -Comment $_.ExceptionsThrown
+            Write-Warning "[warning] $("Either something's wrong with service '$($_.ServiceName)' or there's a bug in Get-ServiceVendors.")`n$($_.ExceptionsThrown)"
         } else {
             if ($isHostServer -or ($_.Vendor -notin $COMMON_VENDORS_FOR_WORKSTATIONS)) {
-                Log-Warning "Found service that is not a core Microsoft service: Vendor='$($_.Vendor)' Name='$TrimmdServiceName'$extra_msg" `
+                Write-Warning "[warning] Found service that is not a core Microsoft service: Vendor='$($_.Vendor)' Name='$TrimmdServiceName'$extra_msg" `
                     -Comment ("Admin must verify if service is legit and needed. Service Description: '$($_.DisplayName)'`n" `
                     + "Executable: '$($_.ExePath)'.")
             } else {
-                Log-notice "Found service that is not a core Microsoft service: Vendor='$($_.Vendor)' Name='$TrimmdServiceName'$extra_msg" `
+                Write-Warning "[notice] Found service that is not a core Microsoft service: Vendor='$($_.Vendor)' Name='$TrimmdServiceName'$extra_msg" `
                     -Comment ("It is however from a common vendor. Admin must verify if service is legit and needed. Service Description: '$($_.DisplayName)'`n" `
                     + "Executable: '$($_.ExePath)'.")
             }
         }
     }
-    if ($ok) {Log-Pass 'Found no service except Microsoft ones'}
+    if ($ok) {Write-Warning "[pass] Found no service except Microsoft ones"}
 }
 
 
@@ -115,7 +115,7 @@ function HealthTest-UnexpectedListeningPorts {
 
         if ($OptionalNoticePorts -contains $p) {
             # Added process name to the notice message for extra context.
-            Log-notice "Optional baseline port is listening: $p ($procDescr)"
+            Write-Warning "[notice] Optional baseline port is listening: $p ($procDescr)"
             continue
         }
 
@@ -131,16 +131,16 @@ function HealthTest-UnexpectedListeningPorts {
         # If vendor is like "Microsoft Windows*" then level becomes "WARNING" for servers and "NOTICE" for workstations
         if ($vendorDescr -like "Microsoft Windows*") {
             if($isHostServer){
-                Log-Warning "Unexpected listening port: $p (Process: $procDescr, Vendor: $vendor)" -comment $comment
+                Write-Warning "[warning] $("Unexpected listening port: $p (Process: $procDescr, Vendor: $vendor)")`n$($comment)"
             } else {
-                Log-notice "Unexpected listening port: $p (Process: $procDescr, Vendor: $vendor)" -comment $comment
+                Write-Warning "[notice] $("Unexpected listening port: $p (Process: $procDescr, Vendor: $vendor)")`n$($comment)"
             }
         } else {
-            Log-failure "Unexpected listening port: $p (Process: $procDescr, Vendor: $vendor)" -comment $comment
+            Write-Warning "[failure] $("Unexpected listening port: $p (Process: $procDescr, Vendor: $vendor)")`n$($comment)"
         }
     }
 
-    if (-not $bad) { Log-pass "Listening ports are within baseline" }
+    if (-not $bad) { Write-Warning "[pass] Listening ports are within baseline" }
 }
 
 <#
@@ -149,10 +149,10 @@ Verifies DFS Namespace (domain-based) objects enumerate without error. OnlyForDo
 #>
 function HealthTest-DfsNamespaceEnumerate{
   $roots=Get-DfsnRoot -ErrorAction SilentlyContinue
-  if(-not $roots){ Log-pass "No DFS Namespace roots found (nothing to check)"; return }
+  if(-not $roots){ Write-Warning "[pass] No DFS Namespace roots found (nothing to check)"; return }
   $count=0
   foreach($r in $roots){ $count += (Get-DfsnFolder -Path $r.Path -ErrorAction SilentlyContinue | Measure-Object).Count }
-  Log-pass "DFSN roots/folders enumerate: Roots=$($roots.Count); Folders=$count"
+  Write-Warning "[pass] DFSN roots/folders enumerate: Roots=$($roots.Count); Folders=$count"
 }
 
 <#
@@ -201,8 +201,8 @@ function HealthTest-SystemScheduledTasks{
     # 1) Disabled tasks
     if(-not $enabled -or $state -eq 'Disabled'){
       $hadIssue = $true
-      if(& $isRequired $path){ Log-failure "Required SYSTEM task is disabled: $path" }
-      else { Log-Warning "SYSTEM task is disabled: $path" }
+      if(& $isRequired $path){ Write-Warning "[failure] Required SYSTEM task is disabled: $path" }
+      else { Write-Warning "[warning] SYSTEM task is disabled: $path" }
       continue
     }
 
@@ -210,19 +210,19 @@ function HealthTest-SystemScheduledTasks{
     if($hasEnabledTrigger -and $StaleDays -gt 0){
       if(($lastRun -eq [datetime]::MinValue) -or ((Get-Date) - $lastRun).TotalDays -gt $StaleDays){
         $hadIssue = $true
-        Log-Warning "SYSTEM task appears stale: $path ; LastRun=$lastRun (> $StaleDays days or never)"
+        Write-Warning "[warning] SYSTEM task appears stale: $path ; LastRun=$lastRun (> $StaleDays days or never)"
       }
     }
 
     # 3) Non-zero last result (optional)
     if($WarnOnNonZeroLastResult -and $info.LastTaskResult -ne 0){
       $hadIssue = $true
-      if(& $isRequired $path){ Log-failure "Required SYSTEM task has non-zero LastTaskResult: $path ; Code=$lastRes" }
-      else { Log-Warning "SYSTEM task has non-zero LastTaskResult: $path ; Code=$lastRes" }
+      if(& $isRequired $path){ Write-Warning "[failure] Required SYSTEM task has non-zero LastTaskResult: $path ; Code=$lastRes" }
+      else { Write-Warning "[warning] SYSTEM task has non-zero LastTaskResult: $path ; Code=$lastRes" }
     }
   }
 
-  if(-not $hadIssue){ Log-pass "All relevant SYSTEM scheduled tasks are enabled and healthy" }
+  if(-not $hadIssue){ Write-Warning "[pass] All relevant SYSTEM scheduled tasks are enabled and healthy" }
 }
 
 <#
@@ -236,9 +236,9 @@ function HealthTest-SysvolAclHygiene{
   foreach($ace in $acl.Access){
     $id=$ace.IdentityReference.Value
     $wr=($ace.FileSystemRights.ToString() -match 'Write|Modify|FullControl')
-    if($wr -and ($id -match 'Everyone|Authenticated Users')){ $bad=$true; Log-failure "SYSVOL ACL too broad: $id has $($ace.FileSystemRights)" }
+    if($wr -and ($id -match 'Everyone|Authenticated Users')){ $bad=$true; Write-Warning "[failure] SYSVOL ACL too broad: $id has $($ace.FileSystemRights)" }
   }
-  if(-not $bad){ Log-pass "SYSVOL does not grant write to broad principals (Everyone/Auth Users)" }
+  if(-not $bad){ Write-Warning "[pass] SYSVOL does not grant write to broad principals (Everyone/Auth Users)" }
 }
 
 <#
@@ -251,15 +251,15 @@ function HealthTest-KerberosEncryptionTypes{
   foreach($o in $objs){
     $v=[int]$o.'msDS-SupportedEncryptionTypes'
     if(($v -band 0x4) -ne 0){
-        Log-Warning "RC4 permitted for $($o.objectClass): $($o.sAMAccountName)"
+        Write-Warning "[warning] RC4 permitted for $($o.objectClass): $($o.sAMAccountName)"
         $bad_count += 1
         if ($bad_count -gt 10) {
-            Log-Warning "I will not report any more 'RC4 permitted for...' warnings"
+            Write-Warning "[warning] I will not report any more 'RC4 permitted for...' warnings"
             break
         }
     }
   }
-  if($bad_count -eq 0){ Log-pass "No accounts permit RC4 in msDS-SupportedEncryptionTypes" }
+  if($bad_count -eq 0){ Write-Warning "[pass] No accounts permit RC4 in msDS-SupportedEncryptionTypes" }
 }
 
 <#
@@ -268,11 +268,11 @@ Ensures DHCP server presence/authorization sane if role installed. OnlyForDomain
 #>
 function HealthTest-DhcpInAd{
   $dhcp=Get-WindowsFeature -Name DHCP -ErrorAction SilentlyContinue
-  if(-not $dhcp -or -not $dhcp.Installed){ Log-pass "DHCP role not installed on this server"; return }
+  if(-not $dhcp -or -not $dhcp.Installed){ Write-Warning "[pass] DHCP role not installed on this server"; return }
   $auth=Get-DhcpServerInDC -ErrorAction SilentlyContinue
   $fqdn=[System.Net.Dns]::GetHostByName($env:COMPUTERNAME).HostName
   $isAuth=($auth | Where-Object { $_.DnsName -ieq $fqdn })
-  if($isAuth){ Log-pass "DHCP server is authorized in AD ($fqdn)" } else { Log-failure "DHCP server is NOT authorized in AD ($fqdn)" }
+  if($isAuth){ Write-Warning "[pass] DHCP server is authorized in AD ($fqdn)" } else { Write-Warning "[failure] DHCP server is NOT authorized in AD ($fqdn)" }
 }
 
 <#
@@ -281,8 +281,8 @@ Flags enabled NICs that are disconnected (cleanup). OnlyForDomainServers
 #>
 function HealthTest-UnusedEnabledAdapters{
   $nics=Get-NetAdapter | Where-Object {$_.AdminStatus -eq 'Up' -and $_.Status -ne 'Up'}
-  foreach($n in $nics){ Log-Warning "Enabled network adapter is disconnected: $($n.Name) ($($n.Status))" }
-  if(($nics | Measure-Object).Count -eq 0){ Log-pass "No enabled-but-disconnected network adapters detected" } else { Log-failure "There are enabled-but-disconnected network adapters present" }
+  foreach($n in $nics){ Write-Warning "[warning] Enabled network adapter is disconnected: $($n.Name) ($($n.Status))" }
+  if(($nics | Measure-Object).Count -eq 0){ Write-Warning "[pass] No enabled-but-disconnected network adapters detected" } else { Write-Warning "[failure] There are enabled-but-disconnected network adapters present" }
 }
 
 <#
@@ -294,9 +294,9 @@ function HealthTest-NetworkInterfaceMetrics{
   $ifs=Get-NetIPInterface -AddressFamily IPv4 | Where-Object {$_.ConnectionState -eq 'Connected'}
   $bad=$false
   foreach($i in $ifs){
-    if($i.InterfaceMetric -gt $MaxPreferredMetric -and !($i.InterfaceAlias -like "Loopback*")){ $bad=$true; Log-Warning "Interface metric too high: $($i.InterfaceAlias) Metric=$($i.InterfaceMetric) (Max=$MaxPreferredMetric)" }
+    if($i.InterfaceMetric -gt $MaxPreferredMetric -and !($i.InterfaceAlias -like "Loopback*")){ $bad=$true; Write-Warning "[warning] Interface metric too high: $($i.InterfaceAlias) Metric=$($i.InterfaceMetric) (Max=$MaxPreferredMetric)" }
   }
-  if(-not $bad){ Log-pass "All connected interfaces have acceptable metrics (<= $MaxPreferredMetric)" } else { Log-failure "One or more interfaces have metrics above the preferred threshold" }
+  if(-not $bad){ Write-Warning "[pass] All connected interfaces have acceptable metrics (<= $MaxPreferredMetric)" } else { Write-Warning "[failure] One or more interfaces have metrics above the preferred threshold" }
 }
 
 <#
@@ -305,7 +305,7 @@ Detects disabled GPO links at domain root (policy choice). OnlyForDCs
 #>
 function HealthTest-DisabledGpoLinksAtDomainRoot{
   if(-not (Get-Command Get-GPO -ErrorAction SilentlyContinue)){
-    Log-Warning "GroupPolicy cmdlets not available; install RSAT/GPMC (GroupPolicy module)."
+    Write-Warning "[warning] GroupPolicy cmdlets not available; install RSAT/GPMC (GroupPolicy module)."
     return
   }
 
@@ -319,7 +319,7 @@ function HealthTest-DisabledGpoLinksAtDomainRoot{
       if(-not $dns -or $dns -eq 'WORKGROUP'){ throw "Not on a domain" }
       $root=($dns -split '\.')|ForEach-Object{"DC=$_"} -join ','
     }catch{
-      Log-Warning "Cannot resolve domain root DN (need AD or machine joined to a domain)."
+      Write-Warning "[warning] Cannot resolve domain root DN (need AD or machine joined to a domain)."
       return
     }
   }
@@ -342,27 +342,27 @@ function HealthTest-DisabledGpoLinksAtDomainRoot{
     }catch{
       $parseFailures++
       $msg=($_.Exception.Message -replace '\s+',' ').Trim()
-      Log-Warning "Failed to parse GPO report; skipping GPO: $($g.DisplayName) ($($g.Id)) - $msg"
+      Write-Warning "[warning] Failed to parse GPO report; skipping GPO: $($g.DisplayName) ($($g.Id)) - $msg"
     }
   }
 
   if($parseFailures -gt 0){
-    Log-Warning "One or more GPO reports could not be read/parsed ($parseFailures). Results may be incomplete."
+    Write-Warning "[warning] One or more GPO reports could not be read/parsed ($parseFailures). Results may be incomplete."
   }
 
   if(-not $links){
-    Log-pass "No GPO links found at the domain root ($root)."
+    Write-Warning "[pass] No GPO links found at the domain root ($root)."
     return
   }
 
   $flagged=$false
   foreach($l in $links){
-    if($l.Enabled -eq 0){ $flagged=$true; Log-Warning "Domain-root GPO link is disabled: $($l.DisplayName)" }
-    if($l.Enforced -eq 0){ $flagged=$true; Log-Warning "Domain-root GPO link is not enforced: $($l.DisplayName)" }
+    if($l.Enabled -eq 0){ $flagged=$true; Write-Warning "[warning] Domain-root GPO link is disabled: $($l.DisplayName)" }
+    if($l.Enforced -eq 0){ $flagged=$true; Write-Warning "[warning] Domain-root GPO link is not enforced: $($l.DisplayName)" }
   }
 
-  if(-not $flagged){ Log-pass "All domain-root GPO links are enabled (and enforced per policy)" }
-  else{ Log-failure "There are disabled or non-enforced GPO links at the domain root" }
+  if(-not $flagged){ Write-Warning "[pass] All domain-root GPO links are enabled (and enforced per policy)" }
+  else{ Write-Warning "[failure] There are disabled or non-enforced GPO links at the domain root" }
 }
 
 <#
@@ -398,7 +398,7 @@ function HealthTest-EventLogMaxSizes{
       $line=($out | Select-String -Pattern 'maximum size:' -SimpleMatch | Select-Object -First 1).Line
       if($line -and ($line -match 'maximum size:\s*(\d+)')){ $sz=[int64]$Matches[1] }
     }
-    if(-not $sz){ Log-Warning "$name log size could not be determined"; $bad=$true; continue }
+    if(-not $sz){ Write-Warning "[warning] $name log size could not be determined"; $bad=$true; continue }
 
     $minMB=[int]$MinSizesMB[$name]
     $minBytes=[int64]$minMB*1MB
@@ -406,11 +406,11 @@ function HealthTest-EventLogMaxSizes{
       $bad=$true
       $currentMB=[math]::Round($sz/1MB)
       $comment="Fix: Run  wevtutil sl $name /ms:$minBytes"
-      Log-failure "$name log maximum size too small: ${currentMB}MB < ${minMB}MB" -comment $comment
+      Write-Warning "[failure] $("$name log maximum size too small: ${currentMB}MB < ${minMB}MB")`n$($comment)"
     }
   }
 
-  if(-not $bad){ Log-pass "Event log maximum sizes meet or exceed baseline" }
+  if(-not $bad){ Write-Warning "[pass] Event log maximum sizes meet or exceed baseline" }
 }
 
 
@@ -421,7 +421,7 @@ Runs DCDIAG RIDManager and checks for failures or low pool signals. OnlyForDCs
 function HealthTest-RidManager{
   $out=& dcdiag /test:ridmanager /v 2>&1
   $fail=($out | Select-String -Pattern 'failed test RidManager','is low' -SimpleMatch)
-  if($fail){ Log-failure "RID Manager test reported issues" -Comment "Review dcdiag /test:ridmanager output"; } else { Log-pass "RID Manager health OK (dcdiag)" }
+  if($fail){ Write-Warning "[failure] RID Manager test reported issues`nReview dcdiag /test:ridmanager output"; } else { Write-Warning "[pass] RID Manager health OK (dcdiag)" }
 }
 
 <#
@@ -431,7 +431,7 @@ Checks presence of EFS Data Recovery Agents policy/certs. OnlyForDomainServers
 function HealthTest-EfsRecoveryAgents{
   $out=& certutil -recoveryagent 2>&1
   $has=($out | Select-String -Pattern 'Recovery Agent' -SimpleMatch)
-  if($has){ Log-pass "EFS Data Recovery Agents are configured" } else { Log-notice "No EFS Data Recovery Agents configured." -comment "If anyone uses EFS (NTFS file encryption), there's no domain recovery agent to decrypt data if the user's key is lost." }
+  if($has){ Write-Warning "[pass] EFS Data Recovery Agents are configured" } else { Write-Warning "[notice] No EFS Data Recovery Agents configured.`nIf anyone uses EFS (NTFS file encryption), there's no domain recovery agent to decrypt data if the user's key is lost." }
 }
 
 <#
@@ -442,9 +442,9 @@ function HealthTest-DnsZoneTransfers{
   $zones=Get-DnsServerZone | Where-Object { -not $_.IsAutoCreated }
   $bad=$false
   foreach($z in $zones){
-    if($z.SecureSecondaries -eq 'Any'){ $bad=$true; Log-failure "DNS zone transfer open to Any: $($z.ZoneName)" }
+    if($z.SecureSecondaries -eq 'Any'){ $bad=$true; Write-Warning "[failure] DNS zone transfer open to Any: $($z.ZoneName)" }
   }
-  if(-not $bad){ Log-pass "DNS zone transfers are restricted (not 'Any')" }
+  if(-not $bad){ Write-Warning "[pass] DNS zone transfers are restricted (not 'Any')" }
 }
 
 <#
@@ -460,9 +460,9 @@ function HealthTest-KrbtgtAge{
   $u=Get-ADUser krbtgt -Properties pwdLastSet
   $ageDays=[int]((Get-Date) - [DateTime]::FromFileTime($u.pwdLastSet)).TotalDays
   if($ageDays -le $MaxDays){
-    Log-pass "krbtgt password age acceptable ($ageDays days <= $MaxDays)"
+    Write-Warning "[pass] krbtgt password age acceptable ($ageDays days <= $MaxDays)"
   } else {
-    Log-failure "krbtgt password age exceeds threshold($MaxDays)" -comment "The KRBTGT account key hasn't been rotated for $ageDays days. Windows keeps the previous KRBTGT key to validate existing TGTs; never rotating extends the brute force time window for an attacker. Risk: If an attacker ever accessed the KRBTGT key, they can mint TGTs and persist. Rotating twice (with replication time in between) is the standard mitigation."
+    Write-Warning "[failure] krbtgt password age exceeds threshold($MaxDays)`nThe KRBTGT account key hasn't been rotated for $ageDays days. Windows keeps the previous KRBTGT key to validate existing TGTs; never rotating extends the brute force time window for an attacker. Risk: If an attacker ever accessed the KRBTGT key, they can mint TGTs and persist. Rotating twice (with replication time in between) is the standard mitigation."
   }
 }
 
@@ -477,7 +477,7 @@ function HealthTest-NtdsLogVolumeFree{
   $drive=(Get-Item $logPath).PSDrive.Name+':'
   $d=Get-CimInstance Win32_LogicalDisk -Filter "DeviceID='$drive'"
   $freeGB=[math]::Round($d.FreeSpace/1GB,2)
-  if($freeGB -ge $MinFreeGB){ Log-pass "NTDS log volume free space OK ($freeGB GB >= $MinFreeGB GB)" } else { Log-failure "NTDS log volume low free space ($freeGB GB < $MinFreeGB GB)" -Comment "Log path: $logPath" }
+  if($freeGB -ge $MinFreeGB){ Write-Warning "[pass] NTDS log volume free space OK ($freeGB GB >= $MinFreeGB GB)" } else { Write-Warning "[failure] NTDS log volume low free space ($freeGB GB < $MinFreeGB GB)`nLog path: $logPath" }
 }
 
 <#
@@ -486,13 +486,13 @@ Verifies required hotfix baseline is present. OnlyForDomainServers
 #>
 function HealthTest-HotfixBaseline{
   [CmdletBinding()] param([string[]]$RequiredKBs)
-  if(-not $RequiredKBs -or $RequiredKBs.Count -eq 0){ Log-pass "No hotfix baseline provided"; return }
+  if(-not $RequiredKBs -or $RequiredKBs.Count -eq 0){ Write-Warning "[pass] No hotfix baseline provided"; return }
   $have=(Get-HotFix | Select-Object -ExpandProperty HotFixID)
   $miss=@()
   foreach($kb in $RequiredKBs){
-    if($have -notcontains $kb){ $miss += $kb; Log-failure "Missing required hotfix: $kb" }
+    if($have -notcontains $kb){ $miss += $kb; Write-Warning "[failure] Missing required hotfix: $kb" }
   }
-  if($miss.Count -eq 0){ Log-pass "All required hotfixes are installed" }
+  if($miss.Count -eq 0){ Write-Warning "[pass] All required hotfixes are installed" }
 }
 
 <#
@@ -502,13 +502,13 @@ Validates DHCP DNS update credential account health. OnlyForDomainServers
 function HealthTest-DhcpDnsCredential{
   [CmdletBinding()] param([int]$MaxPwdAgeDays=365)
   $dhcp=Get-WindowsFeature -Name DHCP -ErrorAction SilentlyContinue
-  if(-not $dhcp -or -not $dhcp.Installed){ Log-pass "DHCP role not installed on this server"; return }
+  if(-not $dhcp -or -not $dhcp.Installed){ Write-Warning "[pass] DHCP role not installed on this server"; return }
   $cred=Get-DhcpServerDnsCredential -ErrorAction SilentlyContinue
-  if(-not $cred -or -not $cred.UserName){ Log-failure "No DHCP DNS update credentials configured"; return }
+  if(-not $cred -or -not $cred.UserName){ Write-Warning "[failure] No DHCP DNS update credentials configured"; return }
   $u=Get-ADUser -Identity $cred.UserName -Properties Enabled,pwdLastSet
   $age=[int]((Get-Date) - [DateTime]::FromFileTime($u.pwdLastSet)).TotalDays
-  if(-not $u.Enabled){ Log-failure "DHCP DNS credential account is disabled: $($cred.UserName)"; return }
-  if($age -gt $MaxPwdAgeDays){ Log-failure "DHCP DNS credential password age too high ($age days > $MaxPwdAgeDays): $($cred.UserName)" } else { Log-pass "DHCP DNS credential healthy (Enabled, pwd age $age days <= $MaxPwdAgeDays)" }
+  if(-not $u.Enabled){ Write-Warning "[failure] DHCP DNS credential account is disabled: $($cred.UserName)"; return }
+  if($age -gt $MaxPwdAgeDays){ Write-Warning "[failure] DHCP DNS credential password age too high ($age days > $MaxPwdAgeDays): $($cred.UserName)" } else { Write-Warning "[pass] DHCP DNS credential healthy (Enabled, pwd age $age days <= $MaxPwdAgeDays)" }
 }
 
 <#
@@ -523,14 +523,14 @@ function HealthTest-GpoVersionConsistency{
     foreach($g in Get-GPO -All){
       $ini="$base\{$($g.Id)}\gpt.ini"
       $gptVer = if(Test-Path $ini){ [int]((Get-Content $ini | where {$_ -match '^Version='}) -replace 'Version=','') } else { -1 }
-      if($gptVer -lt 0){ $bad=$true; Log-failure "GPO missing GPT: $($g.DisplayName)"; continue }
+      if($gptVer -lt 0){ $bad=$true; Write-Warning "[failure] GPO missing GPT: $($g.DisplayName)"; continue }
       $uGpt=$gptVer -shr 16; $cGpt=$gptVer -band 0xFFFF
       if($uGpt -ne $g.User.DSVersion -or $cGpt -ne $g.Computer.DSVersion){
         $bad=$true
-        Log-failure "GPO GPT/AD version mismatch: '$($g.DisplayName)' User AD=$($g.User.DSVersion) GPT=$uGpt; Computer AD=$($g.Computer.DSVersion) GPT=$cGpt"
+        Write-Warning "[failure] GPO GPT/AD version mismatch: '$($g.DisplayName)' User AD=$($g.User.DSVersion) GPT=$uGpt; Computer AD=$($g.Computer.DSVersion) GPT=$cGpt"
       }
     }
-  if(-not $bad){ Log-pass "All GPOs have matching GPT/GPC versions" }
+  if(-not $bad){ Write-Warning "[pass] All GPOs have matching GPT/GPC versions" }
 }
 
 <#
@@ -546,7 +546,7 @@ function HealthTest-SysvolContentConsistency{
     $sigs = foreach($dc in $dcs){
       $p="\\$dc\SYSVOL\$dom\Policies"
       if(-not (Test-Path -LiteralPath $p)){
-        Log-Failure "SYSVOL Policies path missing on ${dc}: $p"
+        Write-Warning "[failure] SYSVOL Policies path missing on ${dc}: $p"
         [pscustomobject]@{DC=$dc;Sig='<missing>'}
         continue
       }
@@ -570,11 +570,11 @@ function HealthTest-SysvolContentConsistency{
     }
 
     if($allSame){
-      Log-Pass "SYSVOL policy tree manifests match across all DCs"
+      Write-Warning "[pass] SYSVOL policy tree manifests match across all DCs"
     } elseif($hasMissing){
-      Log-Failure "At least one DC lacks SYSVOL\Policies" -Comment $map
+      Write-Warning "[failure] $("At least one DC lacks SYSVOL\Policies")`n$($map)"
     } else {
-      Log-Failure "SYSVOL policy manifests are not consistent across DCs" -Comment $map
+      Write-Warning "[failure] $("SYSVOL policy manifests are not consistent across DCs")`n$($map)"
     }
 }
 
@@ -584,13 +584,13 @@ Reviews RODC PRP (allow/deny) presence where RODCs exist. OnlyForDomainServers
 #>
 function HealthTest-RodcPrp{
   $rodcs=Get-ADDomainController -Filter {IsReadOnly -eq $true}
-  if(-not $rodcs){ Log-pass "No RODCs found (PRP not applicable)"; return }
+  if(-not $rodcs){ Write-Warning "[pass] No RODCs found (PRP not applicable)"; return }
   $bad=$false
   foreach($r in $rodcs){
     $ro=Get-ADObject $r.NTDSSettingsObjectDN -Properties msDS-RevealOnDemandGroup,msDS-NeverRevealGroup
-    if(-not $ro.'msDS-RevealOnDemandGroup' -and -not $ro.'msDS-NeverRevealGroup'){ $bad=$true; Log-failure "RODC PRP not configured on $($r.HostName)" }
+    if(-not $ro.'msDS-RevealOnDemandGroup' -and -not $ro.'msDS-NeverRevealGroup'){ $bad=$true; Write-Warning "[failure] RODC PRP not configured on $($r.HostName)" }
   }
-  if(-not $bad){ Log-pass "PRP is configured on all RODCs" }
+  if(-not $bad){ Write-Warning "[pass] PRP is configured on all RODCs" }
 }
 
 <#
@@ -600,8 +600,8 @@ Reports members of 'Pre-Windows 2000 Compatible Access' (should be empty). OnlyF
 function HealthTest-PreWin2000Group{
   $g=Get-ADGroup -Identity 'Pre-Windows 2000 Compatible Access'
   $m=Get-ADGroupMember $g -Recursive -ErrorAction SilentlyContinue
-  foreach($u in $m){ Log-failure "'Pre-Windows 2000 Compatible Access' contains member: $($u.SamAccountName)" }
-  if(($m | Measure-Object).Count -eq 0){ Log-pass "'Pre-Windows 2000 Compatible Access' group has no members" }
+  foreach($u in $m){ Write-Warning "[failure] 'Pre-Windows 2000 Compatible Access' contains member: $($u.SamAccountName)" }
+  if(($m | Measure-Object).Count -eq 0){ Write-Warning "[pass] 'Pre-Windows 2000 Compatible Access' group has no members" }
 }
 
 <#
@@ -619,7 +619,7 @@ function HealthTest-GpWmiFiltersNamespaces{
     $dn = $rootDse.defaultNamingContext
     $dns = $rootDse.rootDomainNamingContext -replace '(?i)(?<=,|^)\s*dc=','' -replace '\s*,\s*','.'
   }catch{
-    Log-Warning "This machine cannot read LDAP RootDSE. Is it domain-joined and can it reach a DC?"
+    Write-Warning "[warning] This machine cannot read LDAP RootDSE. Is it domain-joined and can it reach a DC?"
     return
   }
 
@@ -658,7 +658,7 @@ function HealthTest-GpWmiFiltersNamespaces{
       $wmipath = "LDAP://CN=WMIPolicy,CN=System,$dn"
       $wmicont = [ADSI]$wmipath
       if(-not $wmicont.psbase.Name){
-        Log-pass "No GPO WMI filters defined (CN=WMIPolicy container not found)."
+        Write-Warning "[pass] No GPO WMI filters defined (CN=WMIPolicy container not found)."
         return
       }
       $ds = New-Object System.DirectoryServices.DirectorySearcher($wmicont)
@@ -679,12 +679,12 @@ function HealthTest-GpWmiFiltersNamespaces{
         }
       }
     }catch{
-      Log-Warning "Cannot enumerate WMI filters via GPMC or LDAP. Check: domain join, DC reachability/DNS, and GPMC installation."
+      Write-Warning "[warning] Cannot enumerate WMI filters via GPMC or LDAP. Check: domain join, DC reachability/DNS, and GPMC installation."
       return
     }
   }
 
-  if(-not $items){ Log-pass "No GPO WMI filters defined"; return }
+  if(-not $items){ Write-Warning "[pass] No GPO WMI filters defined"; return }
 
   $unique = $items | Sort-Object Filter,Namespace -Unique
   foreach($i in $unique){
@@ -692,12 +692,12 @@ function HealthTest-GpWmiFiltersNamespaces{
       $null=Get-CimInstance -Namespace $i.Namespace -ClassName __NAMESPACE -ErrorAction Stop
     } catch {
       $bad=$true
-      Log-failure "WMI namespace missing for filter '$($i.Filter)': $($i.Namespace)"
+      Write-Warning "[failure] WMI namespace missing for filter '$($i.Filter)': $($i.Namespace)"
     }
   }  
 
-  if(-not $bad){ Log-pass "All WMI namespaces referenced by GPO WMI filters exist on this host" }
-  else{ Log-Warning "One or more GPO WMI filter namespaces are missing on this host" }
+  if(-not $bad){ Write-Warning "[pass] All WMI namespaces referenced by GPO WMI filters exist on this host" }
+  else{ Write-Warning "[warning] One or more GPO WMI filter namespaces are missing on this host" }
 }
 
 function Get-SoftwareLicensing {
@@ -785,16 +785,16 @@ function HealthTest-DnsSuffixMatchesDomain {
   $cs = Get-CimInstance Win32_ComputerSystem
   $role = $cs.DomainRole
   $fn = $MyInvocation.MyCommand.Name
-  if ($role -in 0,2) { Log-Notice "This test ($fn) is not applicable to non-domain joined hosts"; return }
-  if ($role -in 4,5) { Log-Notice "This test ($fn) is not applicable to Domain Controllers"; return }
+  if ($role -in 0,2) { Write-Warning "[notice] This test ($fn) is not applicable to non-domain joined hosts"; return }
+  if ($role -in 4,5) { Write-Warning "[notice] This test ($fn) is not applicable to Domain Controllers"; return }
 
   $domain = $cs.Domain
   $out = ipconfig /all 2>&1
   $pattern = "DNS Suffix.* $domain`$"
   if ($out | Select-String -Pattern $pattern) {
-    Log-pass "Domain name appears in DNS suffix" -Comment "Domain: $domain"
+    Write-Warning "[pass] Domain name appears in DNS suffix`nDomain: $domain"
   } else {
-    Log-failure "Domain name does not appear in DNS suffix" -Comment "Expected suffix: $domain"
+    Write-Warning "[failure] Domain name does not appear in DNS suffix`nExpected suffix: $domain"
   }
 }
 
@@ -810,10 +810,10 @@ function HealthTest-DomainARecordPointsToDcIp {
   $cs = Get-CimInstance Win32_ComputerSystem
   $role = $cs.DomainRole
   $fn = $MyInvocation.MyCommand.Name
-  if ($role -in 0,2) { Log-Notice "This test ($fn) is not applicable to non-domain joined hosts"; return }
-  if ($role -in 4,5) { Log-Notice "This test ($fn) is not applicable to Domain Controllers"; return }
+  if ($role -in 0,2) { Write-Warning "[notice] This test ($fn) is not applicable to non-domain joined hosts"; return }
+  if ($role -in 4,5) { Write-Warning "[notice] This test ($fn) is not applicable to Domain Controllers"; return }
 
-  Log-debug "Reading C:\it\config\ips-of-all-DCs.conf to get the list of the IPs of all DCs"
+  Write-Output "Reading C:\it\config\ips-of-all-DCs.conf to get the list of the IPs of all DCs"
   # will return a list of IPs or throw
   $dcIps = Get-AllDCIPs -Path 'C:\it\config\ips-of-all-DCs.conf'
 
@@ -821,7 +821,7 @@ function HealthTest-DomainARecordPointsToDcIp {
   $ares = $null
   try { $ares = Resolve-DnsName -Name $domain -Type A -ErrorAction Stop } catch {}
   if (-not $ares) {
-    Log-failure "No A records found for domain DNS name." -Comment $domain
+    Write-Warning "[failure] $("No A records found for domain DNS name.")`n$($domain)"
     return
   }
 
@@ -831,9 +831,9 @@ function HealthTest-DomainARecordPointsToDcIp {
 
   $comment = "Domain=$domain; DC IPs=" + ($dcIps -join ', ') + "; Domain A IPs=" + ($aIps -join ', ')
   if ($intersection.Count -gt 0) {
-    Log-pass "Domain DNS name resolves to at least one DC IP." -Comment $comment
+    Write-Warning "[pass] $("Domain DNS name resolves to at least one DC IP.")`n$($comment)"
   } else {
-    Log-failure "Domain DNS name does not resolve to any known DC IPv4 address." -Comment $comment
+    Write-Warning "[failure] $("Domain DNS name does not resolve to any known DC IPv4 address.")`n$($comment)"
   }
 }
 
@@ -850,16 +850,16 @@ function HealthTest-InterfaceDnsServersUseDcs {
   $cs = Get-CimInstance Win32_ComputerSystem
   $role = $cs.DomainRole
   $fn = $MyInvocation.MyCommand.Name
-  if ($role -in 0,2) { Log-Notice "This test ($fn) is not applicable to non-domain joined hosts"; return }
-  if ($role -in 4,5) { Log-Notice "This test ($fn) is not applicable to Domain Controllers"; return }
+  if ($role -in 0,2) { Write-Warning "[notice] This test ($fn) is not applicable to non-domain joined hosts"; return }
+  if ($role -in 4,5) { Write-Warning "[notice] This test ($fn) is not applicable to Domain Controllers"; return }
 
-  Log-debug "Reading C:\it\config\ips-of-all-DCs.conf to get the list of the IPs of all DCs"
+  Write-Output "Reading C:\it\config\ips-of-all-DCs.conf to get the list of the IPs of all DCs"
   # will return a list of IPs or throw
   $dcIps = Get-AllDCIPs -Path 'C:\it\config\ips-of-all-DCs.conf'
 
   $nets = Get-CimInstance Win32_NetworkAdapterConfiguration -Filter "IPEnabled=TRUE"
   if (-not $nets) {
-    Log-failure "No IP-enabled network adapters found."
+    Write-Warning "[failure] No IP-enabled network adapters found."
     return
   }
 
@@ -870,7 +870,7 @@ function HealthTest-InterfaceDnsServersUseDcs {
     $dns  = $net.DNSServerSearchOrder
     $desc = $net.Description
     if (-not $dns -or $dns.Count -eq 0) {
-      Log-Notice "Interface has no DNS servers configured." -Comment $desc
+      Write-Warning "[notice] $("Interface has no DNS servers configured.")`n$($desc)"
       continue
     }
 
@@ -886,19 +886,19 @@ function HealthTest-InterfaceDnsServersUseDcs {
 
     if ($allDomain) {
       $anyClean = $true
-      Log-pass "Interface has only DCs as DNS servers." -Comment ("Interface: " + $desc + "; DNS=" + $dnsList)
+      Write-Warning ("[pass] Interface has only DCs as DNS servers.`nInterface: " + $desc + "; DNS=" + $dnsList)
     } elseif ($allNonDomain) {
       # Ignoring this interface that only has non-domain DNS servers
     } else {
       $anyBad = $true
-      Log-failure "Interface DNS servers include non-DC addresses." -Comment ("Interface: " + $desc + "; DNS=" + $dnsList + "; DC IPs=" + ($dcIps -join ', '))
+      Write-Warning ("[failure] Interface DNS servers include non-DC addresses.`nInterface: " + $desc + "; DNS=" + $dnsList + "; DC IPs=" + ($dcIps -join ', '))
     }
   }
 
   if (-not $anyClean) {
-    Log-failure "No interface found where all DNS servers are DC IPs."
+    Write-Warning "[failure] No interface found where all DNS servers are DC IPs."
   } elseif (-not $anyBad) {
-    Log-pass "All interfaces with DNS configured use only DC IPs."
+    Write-Warning "[pass] All interfaces with DNS configured use only DC IPs."
   }
 }
 
@@ -911,8 +911,8 @@ function HealthTest-NltestSiteDiscovery {
   $cs = Get-CimInstance Win32_ComputerSystem
   $role = $cs.DomainRole
   $fn = $MyInvocation.MyCommand.Name
-  if ($role -in 0,2) { Log-Notice "This test ($fn) is not applicable to non-domain joined hosts"; return }
-  if ($role -in 4,5) { Log-Notice "This test ($fn) is not applicable to Domain Controllers"; return }
+  if ($role -in 0,2) { Write-Warning "[notice] This test ($fn) is not applicable to non-domain joined hosts"; return }
+  if ($role -in 4,5) { Write-Warning "[notice] This test ($fn) is not applicable to Domain Controllers"; return }
 
   $out  = nltest /dsgetsite 2>&1
   $exit = $LASTEXITCODE
@@ -928,10 +928,10 @@ function HealthTest-NltestSiteDiscovery {
       }
     }
     if (-not $site) { $site = '(unknown)' }
-    Log-pass "NLTEST /dsgetsite succeeded." -Comment ("Site: " + $site)
+    Write-Warning "[pass] $("NLTEST /dsgetsite succeeded.")`n$(("Site: " + $site))"
   } else {
     $hex = '0x{0:X}' -f ($exit -band 0xFFFFFFFF)
-    Log-failure "NLTEST /dsgetsite failed." -Comment ("ExitCode=" + $hex + "; Output=`n" + $txt)
+    Write-Warning ("[failure] NLTEST /dsgetsite failed.`nExitCode=" + $hex + "; Output=`n" + $txt)
   }
 }
 
@@ -944,12 +944,12 @@ function HealthTest-GpupdatePolicyApply {
   $cs   = Get-CimInstance Win32_ComputerSystem
   $role = $cs.DomainRole
   $fn   = $MyInvocation.MyCommand.Name
-  if ($role -in 0,2) { Log-Notice "This test ($fn) is not applicable to non-domain joined hosts"; return }
-  if ($role -in 4,5) { Log-Notice "This test ($fn) is not applicable to Domain Controllers"; return }
+  if ($role -in 0,2) { Write-Warning "[notice] This test ($fn) is not applicable to non-domain joined hosts"; return }
+  if ($role -in 4,5) { Write-Warning "[notice] This test ($fn) is not applicable to Domain Controllers"; return }
 
 
   if (!(Test-ComputerSecureChannel)) {
-      Log-warning "Can't connected to any Domain Controller. Can not run gpupdate." -comment "Make sure you are on the domain LAN or connected via VPN."
+      Write-Warning "[warning] Can't connected to any Domain Controller. Can not run gpupdate.`nMake sure you are on the domain LAN or connected via VPN."
     return
   }
 
@@ -966,24 +966,24 @@ function HealthTest-GpupdatePolicyApply {
   $userOk = ($text -like "*User Policy update has completed successfully*")
 
   if ($compOk -and $userOk) {
-    Log-pass "Computer and user policy updates completed successfully (gpupdate)."
+    Write-Warning "[pass] Computer and user policy updates completed successfully (gpupdate)."
     return
   }
 
   if ($compOk) {
-    Log-pass "Computer policy update completed successfully (gpupdate)."
+    Write-Warning "[pass] Computer policy update completed successfully (gpupdate)."
   } else {
-    Log-failure "Computer policy update did not report success." -Comment ("gpupdate output:`n" + $text)
+    Write-Warning "[failure] $("Computer policy update did not report success.")`n$(("gpupdate output:`n" + $text))"
   }
 
   if (-not $userOk) {
     if ($isSystem) {
-      Log-notice "User policy update did not report success (gpupdate running under SYSTEM/non-interactive)." -Comment ("This can be expected when no interactive user is logged on.`nRaw gpupdate output:`n" + $text)
+      Write-Warning "[notice] $("User policy update did not report success (gpupdate running under SYSTEM/non-interactive).")`n$(("This can be expected when no interactive user is logged on.`nRaw gpupdate output:`n" + $text))"
     } else {
-      Log-failure "User policy update did not report success." -Comment ("Expected success for interactive user.`nRaw gpupdate output:`n" + $text)
+      Write-Warning "[failure] $("User policy update did not report success.")`n$(("Expected success for interactive user.`nRaw gpupdate output:`n" + $text))"
     }
   } else {
-    Log-pass "User policy update completed successfully (gpupdate)."
+    Write-Warning "[pass] User policy update completed successfully (gpupdate)."
   }
 }
 
@@ -1009,18 +1009,18 @@ function HealthTest-RecentDiskErrors {
                     Level        = 2     # Error
                     StartTime    = $start
             } -ErrorAction SilentlyContinue | %{
-                Log-failure "Storage($p) error in last N hours" -comment "N=$Hours hours; Event: $($_.TimeCreated), $($_.LevelDisplayName), $($_.Message)"
+                Write-Warning "[failure] Storage($p) error in last N hours`nN=$Hours hours; Event: $($_.TimeCreated), $($_.LevelDisplayName), $($_.Message)"
                 $pass = $false
             }
         } catch {
             if ($_.Exception.Message -notlike '*There is not an event provider*') {
-                Log-Warning "Failed reading System log for provider '$p': $($_.Exception.Message)"
+                Write-Warning "[warning] Failed reading System log for provider '$p': $($_.Exception.Message)"
             }
         }
     }
 
     if ($pass) {
-        Log-pass "No disk/NTFS/storage errors in last $Hours h"
+        Write-Warning "[pass] No disk/NTFS/storage errors in last $Hours h"
     }
 
 }
@@ -1034,10 +1034,10 @@ function HealthTest-CrashDumpSignals {
     $cutoff = (Get-Date).AddHours(-$Hours)
 
     Get-ChildItem "$env:SystemRoot\Minidump" -Filter *.dmp -ErrorAction SilentlyContinue | ?{ $_.LastWriteTime -gt $cutoff } | %{
-        Log-Failure "Found $env:SystemRoot\Minidump\ file(s) within the last N hours" -comment "N=$Hours hours. File: $env:SystemRoot\Minidump\$($_.name))"
+        Write-Warning "[failure] Found $env:SystemRoot\Minidump\ file(s) within the last N hours`nN=$Hours hours. File: $env:SystemRoot\Minidump\$($_.name))"
     }
     if ($pass) {
-        Log-pass "No recent minidumps"
+        Write-Warning "[pass] No recent minidumps"
     }
 
     $pass = $true
@@ -1046,11 +1046,11 @@ function HealthTest-CrashDumpSignals {
             Id        = 1001  # BugCheck
             StartTime = $cutoff
     } -ErrorAction SilentlyContinue | %{
-        Log-Failure "Found System Event #1001 within the last N hours (this event often indicates a crash)" -comment "N=$Hours hours. Event: $($_.TimeCreated), $($_.LevelDisplayName), $($_.Message)"
+        Write-Warning "[failure] Found System Event #1001 within the last N hours (this event often indicates a crash)`nN=$Hours hours. Event: $($_.TimeCreated), $($_.LevelDisplayName), $($_.Message)"
     }
 
     if ($pass) {
-        Log-pass "No recent System #1001 events"
+        Write-Warning "[pass] No recent System #1001 events"
     }
 }
 
@@ -1109,12 +1109,12 @@ function HealthTest-LocalAdminsBaseline {
         }
 
         if (-not $isAllowed) {
-            Log-Warning "Unexpected Local Administrator: $full"
+            Write-Warning "[warning] Unexpected Local Administrator: $full"
             $pass = $false
         }
     }
     if ($pass) {
-        Log-pass "No unexpected accounts in Local Administrators"
+        Write-Warning "[pass] No unexpected accounts in Local Administrators"
     }
 }
 
@@ -1122,7 +1122,7 @@ function HealthTest-LocalAdminsBaseline {
 function HealthTest-Nic {
     $nics = Get-NetAdapter -Physical -ErrorAction SilentlyContinue | Where-Object { $_.Status -eq 'Up' }
     if (-not $nics) {
-        Log-debug "No physical NICs with Status=Up; skipping NIC health check"
+        Write-Output "No physical NICs with Status=Up; skipping NIC health check"
         return
     }
 
@@ -1132,7 +1132,7 @@ function HealthTest-Nic {
     foreach ($n in $nics) {
         $stat = Get-NetAdapterStatistics -Name $n.Name -ErrorAction SilentlyContinue
         if (-not $stat) {
-            Log-debug "Network interface skipped due to missing stats ($($n.Name))"
+            Write-Output "Network interface skipped due to missing stats ($($n.Name))"
             continue
         }
 
@@ -1152,13 +1152,13 @@ function HealthTest-Nic {
 
         if ($n.MediaConnectionState -ne 'Connected') {
             $warnList += "$($n.Name): mediaState=$($n.MediaConnectionState)"
-            Log-Warning "Disconnected network interface ($($n.Name))" -Comment ""
+            Write-Warning "[warning] Disconnected network interface ($($n.Name))`n"
             $pass = $false
             continue
         }
 
         if ($totalPackets -lt $minPackets) {
-            Log-debug "Network interface skipped due to low traffic ($($n.Name))"
+            Write-Output "Network interface skipped due to low traffic ($($n.Name))"
             continue
         }
 
@@ -1175,11 +1175,11 @@ function HealthTest-Nic {
 
         if ($errors -ge 1000 -and $errorPct -ge 0.01) {
             $warnList += "$($n.Name): errors=$pctStr ($errors/$totalPackets total)"
-            Log-Warning "Network interface with plenty of errors ($($n.Name))" -Comment "errors=$pctStr ($errors/$totalPackets total packets)"
+            Write-Warning "[warning] Network interface with plenty of errors ($($n.Name))`nerrors=$pctStr ($errors/$totalPackets total packets)"
             $pass = $false
         } elseif ($errors -ge 100 -and $errorPct -ge 0.002) {
             $noticeList += "$($n.Name): errors=$pctStr ($errors/$totalPackets total)"
-            Log-Notice "Network interface with some errors ($($n.Name))" -Comment "errors=$pctStr ($errors/$totalPackets total packets)"
+            Write-Warning "[notice] Network interface with some errors ($($n.Name))`nerrors=$pctStr ($errors/$totalPackets total packets)"
             $pass = $false
         } else {
             # below 0.002%: considered OK, no log entry
@@ -1188,14 +1188,14 @@ function HealthTest-Nic {
     }
 
     if ($pass) {
-        Log-pass "Network interfaces healthy; no significant error rates or disconnected interfaces detected"
+        Write-Warning "[pass] Network interfaces healthy; no significant error rates or disconnected interfaces detected"
     }
 }
 
 <# .SYNOPSIS Summarizes BitLocker protection status for local volumes. #>
 function HealthTest-BitLockerStatus {
     if (-not (Get-Command Get-BitLockerVolume -ErrorAction SilentlyContinue)) {
-        Log-warning "BitLocker PowerShell cmdlets not available; skipping BitLocker status check"
+        Write-Warning "[warning] BitLocker PowerShell cmdlets not available; skipping BitLocker status check"
         return
     }
 
@@ -1203,15 +1203,15 @@ function HealthTest-BitLockerStatus {
 
     $vols = Get-BitLockerVolume -ErrorAction SilentlyContinue
     if (-not $vols) {
-        Log-notice "No BitLocker-capable volumes found"
+        Write-Warning "[notice] No BitLocker-capable volumes found"
 
     }
     $vols | Where-Object { $_.ProtectionStatus -ne 'On' } | %{
-        Log-Failure "Volume not protected by BitLocker: $($_.MountPoint)"
+        Write-Warning "[failure] Volume not protected by BitLocker: $($_.MountPoint)"
         $pass = $false
     }
     if ($pass) {
-        Log-pass "BitLocker protection is ON for all detected volumes"
+        Write-Warning "[pass] BitLocker protection is ON for all detected volumes"
     }
 }
 
@@ -1219,18 +1219,18 @@ function HealthTest-BitLockerStatus {
 function HealthTest-DhcpScopeUtilization {
     $svc = Get-Service -Name 'DHCPServer' -ErrorAction SilentlyContinue
     if (-not $svc) {
-        Log-debug "Host is not a DHCP server (DHCPServer service missing); skipping DHCP scope utilization test"
+        Write-Output "Host is not a DHCP server (DHCPServer service missing); skipping DHCP scope utilization test"
         return
     }
 
     if (-not (Get-Command Get-DhcpServerv4ScopeStatistics -ErrorAction SilentlyContinue)) {
-        Log-warning "DHCP server cmdlets not available on this DHCP server; skipping DHCP scope utilization test"
+        Write-Warning "[warning] DHCP server cmdlets not available on this DHCP server; skipping DHCP scope utilization test"
         return
     }
 
     $stats = Get-DhcpServerv4ScopeStatistics -ErrorAction SilentlyContinue
     if (-not $stats) {
-        Log-Warning "DHCP server role present but no DHCPv4 scopes found"
+        Write-Warning "[warning] DHCP server role present but no DHCPv4 scopes found"
         return
     }
 
@@ -1238,15 +1238,15 @@ function HealthTest-DhcpScopeUtilization {
     foreach ($s in $stats) {
         if ($s.PercentageInUse -ge 90) {
             $over += $s.ScopeId
-            Log-Failure "DHCP scope is >=90% used: $($s.ScopeId)"
+            Write-Warning "[failure] DHCP scope is >=90% used: $($s.ScopeId)"
         } elseif ($s.PercentageInUse -ge 80) {
             $over += $s.ScopeId
-            Log-Warning "DHCP scope is >=80% used: $($s.ScopeId)"
+            Write-Warning "[warning] DHCP scope is >=80% used: $($s.ScopeId)"
         }
     }
 
     if ($over.Count -gt 0) {
-        Log-pass "DHCP scope utilization OK (<80% in use)"
+        Write-Warning "[pass] DHCP scope utilization OK (<80% in use)"
     }
 
 }
@@ -1263,24 +1263,24 @@ function HealthTest-DnsSuffixBaseline {
     $primarySuffix = $ipg.DomainName
 
     if ([string]::IsNullOrWhiteSpace($primarySuffix)) {
-        Log-Failure "Primary DNS suffix" "Current is empty" "Ensure the system has a primary DNS suffix (normally set by domain join)."
+        Write-Warning "[failure] Primary DNS suffix" "Current is empty" "Ensure the system has a primary DNS suffix (normally set by domain join)."
     } elseif ($primarySuffix -ieq $DomainName) {
-        Log-Pass "Primary DNS suffix" $primarySuffix
+        Write-Warning "[pass] Primary DNS suffix" $primarySuffix
     } else {
-        Log-Failure "Primary DNS suffix" ("Current='{0}' Expected='{1}'" -f $primarySuffix,$DomainName) "Ensure primary DNS suffix equals the AD DNS name (normally set by domain join)."
+        Write-Warning "[failure] Primary DNS suffix" ("Current='{0}' Expected='{1}'" -f $primarySuffix,$DomainName) "Ensure primary DNS suffix equals the AD DNS name (normally set by domain join)."
     }
 
     # 2) DNS devolution is enabled (boolean only)
     try {
         $g = Get-DnsClientGlobalSetting -ErrorAction Stop
         if ($g.UseDevolution -eq $true) {
-            Log-Pass "DNS devolution enabled" "UseDevolution=True"
+            Write-Warning "[pass] DNS devolution enabled" "UseDevolution=True"
         } else {
-            Log-Failure "DNS devolution enabled" "UseDevolution=False" "Enable devolution (GPO: Computer Configuration/Administrative Templates/Network/DNS Client/Turn off DNS devolution = Disabled)."
+            Write-Warning "[failure] DNS devolution enabled" "UseDevolution=False" "Enable devolution (GPO: Computer Configuration/Administrative Templates/Network/DNS Client/Turn off DNS devolution = Disabled)."
         }
     } catch {
         $err = $_
-        Log-Failure "DNS devolution enabled" ("Unable to query global DNS client settings: {0}" -f $err.Exception.Message) "Check OS support for Get-DnsClientGlobalSetting and that the DNS Client service is running."
+        Write-Warning "[failure] DNS devolution enabled" ("Unable to query global DNS client settings: {0}" -f $err.Exception.Message) "Check OS support for Get-DnsClientGlobalSetting and that the DNS Client service is running."
     }
 
     # 3) Per-NIC checks (only PASS/FAIL; no discovery warning if none found)
@@ -1290,7 +1290,7 @@ function HealthTest-DnsSuffixBaseline {
                 Where-Object { $_.InterfaceOperationalStatus -eq "Up" -and $_.ConnectionSpecificSuffix -ne "localdomain" }
     } catch {
         $err = $_
-        Log-Failure "NIC DNS settings" ("Unable to query DNS client interfaces: {0}" -f $err.Exception.Message) "Confirm OS supports Get-DnsClient and you have sufficient privileges."
+        Write-Warning "[failure] NIC DNS settings" ("Unable to query DNS client interfaces: {0}" -f $err.Exception.Message) "Confirm OS supports Get-DnsClient and you have sufficient privileges."
         $nics = @()
     }
 
@@ -1299,19 +1299,19 @@ function HealthTest-DnsSuffixBaseline {
 
         # 3a) Registration flags must both be True
         if ($n.RegisterThisConnectionsAddress -and $n.UseSuffixWhenRegistering) {
-            Log-Pass ("NIC '{0}' DNS registration" -f $nicName) "RegisterThisConnectionsAddress=True, UseSuffixWhenRegistering=True"
+            Write-Warning ("[pass] NIC '{0}' DNS registration`nRegisterThisConnectionsAddress=True, UseSuffixWhenRegistering=True" -f $nicName)
         } else {
-            Log-Failure ("NIC '{0}' DNS registration" -f $nicName) ("RegisterThisConnectionsAddress={0}, UseSuffixWhenRegistering={1}" -f $n.RegisterThisConnectionsAddress,$n.UseSuffixWhenRegistering) "Enable both flags on important interfaces."
+            Write-Warning (("[failure] NIC '{0}' DNS registration`nRegisterThisConnectionsAddress={1}, UseSuffixWhenRegistering={2}`nEnable both flags on important interfaces." -f $nicName,$n.RegisterThisConnectionsAddress,$n.UseSuffixWhenRegistering))
         }
 
         # 3b) Connection-specific suffix: must be Empty OR exactly the domain
         $css = $n.ConnectionSpecificSuffix
         if ([string]::IsNullOrWhiteSpace($css)) {
-            Log-Pass ("NIC '{0}' Conn.-specific suffix" -f $nicName) "Empty"
+            Write-Warning ("[pass] NIC '{0}' Conn.-specific suffix`nEmpty" -f $nicName)
         } elseif ($css -ieq $DomainName) {
-            Log-Pass ("NIC '{0}' Conn.-specific suffix" -f $nicName) ("Equals {0}" -f $DomainName)
+            Write-Warning ("[pass] NIC '{0}' Conn.-specific suffix`nEquals {1}" -f $nicName,$DomainName)
         } else {
-            Log-Failure ("NIC '{0}' Conn.-specific suffix" -f $nicName) ("Set to '{0}'" -f $css) "Leave blank for single-domain setups unless a specific suffix is required."
+            Write-Warning (("[failure] NIC '{0}' Conn.-specific suffix`nSet to '{1}'`nLeave blank for single-domain setups unless a specific suffix is required." -f $nicName,$css))
         }
     }
 }
@@ -1330,7 +1330,7 @@ function HealthTest-ADReplicationDomainRepadmin {
   $repadmin = if ($repadminCmd -and $repadminCmd.Source) { $repadminCmd.Source } else { "$env:windir\system32\repadmin.exe" }
 
   if (-not (Test-Path -LiteralPath $repadmin)) {
-    Log-failure "AD replication (repadmin): repadmin.exe not found; cannot run domain-wide checks."
+    Write-Warning "[failure] AD replication (repadmin): repadmin.exe not found; cannot run domain-wide checks."
     return
   }
 
@@ -1340,12 +1340,12 @@ function HealthTest-ADReplicationDomainRepadmin {
   try {
     $sumOut = (& $repadmin /replsum 2>&1 | Out-String)
   } catch {
-    Log-failure "AD replication (repadmin): failed to execute 'repadmin /replsum'." -comment $_.Exception.Message
+    Write-Warning "[failure] $("AD replication (repadmin): failed to execute 'repadmin /replsum'.")`n$($_.Exception.Message)"
     return
   }
 
   if (-not $sumOut) {
-    Log-failure "AD replication (repadmin): no output from 'repadmin /replsum'."
+    Write-Warning "[failure] AD replication (repadmin): no output from 'repadmin /replsum'."
     $ok = $false
   } else {
     $bad = @()
@@ -1360,11 +1360,11 @@ function HealthTest-ADReplicationDomainRepadmin {
 
     if ($bad.Count -gt 0) {
       foreach ($b in $bad) {
-        Log-failure "AD replication (repadmin): replsum reports failures on '$($b.DSA)'" -comment ("{0} fail(s) out of {1} neighbors." -f $b.Fails,$b.Total)
+        Write-Warning "[failure] $("AD replication (repadmin): replsum reports failures on '$($b.DSA)'")`n$(("{0} fail(s) out of {1} neighbors." -f $b.Fails,$b.Total))"
       }
       $ok = $false
     } else {
-      Log-pass "AD replication (repadmin): replsum shows 0 fails for all DSAs."
+      Write-Warning "[pass] AD replication (repadmin): replsum shows 0 fails for all DSAs."
     }
   }
 
@@ -1372,33 +1372,33 @@ function HealthTest-ADReplicationDomainRepadmin {
   try {
     $showOut = (& $repadmin /showreps 2>&1 | Out-String)
   } catch {
-    Log-failure "AD replication (repadmin): failed to execute 'repadmin /showreps'." -comment $_.Exception.Message
+    Write-Warning "[failure] $("AD replication (repadmin): failed to execute 'repadmin /showreps'.")`n$($_.Exception.Message)"
     return
   }
 
   if (-not $showOut) {
-    Log-failure "AD replication (repadmin): no output from 'repadmin /showreps'."
+    Write-Warning "[failure] AD replication (repadmin): no output from 'repadmin /showreps'."
     $ok = $false
   } else {
     $attemptLines = ($showOut -split '\r?\n') | Where-Object { $_ -match 'Last attempt @' }
     if (-not $attemptLines -or $attemptLines.Count -eq 0) {
-      Log-Warning "AD replication (repadmin): showreps produced no 'Last attempt' lines." -comment "Run 'repadmin /showreps' manually to inspect output."
+      Write-Warning "[warning] AD replication (repadmin): showreps produced no 'Last attempt' lines.`nRun 'repadmin /showreps' manually to inspect output."
       $ok = $false
     } else {
       $notOk = @($attemptLines | Where-Object { $_ -notmatch 'was successful\.$' })
       if ($notOk.Count -gt 0) {
         foreach ($ln in $notOk) {
-          Log-failure "AD replication (repadmin): showreps has unsuccessful last attempt" -comment ($ln.Trim())
+          Write-Warning "[failure] $("AD replication (repadmin): showreps has unsuccessful last attempt")`n$(($ln.Trim()))"
         }
         $ok = $false
       } else {
-        Log-pass "AD replication (repadmin): showreps indicates all last attempts were successful."
+        Write-Warning "[pass] AD replication (repadmin): showreps indicates all last attempts were successful."
       }
     }
   }
 
   if (-not $ok) {
-    Log-notice "AD replication (repadmin): issues detected."
+    Write-Warning "[notice] AD replication (repadmin): issues detected."
   }
 }
 
@@ -1421,14 +1421,14 @@ function HealthTest-ADReplicationLocalRSAT {
   }
 
   if (-not $adModuleOk) {
-    Log-failure "AD replication (RSAT): ActiveDirectory module not available; cannot query replication partner metadata."
+    Write-Warning "[failure] AD replication (RSAT): ActiveDirectory module not available; cannot query replication partner metadata."
     return
   }
 
   try {
     Import-Module ActiveDirectory -ErrorAction Stop
   } catch {
-    Log-failure "AD replication (RSAT): failed to import ActiveDirectory module." -comment $_.Exception.Message
+    Write-Warning "[failure] $("AD replication (RSAT): failed to import ActiveDirectory module.")`n$($_.Exception.Message)"
     return
   }
 
@@ -1436,19 +1436,19 @@ function HealthTest-ADReplicationLocalRSAT {
   try {
     $me = Get-ADDomainController -ErrorAction Stop
   } catch {
-    Log-failure "AD replication (RSAT): failed to identify local domain controller." -comment $_.Exception.Message
+    Write-Warning "[failure] $("AD replication (RSAT): failed to identify local domain controller.")`n$($_.Exception.Message)"
     return
   }
 
   if (-not $me -or -not $me.HostName) {
-    Log-failure "AD replication (RSAT): could not determine local DC hostname."
+    Write-Warning "[failure] AD replication (RSAT): could not determine local DC hostname."
     return
   }
 
   try {
     [void](Get-ADDomain -ErrorAction Stop)
   } catch {
-    Log-failure "AD replication (RSAT): cannot query domain info (ADWS/permissions/connectivity issue)." -comment $_.Exception.Message
+    Write-Warning "[failure] $("AD replication (RSAT): cannot query domain info (ADWS/permissions/connectivity issue).")`n$($_.Exception.Message)"
     return
   }
 
@@ -1456,23 +1456,23 @@ function HealthTest-ADReplicationLocalRSAT {
   try {
     $md = Get-ADReplicationPartnerMetadata -Target $me.HostName -ErrorAction Stop
   } catch {
-    Log-failure "Exception from: Get-ADReplicationPartnerMetadata -Target $($me.HostName)" -comment $_.Exception.Message
+    Write-Warning "[failure] $("Exception from: Get-ADReplicationPartnerMetadata -Target $($me.HostName)")`n$($_.Exception.Message)"
     return
   }
 
   if (-not $md) {
-    Log-failure "AD replication (RSAT): no partner metadata returned for $($me.HostName)."
+    Write-Warning "[failure] AD replication (RSAT): no partner metadata returned for $($me.HostName)."
     return
   }
 
   $bad = @($md | Where-Object { $_.LastReplicationResult -ne 0 })
   if ($bad.Count -gt 0) {
     $details = $bad | ForEach-Object { "$($_.Partner) rc=$($_.LastReplicationResult) at $($_.LastSuccessfulSync)" }
-    Log-failure "AD replication (RSAT): replication partner errors for $($me.HostName)." -comment ($details -join " | ")
+    Write-Warning "[failure] $("AD replication (RSAT): replication partner errors for $($me.HostName).")`n$(($details -join " | "))"
     return
   }
 
-  Log-pass "AD replication (RSAT): replication partner results healthy for $($me.HostName)."
+  Write-Warning "[pass] AD replication (RSAT): replication partner results healthy for $($me.HostName)."
 }
 
 
@@ -2217,7 +2217,7 @@ param(
     }
     finally {
         if ($driveName) {
-            Log-Debug "Removing PSDrive $driveName"
+            Write-Output "Removing PSDrive $driveName"
             Remove-PSDrive -Name $driveName -ErrorAction SilentlyContinue
         }
     }
@@ -3368,7 +3368,7 @@ param(
     }
     finally {
         if ($driveName) {
-            Log-Debug "Removing PSDrive $driveName"
+            Write-Output "Removing PSDrive $driveName"
             Remove-PSDrive -Name $driveName -ErrorAction SilentlyContinue
         }
     }

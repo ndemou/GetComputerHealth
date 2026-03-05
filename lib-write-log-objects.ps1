@@ -436,12 +436,59 @@ function Log-Msg {
 }
 
 # Convenience functions (e.g. Log-Debug "..." instead of Log-Msg "Debug" "...")
-function Log-Debug   { param([Parameter(Mandatory)][string]$Msg,[string]$Comment="") Log-Msg -Level 'debug'   -Msg $Msg -Comment $Comment }
-function Log-Pass    { param([Parameter(Mandatory)][string]$Msg,[string]$Comment="") Log-Msg -Level 'pass'    -Msg $Msg -Comment $Comment }
-function Log-Info    { param([Parameter(Mandatory)][string]$Msg,[string]$Comment="") Log-Msg -Level 'info'    -Msg $Msg -Comment $Comment }
-function Log-Notice  { param([Parameter(Mandatory)][string]$Msg,[string]$Comment="") Log-Msg -Level 'notice'  -Msg $Msg -Comment $Comment }
-function Log-Warning { param([Parameter(Mandatory)][string]$Msg,[string]$Comment="") Log-Msg -Level 'warning' -Msg $Msg -Comment $Comment }
-function Log-Failure { param([Parameter(Mandatory)][string]$Msg,[string]$Comment="") Log-Msg -Level 'failure' -Msg $Msg -Comment $Comment }
+function Log-Debug {
+  param(
+    [Parameter(Mandatory, Position=0)][Alias('Msg','Message')][string]$Text,
+    [Parameter(Position=1)][string]$Comment=""
+  )
+  if($Comment){ Write-Output ($Text + "`n" + $Comment) }
+  else{ Write-Output $Text }
+}
+
+function Log-Pass {
+  param(
+    [Parameter(Mandatory, Position=0)][Alias('Msg','Message')][string]$Text,
+    [Parameter(Position=1)][string]$Comment=""
+  )
+  if($Comment){ Write-Warning ("[pass] " + $Text + "`n" + $Comment) }
+  else{ Write-Warning ("[pass] " + $Text) }
+}
+
+function Log-Info {
+  param(
+    [Parameter(Mandatory, Position=0)][Alias('Msg','Message')][string]$Text,
+    [Parameter(Position=1)][string]$Comment=""
+  )
+  if($Comment){ Write-Warning ("[info] " + $Text + "`n" + $Comment) }
+  else{ Write-Warning ("[info] " + $Text) }
+}
+
+function Log-Notice {
+  param(
+    [Parameter(Mandatory, Position=0)][Alias('Msg','Message')][string]$Text,
+    [Parameter(Position=1)][string]$Comment=""
+  )
+  if($Comment){ Write-Warning ("[notice] " + $Text + "`n" + $Comment) }
+  else{ Write-Warning ("[notice] " + $Text) }
+}
+
+function Log-Warning {
+  param(
+    [Parameter(Mandatory, Position=0)][Alias('Msg','Message')][string]$Text,
+    [Parameter(Position=1)][string]$Comment=""
+  )
+  if($Comment){ Write-Warning ("[warning] " + $Text + "`n" + $Comment) }
+  else{ Write-Warning ("[warning] " + $Text) }
+}
+
+function Log-Failure {
+  param(
+    [Parameter(Mandatory, Position=0)][Alias('Msg','Message')][string]$Text,
+    [Parameter(Position=1)][string]$Comment=""
+  )
+  if($Comment){ Write-Warning ("[failure] " + $Text + "`n" + $Comment) }
+  else{ Write-Warning ("[failure] " + $Text) }
+}
 
 
 <#

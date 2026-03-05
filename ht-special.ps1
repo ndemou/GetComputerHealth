@@ -2,6 +2,15 @@
 Special
 #>
 
+function HealthTest-Dummy {
+<#
+.SYNOPSIS
+Emits sample warning-stream messages in the new [level] format for integration testing.
+#>
+    Write-Warning "[failure] Dummy failure message from HealthTest-Dummy"
+    Write-Warning "[pass] Dummy pass message from HealthTest-Dummy"
+}
+
 function Start-HealthTestVeeamRecentBackupsExist{
 <#
 .SYNOPSIS
@@ -125,7 +134,7 @@ param(
     }
     finally {
         if ($driveName) {
-            Log-Debug "Removing PSDrive $driveName"
+            Write-Output "Removing PSDrive $driveName"
             Remove-PSDrive -Name $driveName -ErrorAction SilentlyContinue
         }
     }

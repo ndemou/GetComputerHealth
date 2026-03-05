@@ -16,11 +16,11 @@ function HealthTest-LargeDirectories {
         }
         catch {}
 
-        Log-Warning "Directory $($dir.Path) has more than 10000 child items" -Comment $comment
+        Write-Warning "[warning] $("Directory $($dir.Path) has more than 10000 child items")`n$($comment)"
     }
 
     if (-not $foundLargeDirectory) {
-        Log-pass 'No large directories found over threshold'
+        Write-Warning "[pass] No large directories found over threshold"
     }
 }
 

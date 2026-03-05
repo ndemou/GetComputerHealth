@@ -6,10 +6,10 @@ function HealthTest-DomainARecordPointsToDcIp {
   $cs = Get-CimInstance Win32_ComputerSystem
   $role = $cs.DomainRole
   $fn = $MyInvocation.MyCommand.Name
-  if ($role -in 0,2) { Log-Notice "This test ($fn) is not applicable to non-domain joined hosts"; return }
-  if ($role -in 4,5) { Log-Notice "This test ($fn) is not applicable to Domain Controllers"; return }
+  if ($role -in 0,2) { Write-Warning "[notice] This test ($fn) is not applicable to non-domain joined hosts"; return }
+  if ($role -in 4,5) { Write-Warning "[notice] This test ($fn) is not applicable to Domain Controllers"; return }
 
-  Log-debug "Reading C:\it\config\ips-of-all-DCs.conf to get the list of the IPs of all DCs"
+  Write-Output "Reading C:\it\config\ips-of-all-DCs.conf to get the list of the IPs of all DCs"
   # will return a list of IPs or throw
   $dcIps = Get-AllDCIPs -Path 'C:\it\config\ips-of-all-DCs.conf'
 
@@ -17,7 +17,7 @@ function HealthTest-DomainARecordPointsToDcIp {
   $ares = $null
   try { $ares = Resolve-DnsName -Name $domain -Type A -ErrorAction Stop } catch {}
   if (-not $ares) {
-    Log-failure "No A records found for domain DNS name." -Comment $domain
+    Write-Warning "[failure] $("No A records found for domain DNS name.")`n$($domain)"
     return
   }
 
@@ -27,9 +27,9 @@ function HealthTest-DomainARecordPointsToDcIp {
 
   $comment = "Domain=$domain; DC IPs=" + ($dcIps -join ', ') + "; Domain A IPs=" + ($aIps -join ', ')
   if ($intersection.Count -gt 0) {
-    Log-pass "Domain DNS name resolves to at least one DC IP." -Comment $comment
+    Write-Warning "[pass] $("Domain DNS name resolves to at least one DC IP.")`n$($comment)"
   } else {
-    Log-failure "Domain DNS name does not resolve to any known DC IPv4 address." -Comment $comment
+    Write-Warning "[failure] $("Domain DNS name does not resolve to any known DC IPv4 address.")`n$($comment)"
   }
 }
 
@@ -39,16 +39,16 @@ function HealthTest-InterfaceDnsServersUseDcs {
   $cs = Get-CimInstance Win32_ComputerSystem
   $role = $cs.DomainRole
   $fn = $MyInvocation.MyCommand.Name
-  if ($role -in 0,2) { Log-Notice "This test ($fn) is not applicable to non-domain joined hosts"; return }
-  if ($role -in 4,5) { Log-Notice "This test ($fn) is not applicable to Domain Controllers"; return }
+  if ($role -in 0,2) { Write-Warning "[notice] This test ($fn) is not applicable to non-domain joined hosts"; return }
+  if ($role -in 4,5) { Write-Warning "[notice] This test ($fn) is not applicable to Domain Controllers"; return }
 
-  Log-debug "Reading C:\it\config\ips-of-all-DCs.conf to get the list of the IPs of all DCs"
+  Write-Output "Reading C:\it\config\ips-of-all-DCs.conf to get the list of the IPs of all DCs"
   # will return a list of IPs or throw
   $dcIps = Get-AllDCIPs -Path 'C:\it\config\ips-of-all-DCs.conf'
 
   $nets = Get-CimInstance Win32_NetworkAdapterConfiguration -Filter "IPEnabled=TRUE"
   if (-not $nets) {
-    Log-failure "No IP-enabled network adapters found."
+    Write-Warning "[failure] No IP-enabled network adapters found."
     return
   }
 
@@ -59,7 +59,7 @@ function HealthTest-InterfaceDnsServersUseDcs {
     $dns  = $net.DNSServerSearchOrder
     $desc = $net.Description
     if (-not $dns -or $dns.Count -eq 0) {
-      Log-Notice "Interface has no DNS servers configured." -Comment $desc
+      Write-Warning "[notice] $("Interface has no DNS servers configured.")`n$($desc)"
       continue
     }
 
@@ -75,19 +75,19 @@ function HealthTest-InterfaceDnsServersUseDcs {
 
     if ($allDomain) {
       $anyClean = $true
-      Log-pass "Interface has only DCs as DNS servers." -Comment ("Interface: " + $desc + "; DNS=" + $dnsList)
+      Write-Warning ("[pass] Interface has only DCs as DNS servers.`nInterface: " + $desc + "; DNS=" + $dnsList)
     } elseif ($allNonDomain) {
       # Ignoring this interface that only has non-domain DNS servers
     } else {
       $anyBad = $true
-      Log-failure "Interface DNS servers include non-DC addresses." -Comment ("Interface: " + $desc + "; DNS=" + $dnsList + "; DC IPs=" + ($dcIps -join ', '))
+      Write-Warning ("[failure] Interface DNS servers include non-DC addresses.`nInterface: " + $desc + "; DNS=" + $dnsList + "; DC IPs=" + ($dcIps -join ', '))
     }
   }
 
   if (-not $anyClean) {
-    Log-failure "No interface found where all DNS servers are DC IPs."
+    Write-Warning "[failure] No interface found where all DNS servers are DC IPs."
   } elseif (-not $anyBad) {
-    Log-pass "All interfaces with DNS configured use only DC IPs."
+    Write-Warning "[pass] All interfaces with DNS configured use only DC IPs."
   }
 }
 
@@ -101,9 +101,9 @@ function HealthTest-ConnectivityToDCs {
     # 1) DNS resolution
     try {
       [System.Net.Dns]::GetHostAddresses($fqdn) | Out-Null
-      Log-pass "DNS resolved for $fqdn"
+      Write-Warning "[pass] DNS resolved for $fqdn"
     } catch {
-      Log-failure "DNS resolution failed for $fqdn" -comment "Check forward/reverse lookup zones and _msdcs records. Command: nslookup $fqdn"
+      Write-Warning "[failure] DNS resolution failed for $fqdn`nCheck forward/reverse lookup zones and _msdcs records. Command: nslookup $fqdn"
       continue
     }
 
@@ -119,9 +119,9 @@ function HealthTest-ConnectivityToDCs {
     foreach ($p in $ports) {
       $res = Test-NetConnectionFast -ComputerName $fqdn -Port $p.Port -WarningAction SilentlyContinue
       if ($res.TcpTestSucceeded) {
-        Log-pass "$($p.Name) port open on $fqdn"
+        Write-Warning "[pass] $($p.Name) port open on $fqdn"
       } else {
-        Log-failure "TCP port $($p.Port)($($p.Name)) unreachable on $fqdn" -comment "Port $($p.Port)/$($p.Proto) blocked or service down. Check firewall and service status."
+        Write-Warning "[failure] TCP port $($p.Port)($($p.Name)) unreachable on $fqdn`nPort $($p.Port)/$($p.Proto) blocked or service down. Check firewall and service status."
       }
     }
 
@@ -130,12 +130,12 @@ function HealthTest-ConnectivityToDCs {
     try {
       $srv = Resolve-DnsName -Type SRV "_ldap._tcp.dc._msdcs.$domainName" -ErrorAction Stop
       if ($srv.Name -contains $fqdn) {
-        Log-pass "SRV record present for $fqdn"
+        Write-Warning "[pass] SRV record present for $fqdn"
       } else {
-        Log-failure "Missing SRV record for $fqdn" -comment "DC not registered in _ldap._tcp.dc._msdcs. Run ipconfig /registerdns on $fqdn."
+        Write-Warning "[failure] Missing SRV record for $fqdn`nDC not registered in _ldap._tcp.dc._msdcs. Run ipconfig /registerdns on $fqdn."
       }
     } catch {
-      Log-failure "Could not query SRV records." -comment "Check DNS service and replication for zone _msdcs.$((Get-ADForest).RootDomain)."
+      Write-Warning "[failure] Could not query SRV records.`nCheck DNS service and replication for zone _msdcs.$((Get-ADForest).RootDomain)."
     }
   }
 }
@@ -146,13 +146,13 @@ function HealthTest-SysvolNetlogonAccessible{
     $bad = @()
     foreach($dc in $dcs){
       $ok1 = Test-Path "\\$dc\SYSVOL"
-      if (!$ok1) {Log-failure "'\\$dc\SYSVOL' not reachable"}
+      if (!$ok1) {Write-Warning "[failure] '\\$dc\SYSVOL' not reachable"}
       $ok2 = Test-Path "\\$dc\NETLOGON"
-      if (!$ok2) {Log-failure "'\\$dc\NETLOGON' not reachable"}
+      if (!$ok2) {Write-Warning "[failure] '\\$dc\NETLOGON' not reachable"}
       if(-not($ok1 -and $ok2)){ $bad += $dc.HostName }
     }
     $pass = ($bad.Count -eq 0)
-    if($pass){Log-pass "All DCs have reachable SYSVOL & NETLOGON"}
+    if($pass){Write-Warning "[pass] All DCs have reachable SYSVOL & NETLOGON"}
 }
 
 
@@ -171,20 +171,20 @@ function HealthTest-SingleDefaultGateway{
     $v4 = @($nextHops | Where-Object { $_ -notmatch ':' }).Count
     $v6 = @($nextHops | Where-Object { $_ -match ':' }).Count
     if(($v4 -le 1) -and ($v6 -le 1)){
-        Log-pass "Default gateways: at most one per IP family"
+        Write-Warning "[pass] Default gateways: at most one per IP family"
     } else {
         if ((Get-CimInstance Win32_ComputerSystem).DomainRole -ge 2) { # server -- always considered a failure
-            Log-failure "Multiple default gateways detected per IP family" -Comment "IPv4=$v4; IPv6=$v6; Gateways=$(($nextHops) -join ', ')"
+            Write-Warning "[failure] Multiple default gateways detected per IP family`nIPv4=$v4; IPv6=$v6; Gateways=$(($nextHops) -join ', ')"
         } else { # workstation
             Test-MultipleGatewayConfiguration
         }
     }
   } else {
     if($nextHops.Count -le 1){
-      Log-pass "Default gateways: at most one overall"
+      Write-Warning "[pass] Default gateways: at most one overall"
     } else {
         if ((Get-CimInstance Win32_ComputerSystem).DomainRole -ge 2) { # server -- always considered a failure
-            Log-failure "Multiple default gateways configured" -Comment "Gateways=$(($nextHops) -join ', ')"
+            Write-Warning "[failure] Multiple default gateways configured`nGateways=$(($nextHops) -join ', ')"
         } else { # workstation
             Test-MultipleGatewayConfiguration
         }
@@ -195,8 +195,8 @@ function HealthTest-SingleDefaultGateway{
 
 function HealthTest-UnusedEnabledAdapters{
   $nics=Get-NetAdapter | Where-Object {$_.AdminStatus -eq 'Up' -and $_.Status -ne 'Up'}
-  foreach($n in $nics){ Log-Warning "Enabled network adapter is disconnected: $($n.Name) ($($n.Status))" }
-  if(($nics | Measure-Object).Count -eq 0){ Log-pass "No enabled-but-disconnected network adapters detected" } else { Log-failure "There are enabled-but-disconnected network adapters present" }
+  foreach($n in $nics){ Write-Warning "[warning] Enabled network adapter is disconnected: $($n.Name) ($($n.Status))" }
+  if(($nics | Measure-Object).Count -eq 0){ Write-Warning "[pass] No enabled-but-disconnected network adapters detected" } else { Write-Warning "[failure] There are enabled-but-disconnected network adapters present" }
 }
 
 
@@ -205,24 +205,24 @@ function HealthTest-NetworkInterfaceMetrics{
   $ifs=Get-NetIPInterface -AddressFamily IPv4 | Where-Object {$_.ConnectionState -eq 'Connected'}
   $bad=$false
   foreach($i in $ifs){
-    if($i.InterfaceMetric -gt $MaxPreferredMetric -and !($i.InterfaceAlias -like "Loopback*")){ $bad=$true; Log-Warning "Interface metric too high: $($i.InterfaceAlias) Metric=$($i.InterfaceMetric) (Max=$MaxPreferredMetric)" }
+    if($i.InterfaceMetric -gt $MaxPreferredMetric -and !($i.InterfaceAlias -like "Loopback*")){ $bad=$true; Write-Warning "[warning] Interface metric too high: $($i.InterfaceAlias) Metric=$($i.InterfaceMetric) (Max=$MaxPreferredMetric)" }
   }
-  if(-not $bad){ Log-pass "All connected interfaces have acceptable metrics (<= $MaxPreferredMetric)" } else { Log-failure "One or more interfaces have metrics above the preferred threshold" }
+  if(-not $bad){ Write-Warning "[pass] All connected interfaces have acceptable metrics (<= $MaxPreferredMetric)" } else { Write-Warning "[failure] One or more interfaces have metrics above the preferred threshold" }
 }
 
 
 function HealthTest-IPv6Binding{
   [CmdletBinding()] param([switch]$RequireEnabled)
   $rows = Get-NetAdapterBinding -ComponentID ms_tcpip6 | Select-Object Name,Enabled
-  if(-not $rows){ Log-failure "No adapters returned for IPv6 binding (ms_tcpip6)"; return }
+  if(-not $rows){ Write-Warning "[failure] No adapters returned for IPv6 binding (ms_tcpip6)"; return }
   $bad=$false
   if($RequireEnabled){
     foreach($r in $rows){
-      if(-not $r.Enabled){ $bad=$true; Log-failure "IPv6 disabled on adapter" -Comment $r.Name }
+      if(-not $r.Enabled){ $bad=$true; Write-Warning "[failure] $("IPv6 disabled on adapter")`n$($r.Name)" }
     }
-    if(-not $bad){ Log-pass "IPv6 enabled on all adapters" }
+    if(-not $bad){ Write-Warning "[pass] IPv6 enabled on all adapters" }
   } else {
-    Log-pass "IPv6 binding state reported" -Comment (($rows | ForEach-Object { "$($_.Name)=$($_.Enabled)" }) -join '; ')
+    Write-Warning ("[pass] IPv6 binding state reported`n" + (($rows | ForEach-Object { "$($_.Name)=$($_.Enabled)" }) -join "; "))
   }
 }
 
@@ -230,7 +230,7 @@ function HealthTest-IPv6Binding{
 function HealthTest-Nic {
     $nics = Get-NetAdapter -Physical -ErrorAction SilentlyContinue | Where-Object { $_.Status -eq 'Up' }
     if (-not $nics) {
-        Log-debug "No physical NICs with Status=Up; skipping NIC health check"
+        Write-Output "No physical NICs with Status=Up; skipping NIC health check"
         return
     }
 
@@ -240,7 +240,7 @@ function HealthTest-Nic {
     foreach ($n in $nics) {
         $stat = Get-NetAdapterStatistics -Name $n.Name -ErrorAction SilentlyContinue
         if (-not $stat) {
-            Log-debug "Network interface skipped due to missing stats ($($n.Name))"
+            Write-Output "Network interface skipped due to missing stats ($($n.Name))"
             continue
         }
 
@@ -260,13 +260,13 @@ function HealthTest-Nic {
 
         if ($n.MediaConnectionState -ne 'Connected') {
             $warnList += "$($n.Name): mediaState=$($n.MediaConnectionState)"
-            Log-Warning "Disconnected network interface ($($n.Name))" -Comment ""
+            Write-Warning "[warning] Disconnected network interface ($($n.Name))`n"
             $pass = $false
             continue
         }
 
         if ($totalPackets -lt $minPackets) {
-            Log-debug "Network interface skipped due to low traffic ($($n.Name))"
+            Write-Output "Network interface skipped due to low traffic ($($n.Name))"
             continue
         }
 
@@ -283,11 +283,11 @@ function HealthTest-Nic {
 
         if ($errors -ge 1000 -and $errorPct -ge 0.01) {
             $warnList += "$($n.Name): errors=$pctStr ($errors/$totalPackets total)"
-            Log-Warning "Network interface with plenty of errors ($($n.Name))" -Comment "errors=$pctStr ($errors/$totalPackets total packets)"
+            Write-Warning "[warning] Network interface with plenty of errors ($($n.Name))`nerrors=$pctStr ($errors/$totalPackets total packets)"
             $pass = $false
         } elseif ($errors -ge 100 -and $errorPct -ge 0.002) {
             $noticeList += "$($n.Name): errors=$pctStr ($errors/$totalPackets total)"
-            Log-Notice "Network interface with some errors ($($n.Name))" -Comment "errors=$pctStr ($errors/$totalPackets total packets)"
+            Write-Warning "[notice] Network interface with some errors ($($n.Name))`nerrors=$pctStr ($errors/$totalPackets total packets)"
             $pass = $false
         } else {
             # below 0.002%: considered OK, no log entry
@@ -296,7 +296,7 @@ function HealthTest-Nic {
     }
 
     if ($pass) {
-        Log-pass "Network interfaces healthy; no significant error rates or disconnected interfaces detected"
+        Write-Warning "[pass] Network interfaces healthy; no significant error rates or disconnected interfaces detected"
     }
 }
 
@@ -306,8 +306,8 @@ function HealthTest-NltestSiteDiscovery {
   $cs = Get-CimInstance Win32_ComputerSystem
   $role = $cs.DomainRole
   $fn = $MyInvocation.MyCommand.Name
-  if ($role -in 0,2) { Log-Notice "This test ($fn) is not applicable to non-domain joined hosts"; return }
-  if ($role -in 4,5) { Log-Notice "This test ($fn) is not applicable to Domain Controllers"; return }
+  if ($role -in 0,2) { Write-Warning "[notice] This test ($fn) is not applicable to non-domain joined hosts"; return }
+  if ($role -in 4,5) { Write-Warning "[notice] This test ($fn) is not applicable to Domain Controllers"; return }
 
   $out  = nltest /dsgetsite 2>&1
   $exit = $LASTEXITCODE
@@ -323,10 +323,10 @@ function HealthTest-NltestSiteDiscovery {
       }
     }
     if (-not $site) { $site = '(unknown)' }
-    Log-pass "NLTEST /dsgetsite succeeded." -Comment ("Site: " + $site)
+    Write-Warning "[pass] $("NLTEST /dsgetsite succeeded.")`n$(("Site: " + $site))"
   } else {
     $hex = '0x{0:X}' -f ($exit -band 0xFFFFFFFF)
-    Log-failure "NLTEST /dsgetsite failed." -Comment ("ExitCode=" + $hex + "; Output=`n" + $txt)
+    Write-Warning ("[failure] NLTEST /dsgetsite failed.`nExitCode=" + $hex + "; Output=`n" + $txt)
   }
 }
 
@@ -587,7 +587,7 @@ function Test-MultipleGatewayConfiguration {
   if ($good) {
     $note = ""
     if (-not $allUp) { $note = " Note: one or more interfaces not Connected; failover may be impaired." }
-    Log-Info "Gateway Configuration looks fine - Windows will prefer $($best.InterfaceAlias).$note"
+    Write-Warning "[info] Gateway Configuration looks fine - Windows will prefer $($best.InterfaceAlias).$note"
   } else {
     $hints = @()
     if ($ties -gt 1) { $hints += "Multiple routes share the same lowest TotalMetric (tie)"; }
@@ -599,6 +599,6 @@ function Test-MultipleGatewayConfiguration {
     if (-not $allUp) { $hints += "One or more interfaces not Connected" }
     $hintText = if ($hints.Count) { " Hints: " + ($hints -join '; ') + "." } else { "" }
 
-    Log-Failure "Multiple Gateways with metrics that may cause routing instability." -comment "$desc`n$hintText"
+    Write-Warning "[failure] Multiple Gateways with metrics that may cause routing instability.`n$desc`n$hintText"
   }
 }
