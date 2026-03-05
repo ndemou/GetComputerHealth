@@ -53,8 +53,7 @@ function HealthTest-ScheduledTasks {
               } | out-string)
             if ($i.LastTaskResult -notin $OK_TASK_RESULTS) {
                 $meaning = Convert-TaskResultCode $i.LastTaskResult
-                Log-Warning "Scheduled Task with failures: '$($t.TaskPath)$($t.TaskName)'; Last exit code: $($i.LastTaskResult) ($meaning)" `
-                    -comment "Details about this task:`r`n$details"
+                Write-Warning "[warning] Scheduled Task with failures: '$($t.TaskPath)$($t.TaskName)'; Last exit code: $($i.LastTaskResult) ($meaning)`nDetails about this task:`r`n$details"
             }
             if ($i.NumberOfMissedRuns -gt 0) {
                 if ($i.NumberOfMissedRuns -lt 5){
@@ -62,19 +61,19 @@ function HealthTest-ScheduledTasks {
                         -or $t.TaskName -like '*Maintenance*' `
                         -or $t.TaskName -in @('Office Serviceability Manager','Resolut Refresh') `
                     ) {
-                        Log-info "Scheduled Task with just a few missed runs(<5): '$($t.TaskPath)$($t.TaskName)'" -Comment "$($i.NumberOfMissedRuns) runs where missed. Details about this task: $details"
+                        Write-Warning "[info] Scheduled Task with just a few missed runs(<5): '$($t.TaskPath)$($t.TaskName)'`n$($i.NumberOfMissedRuns) runs where missed. Details about this task: $details"
                     } else {
-                        Log-notice "Scheduled Task with just a few missed runs(<5): '$($t.TaskPath)$($t.TaskName)'" -Comment "$($i.NumberOfMissedRuns) runs where missed. Details about this task: $details"
+                        Write-Warning "[notice] Scheduled Task with just a few missed runs(<5): '$($t.TaskPath)$($t.TaskName)'`n$($i.NumberOfMissedRuns) runs where missed. Details about this task: $details"
                     }
                 } else {
-                    Log-Warning "Scheduled Task with missed runs: '$($t.TaskPath)$($t.TaskName)'" -Comment "$($i.NumberOfMissedRuns) runs where missed. Details about this task: $details"
+                    Write-Warning "[warning] Scheduled Task with missed runs: '$($t.TaskPath)$($t.TaskName)'`n$($i.NumberOfMissedRuns) runs where missed. Details about this task: $details"
                 }
             }
         }
     }
     if ($problem_found) { return }
 
-    Log-pass "Scheduled tasks healthy (non-Microsoft)"
+    Write-Warning "[pass] Scheduled tasks healthy (non-Microsoft)"
 }
 
 
@@ -201,12 +200,12 @@ function HealthTest-ScheduledTasksLastResult {
     }
     $details = ($lines -join "`r`n")
 
-    if($sev -eq 'Error'){ Log-Failure -Message $msg -Comment $details; $passed = $false }
-    elseif($sev -eq 'Warning'){ Log-Warning -Message $msg; $passed = $false }
+    if($sev -eq 'Error'){ Write-Warning "[failure] $msg`n$details"; $passed = $false }
+    elseif($sev -eq 'Warning'){ Write-Warning "[warning] $msg"; $passed = $false }
   }
 
   if ($passed) {
-      Log-pass "HealthTest-ScheduledTasksLastResult found no problem"
+      Write-Warning "[pass] HealthTest-ScheduledTasksLastResult found no problem"
   }
 }
 
@@ -253,8 +252,8 @@ function HealthTest-SystemScheduledTasks{
     # 1) Disabled tasks
     if(-not $enabled -or $state -eq 'Disabled'){
       $hadIssue = $true
-      if(& $isRequired $path){ Log-failure "Required SYSTEM task is disabled: $path" }
-      else { Log-Warning "SYSTEM task is disabled: $path" }
+      if(& $isRequired $path){ Write-Warning "[failure] Required SYSTEM task is disabled: $path" }
+      else { Write-Warning "[warning] SYSTEM task is disabled: $path" }
       continue
     }
 
@@ -262,19 +261,19 @@ function HealthTest-SystemScheduledTasks{
     if($hasEnabledTrigger -and $StaleDays -gt 0){
       if(($lastRun -eq [datetime]::MinValue) -or ((Get-Date) - $lastRun).TotalDays -gt $StaleDays){
         $hadIssue = $true
-        Log-Warning "SYSTEM task appears stale: $path ; LastRun=$lastRun (> $StaleDays days or never)"
+        Write-Warning "[warning] SYSTEM task appears stale: $path ; LastRun=$lastRun (> $StaleDays days or never)"
       }
     }
 
     # 3) Non-zero last result (optional)
     if($WarnOnNonZeroLastResult -and $info.LastTaskResult -ne 0){
       $hadIssue = $true
-      if(& $isRequired $path){ Log-failure "Required SYSTEM task has non-zero LastTaskResult: $path ; Code=$lastRes" }
-      else { Log-Warning "SYSTEM task has non-zero LastTaskResult: $path ; Code=$lastRes" }
+      if(& $isRequired $path){ Write-Warning "[failure] Required SYSTEM task has non-zero LastTaskResult: $path ; Code=$lastRes" }
+      else { Write-Warning "[warning] SYSTEM task has non-zero LastTaskResult: $path ; Code=$lastRes" }
     }
   }
 
-  if(-not $hadIssue){ Log-pass "All relevant SYSTEM scheduled tasks are enabled and healthy" }
+  if(-not $hadIssue){ Write-Warning "[pass] All relevant SYSTEM scheduled tasks are enabled and healthy" }
 }
 
 
