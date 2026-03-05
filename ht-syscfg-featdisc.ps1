@@ -1148,7 +1148,7 @@ function HealthTest-IPv6Binding{
     }
     if(-not $bad){ Write-Warning "[pass] IPv6 enabled on all adapters" }
   } else {
-    Write-Warning "[pass] $("IPv6 binding state reported")`n$((($rows | ForEach-Object { "$($_.Name)=$($_.Enabled)" }))" -join '; ')
+    Write-Warning ("[pass] IPv6 binding state reported`n" + (($rows | ForEach-Object { "$($_.Name)=$($_.Enabled)" }) -join '; '))
   }
 }
 
@@ -1224,11 +1224,11 @@ function HealthTest-ShadowStorage{
       if (-not $present.ContainsKey($k)) { $missing += $k; Write-Warning "[failure] $("Shadow storage not configured on required volume")`n$($k)" }
     }
     if($missing.Count -eq 0){
-      Write-Warning "[pass] $("Shadow storage on required volumes")`n$(("Configured on: " + ((@($present.Keys) | Sort-Object) -join ', ')))"
+      Write-Warning ("[pass] Shadow storage on required volumes`nConfigured on: " + ((@($present.Keys) | Sort-Object) -join ', '))
     }
   } else {
     if ($present.Count -gt 0) {
-      Write-Warning "[pass] $("Shadow storage configured")`n$(("On: " + ((@($present.Keys) | Sort-Object) -join ', ')))"
+      Write-Warning ("[pass] Shadow storage configured`nOn: " + ((@($present.Keys) | Sort-Object) -join ', '))
     } else {
       Write-Warning "[notice] Shadow storage (Volume Shadow Copies) is not enabled`nUsers won't see Previous Version for files/folders. (Note that this issue is UNRELATED to the VSS service that backup software use.)"
     }
@@ -1629,7 +1629,7 @@ function HealthTest-UnsignedDrivers {
               if(Test-Path $sysPath){
                 $sig = Get-AuthenticodeSignature $sysPath
                 if($sig.Status -eq 'Valid'){
-                  Write-Warning "[notice] $(("Benign logical child without INF: {0} (ParentSvc={1}, Signed={2})" -f $d.DeviceName,$svc,$sig.SignerCertificate.Subject))"
+                  Write-Warning (("[notice] Benign logical child without INF: {0} (ParentSvc={1}, Signed={2})" -f $d.DeviceName,$svc,$sig.SignerCertificate.Subject))
                   continue
                 }
               }

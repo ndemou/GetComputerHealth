@@ -362,7 +362,7 @@ function HealthTest-StartupItems{
     }
   }
   if($items.Count -gt 0){
-    Write-Warning ("[pass] " + "Startup items reviewed" + "`n" + ($items -join '); ')
+    Write-Warning ("[pass] Startup items reviewed`n" + ($items -join '; '))
   } else {
     Write-Warning "[pass] No startup items found in standard keys"}
 }
@@ -421,7 +421,7 @@ function HealthTest-UnsignedDrivers {
               if(Test-Path $sysPath){
                 $sig = Get-AuthenticodeSignature $sysPath
                 if($sig.Status -eq 'Valid'){
-                  Write-Warning ("[notice] " + ("Benign logical child without INF: {0} (ParentSvc={1}, Signed={2}))" -f $d.DeviceName,$svc,$sig.SignerCertificate.Subject)
+                  Write-Warning (("[notice] Benign logical child without INF: {0} (ParentSvc={1}, Signed={2})" -f $d.DeviceName,$svc,$sig.SignerCertificate.Subject))
                   continue
                 }
               }
