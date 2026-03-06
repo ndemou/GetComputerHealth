@@ -1,20 +1,18 @@
-# Get-ComputerHealth
+# Introduction
 
-Stop wondering whether your disks have free space, whether Windows is up to date, whether critical services are running, or whether your DCs are replicating. This extensible, **open-source** toolkit automates over a hundred daily health checks you know you should be doing but don’t have time for. It’s a **free**, set-and-forget health monitor that gives you **near enterprise-grade visibility** without the usual complexity, overhead, or cost.
+**Get-ComputerHealth** is a lightweight, extendable PowerShell framework. It is ideal for a single workstation or server, and it also works well in domains with a few dozen servers managed through PowerShell remoting with `Enter-PSSession` and `Invoke-Command`. It produces clean terminal output, concise Excel reports, and actionable email alerts that highlight risks before they become disasters.
 
-Designed as a **lightweight** alternative to heavy monitoring suites, the framework uses native PowerShell Remoting to perform deep analysis of your infrastructure without installing a single agent. It’s perfect for a single workstation or server, but it also works great for domains with a few dozen servers that you already manage via PowerShell (`Enter-PSSession`/`Invoke-Command`). It generates clean terminal output, concise Excel reports, and actionable email alerts that highlight risks before they become disasters.
-
-Installation is extremely easy. Once you spend a few minutes getting familiar with it, you’ll rarely need more than two minutes per server. If you have even a little PowerShell fluency, you can easily add your own custom health tests.
+It is a native, agentless alternative to heavy monitoring suites. Installation is simple, and routine use usually takes no more than two minutes per server once you are familiar with it. If you have basic PowerShell skills, you can easily add your own custom health tests.
 
 <img width="1086" height="251" alt="Example of the report you receive via email" src="https://github.com/user-attachments/assets/9da7e7f7-c1ef-4f3e-9d47-d164a96b2d4f" />
 
 # Status & Is this code for you?
 
-This code is actively used in production across several domains (multiple servers), but as far as I know, only by me (the author). 
+This code is actively used in production across several domains and multiple servers, but as far as I know, I am its only user.
 
-Although everything seems to work, I'm still at an early stage and thus, large refactoring of code and new tests are expected.
+It appears to work well, but the project is still at an early stage. Significant refactoring and additional tests should be expected.
 
-I’m happy to help when I can, but "when I can" is not much. So, **if you want to use it, you must assume you are alone**. You should be comfortable with PowerShell and prepared to invest your time and LLM tokens. The good news is that the codebase is very simple. The only reason it's large is because there are a lot of tests.
+I am happy to help when I can, but my availability is limited. If you decide to use it, **assume you are on your own**. You should be comfortable with PowerShell and prepared to invest time and LLM tokens. On the plus side, the codebase is surprisingly small and straightforward: **the core is about 1,500 lines, including comments**. The tests total well over ten thousand lines, but each one is small and the vast majority are self-contained.
 
 # Security
 
