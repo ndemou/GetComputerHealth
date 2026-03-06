@@ -477,7 +477,7 @@ Lists all loaded HealthTest-* functions with their synopsis text.
     }
 }
 
-function Invoke-HealtTestsFromFolder {
+function Invoke-HealthTestsFromFolder {
   [CmdletBinding()]
   param([Parameter(Mandatory=$true,Position=0)][string]$FolderPath)
 
@@ -543,7 +543,7 @@ function Invoke-HealtTestsFromFolder {
   }
   if (!$fileImported) {return}
 
-  log-info "Invoke-HealtTestsFromFolder imported at least one file with CustomHealthTest-* functions."
+  log-info "Invoke-HealthTestsFromFolder imported at least one file with CustomHealthTest-* functions."
 }
 
 function Write-UsageHelp {
@@ -862,7 +862,7 @@ if (Get-Command -Name Get-VM -ErrorAction SilentlyContinue) {
 }
 
 if ($IncludeTestsFromFolder) {
-    Invoke-HealtTestsFromFolder $IncludeTestsFromFolder
+    Invoke-HealthTestsFromFolder $IncludeTestsFromFolder
 }
 
 #=============================================================================
@@ -870,3 +870,4 @@ if ($IncludeTestsFromFolder) {
 # END OF TESTS
 #
 #=============================================================================
+
