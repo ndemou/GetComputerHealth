@@ -8,7 +8,6 @@ This array along with the values of the following variables will be added to `$G
    - `$isHostVM, $isHostMobile, $isHostDomainJoined, $isHostServer, $isHostDC, $isHostPDC`
    - `GetCurrentDomain = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain()`
 
-## Fix typo: Invoke-HealtTestsFromFolder (Note the missing 'h' in 'Healt')
 
 ## Review the hundrends of warnings from Invoke-ScriptAnalyzer (and 3 errors)
 
