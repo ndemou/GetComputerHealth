@@ -678,14 +678,28 @@ $isHostMobile = Test-IsLaptopOrMobile            # L   (based on heuristics)
 $isHostDomainJoined = ($domainRole  -in 1,3,4,5) # J (N = Not domain joines)
 $isHostServer = ($domainRole  -in 3,4,5)         # S (W = not a server (Workstation))
 $isHostDC = ($domainRole -in 4,5)                # C   (by definition also JS)
+$currentDomain = $null
 if($isHostDC){$isHostPDC=$false                  # P   (by definition also CJS)
 	$domainInfo=$null
     try{
         $domainInfo=[System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain()
+        $currentDomain = $domainInfo
         $isHostPDC=(($domainInfo.PdcRoleOwner.Name -replace '[.].*') -eq $env:COMPUTERNAME)
     } catch {
         Log-Warning "Could not determine if host is the PDC emulator for its domain."
     }
+}
+
+# Explicitly created so host-fact values are publicly accessible to all health tests,
+# including custom health tests loaded at runtime.
+$Global:GetComputerHealthDataQMTA = [pscustomobject]@{
+    isHostVM           = $isHostVM
+    isHostMobile       = $isHostMobile
+    isHostDomainJoined = $isHostDomainJoined
+    isHostServer       = $isHostServer
+    isHostDC           = $isHostDC
+    isHostPDC          = $isHostPDC
+    GetCurrentDomain   = $currentDomain
 }
 
 if ($isHostMobile) {
@@ -868,4 +882,3 @@ if (Get-Command -Name Get-VM -ErrorAction SilentlyContinue) {
 if ($IncludeTestsFromFolder) {
     Invoke-HealthTestsFromFolder $IncludeTestsFromFolder
 }
-
