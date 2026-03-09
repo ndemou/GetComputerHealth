@@ -552,14 +552,16 @@ function Write-UsageHelp {
         'PSAvoidUsingWriteHost', '',
         Justification='Only triggered by interactive use.'
     )]
-    write-host -ForegroundColor Cyan  "$((Split-Path $PSCommandPath -Leaf) -replace '.ps1') version $VERSION, Nick Demou, enLogic"
-    write-host -ForegroundColor Gray  ""
-    write-host -ForegroundColor Gray  "Most often you want to use me like this:"
-    write-host -ForegroundColor white "    `$out = $PSCommandPath -OutputConsoleMessages -Hide " -nonewline
-    write-host -ForegroundColor DarkCyan "DIP"
-    write-host -ForegroundColor Gray  "          # (-Hide DIP means: hide Debug, Informationcal and Pass messages)"
-    write-host -ForegroundColor white "    `$out | ogv # or similar"
-    write-host -ForegroundColor Gray  ""
+    param()
+
+    Write-Host -ForegroundColor Cyan  "$((Split-Path $PSCommandPath -Leaf) -replace '.ps1') version $VERSION, Nick Demou, enLogic"
+    Write-Host -ForegroundColor Gray  ""
+    Write-Host -ForegroundColor Gray  "Most often you want to use me like this:"
+    Write-Host -ForegroundColor White "    `$out = $PSCommandPath -OutputConsoleMessages -Hide " -NoNewline
+    Write-Host -ForegroundColor DarkCyan "DIP"
+    Write-Host -ForegroundColor Gray  "          # (-Hide DIP means: hide Debug, Informationcal and Pass messages)"
+    Write-Host -ForegroundColor White "    `$out | ogv # or similar"
+    Write-Host -ForegroundColor Gray  ""
     return
 }
 #=============================================================================
