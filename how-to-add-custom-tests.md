@@ -4,22 +4,6 @@
 
 `.ps1` files in `C:\IT\config\Custom-HealthTests\` are dot-sourced, all functions with a name starting with `CustomHealthTest-` are executed, and these functions should call either `Write-Warning "[pass] $message"` if all is well or `Write-Warning "[failure] $message` or `Write-Warning "[failure] $message" + [Environment]::NewLine + "$optionalDetails"`. The code you write will be executed with *high privileges* and appart from temporary files or similar, it *should not make any changes* to the system state.
 
-
-## Runtime context available to custom health tests
-
-When `Get-ComputerHealth.ps1` runs, it populates a global variable named `$Global:GetComputerHealthDataQMTA` so built-in and custom tests can reuse host facts that were already computed.
-
-Examples of available properties include:
-- `$Global:GetComputerHealthDataQMTA.isHostVM`
-- `$Global:GetComputerHealthDataQMTA.isHostMobile`
-- `$Global:GetComputerHealthDataQMTA.isHostDomainJoined`
-- `$Global:GetComputerHealthDataQMTA.isHostServer`
-- `$Global:GetComputerHealthDataQMTA.isHostDC`
-- `$Global:GetComputerHealthDataQMTA.isHostPDC`
-- `$Global:GetComputerHealthDataQMTA.GetCurrentDomain`
-
-Use this variable when you need these values inside `CustomHealthTest-*` functions, instead of recomputing them.
-
 ## Step by step
 
 1. Create the folder `C:\IT\config\Custom-HealthTests\` on the target computer.
@@ -57,6 +41,19 @@ Use this variable when you need these values inside `CustomHealthTest-*` functio
    ```
 
 If you wish you can have more than one .ps1 files in `C:\IT\config\Custom-HealthTests\`
+
+## Runtime context available to custom health tests
+
+When `Get-ComputerHealth.ps1` runs, it populates a global variable named `$Global:GetComputerHealthDataQMTA` so all health tests can reuse these host facts without re-computing.
+
+Available properties include these self-documenting booleans:
+- `.isHostVM`
+- `.isHostMobile`
+- `.isHostDomainJoined`
+- `.isHostServer`
+- `.isHostDC`
+- `.isHostPDC`
+And `.GetCurrentDomain = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain()`
 
 # Instructions for LLMs helping a novice write a custom test.
 
