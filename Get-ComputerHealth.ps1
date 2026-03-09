@@ -293,9 +293,7 @@ FunctionName, Time, ElapsedMilliseconds, Output, Success, Error, Category, Reaso
   param(
     [Parameter(Mandatory=$true)]
     [ValidateNotNullOrEmpty()]
-    [string]$FunctionName,
-
-  [object]$Argument
+    [string]$FunctionName
   )
 
   function Convert-TextToLogRecord {
