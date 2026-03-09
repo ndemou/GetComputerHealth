@@ -546,8 +546,11 @@ function Invoke-HealthTestsFromFolder {
   log-info "Invoke-HealthTestsFromFolder imported at least one file with CustomHealthTest-* functions."
 }
 
-[Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingWriteHost', '', Justification='Only triggered by interactive use.')]
 function Write-UsageHelp {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute(
+        'PSAvoidUsingWriteHost', '',
+        Justification='Only triggered by interactive use.'
+    )]
     write-host -ForegroundColor Cyan  "$((Split-Path $PSCommandPath -Leaf) -replace '.ps1') version $VERSION, Nick Demou, enLogic"
     write-host -ForegroundColor Gray  ""
     write-host -ForegroundColor Gray  "Most often you want to use me like this:"
