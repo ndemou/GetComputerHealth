@@ -210,6 +210,7 @@ function Add-AsciiLine {
 function Test-IsVirtualMachine {
 # returns $true if it guesses the computer is VM
     [CmdletBinding()]
+    [OutputType([bool])]
     param()
 
     $cs  = Get-CimInstance -ClassName Win32_ComputerSystem -ErrorAction SilentlyContinue
