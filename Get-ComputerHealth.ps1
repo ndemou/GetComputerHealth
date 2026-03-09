@@ -268,7 +268,7 @@ function Test-IsLaptopOrMobile {
         $pcSystemType = $cs.PCSystemType  # 2 ~= Mobile
     }
 
-    $hasBattery = $bat -ne $null
+    $hasBattery = $null -ne $bat
 
     $isMobile = $false
     if ($hasMobileType -or $pcSystemType -eq 2 -or ($hasBattery -and -not $hasDesktopType)) {
@@ -297,7 +297,7 @@ FunctionName, Time, ElapsedMilliseconds, Output, Success, Error, Category, Reaso
   [object]$Argument
   )
 
-  function Convert-TextToLogParts {
+  function Convert-TextToLogRecord {
     param([Parameter(Mandatory)][string]$Text)
 
     $normalized = ($Text -replace "`r", '')
@@ -317,7 +317,7 @@ FunctionName, Time, ElapsedMilliseconds, Output, Success, Error, Category, Reaso
   function Convert-WarningRecordToLog {
     param([Parameter(Mandatory)][System.Management.Automation.WarningRecord]$WarningRecord)
 
-    $parts = Convert-TextToLogParts ([string]$WarningRecord.Message)
+    $parts = Convert-TextToLogRecord ([string]$WarningRecord.Message)
     $level = 'warning'
     $msg = $parts.Message
     $comment = $parts.Comment
@@ -376,7 +376,7 @@ FunctionName, Time, ElapsedMilliseconds, Output, Success, Error, Category, Reaso
         return
       }
 
-      if($_ -and $_.PSObject.Properties['Hash'] -and $_.PSObject.Properties['Message'] -ne $null -and $_.PSObject.Properties['level']){
+      if($_ -and $_.PSObject.Properties['Hash'] -and $null -ne $_.PSObject.Properties['Message'] -and $_.PSObject.Properties['level']){
         $legacyLogDetected = $true
         $cntProperRecord += 1
         if ($_.level -eq 'pass') {$cntPassRecord += 1}
@@ -385,7 +385,7 @@ FunctionName, Time, ElapsedMilliseconds, Output, Success, Error, Category, Reaso
       }
 
       if ($_ -is [string]) {
-        $parts = Convert-TextToLogParts $_
+        $parts = Convert-TextToLogRecord $_
         $cntImproperRecord += 1
         Log-Debug $parts.Message -Comment $parts.Comment
         return
@@ -431,7 +431,7 @@ FunctionName, Time, ElapsedMilliseconds, Output, Success, Error, Category, Reaso
         if ($innerFile -and (Test-Path -LiteralPath $innerFile)) {
           $innerCode = (Get-Content -LiteralPath $innerFile -TotalCount $innerLine)[-1]
         }
-      } catch { }
+      } catch { Log-Debug "Program Error: Failed to fetch the actual source line"}
     }
 
     # Build a helpful message with graceful fallbacks
@@ -459,7 +459,7 @@ FunctionName, Time, ElapsedMilliseconds, Output, Success, Error, Category, Reaso
   Log-debug "Done with test $FunctionName in $([int]$sw.ElapsedMilliseconds) ms"
 }
 
-function Get-HealthTests {
+function Get-HealthTest {
 <#
 .SYNOPSIS
 Lists all loaded HealthTest-* functions with their synopsis text.
@@ -546,6 +546,7 @@ function Invoke-HealthTestsFromFolder {
   log-info "Invoke-HealthTestsFromFolder imported at least one file with CustomHealthTest-* functions."
 }
 
+[Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingWriteHost', '', Justification='Only triggered by interactive use.')]
 function Write-UsageHelp {
     write-host -ForegroundColor Cyan  "$((Split-Path $PSCommandPath -Leaf) -replace '.ps1') version $VERSION, Nick Demou, enLogic"
     write-host -ForegroundColor Gray  ""
@@ -555,17 +556,6 @@ function Write-UsageHelp {
     write-host -ForegroundColor Gray  "          # (-Hide DIP means: hide Debug, Informationcal and Pass messages)"
     write-host -ForegroundColor white "    `$out | ogv # or similar"
     write-host -ForegroundColor Gray  ""
-    write-host -ForegroundColor Gray  "You can whitelist messages that are normal for this computer like this:"
-    write-host -ForegroundColor white "    $PSCommandPath -AddWhitelisting -sig " -nonewline
-    write-host -ForegroundColor DarkCyan "012345678" -nonewline
-    write-host -ForegroundColor white " -comment `"" -nonewline
-    write-host -ForegroundColor DarkCyan "optional comment" -nonewline
-    write-host -ForegroundColor white "`""
-    write-host -ForegroundColor Gray  ""
-    write-host -ForegroundColor Gray  "Consider installing the ImportExcel module to easily export results to excel:"
-    write-host -ForegroundColor white "    Install-Module ImportExcel"
-    write-host -ForegroundColor white "    . 'c:\it\bin\lib-write-log-objects.ps1'"
-    write-host -ForegroundColor white '    Export-HealthMessagesToExcel -Data $out -FileName "C:\it\all-messages.xlsx"'
     return
 }
 #=============================================================================
@@ -574,7 +564,7 @@ function Write-UsageHelp {
 #
 #=============================================================================
 
-if ($ListAllBuiltInTests) {Get-HealthTests; return}
+if ($ListAllBuiltInTests) {Get-HealthTest; return}
 
 # Fail if not run as Administrator (elevated)
 # None of the functionality that follows is available to non-admins
@@ -616,7 +606,7 @@ if (-not $OutputConsoleMessages -and -not $OutputObjects) {
 	return
 }
 
-# To reach this line either one or both of these switches where passed: 
+# To reach this line either one or both of these switches where passed:
 # -OutputConsoleMessages -OutputObjects
 
 #+-----------------------------------------------------------
