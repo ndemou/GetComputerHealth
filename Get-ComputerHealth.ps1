@@ -586,8 +586,8 @@ if (-not ([Security.Principal.WindowsPrincipal] `
 }
 
 if ($AddWhitelisting ){
-    if (!$Signature) {throw "You must supply a -Signature"}
-    if (!$ComputerName) {throw "You must supply a -ComputerName"}
+    if (-not $Signature) {throw "You must supply a -Signature"}
+    if (-not $ComputerName) {throw "You must supply a -ComputerName"}
     if ($Signature -notmatch '^[0-9A-Fa-f]{8}$') {
         throw "Invalid -Signature: $Signature"
     }
@@ -595,9 +595,10 @@ if ($AddWhitelisting ){
         throw "Running on $($env:COMPUTERNAME) but suppression is for $ComputerName"
     }
     if ($Until) {
+        $culture = [System.Globalization.CultureInfo]::InvariantCulture
         $dt=[datetime]::MinValue
-        $ok=[DateTime]::TryParseExact($Until,'yyyy-MM-dd',$Culture,[System.Globalization.DateTimeStyles]::None,[ref]$dt)
-        if(-not $ok){$ok=[DateTime]::TryParse($Until,[System.IFormatProvider]$Culture,[System.Globalization.DateTimeStyles]::None,[ref]$dt)}
+        $ok=[DateTime]::TryParseExact($Until,'yyyy-MM-dd',$culture,[System.Globalization.DateTimeStyles]::None,[ref]$dt)
+        if(-not $ok){$ok=[DateTime]::TryParse($Until,[System.IFormatProvider]$culture,[System.Globalization.DateTimeStyles]::None,[ref]$dt)}
         if(-not $ok){throw "Invalid date: `$Until"}
         $line='{0} UNTIL {1:yyyy-MM-dd} # {2:yyyy-MM-dd HH:mm} # {3}' -f $Signature,$dt,(Get-Date),$Comment
         Add-AsciiLine -Line $line -Path $script:Config.SuppressSignaturesPath
@@ -610,7 +611,7 @@ if ($AddWhitelisting ){
 
 if ($DoNothing){return}
 
-if (!$OutputConsoleMessages -and !$OutputObjects) {
+if (-not $OutputConsoleMessages -and -not $OutputObjects) {
 	Write-UsageHelp
 	return
 }
@@ -633,9 +634,16 @@ Initialize-LogSystem `
 Log-info "$((Split-Path $PSCommandPath -Leaf) -replace '.ps1'), ver.$VERSION, Nick Demou, enLogic"
 Log-info "$(Get-Date -format yyyy-MM-dd` HH:mm:ss), Computer: $($env:COMPUTERNAME), S/N: $((Get-CimInstance win32_bios).serialnumber)"
 Log-Debug "-Hide '$Hide'"
-[array]$ExcludeTests=$ExcludeTests | %{ $_ -split '[,\s]+'} | %{$_.trim()} | ?{ $_ } | sort -uniq
+[array]$ExcludeTests = $ExcludeTests |
+  ForEach-Object { $_ -split '[,\s]+' } |
+  ForEach-Object { $_.Trim() } |
+  Where-Object { $_ } |
+  Sort-Object -Unique
 Log-Debug "-ExcludeTests (semicolon separated): $($ExcludeTests -join ';')"
-[array]$OnlyTheseTests=$OnlyTheseTests | %{ $_ -split '[,\s]+'} | %{$_.trim()} | ?{ $_ }
+[array]$OnlyTheseTests = $OnlyTheseTests |
+  ForEach-Object { $_ -split '[,\s]+' } |
+  ForEach-Object { $_.Trim() } |
+  Where-Object { $_ }
 Log-Debug "-OnlyTheseTests (semicolon separated): $($OnlyTheseTests -join ';')"
 Log-Debug "-WhitelistSigs '$WhitelistSigs'"
 $cfg = Get-LogConfig
@@ -681,7 +689,9 @@ if($isHostDC){$isHostPDC=$false                  # P   (by definition also CJS)
     try{
         $domainInfo=[System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain()
         $isHostPDC=(($domainInfo.PdcRoleOwner.Name -replace '[.].*') -eq $env:COMPUTERNAME)
-    }catch{}
+    } catch {
+        Log-Warning "Could not determine if host is the PDC emulator for its domain."
+    }
 }
 
 if ($isHostMobile) {
@@ -864,10 +874,4 @@ if (Get-Command -Name Get-VM -ErrorAction SilentlyContinue) {
 if ($IncludeTestsFromFolder) {
     Invoke-HealthTestsFromFolder $IncludeTestsFromFolder
 }
-
-#=============================================================================
-#
-# END OF TESTS
-#
-#=============================================================================
 
