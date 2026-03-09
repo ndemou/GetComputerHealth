@@ -53,6 +53,7 @@ Available properties include these self-documenting booleans:
 - `.isHostServer`
 - `.isHostDC`
 - `.isHostPDC`
+
 And `.GetCurrentDomain = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain()`
 
 # Instructions for LLMs helping a novice write a custom test.
