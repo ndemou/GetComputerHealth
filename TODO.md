@@ -1,5 +1,9 @@
 # TODO
 
+## Add option -Reinstall in updater
+
+Will re-download and update even if already at the latest release.
+
 ## Stop using C:\it\config\ips-of-all-DCs.conf
 
 Instead add parameter -IpsOfAllDcs to `\Invoke-GetComputerHealth.ps1`.
