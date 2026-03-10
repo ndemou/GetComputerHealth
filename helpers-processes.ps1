@@ -373,6 +373,8 @@ boundaries).
   $task
 }
 
+
+function Invoke-DetachedPSScript {
 <#
 .SYNOPSIS
 Executes a PowerShell script on a remote host as a detached process
@@ -380,8 +382,8 @@ without leaving a disconnected session after execution completes.
 
 .DESCRIPTION
 The script or script block is executed on the remote host. Unlike 
-`Invoke-Command -Detached` once the execution terminates it does not 
-leave a disconnected session on the target.
+`Invoke-Command -InDisconnectedSession` once the execution terminates 
+it does not leave a disconnected session on the target.
 
 .OUTPUTS
 Produces a PSCustomObject representing the process start result:
@@ -392,8 +394,6 @@ Produces a PSCustomObject representing the process start result:
   ExecutionPath : The path to the script being executed on the target.
 }
 #>
-
-function Invoke-DetachedPSScript {
     [CmdletBinding(DefaultParameterSetName='FilePath')]
     param(
         [Parameter(Mandatory=$true)]
@@ -589,3 +589,4 @@ function Test-ExeFound {
   return $false
 
 }
+
