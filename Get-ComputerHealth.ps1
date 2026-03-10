@@ -856,6 +856,7 @@ if ($isHostDC) {
 		Invoke-HealthTest "HealthTest-DfsDiagTestDCs"
 		Invoke-HealthTest "HealthTest-Dcdiag"
 	}
+	Invoke-HealthTest "HealthTest-DcDnsRegistration"
     Invoke-HealthTest "HealthTest-ADViewConsistency"
     Invoke-HealthTest "HealthTest-DfsReplicationState"
     Invoke-HealthTest "HealthTest-ADReplicationLocalRSAT"
