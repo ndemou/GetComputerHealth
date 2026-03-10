@@ -378,29 +378,22 @@ FunctionName, Time, ElapsedMilliseconds, Output, Success, Error, Category, Reaso
         Convert-WarningRecordToLog $_
         $cntProperRecord += 1
         if (($_.Message -as [string]) -match '^\s*\[\s*pass\s*\]') { $cntPassRecord += 1 }
-        return
-      }
-
-      if($_ -and $_.PSObject.Properties['Hash'] -and $null -ne $_.PSObject.Properties['Message'] -and $_.PSObject.Properties['level']){
+      } elseif ($_ -and $_.PSObject.Properties['Hash'] -and $null -ne $_.PSObject.Properties['Message'] -and $_.PSObject.Properties['level']){
         $legacyLogDetected = $true
         $cntProperRecord += 1
         if ($_.level -eq 'pass') {$cntPassRecord += 1}
         Write-Output $_
-        return
-      }
-
-      if ($_ -is [string]) {
+      } elseif ($_ -is [string]) {
         $parts = Convert-TextToLogRecord $_
         $cntImproperRecord += 1
         Log-Debug $parts.Message -Comment $parts.Comment
-        return
+      } else {
+        $cntImproperRecord += 1
+        $objType = $_.GetType().FullName
+        $objText = ($_ | Out-String).Trim()
+        if ([string]::IsNullOrWhiteSpace($objText)) { $objText = '<empty object serialization>' }
+        Log-Debug "Converted output object of type $objType" -Comment $objText
       }
-
-      $cntImproperRecord += 1
-      $objType = $_.GetType().FullName
-      $objText = ($_ | Out-String).Trim()
-      if ([string]::IsNullOrWhiteSpace($objText)) { $objText = '<empty object serialization>' }
-      Log-Debug "Converted output object of type $objType" -Comment $objText
     }
 
     if ($legacyLogDetected) {
