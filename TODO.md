@@ -4,10 +4,7 @@
 
 Instead add parameter -IpsOfAllDcs to `\Invoke-GetComputerHealth.ps1`.
 It will be used by `Invoke-GetHealthDomainComputers.ps1` (document it).
-This array along with the values of the following variables will be added to `$Global:GetComputerHealthDataQMTA` so that they are accessible to all functions:
-   - `$isHostVM, $isHostMobile, $isHostDomainJoined, $isHostServer, $isHostDC, $isHostPDC`
-   - `GetCurrentDomain = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain()`
-
+This array will be added to `$Global:GetComputerHealthDataQMTA`.
 
 ## Review the hundrends of warnings from Invoke-ScriptAnalyzer (and 3 errors)
 
@@ -36,28 +33,27 @@ Possible systems:
    L: laptop/mobile
 Possible types: 
    S: Slow
-   B: Baseline (see below)
+   B: Relative (see below)
 ```
 
 ### End game
 
-With these changes in place I can greatly simplify the main code of 
-Get-ComputerHealth.
+With these changes in place I can greatly simplify the main part of the code that execute the built in tests.
 
-**About Baseline Tests**
-Baseline tests don't produce definitive pass/fail results.
-Rather, they warn for everything they detect as if it's a failure 
-and the user is responsible to suppress results that *are* accepted.
-Examples of Baseline tests are those that list open ports or installed SW.
-The first time a baseline test is run it automatically 
+**About relative Tests**
+relative tests don't produce absolute pass/fail results.
+Rather, they warn for every funding as if it's a failure 
+and the user is responsible to suppress findings that *are* accepted, thus establishing a baseline.
+Examples of relative tests are those that list open ports or installed SW.
+The first time a specific relative test is run it automatically 
 supresses all findings (except if -DontRecordBaseline is passed)
 and appends a line to Get-ComputerHealth.sigs-to-suppress.txt to
 note that the first-time supression was performed.
 E.g. for a function named HealthTest-CheckSomething__s_D-V__t_S
    `BASELINE_RECORDED_FOR: HealthTest-CheckSomething`
-This allows you to add baseline tests to the library without
-anoying the administrator with warnings. Code could be emmiting a Notice
-for the suppressions it is adding:
+
+This automatic suppression allows developers of get computer health to add Relative tests without
+anoying their users with new warnings. Code is also emmiting a Notice:
   `Automatically suppressed this finding from new test 'HealthTest-OpenPorts': Found unexpected open port TCP:3389`
 
 
