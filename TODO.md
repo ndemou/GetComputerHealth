@@ -1,5 +1,11 @@
 # TODO
 
+## New tests
+
+Get-NetConnectionProfile: 
+  1. both for Servers & workstations: at least one interface must have IPv4Connectivity or IPv4Connectivity equal to "Internet".
+  2. For servers at least one interface must have NetworkCategory that is: a) private if it's either a DC/PDC or not domain joined b) DomainAuthenticated if domain joined
+
 ## Add option -Reinstall in updater
 
 Will re-download and update even if already at the latest release.
