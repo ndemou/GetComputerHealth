@@ -32,6 +32,9 @@ Optional list of target hostnames. If omitted, defaults to the local computer.
 Accepts whitespace/comma-separated input (e.g. `"srv1,srv2"` or `"srv1 srv2"`).
 Special token `ALL_DOMAIN_SERVERS` expands to all AD computer objects with `operatingSystem=*Server*` (optionally excluding some via `-ExcludeServers`).
 
+.PARAMETER IpsOfAllDcs
+Array of IPv4 addresses for all domain controllers. Passed through to `Get-ComputerHealth.ps1` as `-IpsOfAllDcs` so tests can use this list without reading `C:\it\config\ips-of-all-DCs.conf`.
+
 .PARAMETER ExcludeServers
 One or more hostnames to remove from the `ALL_DOMAIN_SERVERS` expansion.
 
@@ -73,12 +76,13 @@ Skips execution of `C:\IT\bin\Update-GetHealthCode.ps1` before running `Get-Comp
 param(
     [string]$Hide="DIP",
     [string]$WhitelistSigs,
-    [string]$OnlyTheseTests, 
+    [string]$OnlyTheseTests,
     [string]$ExcludeTests,
     [string[]]$ExcludeServers = @(),
     [switch]$DebugSkipSlowTests,
     [switch]$NoUpdate,
     [switch]$NoSendMessage,
+    [string[]]$IpsOfAllDcs = @(),
     [string[]]$Computers
 )
 
@@ -201,11 +205,11 @@ function Get-DomainServers {
 }
 
 function Get-TcpPortStateFast ($hostname,$ports,$timeout=100) {
-    $tcpobj = @{}; $open = @{}; $requestCallback = $state = $null; 
+    $tcpobj = @{}; $open = @{}; $requestCallback = $state = $null;
     foreach ($port in $ports) {
         $tcpobj[$port] = New-Object System.Net.Sockets.TcpClient; $foo = $tcpobj[$port].BeginConnect($hostname,$port,$requestCallback,$state)
-        } 
-        Start-Sleep -milli $timeOut; 
+        }
+        Start-Sleep -milli $timeOut;
         foreach ($port in $ports) {
             $open=($tcpobj[$port].Connected); $tcpobj[$port].Close(); [pscustomobject]@{port=$port;open=$open}
         }
@@ -273,7 +277,7 @@ foreach ($target in $targets) {
     Write-host ""
     Write-host -for darkgray "Checking " -nonew
     Write-host -for cyan "$target" -nonew
-    Write-host -for darkgray " at $(get-date -Format 'yyyy-MM-dd HH:mm:ss')" 
+    Write-host -for darkgray " at $(get-date -Format 'yyyy-MM-dd HH:mm:ss')"
   }
 
   # The code to run on the target Computer
@@ -284,7 +288,8 @@ foreach ($target in $targets) {
           $ExcludeTests,
           $WhitelistSigs,
           $DebugSkipSlowTests,
-          $NoUpdate
+          $NoUpdate,
+          $IpsOfAllDcs
       )
 
       if (-not (Test-Path "C:\IT\bin\Update-GetHealthCode.ps1")){
@@ -301,18 +306,19 @@ foreach ($target in $targets) {
           -ExcludeTests $ExcludeTests `
           -IncludeTestsFromFolder C:\IT\config\Custom-HealthTests\ `
           -SuppressSigs $WhitelistSigs `
-          -DebugSkipSlowTests:$DebugSkipSlowTests | 
+          -DebugSkipSlowTests:$DebugSkipSlowTests `
+          -IpsOfAllDcs $IpsOfAllDcs |
           Select-Object -Property Computer,Level,Hash,Suppressed,Message,Comment,Emitter
   }
-  
+
   if ($target -eq $env:COMPUTERNAME) {
-      $output = & $healthCheckBlock $Hide $OnlyTheseTests $ExcludeTests $WhitelistSigs $DebugSkipSlowTests $NoUpdate
-  } 
+      $output = & $healthCheckBlock $Hide $OnlyTheseTests $ExcludeTests $WhitelistSigs $DebugSkipSlowTests $NoUpdate $IpsOfAllDcs
+  }
   else {
       if (Get-TcpPortStateFast $target @(5985, 5986, 80, 443, 88, 135, 389, 636, 445, 3268, 3269) | ?{$_.open}) {
         Write-Progress -Activity "Checking $target" -Status "Phase #2 (running Get-ComputerHealth.ps1)"
         $session = New-PSSession -ComputerName $target
-        $output = Invoke-Command -Session $session -ScriptBlock $healthCheckBlock -ArgumentList $Hide, $OnlyTheseTests, $ExcludeTests, $WhitelistSigs, $DebugSkipSlowTests, $NoUpdate
+        $output = Invoke-Command -Session $session -ScriptBlock $healthCheckBlock -ArgumentList $Hide, $OnlyTheseTests, $ExcludeTests, $WhitelistSigs, $DebugSkipSlowTests, $NoUpdate, $IpsOfAllDcs
         Remove-PSSession $session
       } else {
           if ($target -in $domain_servers) {
@@ -346,7 +352,7 @@ if ($all_messages){
         | Sort-Object -Property @{ Expression = { $SortOrder[$_.Level] } }, Computer `
   )
   if ($notable_msgs) {
-      Export-HealthMessagesToExcel -Data $notable_msgs -FileName "C:\IT\temp\notable-messages-$($timestamp).xlsx" 
+      Export-HealthMessagesToExcel -Data $notable_msgs -FileName "C:\IT\temp\notable-messages-$($timestamp).xlsx"
   }
 
   $synopsis = " " +($notable_msgs | Where-Object {$_.Level} |
@@ -356,7 +362,7 @@ if ($all_messages){
             "    $($_.Count.ToString().PadRight(5)) $($_.Name)`r`n"
         }
     })
-    
+
   write-host ""
   Write-host -for white    "Synopsis of notable messages per level"
   Write-host -for gray   $synopsis
@@ -385,7 +391,7 @@ if ($all_messages){
                   "$($_.Computer.PadRight(15)) $($_.Level.PadRight(8)) $($_.Message)"
               } | Out-String `
           )
-    
+
       $encoded = [System.Net.WebUtility]::HtmlEncode($body)
       $html = "<pre style='font-family: Consolas, ""Courier New"", monospace; white-space:pre-wrap; margin:0; font-size:12px; line-height:1.35'>$encoded</pre>"
 
