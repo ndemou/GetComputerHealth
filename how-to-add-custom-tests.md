@@ -12,22 +12,36 @@
    ```powershell
    # If you wish, you can have helper functions (or dot-source them).
      
-   # This is the function that implemets the test. It's name starts with CustomHealthTest-.
+   # This is the function that implemets the test.
+   # It's name starts with CustomHealthTest-. and it doesn't return anything.
+   # It outputs either information for a passed test or findings using  Write-Warning.
    function CustomHealthTest-LargeDirectories {
-       $found = $false
+       $issueFound = $false
        foreach ($dir in Find-LargeDirectory -Path 'C:\' -Threshold 10000) {
-           $found = $true
-           # The message should uniqely identify the problem; comment is optional and provides details
-           # This is a good message:
-           $comment = "`n" + "$($dir.ItemsCount) items"
-           Write-Warning "[failure] Directory $($dir.Path) has more than 10000 child items$comment"
-           # This would be a bad message because it changes as more files are added.
-           # So DON'T DO THIS: Write-Warning "[failure] Directory $($dir.Path) has $($dir.ItemsCount) items"
-           # Rationale: Often the administrator will suppress reports of false positives.
-           # The suppression depends on the contents of the message. If even a single character
-           # of the message changes, it will be treated as a different issue and will not be suppressed
+           $issueFound = $true
+
+           # The synopsis should be one terse line, that uniqely identifies the problem.
+           # The synopsis should not change if the essense of the issue remains the same.
+           # This is good:
+           $synopsis = "Directory $($dir.Path) has more than 10000 child items"
+           # This is a bad: (it changes everytime files are added or deleted)
+           # $synopsis = "Directory $($dir.Path) has $($dir.ItemsCount) items"
+   
+           # The optional details can contain one or more lines.
+           $details = "`n" +"$($dir.ItemsCount) items" + "`n" + `
+               "Most of them ($(dir.MostCommonExtCount)) are .$(dir.MostCommonExt)"
+   
+           # We use [notice] here, which is the lightest level for a finding.
+           # You can also use [warning], and [failure] for more sever findings
+           # and [info] for non-findings (informational messages).
+           Write-Warning ("[notice] " + $synopsis + $details)
        }
-       if (-not $found) {Write-Warning "[pass] No directories found with >10000 items"}
+       if (-not $issueFound) {
+           $synopsis = "No directories found with >10000 items"
+           $details = "" # (no details no new line needed)
+           # Yes, we always use Write-Warning (even for passed tests)
+           Write-Warning ("[pass] " + $synopsis + $details)
+       }
    }
 
    # You can have more than one CustomHealthTest-... functions.
