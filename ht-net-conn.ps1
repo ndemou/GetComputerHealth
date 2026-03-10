@@ -8,10 +8,7 @@ function HealthTest-DomainARecordPointsToDcIp {
   $fn = $MyInvocation.MyCommand.Name
   if ($role -in 0,2) { Write-Warning "[notice] This test ($fn) is not applicable to non-domain joined hosts"; return }
   if ($role -in 4,5) { Write-Warning "[notice] This test ($fn) is not applicable to Domain Controllers"; return }
-
-  Write-Output "Reading C:\it\config\ips-of-all-DCs.conf to get the list of the IPs of all DCs"
-  # will return a list of IPs or throw
-  $dcIps = Get-AllDCIPs -Path 'C:\it\config\ips-of-all-DCs.conf'
+  $dcIps = @($Global:GetComputerHealthDataQMTA.IpsOfAllDcs)
 
   $domain = $cs.Domain
   $ares = $null
@@ -41,10 +38,7 @@ function HealthTest-InterfaceDnsServersUseDcs {
   $fn = $MyInvocation.MyCommand.Name
   if ($role -in 0,2) { Write-Warning "[notice] This test ($fn) is not applicable to non-domain joined hosts"; return }
   if ($role -in 4,5) { Write-Warning "[notice] This test ($fn) is not applicable to Domain Controllers"; return }
-
-  Write-Output "Reading C:\it\config\ips-of-all-DCs.conf to get the list of the IPs of all DCs"
-  # will return a list of IPs or throw
-  $dcIps = Get-AllDCIPs -Path 'C:\it\config\ips-of-all-DCs.conf'
+  $dcIps = @($Global:GetComputerHealthDataQMTA.IpsOfAllDcs)
 
   $nets = Get-CimInstance Win32_NetworkAdapterConfiguration -Filter "IPEnabled=TRUE"
   if (-not $nets) {
@@ -328,94 +322,6 @@ function HealthTest-NltestSiteDiscovery {
     $hex = '0x{0:X}' -f ($exit -band 0xFFFFFFFF)
     Write-Warning ("[failure] NLTEST /dsgetsite failed.`nExitCode=" + $hex + "; Output=`n" + $txt)
   }
-}
-
-
-function Get-AllDCIPs {
-<#
-.SYNOPSIS
-  Loads and validates the list of Domain Controller IPv4 addresses from a JSON config file.
-
-.DESCRIPTION
-  Expected file format:
-    {"ips":["192.168.0.1","192.168.0.2"]}
-
-.OUTPUTS
-  [string[]]  List of validated IPv4 addresses
-#>
-
-  [CmdletBinding()]
-  param(
-    [Parameter()]
-    [ValidateNotNullOrEmpty()]
-    [string]$Path
-  )
-
-  function Test-IPv4 {
-    param([Parameter(Mandatory)][string]$IP)
-
-    $null -ne (
-      $IP -as [ipaddress]
-    ) -and (
-      ([ipaddress]$IP).AddressFamily -eq [System.Net.Sockets.AddressFamily]::InterNetwork
-    )
-  }
-
-  try { $null = Get-Item -LiteralPath $Path -ErrorAction Stop }
-  catch {
-    $e = New-Object System.Management.Automation.ErrorRecord(
-      $_.Exception, "DcIpConfigNotAccessible", [System.Management.Automation.ErrorCategory]::OpenError, $Path
-    )
-    $e.ErrorDetails = New-Object System.Management.Automation.ErrorDetails(
-      "DC IP config file not accessible: $Path. $($_.Exception.Message)"
-    )
-    throw $e
-  }
-
-  $text = Get-Content -LiteralPath $Path -Raw -Encoding UTF8 -ErrorAction Stop
-
-  if ([string]::IsNullOrWhiteSpace($text)) {
-    throw "DC IP config file is empty: $Path --  File should contain the IPs of all DCs in json format. Example:`n{`"ips`":[`"192.168.0.1`",`"192.168.0.2`"]}"
-  }
-
-  try { 
-    $json = ConvertFrom-Json -InputObject $text -ErrorAction Stop 
-  } catch {
-    $msg = "Invalid JSON in $Path. Expected format:`n{`"ips`":[`"192.168.0.1`",`"192.168.0.2`"]}"
-    throw (New-Object System.Exception($msg, $_.Exception))
-  }
-
-  if (-not ($json.PSObject.Properties.Name -contains 'ips')) {
-    throw "Config missing required property 'ips'. Expected format:`n{`"ips`":[`"192.168.0.1`",`"192.168.0.2`"]}"
-  }
-
-  $ips = @($json.ips | Where-Object { $_ -and $_.ToString().Trim() })
-
-  if ($ips.Count -eq 0) {
-    throw "No DC IPs discovered in $Path. Expected format:`n{`"ips`":[`"192.168.0.1`",`"192.168.0.2`"]}"
-  }
-
-  $valid = New-Object System.Collections.Generic.List[string]
-  $invalid = New-Object System.Collections.Generic.List[string]
-  
-  foreach ($ip in $ips) {
-    $ipStr = $ip.ToString().Trim()
-    if ((Test-IPv4 $ipStr) -and (-not $valid.Contains($ipStr))) { $null = $valid.Add($ipStr) }
-    else { $null = $invalid.Add($ipStr) }
-  }
-  
-  $valid = $valid.ToArray()
-  $invalid = $invalid.ToArray()
-
-  if ($invalid.Count -gt 0) {
-    throw "Invalid IPv4 address(es) in $($Path): $($invalid -join ', '). Expected format:`n{`"ips`":[`"192.168.0.1`",`"192.168.0.2`"]}"
-  }
-
-  if (-not $valid -or $valid.Count -eq 0) {
-      throw "No DC IPs discovered. $Path should contain the IPs of all DCs in json format. Example:`n{`"ips`":[`"192.168.0.1`",`"192.168.0.2`"]}"
-  }
-
-  return $valid
 }
 
 

@@ -3485,9 +3485,9 @@ function HealthTest-DnsSuffixMatchesDomain {
 .SYNOPSIS
 Checks that the domain DNS name A record points to at least one DC IP. OnlyForDomain,NotForDCs
 
-IMPORTANT: you need to have a json list with the IPs of all DCs in file
-	'C:\it\config\ips-of-all-DCs.conf'. E.g:
-	{"ips":["192.168.0.1","192.168.0.2"]}
+IMPORTANT: Invoke-GetHealthDomainComputers.ps1 must pass all DC IPs via
+	`-IpsOfAllDcs`. E.g:
+	@("192.168.0.1","192.168.0.2")
 #>
 function HealthTest-DomainARecordPointsToDcIp {
   $cs = Get-CimInstance Win32_ComputerSystem
@@ -3495,10 +3495,7 @@ function HealthTest-DomainARecordPointsToDcIp {
   $fn = $MyInvocation.MyCommand.Name
   if ($role -in 0,2) { Write-Warning "[notice] This test ($fn) is not applicable to non-domain joined hosts"; return }
   if ($role -in 4,5) { Write-Warning "[notice] This test ($fn) is not applicable to Domain Controllers"; return }
-
-  Write-Output "Reading C:\it\config\ips-of-all-DCs.conf to get the list of the IPs of all DCs"
-  # will return a list of IPs or throw
-  $dcIps = Get-AllDCIPs -Path 'C:\it\config\ips-of-all-DCs.conf'
+  $dcIps = @($Global:GetComputerHealthDataQMTA.IpsOfAllDcs)
 
   $domain = $cs.Domain
   $ares = $null
@@ -3524,9 +3521,9 @@ function HealthTest-DomainARecordPointsToDcIp {
 .SYNOPSIS
 Ensures each interface DNS server list contains only DC IPs. OnlyForDomain,NotForDCs
 
-IMPORTANT: you need to have a json list with the IPs of all DCs in file
-	'C:\it\config\ips-of-all-DCs.conf'. E.g:
-	{"ips":["192.168.0.1","192.168.0.2"]}
+IMPORTANT: Invoke-GetHealthDomainComputers.ps1 must pass all DC IPs via
+	`-IpsOfAllDcs`. E.g:
+	@("192.168.0.1","192.168.0.2")
 #>
 function HealthTest-InterfaceDnsServersUseDcs {
 
@@ -3535,10 +3532,7 @@ function HealthTest-InterfaceDnsServersUseDcs {
   $fn = $MyInvocation.MyCommand.Name
   if ($role -in 0,2) { Write-Warning "[notice] This test ($fn) is not applicable to non-domain joined hosts"; return }
   if ($role -in 4,5) { Write-Warning "[notice] This test ($fn) is not applicable to Domain Controllers"; return }
-
-  Write-Output "Reading C:\it\config\ips-of-all-DCs.conf to get the list of the IPs of all DCs"
-  # will return a list of IPs or throw
-  $dcIps = Get-AllDCIPs -Path 'C:\it\config\ips-of-all-DCs.conf'
+  $dcIps = @($Global:GetComputerHealthDataQMTA.IpsOfAllDcs)
 
   $nets = Get-CimInstance Win32_NetworkAdapterConfiguration -Filter "IPEnabled=TRUE"
   if (-not $nets) {

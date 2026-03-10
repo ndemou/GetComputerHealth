@@ -55,6 +55,9 @@ Default: empty (show all). Typical value: `DIP`
 .PARAMETER DebugSkipSlowTests
 (Parameter set: Run) Skips a predefined subset of "slow" built-in tests (those gated by the script's `$DebugSkipSlowTests` check).
 
+.PARAMETER IpsOfAllDcs
+(Parameter set: Run) Optional list of Domain Controller IP addresses passed in by the orchestrator. Stored in `$Global:GetComputerHealthDataQMTA.IpsOfAllDcs` for health tests that need it.
+
 .PARAMETER DoNothing
 (Parameter set: Run) Immediate no-op return (useful for smoke-testing invocation/parameter binding).
 
@@ -133,6 +136,9 @@ param(
 
   [Parameter(ParameterSetName='Run')]
   [switch]$DebugSkipSlowTests,
+
+  [Parameter(ParameterSetName='Run')]
+  [string[]]$IpsOfAllDcs = @(),
 
   [Parameter(ParameterSetName='Run')]
   [switch]$DoNothing,
@@ -678,6 +684,7 @@ $isHostMobile = Test-IsLaptopOrMobile            # L   (based on heuristics)
 $isHostDomainJoined = ($domainRole  -in 1,3,4,5) # J (N = Not domain joines)
 $isHostServer = ($domainRole  -in 3,4,5)         # S (W = not a server (Workstation))
 $isHostDC = ($domainRole -in 4,5)                # C   (by definition also JS)
+$isHostPDC = $false
 $currentDomain = $null
 if($isHostDC){$isHostPDC=$false                  # P   (by definition also CJS)
 	$domainInfo=$null
@@ -687,7 +694,53 @@ if($isHostDC){$isHostPDC=$false                  # P   (by definition also CJS)
         $isHostPDC=(($domainInfo.PdcRoleOwner.Name -replace '[.].*') -eq $env:COMPUTERNAME)
     } catch {
         Log-Warning "Could not determine if host is the PDC emulator for its domain."
+	}
+}
+
+$normalizedIpsOfAllDcs = @(
+    $IpsOfAllDcs |
+        Where-Object { $_ } |
+        ForEach-Object { $_.ToString().Trim() } |
+        Where-Object { $_ }
+)
+
+$ipCounts = @{}
+$validIpsList = New-Object System.Collections.Generic.List[string]
+$invalidIps = New-Object System.Collections.Generic.List[string]
+
+foreach ($ip in $normalizedIpsOfAllDcs) {
+    if ($ipCounts.ContainsKey($ip)) { $ipCounts[$ip]++ } else { $ipCounts[$ip] = 1 }
+
+    $parsed = $ip -as [ipaddress]
+    $isValidV4 = ($parsed -and ($parsed.AddressFamily -eq [System.Net.Sockets.AddressFamily]::InterNetwork))
+
+    if ($isValidV4) {
+        if (-not $validIpsList.Contains($ip)) {
+            [void]$validIpsList.Add($ip)
+        }
+    } else {
+        if (-not $invalidIps.Contains($ip)) {
+            [void]$invalidIps.Add($ip)
+        }
     }
+}
+
+foreach ($entry in $ipCounts.GetEnumerator() | Where-Object { $_.Value -gt 1 } | Sort-Object Key) {
+    Log-Warning "Duplicate IP '$($entry.Key)' provided in -IpsOfAllDcs $($entry.Value) times; using one instance."
+}
+
+if ($invalidIps.Count -gt 0) {
+    throw "Invalid IPv4 value(s) supplied in -IpsOfAllDcs: $($invalidIps -join ', ')"
+}
+
+$validIpsOfAllDcs = @($validIpsList)
+
+if ($isHostDomainJoined -and $validIpsOfAllDcs.Count -eq 0) {
+    Log-failure "Cannot run many domain-related tests because no valid IPv4 addresses were provided in -IpsOfAllDcs. Marking this host as non-domain for test applicability."
+    $isHostDomainJoined = $false
+    $isHostDC = $false
+    $isHostPDC = $false
+    $currentDomain = $null
 }
 
 # Explicitly created so host-fact values are publicly accessible to all health tests,
@@ -700,6 +753,7 @@ $Global:GetComputerHealthDataQMTA = [pscustomobject]@{
     isHostDC           = $isHostDC
     isHostPDC          = $isHostPDC
     GetCurrentDomain   = $currentDomain
+    IpsOfAllDcs        = @($validIpsOfAllDcs)
 }
 
 if ($isHostMobile) {

@@ -209,8 +209,15 @@ New-ScheduledTaskForPSScript -ScriptPath "C:\IT\bin\Invoke-GetComputerHealth.ps1
 # Executes Invoke-GetComputerHealth.ps1 with proper arguments to select all domain joined servers
 param([string]$Hide="DIP",[string]$OnlyTheseTests,[switch]$DebugSkipSlowTests,[switch]$NoSendMessage)
 
-& c:\it\bin\Invoke-GetComputerHealth.ps1 -Computers "ALL_DOMAIN_SERVERS,workstation1,workstation2" -ExcludeServers "server1,server2" -Hide:$Hide -OnlyTheseTests $OnlyTheseTests -DebugSkipSlowTests:$DebugSkipSlowTests -NoSendMessage:$NoSendMessage
+$IpsOfAllDcs = @(
+  "10.10.0.10", # dc1
+  "10.10.0.11"  # dc2
+)
+
+& c:\it\bin\Invoke-GetComputerHealth.ps1 -Computers "ALL_DOMAIN_SERVERS,workstation1,workstation2" -ExcludeServers "server1,server2" -Hide:$Hide -OnlyTheseTests $OnlyTheseTests -DebugSkipSlowTests:$DebugSkipSlowTests -NoSendMessage:$NoSendMessage -IpsOfAllDcs $IpsOfAllDcs
 ```
+
+`Invoke-GetHealthDomainComputers.ps1` must supply `-IpsOfAllDcs` when calling `Invoke-GetComputerHealth.ps1`.
 
 2. Edit the scheduled task to execute the script you created instead of `C:\IT\bin\Invoke-GetComputerHealth.ps1`. 
 
