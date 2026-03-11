@@ -76,140 +76,6 @@ function HealthTest-ScheduledTasks {
     Write-Warning "[pass] Scheduled tasks healthy (non-Microsoft)"
 }
 
-
-function HealthTest-ScheduledTasksLastResult {
-  $mapHresult = @{
-    0x40010004=@{d='Process terminated externally'}
-    0x80070001=@{d='Incorrect function'}
-    0x80070002=@{d='File or path not found'}
-    0x80070003=@{d='Path not found'}
-    0x80070005=@{d='Access denied'}
-    0x8007000A=@{d='Invalid environment'}
-    0x8007000B=@{d='Bad EXE format / arch mismatch'}
-    0x80070070=@{d='Disk full'}
-    0x8007052E=@{d='Logon failure (bad username/password)'}
-    0x80070533=@{d='Account disabled'}
-    0x800705B4=@{d='Operation timed out'}
-    0x800706BA=@{d='RPC server unavailable'}
-    0x80040121=@{d='Storage access denied'}
-    0x80040154=@{d='COM class not registered'}
-    0x800401F5=@{d='COM application not found'}
-    0x8004130F=@{d='Task engine execution error/timeout'}
-    0x80004005=@{d='Unspecified failure'}
-    0x80090020=@{d='Cryptographic/DPAPI failure'}
-    0xC000006D=@{d='Logon failure'}
-    0xC000006A=@{d='Wrong password'}
-    0xC0000064=@{d='Unknown user'}
-    0xC0000072=@{d='Account disabled'}
-    0xC0000234=@{d='Account locked out'}
-  }
-  $mapWin32Bare = @{
-    1056=@{d='Service already running'}
-    1326=@{d='Logon failure (bad username/password)'}
-    1331=@{d='Account disabled'}
-    1909=@{d='Account locked out'}
-  }
-
-  function Normalize-Code($v){
-    if($null -eq $v){return $null}
-    $s="$v".Trim()
-    if($s -eq '' -or $s -eq 'N/A'){return $null}
-    if($s -match '(?i)^0x([0-9a-f]{1,8})$'){return [int64]([uint32]::Parse($matches[1],[System.Globalization.NumberStyles]::HexNumber))}
-    if($s -match '^-?\d+$'){return [int64]$s}
-    $null
-  }
-  function To-UInt32($code){
-    try{
-      $i64=[int64]$code
-      $u64=[uint64]($i64 -band 0xFFFFFFFFFFFFFFFF)
-      [uint32]($u64 -band 0x00000000FFFFFFFF)
-    }catch{$null}
-  }
-  function Get-Severity($u32,$isBare){
-    if($isBare){return 'Error'}
-    if($null -eq $u32){return 'Error'}
-    $sev=($u32 -band 0xC0000000)
-    if($sev -eq 0x80000000){'Error'}
-    elseif($sev -eq 0x40000000){'Warning'}
-    elseif($u32 -eq 0){'Success'}
-    else{'Success'}
-  }
-
-  # Suppress purely informational "Last Result" values entirely
-  $benign = [uint32[]](0x00000000,0x10000000,0x40010004) # S_OK, success-severity flag, DBG_TERMINATE_PROCESS
-  function Is-Informational($u32,$sev){
-    if($null -eq $u32){return $false}
-    if($benign -contains $u32){return $true}
-    if($sev -eq 'Success'){return $true}
-    if($u32 -ge 0x00041300 -and $u32 -le 0x000413FF){return $true} # SCHED_S_* family
-    $false
-  }
-
-  function Get-RowValue{ param($row,[string[]]$names)
-    foreach($n in $names){
-      if($row.PSObject.Properties.Name -contains $n){
-        $v=$row.$n; if($v){return "$v"}
-      }
-    }
-    $null
-  }
-
-  $want = [ordered]@{
-    'Task Name'         = @('TaskName','Task Name')
-    'Run As User'       = @('Run As User','RunAsUser')
-    'Last Run Time'     = @('Last Run Time','LastRunTime')
-    'Next Run Time'     = @('Next Run Time','NextRunTime')
-    'Status'            = @('Status')
-    'Schedule Type'     = @('Schedule Type','ScheduleType')
-    'Triggers'          = @('Schedule','Triggers')
-    'Task To Run'       = @('Task To Run','TaskToRun','Actions')
-    'Start In'          = @('Start In','StartIn')
-    'Logon Mode'        = @('Logon Mode','LogonMode')
-    'Author'            = @('Author')
-    'Last Result (raw)' = @('Last Result','LastResult')
-  }
-
-  $passed = $true
-  # These conditions:
-  #     $_.'Last Result' -notmatch 'Last Result' -and $_.HostName -eq $env:COMPUTERNAME
-  # filter-out plenty of invalid lines that schtasks generates
-  $tasks = schtasks /query /fo csv /v | ConvertFrom-Csv | Where-Object {
-    $_.'Last Result' -ne 0 -and `
-    $_.'Last Result' -notmatch 'Last Result' -and $_.HostName -eq $env:COMPUTERNAME
-  }
-
-  foreach($t in $tasks){
-    $dec = Normalize-Code $t.'Last Result'
-    if($null -eq $dec){ continue }
-    $u32 = To-UInt32 $dec
-    if($null -eq $u32){ continue }
-
-    $isBare = $mapWin32Bare.ContainsKey($u32)
-    $sev = Get-Severity $u32 $isBare
-    if(Is-Informational $u32 $sev){ continue } # suppress informational results
-
-    $info = if($isBare){ $mapWin32Bare[$u32] } else { $mapHresult[$u32] }
-    $desc = if($info){ $info.d } else { 'Unknown failure' }
-    $hex  = ('0x{0:X8}' -f $u32)
-    $msg  = "Scheduled Task '$($t.TaskName)' terminated with Last Result=$hex('$desc')"
-
-    $lines=@()
-    foreach($k in $want.Keys){
-      $val = Get-RowValue -row $t -names $want[$k]
-      if($val){ $lines += ('{0}: {1}' -f $k,$val) }
-    }
-    $details = ($lines -join "`r`n")
-
-    if($sev -eq 'Error'){ Write-Warning "[failure] $msg`n$details"; $passed = $false }
-    elseif($sev -eq 'Warning'){ Write-Warning "[warning] $msg"; $passed = $false }
-  }
-
-  if ($passed) {
-      Write-Warning "[pass] HealthTest-ScheduledTasksLastResult found no problem"
-  }
-}
-
-
 function HealthTest-SystemScheduledTasks{
   [CmdletBinding()] param(
     [string[]]$MustBeEnabled = @(),  # exact paths or regex
@@ -421,5 +287,137 @@ function Get-ScheduledTaskDeepInfo{
         Priority=$t.Settings.Priority
       }
     }
+  }
+}
+
+function HealthTest-ScheduledTasksLastResult {
+  $mapHresult = @{
+    0x40010004=@{d='Process terminated externally'}
+    0x80070001=@{d='Incorrect function'}
+    0x80070002=@{d='File or path not found'}
+    0x80070003=@{d='Path not found'}
+    0x80070005=@{d='Access denied'}
+    0x8007000A=@{d='Invalid environment'}
+    0x8007000B=@{d='Bad EXE format / arch mismatch'}
+    0x80070070=@{d='Disk full'}
+    0x8007052E=@{d='Logon failure (bad username/password)'}
+    0x80070533=@{d='Account disabled'}
+    0x800705B4=@{d='Operation timed out'}
+    0x800706BA=@{d='RPC server unavailable'}
+    0x80040121=@{d='Storage access denied'}
+    0x80040154=@{d='COM class not registered'}
+    0x800401F5=@{d='COM application not found'}
+    0x8004130F=@{d='Task engine execution error/timeout'}
+    0x80004005=@{d='Unspecified failure'}
+    0x80090020=@{d='Cryptographic/DPAPI failure'}
+    0xC000006D=@{d='Logon failure'}
+    0xC000006A=@{d='Wrong password'}
+    0xC0000064=@{d='Unknown user'}
+    0xC0000072=@{d='Account disabled'}
+    0xC0000234=@{d='Account locked out'}
+  }
+  $mapWin32Bare = @{
+    1056=@{d='Service already running'}
+    1326=@{d='Logon failure (bad username/password)'}
+    1331=@{d='Account disabled'}
+    1909=@{d='Account locked out'}
+  }
+
+  function Normalize-Code($v){
+    if($null -eq $v){return $null}
+    $s="$v".Trim()
+    if($s -eq '' -or $s -eq 'N/A'){return $null}
+    if($s -match '(?i)^0x([0-9a-f]{1,8})$'){return [int64]([uint32]::Parse($matches[1],[System.Globalization.NumberStyles]::HexNumber))}
+    if($s -match '^-?\d+$'){return [int64]$s}
+    $null
+  }
+  function To-UInt32($code){
+    try{
+      $i64=[int64]$code
+      $u64=[uint64]($i64 -band 0xFFFFFFFFFFFFFFFF)
+      [uint32]($u64 -band 0x00000000FFFFFFFF)
+    }catch{$null}
+  }
+  function Get-Severity($u32,$isBare){
+    if($isBare){return 'Error'}
+    if($null -eq $u32){return 'Error'}
+    $sev=($u32 -band 0xC0000000)
+    if($sev -eq 0x80000000){'Error'}
+    elseif($sev -eq 0x40000000){'Warning'}
+    elseif($u32 -eq 0){'Success'}
+    else{'Success'}
+  }
+
+  # Suppress purely informational "Last Result" values entirely
+  $benign = [uint32[]](0x00000000,0x10000000,0x40010004) # S_OK, success-severity flag, DBG_TERMINATE_PROCESS
+  function Is-Informational($u32,$sev){
+    if($null -eq $u32){return $false}
+    if($benign -contains $u32){return $true}
+    if($sev -eq 'Success'){return $true}
+    if($u32 -ge 0x00041300 -and $u32 -le 0x000413FF){return $true} # SCHED_S_* family
+    $false
+  }
+
+  function Get-RowValue{ param($row,[string[]]$names)
+    foreach($n in $names){
+      if($row.PSObject.Properties.Name -contains $n){
+        $v=$row.$n; if($v){return "$v"}
+      }
+    }
+    $null
+  }
+
+  $want = [ordered]@{
+    'Task Name'         = @('TaskName','Task Name')
+    'Run As User'       = @('Run As User','RunAsUser')
+    'Last Run Time'     = @('Last Run Time','LastRunTime')
+    'Next Run Time'     = @('Next Run Time','NextRunTime')
+    'Status'            = @('Status')
+    'Schedule Type'     = @('Schedule Type','ScheduleType')
+    'Triggers'          = @('Schedule','Triggers')
+    'Task To Run'       = @('Task To Run','TaskToRun','Actions')
+    'Start In'          = @('Start In','StartIn')
+    'Logon Mode'        = @('Logon Mode','LogonMode')
+    'Author'            = @('Author')
+    'Last Result (raw)' = @('Last Result','LastResult')
+  }
+
+  $passed = $true
+  # These conditions:
+  #     $_.'Last Result' -notmatch 'Last Result' -and $_.HostName -eq $env:COMPUTERNAME
+  # filter-out plenty of invalid lines that schtasks generates
+  $tasks = schtasks /query /fo csv /v | ConvertFrom-Csv | Where-Object {
+    $_.'Last Result' -ne 0 -and `
+    $_.'Last Result' -notmatch 'Last Result' -and $_.HostName -eq $env:COMPUTERNAME
+  }
+
+  foreach($t in $tasks){
+    $dec = Normalize-Code $t.'Last Result'
+    if($null -eq $dec){ continue }
+    $u32 = To-UInt32 $dec
+    if($null -eq $u32){ continue }
+
+    $isBare = $mapWin32Bare.ContainsKey($u32)
+    $sev = Get-Severity $u32 $isBare
+    if(Is-Informational $u32 $sev){ continue } # suppress informational results
+
+    $info = if($isBare){ $mapWin32Bare[$u32] } else { $mapHresult[$u32] }
+    $desc = if($info){ $info.d } else { 'Unknown failure' }
+    $hex  = ('0x{0:X8}' -f $u32)
+    $msg  = "Scheduled Task '$($t.TaskName)' terminated with Last Result=$hex('$desc')"
+
+    $lines=@()
+    foreach($k in $want.Keys){
+      $val = Get-RowValue -row $t -names $want[$k]
+      if($val){ $lines += ('{0}: {1}' -f $k,$val) }
+    }
+    $details = ($lines -join "`r`n")
+
+    if($sev -eq 'Error'){ Write-Warning "[failure] $($msg)`n$($details)"; $passed = $false }
+    elseif($sev -eq 'Warning'){ Write-Warning "[warning] $($msg)"; $passed = $false }
+  }
+
+  if ($passed) {
+      Write-Warning "[pass] HealthTest-ScheduledTasksLastResult found no problem"
   }
 }

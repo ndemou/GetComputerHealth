@@ -2,90 +2,6 @@
 Network & Connectivity
 #>
 
-function HealthTest-DomainARecordPointsToDcIp {
-  $cs = Get-CimInstance Win32_ComputerSystem
-  $role = $cs.DomainRole
-  $fn = $MyInvocation.MyCommand.Name
-  if ($role -in 0,2) { Write-Warning "[notice] This test ($fn) is not applicable to non-domain joined hosts"; return }
-  if ($role -in 4,5) { Write-Warning "[notice] This test ($fn) is not applicable to Domain Controllers"; return }
-  $dcIps = @($Global:GetComputerHealthDataQMTA.IpsOfAllDcs)
-
-  $domain = $cs.Domain
-  $ares = $null
-  try { $ares = Resolve-DnsName -Name $domain -Type A -ErrorAction Stop } catch {}
-  if (-not $ares) {
-    Write-Warning "[failure] $("No A records found for domain DNS name.")`n$($domain)"
-    return
-  }
-
-  $aIps = @($ares | Where-Object { $_.IPAddress } | ForEach-Object { $_.IPAddress })
-  $intersection = @()
-  foreach ($ip in $aIps) { if ($dcIps -contains $ip) { $intersection += $ip } }
-
-  $comment = "Domain=$domain; DC IPs=" + ($dcIps -join ', ') + "; Domain A IPs=" + ($aIps -join ', ')
-  if ($intersection.Count -gt 0) {
-    Write-Warning "[pass] $("Domain DNS name resolves to at least one DC IP.")`n$($comment)"
-  } else {
-    Write-Warning "[failure] $("Domain DNS name does not resolve to any known DC IPv4 address.")`n$($comment)"
-  }
-}
-
-
-function HealthTest-InterfaceDnsServersUseDcs {
-
-  $cs = Get-CimInstance Win32_ComputerSystem
-  $role = $cs.DomainRole
-  $fn = $MyInvocation.MyCommand.Name
-  if ($role -in 0,2) { Write-Warning "[notice] This test ($fn) is not applicable to non-domain joined hosts"; return }
-  if ($role -in 4,5) { Write-Warning "[notice] This test ($fn) is not applicable to Domain Controllers"; return }
-  $dcIps = @($Global:GetComputerHealthDataQMTA.IpsOfAllDcs)
-
-  $nets = Get-CimInstance Win32_NetworkAdapterConfiguration -Filter "IPEnabled=TRUE"
-  if (-not $nets) {
-    Write-Warning "[failure] No IP-enabled network adapters found."
-    return
-  }
-
-  $anyClean = $false
-  $anyBad   = $false
-
-  foreach ($net in $nets) {
-    $dns  = $net.DNSServerSearchOrder
-    $desc = $net.Description
-    if (-not $dns -or $dns.Count -eq 0) {
-      Write-Warning "[notice] $("Interface has no DNS servers configured.")`n$($desc)"
-      continue
-    }
-
-    $dnsList = $dns -join ', '
-    $allDomain = $true
-    $allNonDomain = $true
-    foreach ($s in $dns) {
-      if ($dcIps -notcontains $s) { $allDomain = $false; break }
-    }
-    foreach ($s in $dns) {
-      if ($dcIps -contains $s) { $allNonDomain = $false; break }
-    }
-
-    if ($allDomain) {
-      $anyClean = $true
-      Write-Warning ("[pass] Interface has only DCs as DNS servers.`nInterface: " + $desc + "; DNS=" + $dnsList)
-    } elseif ($allNonDomain) {
-      # Ignoring this interface that only has non-domain DNS servers
-    } else {
-      $anyBad = $true
-      Write-Warning ("[failure] Interface DNS servers include non-DC addresses.`nInterface: " + $desc + "; DNS=" + $dnsList + "; DC IPs=" + ($dcIps -join ', '))
-    }
-  }
-
-  if (-not $anyClean) {
-    Write-Warning "[failure] No interface found where all DNS servers are DC IPs."
-  } elseif (-not $anyBad) {
-    Write-Warning "[pass] All interfaces with DNS configured use only DC IPs."
-  }
-}
-
-
 function HealthTest-ConnectivityToDCs {
 
   $dcs  = Get-DomainControllers
@@ -134,22 +50,6 @@ function HealthTest-ConnectivityToDCs {
   }
 }
 
-
-function HealthTest-SysvolNetlogonAccessible{
-    $dcs = Get-DomainControllers
-    $bad = @()
-    foreach($dc in $dcs){
-      $ok1 = Test-Path "\\$dc\SYSVOL"
-      if (!$ok1) {Write-Warning "[failure] '\\$dc\SYSVOL' not reachable"}
-      $ok2 = Test-Path "\\$dc\NETLOGON"
-      if (!$ok2) {Write-Warning "[failure] '\\$dc\NETLOGON' not reachable"}
-      if(-not($ok1 -and $ok2)){ $bad += $dc.HostName }
-    }
-    $pass = ($bad.Count -eq 0)
-    if($pass){Write-Warning "[pass] All DCs have reachable SYSVOL & NETLOGON"}
-}
-
-
 function HealthTest-SingleDefaultGateway{
   [CmdletBinding()] param([switch]$AllowOnePerFamily)
   $cfg = Get-NetIPConfiguration
@@ -186,14 +86,6 @@ function HealthTest-SingleDefaultGateway{
   }
 }
 
-
-function HealthTest-UnusedEnabledAdapters{
-  $nics=Get-NetAdapter | Where-Object {$_.AdminStatus -eq 'Up' -and $_.Status -ne 'Up'}
-  foreach($n in $nics){ Write-Warning "[warning] Enabled network adapter is disconnected: $($n.Name) ($($n.Status))" }
-  if(($nics | Measure-Object).Count -eq 0){ Write-Warning "[pass] No enabled-but-disconnected network adapters detected" } else { Write-Warning "[failure] There are enabled-but-disconnected network adapters present" }
-}
-
-
 function HealthTest-NetworkInterfaceMetrics{
   [CmdletBinding()] param([int]$MaxPreferredMetric=25)
   $ifs=Get-NetIPInterface -AddressFamily IPv4 | Where-Object {$_.ConnectionState -eq 'Connected'}
@@ -203,145 +95,6 @@ function HealthTest-NetworkInterfaceMetrics{
   }
   if(-not $bad){ Write-Warning "[pass] All connected interfaces have acceptable metrics (<= $MaxPreferredMetric)" } else { Write-Warning "[failure] One or more interfaces have metrics above the preferred threshold" }
 }
-
-
-function HealthTest-IPv6Binding{
-  [CmdletBinding()] param([switch]$RequireEnabled)
-  $rows = Get-NetAdapterBinding -ComponentID ms_tcpip6 | Select-Object Name,Enabled
-  if(-not $rows){ Write-Warning "[failure] No adapters returned for IPv6 binding (ms_tcpip6)"; return }
-  $bad=$false
-  if($RequireEnabled){
-    foreach($r in $rows){
-      if(-not $r.Enabled){ $bad=$true; Write-Warning "[failure] $("IPv6 disabled on adapter")`n$($r.Name)" }
-    }
-    if(-not $bad){ Write-Warning "[pass] IPv6 enabled on all adapters" }
-  } else {
-    Write-Warning ("[pass] IPv6 binding state reported`n" + (($rows | ForEach-Object { "$($_.Name)=$($_.Enabled)" }) -join "; "))
-  }
-}
-
-
-function HealthTest-Nic {
-    $nics = Get-NetAdapter -Physical -ErrorAction SilentlyContinue | Where-Object { $_.Status -eq 'Up' }
-    if (-not $nics) {
-        Write-Output "No physical NICs with Status=Up; skipping NIC health check"
-        return
-    }
-
-    $pass = $true
-    $minPackets = 100000
-
-    foreach ($n in $nics) {
-        $stat = Get-NetAdapterStatistics -Name $n.Name -ErrorAction SilentlyContinue
-        if (-not $stat) {
-            Write-Output "Network interface skipped due to missing stats ($($n.Name))"
-            continue
-        }
-
-        $errors =
-            $stat.ReceivedDiscardedPackets +
-            $stat.ReceivedPacketErrors +
-            $stat.OutboundDiscardedPackets +
-            $stat.OutboundPacketErrors
-
-        $totalPackets =
-            $stat.ReceivedUnicastPackets +
-            $stat.ReceivedBroadcastPackets +
-            $stat.ReceivedMulticastPackets +
-            $stat.OutboundUnicastPackets +
-            $stat.OutboundBroadcastPackets +
-            $stat.OutboundMulticastPackets
-
-        if ($n.MediaConnectionState -ne 'Connected') {
-            $warnList += "$($n.Name): mediaState=$($n.MediaConnectionState)"
-            Write-Warning "[warning] Disconnected network interface ($($n.Name))`n"
-            $pass = $false
-            continue
-        }
-
-        if ($totalPackets -lt $minPackets) {
-            Write-Output "Network interface skipped due to low traffic ($($n.Name))"
-            continue
-        }
-
-        if ($errors -le 0) {
-            continue
-        }
-
-        $errorPct = 0.0
-        if ($totalPackets -gt 0) {
-            $errorPct = [double]$errors * 100.0 / [double]$totalPackets
-        }
-
-        $pctStr = ("{0:N4}%%" -f $errorPct)
-
-        if ($errors -ge 1000 -and $errorPct -ge 0.01) {
-            $warnList += "$($n.Name): errors=$pctStr ($errors/$totalPackets total)"
-            Write-Warning "[warning] Network interface with plenty of errors ($($n.Name))`nerrors=$pctStr ($errors/$totalPackets total packets)"
-            $pass = $false
-        } elseif ($errors -ge 100 -and $errorPct -ge 0.002) {
-            $noticeList += "$($n.Name): errors=$pctStr ($errors/$totalPackets total)"
-            Write-Warning "[notice] Network interface with some errors ($($n.Name))`nerrors=$pctStr ($errors/$totalPackets total packets)"
-            $pass = $false
-        } else {
-            # below 0.002%: considered OK, no log entry
-            continue
-        }
-    }
-
-    if ($pass) {
-        Write-Warning "[pass] Network interfaces healthy; no significant error rates or disconnected interfaces detected"
-    }
-}
-
-
-function HealthTest-NltestSiteDiscovery {
-  [CmdletBinding()] param()
-  $cs = Get-CimInstance Win32_ComputerSystem
-  $role = $cs.DomainRole
-  $fn = $MyInvocation.MyCommand.Name
-  if ($role -in 0,2) { Write-Warning "[notice] This test ($fn) is not applicable to non-domain joined hosts"; return }
-  if ($role -in 4,5) { Write-Warning "[notice] This test ($fn) is not applicable to Domain Controllers"; return }
-
-  $out  = nltest /dsgetsite 2>&1
-  $exit = $LASTEXITCODE
-  $txt  = ($out | Out-String).Trim()
-
-  if ($exit -eq 0 -and $txt -match 'The command completed successfully') {
-    $lines = $txt -split "`r?`n"
-    $site  = $null
-    foreach ($l in $lines) {
-      if (-not $site -and $l -and $l -notmatch 'The command completed successfully') {
-        $site = $l.Trim()
-        break
-      }
-    }
-    if (-not $site) { $site = '(unknown)' }
-    Write-Warning "[pass] $("NLTEST /dsgetsite succeeded.")`n$(("Site: " + $site))"
-  } else {
-    $hex = '0x{0:X}' -f ($exit -band 0xFFFFFFFF)
-    Write-Warning ("[failure] NLTEST /dsgetsite failed.`nExitCode=" + $hex + "; Output=`n" + $txt)
-  }
-}
-
-
-function Get-DomainControllers {
-  $Domain = (Get-CimInstance Win32_ComputerSystem).Domain
-
-  if (-not $Domain) { throw "No domain detected." }
-  $results = New-Object System.Collections.Generic.HashSet[string] ([StringComparer]::OrdinalIgnoreCase)
-
-  try {
-    if (Get-Command Resolve-DnsName -ErrorAction SilentlyContinue) {
-      $srv = Resolve-DnsName -Type SRV ("_ldap._tcp.dc._msdcs.{0}" -f $Domain) -ErrorAction Stop
-      foreach ($r in $srv) {
-        if ($r.NameTarget) { [void]$results.Add(($r.NameTarget.TrimEnd('.'))) }
-      }
-    }
-  } catch {}
-  return $results
-}
-
 
 function Test-NetConnectionFast {
   [CmdletBinding()]
@@ -507,4 +260,98 @@ function Test-MultipleGatewayConfiguration {
 
     Write-Warning "[failure] Multiple Gateways with metrics that may cause routing instability.`n$desc`n$hintText"
   }
+}
+
+function HealthTest-IPv6Binding{
+  [CmdletBinding()] param([switch]$RequireEnabled)
+  $rows = Get-NetAdapterBinding -ComponentID ms_tcpip6 | Select-Object Name,Enabled
+  if(-not $rows){ Write-Warning "[failure] No adapters returned for IPv6 binding (ms_tcpip6)"; return }
+  $bad=$false
+  if($RequireEnabled){
+    foreach($r in $rows){
+      if(-not $r.Enabled){ $bad=$true; Write-Warning "[failure] $("IPv6 disabled on adapter")`n$($r.Name)" }
+    }
+    if(-not $bad){ Write-Warning "[pass] IPv6 enabled on all adapters" }
+  } else {
+    Write-Warning ("[pass] IPv6 binding state reported`n" + (($rows | ForEach-Object { "$($_.Name)=$($_.Enabled)" }) -join '; '))
+  }
+}
+
+function HealthTest-Nic {
+    $nics = Get-NetAdapter -Physical -ErrorAction SilentlyContinue | Where-Object { $_.Status -eq 'Up' }
+    if (-not $nics) {
+        Write-Output "No physical NICs with Status=Up; skipping NIC health check"
+        return
+    }
+
+    $pass = $true
+    $minPackets = 100000
+
+    foreach ($n in $nics) {
+        $stat = Get-NetAdapterStatistics -Name $n.Name -ErrorAction SilentlyContinue
+        if (-not $stat) {
+            Write-Output "Network interface skipped due to missing stats ($($n.Name))"
+            continue
+        }
+
+        $errors =
+            $stat.ReceivedDiscardedPackets +
+            $stat.ReceivedPacketErrors +
+            $stat.OutboundDiscardedPackets +
+            $stat.OutboundPacketErrors
+
+        $totalPackets =
+            $stat.ReceivedUnicastPackets +
+            $stat.ReceivedBroadcastPackets +
+            $stat.ReceivedMulticastPackets +
+            $stat.OutboundUnicastPackets +
+            $stat.OutboundBroadcastPackets +
+            $stat.OutboundMulticastPackets
+
+        if ($n.MediaConnectionState -ne 'Connected') {
+            $warnList += "$($n.Name): mediaState=$($n.MediaConnectionState)"
+            Write-Warning "[warning] Disconnected network interface ($($n.Name))"
+            $pass = $false
+            continue
+        }
+
+        if ($totalPackets -lt $minPackets) {
+            Write-Output "Network interface skipped due to low traffic ($($n.Name))"
+            continue
+        }
+
+        if ($errors -le 0) {
+            continue
+        }
+
+        $errorPct = 0.0
+        if ($totalPackets -gt 0) {
+            $errorPct = [double]$errors * 100.0 / [double]$totalPackets
+        }
+
+        $pctStr = ("{0:N4}%%" -f $errorPct)
+
+        if ($errors -ge 1000 -and $errorPct -ge 0.01) {
+            $warnList += "$($n.Name): errors=$pctStr ($errors/$totalPackets total)"
+            Write-Warning "[warning] Network interface with plenty of errors ($($n.Name))`nerrors=$pctStr ($errors/$totalPackets total packets)"
+            $pass = $false
+        } elseif ($errors -ge 100 -and $errorPct -ge 0.002) {
+            $noticeList += "$($n.Name): errors=$pctStr ($errors/$totalPackets total)"
+            Write-Warning "[notice] Network interface with some errors ($($n.Name))`nerrors=$pctStr ($errors/$totalPackets total packets)"
+            $pass = $false
+        } else {
+            # below 0.002%: considered OK, no log entry
+            continue
+        }
+    }
+
+    if ($pass) {
+        Write-Warning "[pass] Network interfaces healthy; no significant error rates or disconnected interfaces detected"}
+}
+
+function HealthTest-WinRMListening{
+  $svc=Get-Service WinRM -ErrorAction Stop
+  if($svc.Status -ne 'Running'){ Write-Warning "[failure] WinRM service is not running`nStatus=$($svc.Status)"; return }
+  try{ $null=Test-WSMan -ErrorAction Stop; Write-Warning "[pass] WinRM running and responding"}
+  catch{ Write-Warning "[failure] WinRM not responding`n$($_.Exception.Message)" }
 }
