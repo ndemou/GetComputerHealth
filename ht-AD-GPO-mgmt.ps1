@@ -2,158 +2,6 @@
 Active Directory & GPO Management
 #>
 
-function HealthTest-ADReplicationLocalRSAT {
-  $domainRole = (Get-CimInstance Win32_ComputerSystem -ErrorAction Stop).DomainRole
-  $isHostDC = ($domainRole -in 4,5)
-
-  if (-not $isHostDC) { return }
-
-  $adModuleOk = $true
-  try {
-    if (-not (Get-Module -ListAvailable -Name ActiveDirectory)) { $adModuleOk = $false }
-  } catch {
-    $adModuleOk = $false
-  }
-
-  if (-not $adModuleOk) {
-    Write-Warning "[failure] AD replication (RSAT): ActiveDirectory module not available; cannot query replication partner metadata."
-    return
-  }
-
-  try {
-    Import-Module ActiveDirectory -ErrorAction Stop
-  } catch {
-    Write-Warning "[failure] $("AD replication (RSAT): failed to import ActiveDirectory module.")`n$($_.Exception.Message)"
-    return
-  }
-
-  $me = $null
-  try {
-    $me = Get-ADDomainController -ErrorAction Stop
-  } catch {
-    Write-Warning "[failure] $("AD replication (RSAT): failed to identify local domain controller.")`n$($_.Exception.Message)"
-    return
-  }
-
-  if (-not $me -or -not $me.HostName) {
-    Write-Warning "[failure] AD replication (RSAT): could not determine local DC hostname."
-    return
-  }
-
-  try {
-    [void](Get-ADDomain -ErrorAction Stop)
-  } catch {
-    Write-Warning "[failure] $("AD replication (RSAT): cannot query domain info (ADWS/permissions/connectivity issue).")`n$($_.Exception.Message)"
-    return
-  }
-
-  $md = $null
-  try {
-    $md = Get-ADReplicationPartnerMetadata -Target $me.HostName -ErrorAction Stop
-  } catch {
-    Write-Warning "[failure] $("Exception from: Get-ADReplicationPartnerMetadata -Target $($me.HostName)")`n$($_.Exception.Message)"
-    return
-  }
-
-  if (-not $md) {
-    Write-Warning "[failure] AD replication (RSAT): no partner metadata returned for $($me.HostName)."
-    return
-  }
-
-  $bad = @($md | Where-Object { $_.LastReplicationResult -ne 0 })
-  if ($bad.Count -gt 0) {
-    $details = $bad | ForEach-Object { "$($_.Partner) rc=$($_.LastReplicationResult) at $($_.LastSuccessfulSync)" }
-    Write-Warning "[failure] $("AD replication (RSAT): replication partner errors for $($me.HostName).")`n$(($details -join " | "))"
-    return
-  }
-
-  Write-Warning "[pass] AD replication (RSAT): replication partner results healthy for $($me.HostName)."
-}
-
-
-function HealthTest-ADReplicationDomainRepadmin {
-  $domainRole = (Get-CimInstance Win32_ComputerSystem -ErrorAction Stop).DomainRole
-  $isHostDC = ($domainRole -in 4,5)
-
-  if (-not $isHostDC) { return }
-
-  $repadminCmd = Get-Command repadmin.exe -ErrorAction SilentlyContinue
-  $repadmin = if ($repadminCmd -and $repadminCmd.Source) { $repadminCmd.Source } else { "$env:windir\system32\repadmin.exe" }
-
-  if (-not (Test-Path -LiteralPath $repadmin)) {
-    Write-Warning "[failure] AD replication (repadmin): repadmin.exe not found; cannot run domain-wide checks."
-    return
-  }
-
-  $ok = $true
-
-  # --- Test 1: repadmin /replsum -> ensure all 'fails' are 0
-  try {
-    $sumOut = (& $repadmin /replsum 2>&1 | Out-String)
-  } catch {
-    Write-Warning "[failure] $("AD replication (repadmin): failed to execute 'repadmin /replsum'.")`n$($_.Exception.Message)"
-    return
-  }
-
-  if (-not $sumOut) {
-    Write-Warning "[failure] AD replication (repadmin): no output from 'repadmin /replsum'."
-    $ok = $false
-  } else {
-    $bad = @()
-    foreach ($ln in ($sumOut -split '\r?\n')) {
-      if ($ln -match '^\s*(?<DSA>\S+)\s+(?<Delta>(?:\d+d:)?(?:\d+h:)?\d+m:\d+s|\d+s)\s+(?<Fails>\d+)\s*/\s*(?<Total>\d+)\b') {
-        $dsa = $Matches.DSA
-        $fails = [int]$Matches.Fails
-        $total = [int]$Matches.Total
-        if ($fails -gt 0) { $bad += [pscustomobject]@{ DSA=$dsa; Fails=$fails; Total=$total } }
-      }
-    }
-
-    if ($bad.Count -gt 0) {
-      foreach ($b in $bad) {
-        Write-Warning "[failure] $("AD replication (repadmin): replsum reports failures on '$($b.DSA)'")`n$(("{0} fail(s) out of {1} neighbors." -f $b.Fails,$b.Total))"
-      }
-      $ok = $false
-    } else {
-      Write-Warning "[pass] AD replication (repadmin): replsum shows 0 fails for all DSAs."
-    }
-  }
-
-  # --- Test 2: repadmin /showreps -> all latest attempts 'was successful.'
-  try {
-    $showOut = (& $repadmin /showreps 2>&1 | Out-String)
-  } catch {
-    Write-Warning "[failure] $("AD replication (repadmin): failed to execute 'repadmin /showreps'.")`n$($_.Exception.Message)"
-    return
-  }
-
-  if (-not $showOut) {
-    Write-Warning "[failure] AD replication (repadmin): no output from 'repadmin /showreps'."
-    $ok = $false
-  } else {
-    $attemptLines = ($showOut -split '\r?\n') | Where-Object { $_ -match 'Last attempt @' }
-    if (-not $attemptLines -or $attemptLines.Count -eq 0) {
-      Write-Warning "[warning] AD replication (repadmin): showreps produced no 'Last attempt' lines.`nRun 'repadmin /showreps' manually to inspect output."
-      $ok = $false
-    } else {
-      $notOk = @($attemptLines | Where-Object { $_ -notmatch 'was successful\.$' })
-      if ($notOk.Count -gt 0) {
-        foreach ($ln in $notOk) {
-          Write-Warning "[failure] $("AD replication (repadmin): showreps has unsuccessful last attempt")`n$(($ln.Trim()))"
-        }
-        $ok = $false
-      } else {
-        Write-Warning "[pass] AD replication (repadmin): showreps indicates all last attempts were successful."
-      }
-    }
-  }
-
-  if (-not $ok) {
-    Write-Warning "[notice] AD replication (repadmin): issues detected."
-  }
-}
-
-
 function HealthTest-ADViewConsistency {
   [CmdletBinding()]
   param(
@@ -285,20 +133,6 @@ function HealthTest-RidManager{
   if($fail){ Write-Warning "[failure] RID Manager test reported issues`nReview dcdiag /test:ridmanager output"; } else { Write-Warning "[pass] RID Manager health OK (dcdiag)" }
 }
 
-
-function HealthTest-DcDnsARecords{
-  $bad=@()
-  foreach($dc in (Get-ADDomainController -Filter *)){
-    $hn=$dc.HostName; $ip=$dc.IPv4Address
-    if(-not $hn -or -not $ip){ continue }
-    $ares=(Resolve-DnsName -Name $hn -Type A -ErrorAction SilentlyContinue).IPAddress
-    if(-not $ares){ $msg="$hn has no A records in DNS"; $bad+=$msg; Write-Warning "[failure] $($msg)"; continue }
-    if($ares -notcontains $ip){ $msg="$hn A record mismatch: AD IP=$ip, DNS IPs="+($ares -join ','); $bad+=$msg; Write-Warning "[failure] $($msg)" }
-  }
-  if($bad.Count -eq 0){ Write-Warning "[pass] DC DNS A records match AD IPs for all DCs" }
-}
-
-
 function HealthTest-DfsrBacklogSysvol{
   [CmdletBinding()] param([int]$MaxBacklog=100)
   $group='Domain System Volume'; $folder='SYSVOL Share'
@@ -368,112 +202,6 @@ function HealthTest-DfsrBacklog {
     if ($over.Count -gt 0) { Write-Warning "[warning] DFS-R backlog high`n$($over -join ' | ')"; return }
     Write-Warning "[pass] DFS-R backlog OK"; return
 }
-
-
-function HealthTest-DisabledGpoLinksAtDomainRoot{
-  if(-not (Get-Command Get-GPO -ErrorAction SilentlyContinue)){
-    Write-Warning "[warning] GroupPolicy cmdlets not available; install RSAT/GPMC (GroupPolicy module)."
-    return
-  }
-
-  $root=$null
-  if(Get-Command Get-ADDomain -ErrorAction SilentlyContinue){
-    try{ $root=(Get-ADDomain).DistinguishedName }catch{}
-  }
-  if(-not $root){
-    try{
-      $dns=(Get-CimInstance Win32_ComputerSystem).Domain
-      if(-not $dns -or $dns -eq 'WORKGROUP'){ throw "Not on a domain" }
-      $root=($dns -split '\.')|ForEach-Object{"DC=$_"} -join ','
-    }catch{
-      Write-Warning "[warning] Cannot resolve domain root DN (need AD or machine joined to a domain)."
-      return
-    }
-  }
-
-  $parseFailures=0
-  $links=@()
-  foreach($g in (Get-GPO -All -ErrorAction Stop)){
-    try{
-      $xml=[xml](Get-GPOReport -Guid $g.Id -ReportType Xml -ErrorAction Stop)
-      foreach($lnk in @($xml.GPO.LinksTo.LinkTo)){
-        if($lnk.SOMPath -eq $root){
-          $links += [pscustomobject]@{
-            DisplayName=$xml.GPO.Name
-            Enabled= if($lnk.Enabled -eq 'true'){1}else{0}
-            Enforced=if($lnk.NoOverride -eq 'true'){1}else{0}
-            Order=[int]$lnk.Order
-          }
-        }
-      }
-    }catch{
-      $parseFailures++
-      $msg=($_.Exception.Message -replace '\s+',' ').Trim()
-      Write-Warning "[warning] Failed to parse GPO report; skipping GPO: $($g.DisplayName) ($($g.Id)) - $msg"
-    }
-  }
-
-  if($parseFailures -gt 0){
-    Write-Warning "[warning] One or more GPO reports could not be read/parsed ($parseFailures). Results may be incomplete."
-  }
-
-  if(-not $links){
-    Write-Warning "[pass] No GPO links found at the domain root ($root)."
-    return
-  }
-
-  $flagged=$false
-  foreach($l in $links){
-    if($l.Enabled -eq 0){ $flagged=$true; Write-Warning "[warning] Domain-root GPO link is disabled: $($l.DisplayName)" }
-    if($l.Enforced -eq 0){ $flagged=$true; Write-Warning "[warning] Domain-root GPO link is not enforced: $($l.DisplayName)" }
-  }
-
-  if(-not $flagged){ Write-Warning "[pass] All domain-root GPO links are enabled (and enforced per policy)" }
-  else{ Write-Warning "[failure] There are disabled or non-enforced GPO links at the domain root" }
-}
-
-
-function HealthTest-DuplicateSpn{
-  $objs = Get-ADObject -LDAPFilter "(servicePrincipalName=*)" -Properties servicePrincipalName,sAMAccountName,distinguishedName -ErrorAction Stop
-  if(-not $objs){ Write-Warning "[pass] No objects with SPN found"; return }
-
-  $map = @{}
-  foreach($o in $objs){
-    $acct = if($o.sAMAccountName){ $o.sAMAccountName } else { $o.distinguishedName }
-    foreach($spn in @($o.servicePrincipalName)){
-      if([string]::IsNullOrEmpty($spn)){ continue }
-      if($map.ContainsKey($spn)){ $map[$spn] += $acct } else { $map[$spn] = @($acct) }
-    }
-  }
-
-  $dupsFound=$false
-  foreach($spn in $map.Keys){
-    $owners = @($map[$spn] | Sort-Object -Unique)
-    if($owners.Count -gt 1){
-      $dupsFound=$true
-      Write-Warning "[failure] Duplicate SPN detected`n$(("$spn -> " + ($owners -join ', ')))"
-    }
-  }
-  if(-not $dupsFound){ Write-Warning "[pass] No duplicate SPNs detected" }
-}
-
-
-function HealthTest-GcPlacement{
-  [CmdletBinding()] param([switch]$AtLeastOnePerSite=$true)
-  $dcs=Get-ADDomainController -Filter *
-  if(-not $AtLeastOnePerSite){
-    $has=($dcs | Where-Object {$_.IsGlobalCatalog}).Count -gt 0
-    if($has){ Write-Warning "[pass] At least one Global Catalog exists in the domain" } else { Write-Warning "[failure] No Global Catalog server detected in the domain" }
-    return
-  }
-  $sites=$dcs | Group-Object Site
-  $bad=@()
-  foreach($s in $sites){
-    if(($s.Group | Where-Object {$_.IsGlobalCatalog}).Count -eq 0){ $bad+=$s.Name; Write-Warning "[failure] No Global Catalog in site '$($s.Name)'" }
-  }
-  if($bad.Count -eq 0){ Write-Warning "[pass] Each AD site has at least one Global Catalog" }
-}
-
 
 function HealthTest-GpoVersionConsistency{
 
@@ -551,50 +279,6 @@ function HealthTest-KerberosEncryptionTypes{
   if($bad_count -eq 0){ Write-Warning "[pass] No accounts permit RC4 in msDS-SupportedEncryptionTypes" }
 }
 
-
-function HealthTest-LdapSigningChannelBinding {
-    $p = 'HKLM:\SYSTEM\CurrentControlSet\Services\NTDS\Parameters'
-
-    # Read all registry values in one shot (avoids repeated calls)
-    $props = Get-ItemProperty -Path $p -ErrorAction SilentlyContinue
-
-    # LDAPServerIntegrity
-    $signProp = $props.PSObject.Properties['LDAPServerIntegrity']
-    $sign     = if ($signProp) { $signProp.Value } else { $null }
-
-    # LdapEnforceChannelBinding
-    $cbProp = $props.PSObject.Properties['LdapEnforceChannelBinding']
-    $cb     = if ($cbProp) { $cbProp.Value } else { $null }
-
-    # Bonus tip: normalize null -> 0 (disabled)
-    $sign = [int]($sign + 0)
-    $cb   = [int]($cb   + 0)
-
-    if (($sign -ge 1) -and ($cb -ge 1)) {
-        Write-Warning "[pass] LDAP signing & channel binding enforced"
-    } else {
-        Write-Warning "[notice] LDAP signing and/or channel binding not enforced`nLDAPServerIntegrity=$sign; LdapEnforceChannelBinding=$cb"
-    }
-}
-
-
-function HealthTest-ReplicationLatency{
-  [CmdletBinding()] param([int]$MaxMinutes=30)
-  $parts=@((Get-ADRootDSE).schemaNamingContext,(Get-ADRootDSE).configurationNamingContext)
-  $anyFail=$false
-  foreach($dc in (Get-ADDomainController -Filter *)){
-    foreach($p in $parts){
-      $m=Get-ADReplicationPartnerMetadata -Target $dc.HostName -Partition $p -ErrorAction Stop
-      foreach($row in $m){
-        $mins = [int](((Get-Date)-$row.LastReplicationSuccess).TotalMinutes)
-        if($mins -gt $MaxMinutes){ $anyFail=$true; Write-Warning "[failure] Replication latency above threshold`n$($dc.HostName) partition '$p' latency=$mins min (Max=$MaxMinutes)" }
-      }
-    }
-  }
-  if(-not $anyFail){ Write-Warning "[pass] AD replication latency acceptable (<= $MaxMinutes min on schema/config)" }
-}
-
-
 function HealthTest-RodcPrp{
   $rodcs=Get-ADDomainController -Filter {IsReadOnly -eq $true}
   if(-not $rodcs){ Write-Warning "[pass] No RODCs found (PRP not applicable)"; return }
@@ -605,92 +289,6 @@ function HealthTest-RodcPrp{
   }
   if(-not $bad){ Write-Warning "[pass] PRP is configured on all RODCs" }
 }
-
-
-function HealthTest-SchemaVersionConsistency{
-  $schemaNC=(Get-ADRootDSE).schemaNamingContext
-  $vers=@{}; $errs=@()
-  foreach($dc in (Get-ADDomainController -Filter *)){
-    try{
-      $ov=(Get-ADObject -Identity $schemaNC -Server $dc.HostName -Properties objectVersion -ErrorAction Stop).objectVersion
-      if($null -eq $ov -or "$ov" -eq ''){
-        $msg="$($dc.HostName): objectVersion missing"; $errs+=$msg; Write-Warning "[failure] $($msg)"; continue
-      }
-      $ov=[int]("$ov".Trim()); $vers[$dc.HostName]=$ov
-    }catch{
-      $msg="$($dc.HostName): $($_.Exception.Message)"; $errs+=$msg; Write-Warning "[failure] $($msg)"
-    }
-  }
-
-  if($vers.Count -eq 0){
-    Write-Warning "[failure] $("AD schema version consistency")`n$(("No schema versions retrieved. Errors: "+($errs -join ' | ')))"
-    return
-  }
-
-  # Force array so .Count and [0] are always valid even when only one element
-  $distinct = @($vers.Values | Sort-Object -Unique)
-  $distinctCount = $distinct.Count
-
-  $perDc = ($vers.GetEnumerator() | Sort-Object Name | ForEach-Object { "$($_.Name)=$($_.Value)" }) -join '; '
-
-  $det = if ($distinctCount -eq 1) {
-    "SchemaVersion=$($distinct[0]); $perDc"
-  } else {
-    "Mismatch: "+($distinct -join ', ')+" | "+$perDc
-  }
-
-  if($errs){ $det += " | Errors: "+($errs -join ' | ') }
-
-  $pass = ($distinctCount -eq 1 -and $errs.Count -eq 0)
-
-  if($pass){
-    Write-Warning "[pass] AD schema version consistent across DCs ($det)"
-  } else {
-    Write-Warning "[failure] $("AD schema version consistent across DCs")`n$($det)"
-  }
-}
-
-
-function HealthTest-SysvolContentConsistency{
-    $dom=(Get-CimInstance Win32_ComputerSystem).Domain
-    $dcs=Get-ADDomainController -Filter * | Select-Object -ExpandProperty HostName
-
-    $sigs = foreach($dc in $dcs){
-      $p="\\$dc\SYSVOL\$dom\Policies"
-      if(-not (Test-Path -LiteralPath $p)){
-        Write-Warning "[failure] SYSVOL Policies path missing on ${dc}: $p"
-        [pscustomobject]@{DC=$dc;Sig='<missing>'}
-        continue
-      }
-      $files = Get-ChildItem -LiteralPath $p -Recurse -File -Force -ErrorAction SilentlyContinue
-      $count = ($files | Measure-Object).Count
-      [uint64]$total=0; foreach($f in $files){ $total += [uint64]$f.Length }
-      [pscustomobject]@{DC=$dc;Sig=('' + $count + '|' + $total).Trim()}
-    }
-
-    # Compute uniqueness without Group-Object
-    $uniqueSigs = @($sigs | Select-Object -ExpandProperty Sig -Unique)
-    $hasMissing = $uniqueSigs -contains '<missing>'
-    $allSame    = ($uniqueSigs.Count -eq 1) -and -not $hasMissing
-    $map        = ($sigs | ForEach-Object { "$($_.DC)=$($_.Sig)" }) -join ' | '
-
-    # Debug: show what PowerShell *thinks* are distinct values and their bytes
-    write-verbose "`nDEBUG: Distinct Sig values ($uniqueSigs.Count):"
-    $uniqueSigs | ForEach-Object {
-      $bytes = [System.Text.Encoding]::UTF8.GetBytes($_)
-      write-verbose "  '$_'  bytes=[$([System.BitConverter]::ToString($bytes))]"
-    }
-
-    if($allSame){
-      Write-Warning "[pass] SYSVOL policy tree manifests match across all DCs"
-    } elseif($hasMissing){
-      Write-Warning "[failure] $("At least one DC lacks SYSVOL\Policies")`n$($map)"
-    } else {
-      Write-Warning "[failure] $("SYSVOL policy manifests are not consistent across DCs")`n$($map)"
-    }
-}
-
-
 function HealthTest-SysvolAclHygiene{
   $path="C:\Windows\SYSVOL\sysvol"
   $acl=Get-Acl -Path $path
@@ -703,67 +301,6 @@ function HealthTest-SysvolAclHygiene{
   if(-not $bad){ Write-Warning "[pass] SYSVOL does not grant write to broad principals (Everyone/Auth Users)" }
 }
 
-
-function HealthTest-TombstoneLifetime{
-  [CmdletBinding()] param([int]$MinDays=60)
-  $ds="CN=Directory Service,CN=Windows NT,CN=Services,$((Get-ADRootDSE).ConfigurationNamingContext)"
-  $tl=(Get-ADObject $ds -Properties tombstoneLifetime).tombstoneLifetime
-  if(-not $tl){$tl=60}
-  if($tl -ge $MinDays){ Write-Warning "[pass] AD tombstoneLifetime is sufficient ($tl days >= $MinDays)" }
-  else{ Write-Warning "[failure] AD tombstoneLifetime below threshold`nCurrent=$tl; Min=$MinDays" }
-}
-
-
-function HealthTest-UnconstrainedDelegationAccounts{
-  [CmdletBinding()] param([switch]$IncludeDomainControllers)
-
-  $bitTrusted  = 524288    # 0x80000 TRUSTED_FOR_DELEGATION
-  $bitDC       = 8192      # 0x2000  SERVER_TRUST_ACCOUNT
-
-  if ($IncludeDomainControllers) {
-    $ldap = "(&(|(objectClass=user)(objectClass=computer))(userAccountControl:1.2.840.113556.1.4.803:=$bitTrusted))"
-  } else {
-    $ldap = "(&(|(objectClass=user)(objectClass=computer))(userAccountControl:1.2.840.113556.1.4.803:=$bitTrusted)(!(userAccountControl:1.2.840.113556.1.4.803:=$bitDC)))"
-  }
-
-  $objs = @(
-    Get-ADObject -LDAPFilter $ldap -Properties sAMAccountName,objectClass,dnsHostName |
-      Select-Object sAMAccountName,objectClass,dnsHostName
-  )
-
-  if ($objs.Count -gt 0) {
-
-    foreach($o in $objs){
-
-      # Determine if computer object (objectClass may be array or string)
-      $isComputer = $false
-      if ($o.objectClass -is [array]) {
-        if ($o.objectClass -contains 'computer') { $isComputer = $true }
-      } elseif ($o.objectClass -eq 'computer') {
-        $isComputer = $true
-      }
-
-      # Build a friendly name
-      if ($isComputer) {
-        $name = $o.sAMAccountName.TrimEnd('$')
-        if ($o.dnsHostName) {
-          $name += " ($($o.dnsHostName))"
-        }
-        $cls = 'computer'
-      } else {
-        $name = $o.sAMAccountName
-        $cls  = 'user'
-      }
-
-      Write-Warning "[failure] Unconstrained delegation account found`n$($cls): $name"
-    }
-
-  } else {
-    Write-Warning "[pass] No unconstrained delegation accounts"
-  }
-}
-
-
 function HealthTest-DfsDiagTestDCs {
     write-progress "Runing 'DFSDIAG /TestDCs'"
     $out=(DFSDIAG /TestDCs | sls -NotMatch '^$|^(Information|[A-Za-z]+ing|Success)[ :]|^Finished TestDcs[.] *$')
@@ -772,91 +309,6 @@ function HealthTest-DfsDiagTestDCs {
         return
     }
     Write-Warning "[pass] 'DFSDIAG /TestDCs' returned expected output"
-}
-
-function HealthTest-DcDnsRegistration {
-    [CmdletBinding()]
-    param()
-
-    $domain = $env:USERDNSDOMAIN
-    $dcFqdn = "$($env:COMPUTERNAME).$domain"
-
-    if (-not $domain) {
-        Write-Warning "[debug] USERDNSDOMAIN is not set`nThis computer does not appear to have a domain DNS context in the current session."
-        return
-    }
-
-    $checks = @(
-        [pscustomobject]@{
-            Name = 'HostARecord'
-            QueryName = $dcFqdn
-            Type = 'A'
-            Test = {
-                @(Resolve-DnsName $dcFqdn -Type A -ErrorAction Stop)
-            }
-            Detail = {
-                param($result)
-                (($result | Select-Object -ExpandProperty IPAddress) -join ', ')
-            }
-        }
-        [pscustomobject]@{
-            Name = 'LdapDcSrv'
-            QueryName = "_ldap._tcp.dc._msdcs.$domain"
-            Type = 'SRV'
-            Test = {
-                @(Resolve-DnsName "_ldap._tcp.dc._msdcs.$domain" -Type SRV -ErrorAction Stop | Where-Object { $_.NameTarget -eq $dcFqdn })
-            }
-            Detail = {
-                param($result)
-                (($result | ForEach-Object { "$($_.NameTarget):$($_.Port)" }) -join ', ')
-            }
-        }
-        [pscustomobject]@{
-            Name = 'KerberosDcSrv'
-            QueryName = "_kerberos._tcp.dc._msdcs.$domain"
-            Type = 'SRV'
-            Test = {
-                @(Resolve-DnsName "_kerberos._tcp.dc._msdcs.$domain" -Type SRV -ErrorAction Stop | Where-Object { $_.NameTarget -eq $dcFqdn })
-            }
-            Detail = {
-                param($result)
-                (($result | ForEach-Object { "$($_.NameTarget):$($_.Port)" }) -join ', ')
-            }
-        }
-    )
-
-    $issueFound = $false
-
-    foreach ($check in $checks) {
-        $result = $null
-        try {
-            $result = & $check.Test
-        } catch {
-            $issueFound = $true
-            $synopsis = "DNS record $($check.Name) for this domain controller is missing or unresolved"
-            $details = "`nQuery: $($check.QueryName)`nType: $($check.Type)`nError: $($_.Exception.Message)"
-            Write-Warning ("[notice] " + $synopsis + $details)
-            continue
-        }
-
-        if (-not $result) {
-            $issueFound = $true
-            $synopsis = "DNS record $($check.Name) for this domain controller is missing"
-            $details = "`nQuery: $($check.QueryName)`nType: $($check.Type)`nExpected target: $dcFqdn"
-            Write-Warning ("[notice] " + $synopsis + $details)
-            continue
-        }
-
-        $synopsis = "DNS record $($check.Name) for this domain controller exists"
-        $details = "`nQuery: $($check.QueryName)`nType: $($check.Type)`nValue: $(& $check.Detail $result)"
-        Write-Warning ("[debug] " + $synopsis + $details)
-    }
-
-    if (-not $issueFound) {
-        $synopsis = "All tested DNS records for this domain controller exist"
-        $details = "`nDomain controller: $dcFqdn"
-        Write-Warning ("[pass] " + $synopsis + $details)
-    }
 }
 
 function HealthTest-DfsNamespaceEnumerate{
@@ -886,157 +338,6 @@ function HealthTest-TrustsVerify{
   }
   if(-not $bad){ Write-Warning "[pass] All domain trusts verify successfully" }
 }
-
-
-function HealthTest-RecycleBinEnabled{
-  $f=Get-ADOptionalFeature 'Recycle Bin Feature' -ErrorAction Stop
-  $enabled=($f.EnabledScopes -ne $null -and $f.EnabledScopes.Count -gt 0)
-  if($enabled){ Write-Warning "[pass] AD Recycle Bin enabled" } else { Write-Warning "[notice] AD Recycle Bin is not enabled -- consider enabling it." }
-}
-
-
-function HealthTest-GpWmiFiltersNamespaces{
-  $bad=$false
-  $items=@()
-
-  # Resolve domain via RootDSE
-  $dns=$null; $dn=$null
-  try{
-    $rootDse = [ADSI]"LDAP://RootDSE"
-    $dn = $rootDse.defaultNamingContext
-    $dns = $rootDse.rootDomainNamingContext -replace '(?i)(?<=,|^)\s*dc=','' -replace '\s*,\s*','.'
-  }catch{
-    Write-Warning "[warning] This machine cannot read LDAP RootDSE. Is it domain-joined and can it reach a DC?"
-    return
-  }
-
-  # Try GPMC COM first if present
-  $usedCom=$false
-  try{
-    if([type]::GetTypeFromProgID('GPMgmt.GPM')){
-      $gpm   = New-Object -ComObject GPMgmt.GPM
-      $const = $gpm.GetConstants()
-      $dom   = $gpm.GetDomain($dns,$null,$const.UseAnyDC)
-      $sc    = $gpm.CreateSearchCriteria()
-      foreach($f in @($dom.SearchWmiFilters($sc))){
-        $got=$false
-        try{
-          foreach($q in @($f.Queries)){
-            if($q -and $q.Namespace){ $items += [pscustomobject]@{Filter=$f.Name; Namespace=$q.Namespace}; $got=$true }
-          }
-        }catch{}
-        if(-not $got){
-          $txt = ($f.Query,$f.Description,$f.ToString()) -join "`n"
-          foreach($m in [regex]::Matches($txt,'(?im)\broot(\\[A-Za-z0-9_]+)+')){
-            $items += [pscustomobject]@{Filter=$f.Name; Namespace=$m.Value}
-          }
-        }
-      }
-      $usedCom=$true
-    }
-  }catch{
-    # fall through to LDAP
-    $usedCom=$false
-  }
-
-  # LDAP fallback (and also used to detect "no filters defined")
-  if(-not $usedCom -or -not $items){
-    try{
-      $wmipath = "LDAP://CN=WMIPolicy,CN=System,$dn"
-      $wmicont = [ADSI]$wmipath
-      if(-not $wmicont.psbase.Name){
-        Write-Warning "[pass] No GPO WMI filters defined (CN=WMIPolicy container not found)."
-        return
-      }
-      $ds = New-Object System.DirectoryServices.DirectorySearcher($wmicont)
-      $ds.PageSize=500
-      $ds.ReferralChasing = [System.DirectoryServices.ReferralChasingOption]::All
-      [void]$ds.PropertiesToLoad.AddRange(@('msWMI-Name','msWMI-Parm1'))
-      $ds.Filter="(objectClass=msWMI-Som)"
-      foreach($res in @($ds.FindAll())){
-        $name = ($res.Properties['mswmi-name']|Select-Object -First 1)
-        foreach($p in @($res.Properties['mswmi-parm1'])){
-          $ns=$null
-          if($p -match '^\s*\d+\s*;\s*([^;:]+)'){ $ns=$matches[1] }
-          if(-not $ns){
-            $m=[regex]::Match($p,'(?im)\broot(\\[A-Za-z0-9_]+)+')
-            if($m.Success){ $ns=$m.Value }
-          }
-          if($ns){ $items += [pscustomobject]@{Filter=$name; Namespace=$ns} }
-        }
-      }
-    }catch{
-      Write-Warning "[warning] Cannot enumerate WMI filters via GPMC or LDAP. Check: domain join, DC reachability/DNS, and GPMC installation."
-      return
-    }
-  }
-
-  if(-not $items){ Write-Warning "[pass] No GPO WMI filters defined"; return }
-
-  $unique = $items | Sort-Object Filter,Namespace -Unique
-  foreach($i in $unique){
-    try{
-      $null=Get-CimInstance -Namespace $i.Namespace -ClassName __NAMESPACE -ErrorAction Stop
-    } catch {
-      $bad=$true
-      Write-Warning "[failure] WMI namespace missing for filter '$($i.Filter)': $($i.Namespace)"
-    }
-  }  
-
-  if(-not $bad){ Write-Warning "[pass] All WMI namespaces referenced by GPO WMI filters exist on this host" }
-  else{ Write-Warning "[warning] One or more GPO WMI filter namespaces are missing on this host" }
-}
-
-
-function HealthTest-GpupdatePolicyApply {
-  [CmdletBinding()] param()
-  $cs   = Get-CimInstance Win32_ComputerSystem
-  $role = $cs.DomainRole
-  $fn   = $MyInvocation.MyCommand.Name
-  if ($role -in 0,2) { Write-Warning "[notice] This test ($fn) is not applicable to non-domain joined hosts"; return }
-  if ($role -in 4,5) { Write-Warning "[notice] This test ($fn) is not applicable to Domain Controllers"; return }
-
-
-  if (!(Test-ComputerSecureChannel)) {
-      Write-Warning "[warning] Can't connected to any Domain Controller. Can not run gpupdate.`nMake sure you are on the domain LAN or connected via VPN."
-    return
-  }
-
-  $id = [Security.Principal.WindowsIdentity]::GetCurrent()
-  $isSystem = $false
-  try {
-    if ($id -and $id.User -and $id.User.Value -eq 'S-1-5-18') { $isSystem = $true }
-  } catch {}
-
-  $out  = gpupdate 2>&1
-  $text = ($out | sls -notmatch '^ *$' | Out-String)
-
-  $compOk = ($text -like "*Computer Policy update has completed successfully*")
-  $userOk = ($text -like "*User Policy update has completed successfully*")
-
-  if ($compOk -and $userOk) {
-    Write-Warning "[pass] Computer and user policy updates completed successfully (gpupdate)."
-    return
-  }
-
-  if ($compOk) {
-    Write-Warning "[pass] Computer policy update completed successfully (gpupdate)."
-  } else {
-    Write-Warning "[failure] $("Computer policy update did not report success.")`n$(("gpupdate output:`n" + $text))"
-  }
-
-  if (-not $userOk) {
-    if ($isSystem) {
-      Write-Warning "[notice] $("User policy update did not report success (gpupdate running under SYSTEM/non-interactive).")`n$(("This can be expected when no interactive user is logged on.`nRaw gpupdate output:`n" + $text))"
-    } else {
-      Write-Warning "[failure] $("User policy update did not report success.")`n$(("Expected success for interactive user.`nRaw gpupdate output:`n" + $text))"
-    }
-  } else {
-    Write-Warning "[pass] User policy update completed successfully (gpupdate)."
-  }
-}
-
-
 function Get-DcDiagFailures {
   [CmdletBinding()]
   param(
@@ -1096,4 +397,487 @@ function Get-DcDiagFailures {
     }
   }
   $out
+}
+
+function HealthTest-AdminSDHolderCoverage{
+  $prot=Get-ADUser -LDAPFilter '(adminCount=1)' -Properties MemberOf | Select-Object -ExpandProperty SamAccountName
+  if($prot){ Write-Warning "[pass] AdminSDHolder applied; protected users: $($prot -join ", ")" } else { Write-Warning "[pass] No users currently protected by AdminSDHolder" }
+}
+
+function HealthTest-ADReplicationDomainRepadmin {
+  $domainRole = (Get-CimInstance Win32_ComputerSystem -ErrorAction Stop).DomainRole
+  $isHostDC = ($domainRole -in 4,5)
+
+  if (-not $isHostDC) { return }
+
+  $repadminCmd = Get-Command repadmin.exe -ErrorAction SilentlyContinue
+  $repadmin = if ($repadminCmd -and $repadminCmd.Source) { $repadminCmd.Source } else { "$env:windir\system32\repadmin.exe" }
+
+  if (-not (Test-Path -LiteralPath $repadmin)) {
+    Write-Warning "[failure] AD replication (repadmin): repadmin.exe not found; cannot run domain-wide checks."; return
+  }
+
+  $ok = $true
+
+  # --- Test 1: repadmin /replsum -> ensure all 'fails' are 0
+  try {
+    $sumOut = (& $repadmin /replsum 2>&1 | Out-String)
+  } catch {
+    Write-Warning "[failure] AD replication (repadmin): failed to execute 'repadmin /replsum'.`n$($_.Exception.Message)"
+    return
+  }
+
+  if (-not $sumOut) {
+    Write-Warning "[failure] AD replication (repadmin): no output from 'repadmin /replsum'."
+    $ok = $false
+  } else {
+    $bad = @()
+    foreach ($ln in ($sumOut -split '\r?\n')) {
+      if ($ln -match '^\s*(?<DSA>\S+)\s+(?<Delta>(?:\d+d:)?(?:\d+h:)?\d+m:\d+s|\d+s)\s+(?<Fails>\d+)\s*/\s*(?<Total>\d+)\b') {
+        $dsa = $Matches.DSA
+        $fails = [int]$Matches.Fails
+        $total = [int]$Matches.Total
+        if ($fails -gt 0) { $bad += [pscustomobject]@{ DSA=$dsa; Fails=$fails; Total=$total } }
+      }
+    }
+
+    if ($bad.Count -gt 0) {
+      foreach ($b in $bad) {
+        Write-Warning "[failure] AD replication (repadmin): replsum reports failures on '$($b.DSA)'`n$($b.Fails) fail(s) out of $($b.Total) neighbors."
+      }
+      $ok = $false
+    } else {
+      Write-Warning "[pass] AD replication (repadmin): replsum shows 0 fails for all DSAs."}
+  }
+
+  # --- Test 2: repadmin /showreps -> all latest attempts 'was successful.'
+  try {
+    $showOut = (& $repadmin /showreps 2>&1 | Out-String)
+  } catch {
+    Write-Warning "[failure] AD replication (repadmin): failed to execute 'repadmin /showreps'.`n$($_.Exception.Message)"
+    return
+  }
+
+  if (-not $showOut) {
+    Write-Warning "[failure] AD replication (repadmin): no output from 'repadmin /showreps'."
+    $ok = $false
+  } else {
+    $attemptLines = ($showOut -split '\r?\n') | Where-Object { $_ -match 'Last attempt @' }
+    if (-not $attemptLines -or $attemptLines.Count -eq 0) {
+      Write-Warning "[warning] AD replication (repadmin): showreps produced no 'Last attempt' lines.`nRun 'repadmin /showreps' manually to inspect output."
+      $ok = $false
+    } else {
+      $notOk = @($attemptLines | Where-Object { $_ -notmatch 'was successful\.$' })
+      if ($notOk.Count -gt 0) {
+        foreach ($ln in $notOk) {
+          Write-Warning "[failure] AD replication (repadmin): showreps has unsuccessful last attempt`n$($ln.Trim())"
+        }
+        $ok = $false
+      } else {
+        Write-Warning "[pass] AD replication (repadmin): showreps indicates all last attempts were successful."}
+    }
+  }
+
+  if (-not $ok) {
+    Write-Warning "[notice] AD replication (repadmin): issues detected."}
+}
+
+function HealthTest-ADReplicationLocalRSAT {
+  $domainRole = (Get-CimInstance Win32_ComputerSystem -ErrorAction Stop).DomainRole
+  $isHostDC = ($domainRole -in 4,5)
+
+  if (-not $isHostDC) { return }
+
+  $adModuleOk = $true
+  try {
+    if (-not (Get-Module -ListAvailable -Name ActiveDirectory)) { $adModuleOk = $false }
+  } catch {
+    $adModuleOk = $false
+  }
+
+  if (-not $adModuleOk) {
+    Write-Warning "[failure] AD replication (RSAT): ActiveDirectory module not available; cannot query replication partner metadata."; return
+  }
+
+  try {
+    Import-Module ActiveDirectory -ErrorAction Stop
+  } catch {
+    Write-Warning "[failure] AD replication (RSAT): failed to import ActiveDirectory module.`n$($_.Exception.Message)"
+    return
+  }
+
+  $me = $null
+  try {
+    $me = Get-ADDomainController -ErrorAction Stop
+  } catch {
+    Write-Warning "[failure] AD replication (RSAT): failed to identify local domain controller.`n$($_.Exception.Message)"
+    return
+  }
+
+  if (-not $me -or -not $me.HostName) {
+    Write-Warning "[failure] AD replication (RSAT): could not determine local DC hostname."; return
+  }
+
+  try {
+    [void](Get-ADDomain -ErrorAction Stop)
+  } catch {
+    Write-Warning "[failure] AD replication (RSAT): cannot query domain info (ADWS/permissions/connectivity issue).`n$($_.Exception.Message)"
+    return
+  }
+
+  $md = $null
+  try {
+    $md = Get-ADReplicationPartnerMetadata -Target $me.HostName -ErrorAction Stop
+  } catch {
+    Write-Warning "[failure] Exception from: Get-ADReplicationPartnerMetadata -Target $($me.HostName)`n$($_.Exception.Message)"
+    return
+  }
+
+  if (-not $md) {
+    Write-Warning "[failure] AD replication (RSAT): no partner metadata returned for $($me.HostName)."; return
+  }
+
+  $bad = @($md | Where-Object { $_.LastReplicationResult -ne 0 })
+  if ($bad.Count -gt 0) {
+    $details = $bad | ForEach-Object { "$($_.Partner) rc=$($_.LastReplicationResult) at $($_.LastSuccessfulSync)" }
+    Write-Warning "[failure] AD replication (RSAT): replication partner errors for $($me.HostName).`n$($details -join ' | ')"
+    return
+  }
+
+  Write-Warning "[pass] AD replication (RSAT): replication partner results healthy for $($me.HostName)."
+}
+
+function HealthTest-DhcpInAd{
+  $dhcp=Get-WindowsFeature -Name DHCP -ErrorAction SilentlyContinue
+  if(-not $dhcp -or -not $dhcp.Installed){ Write-Warning "[pass] DHCP role not installed on this server"; return }
+  $auth=Get-DhcpServerInDC -ErrorAction SilentlyContinue
+  $fqdn=[System.Net.Dns]::GetHostByName($env:COMPUTERNAME).HostName
+  $isAuth=($auth | Where-Object { $_.DnsName -ieq $fqdn })
+  if($isAuth){ Write-Warning "[pass] DHCP server is authorized in AD ($fqdn)" } else { Write-Warning "[failure] DHCP server is NOT authorized in AD ($fqdn)" }
+}
+
+function HealthTest-DisabledGpoLinksAtDomainRoot{
+  if(-not (Get-Command Get-GPO -ErrorAction SilentlyContinue)){
+    Write-Warning "[warning] GroupPolicy cmdlets not available; install RSAT/GPMC (GroupPolicy module)."; return
+  }
+
+  $root=$null
+  if(Get-Command Get-ADDomain -ErrorAction SilentlyContinue){
+    try{ $root=(Get-ADDomain).DistinguishedName }catch{}
+  }
+  if(-not $root){
+    try{
+      $dns=(Get-CimInstance Win32_ComputerSystem).Domain
+      if(-not $dns -or $dns -eq 'WORKGROUP'){ throw "Not on a domain" }
+      $root=($dns -split '\.')|ForEach-Object{"DC=$_"} -join ','
+    }catch{
+      Write-Warning "[warning] Cannot resolve domain root DN (need AD or machine joined to a domain)."; return
+    }
+  }
+
+  $parseFailures=0
+  $links=@()
+  foreach($g in (Get-GPO -All -ErrorAction Stop)){
+    try{
+      $xml=[xml](Get-GPOReport -Guid $g.Id -ReportType Xml -ErrorAction Stop)
+      foreach($lnk in @($xml.GPO.LinksTo.LinkTo)){
+        if($lnk.SOMPath -eq $root){
+          $links += [pscustomobject]@{
+            DisplayName=$xml.GPO.Name
+            Enabled= if($lnk.Enabled -eq 'true'){1}else{0}
+            Enforced=if($lnk.NoOverride -eq 'true'){1}else{0}
+            Order=[int]$lnk.Order
+          }
+        }
+      }
+    }catch{
+      $parseFailures++
+      $msg=($_.Exception.Message -replace '\s+',' ').Trim()
+      Write-Warning "[warning] Failed to parse GPO report; skipping GPO: $($g.DisplayName) ($($g.Id)) - $msg"
+    }
+  }
+
+  if($parseFailures -gt 0){
+    Write-Warning "[warning] One or more GPO reports could not be read/parsed ($parseFailures). Results may be incomplete."}
+
+  if(-not $links){
+    Write-Warning "[pass] No GPO links found at the domain root ($root)."; return
+  }
+
+  $flagged=$false
+  foreach($l in $links){
+    if($l.Enabled -eq 0){ $flagged=$true; Write-Warning "[warning] Domain-root GPO link is disabled: $($l.DisplayName)"}
+    if($l.Enforced -eq 0){ $flagged=$true; Write-Warning "[warning] Domain-root GPO link is not enforced: $($l.DisplayName)"}
+  }
+
+  if(-not $flagged){ Write-Warning "[pass] All domain-root GPO links are enabled (and enforced per policy)"}
+  else{ Write-Warning "[failure] There are disabled or non-enforced GPO links at the domain root"}
+}
+
+function HealthTest-KrbtgtAge{
+  [CmdletBinding()] param([int]$MaxDays=720)
+  $u=Get-ADUser krbtgt -Properties pwdLastSet
+  $ageDays=[int]((Get-Date) - [DateTime]::FromFileTime($u.pwdLastSet)).TotalDays
+  if($ageDays -le $MaxDays){
+    Write-Warning "[pass] krbtgt password age acceptable ($ageDays days <= $MaxDays)"
+  } else {
+    Write-Warning "[failure] krbtgt password age exceeds threshold ($MaxDays)`nThe KRBTGT account key hasn't been rotated for $ageDays days. Windows keeps the previous KRBTGT key to validate existing TGTs; never rotating extends the attack window. Risk: if an attacker ever accessed the KRBTGT key, they can mint TGTs and persist. Rotating twice (with replication time in between) is the standard mitigation."
+  }
+}
+
+function HealthTest-LocalAdminsBaseline {
+    param(
+        [string[]]$Allowed = @(
+            'BUILTIN\Administrators',
+            'NT AUTHORITY\SYSTEM',
+            'Domain Admins',
+            'Enterprise Admins'
+        )
+    )
+
+    $pass = $true
+
+    $grp = [ADSI]"WinNT://$env:COMPUTERNAME/Administrators,group"
+    $members = @(@($grp.psbase.Invoke('Members')) | ForEach-Object { [ADSI]$_ })
+    $unexpected = @()
+
+    foreach ($m in $members) {
+        $name = $m.InvokeGet('Name')
+        $path = [string]$m.Path
+
+        $dom  = ''
+        $acct = $name
+
+        if ($path -match '^WinNT://([^/]+)/([^/,]+)(?:,.*)?$') {
+            $dom  = $Matches[1]
+            $acct = $Matches[2]
+        }
+
+        $full = if ($dom) { "$dom\$acct" } else { $acct }
+
+        $isAllowed = $false
+        # 1) Built-in Administrator: SID ends with -500
+        try {
+            $sidBytes = $m.InvokeGet('ObjectSid')
+            if ($sidBytes) {
+                $sid = New-Object System.Security.Principal.SecurityIdentifier($sidBytes, 0)
+                if ($sid.Value -match '-500$') {
+                    $isAllowed = $true
+                }
+            }
+        } catch {
+            # If SID lookup fails we just fall back to name-based checks
+        }
+        # 2) Name-based allow list (if not already allowed by SID)
+        if (-not $isAllowed) {
+            foreach ($a in $Allowed) {
+                if ($full -ieq $a -or $full -like "*\$a") {
+                    $isAllowed = $true
+                    break
+                }
+            }
+        }
+
+        if (-not $isAllowed) {
+            Write-Warning "[warning] Unexpected Local Administrator: $full"
+            $pass = $false
+        }
+    }
+    if ($pass) {
+        Write-Warning "[pass] No unexpected accounts in Local Administrators"}
+}
+
+function HealthTest-ShadowStorage{
+  [CmdletBinding()] param(
+    [string[]]$RequireOnVolumes = @()   # e.g. 'D:','E:'; empty = informational only
+  )
+  $assoc = Get-CimInstance -ClassName Win32_ShadowStorage 2>$null
+  $vols  = Get-CimInstance -ClassName Win32_Volume | Select-Object DeviceID, DriveLetter
+
+  $present = @{}
+  if ($assoc) {
+    foreach($a in $assoc){
+      $volRef = [string]$a.Volume
+      $devId  = $null
+      if ($volRef -match 'DeviceID="([^"]+)"') { $devId = $Matches[1] }
+      if ($devId) { $devId = ($devId -replace '\\\\','\') }
+      $drive = $null
+      if ($devId -and ($devId -match '^[A-Z]:\\')) {
+        $drive = $devId.Substring(0,2)
+      } else {
+        if ($devId) {
+          $m = $vols | Where-Object { $_.DeviceID -eq $devId }
+          if ($m -and $m.DriveLetter) { $drive = $m.DriveLetter }
+        }
+      }
+      if (-not $drive) { $drive = $devId }
+      if ($drive) { $present[$drive.TrimEnd('\')] = $true }
+    }
+  }
+
+  if ($RequireOnVolumes.Count -gt 0) {
+    $missing = @()
+    foreach($v in $RequireOnVolumes){
+      $k = $v.TrimEnd('\')
+      if (-not $present.ContainsKey($k)) { $missing += $k; Write-Warning "[failure] Shadow storage not configured on required volume`n$k" }
+    }
+    if($missing.Count -eq 0){
+      Write-Warning ("[pass] Shadow storage on required volumes`nConfigured on: " + ((@($present.Keys) | Sort-Object) -join ', '))
+    }
+  } else {
+    if ($present.Count -gt 0) {
+      Write-Warning ("[pass] Shadow storage configured`nOn: " + ((@($present.Keys) | Sort-Object) -join ', '))
+    } else {
+      Write-Warning "[notice] Shadow storage (Volume Shadow Copies) is not enabled`nUsers won't see Previous Version for files/folders. (Note that this issue is UNRELATED to the VSS service that backup software use.)"
+    }
+  }
+}
+
+function HealthTest-SysvolContentConsistency{
+    $dom=(Get-CimInstance Win32_ComputerSystem).Domain
+    $dcs=Get-ADDomainController -Filter * | Select-Object -ExpandProperty HostName
+
+    $sigs = foreach($dc in $dcs){
+      $p="\\$dc\SYSVOL\$dom\Policies"
+      if(-not (Test-Path -LiteralPath $p)){
+        Write-Warning "[failure] SYSVOL Policies path missing on ${dc}: $p"
+        [pscustomobject]@{DC=$dc;Sig='<missing>'}
+        continue
+      }
+      $files = Get-ChildItem -LiteralPath $p -Recurse -File -Force -ErrorAction SilentlyContinue
+      $count = ($files | Measure-Object).Count
+      [uint64]$total=0; foreach($f in $files){ $total += [uint64]$f.Length }
+      [pscustomobject]@{DC=$dc;Sig=('' + $count + '|' + $total).Trim()}
+    }
+
+    # Compute uniqueness without Group-Object
+    $uniqueSigs = @($sigs | Select-Object -ExpandProperty Sig -Unique)
+    $hasMissing = $uniqueSigs -contains '<missing>'
+    $allSame    = ($uniqueSigs.Count -eq 1) -and -not $hasMissing
+    $map        = ($sigs | ForEach-Object { "$($_.DC)=$($_.Sig)" }) -join ' | '
+
+    # Debug: show what PowerShell *thinks* are distinct values and their bytes
+    write-verbose "`nDEBUG: Distinct Sig values ($uniqueSigs.Count):"
+    $uniqueSigs | ForEach-Object {
+      $bytes = [System.Text.Encoding]::UTF8.GetBytes($_)
+      write-verbose "  '$_'  bytes=[$([System.BitConverter]::ToString($bytes))]"
+    }
+
+    if($allSame) {
+      Write-Warning "[pass] SYSVOL policy tree manifests match across all DCs"
+    } elseif($hasMissing) {
+      Write-Warning "[failure] At least one DC lacks SYSVOL\Policies`n$map"
+    } else {
+      Write-Warning "[failure] SYSVOL policy manifests are not consistent across DCs`n$map"
+    }
+}
+
+function HealthTest-SysvolNetlogonAccessible{
+    $dcs = Get-DomainControllers
+    $bad = @()
+    foreach($dc in $dcs){
+      $ok1 = Test-Path "\\$dc\SYSVOL"
+      if (!$ok1) {Write-Warning "[failure] '\\$dc\SYSVOL' not reachable"}
+      $ok2 = Test-Path "\\$dc\NETLOGON"
+      if (!$ok2) {Write-Warning "[failure] '\\$dc\NETLOGON' not reachable"}
+      if(-not($ok1 -and $ok2)){ $bad += $dc.HostName }
+    }
+    $pass = ($bad.Count -eq 0)
+    if($pass){Write-Warning "[pass] All DCs have reachable SYSVOL & NETLOGON"}
+}
+
+function HealthTest-UnexpectedListeningPorts {
+    [CmdletBinding()] param(
+        [int[]]$AllowedPorts = @(53, 88, 123, 135, 139, 389, 445, 464, 636, 3268, 3269, 5722, 5985, 5986, 9389),
+        [int[]]$OptionalNoticePorts = @(3389, 47001, 593),
+        [int]$DynamicStart = 49152,
+        [int]$DynamicEnd = 65535
+    )
+# From a brand new Lenovo:
+#    FAILURE:[01d04124] Unexpected listening port: 7680 (Process: svchost)
+#    FAILURE:[3d641d0f] Unexpected listening port: 5040 (Process: svchost)
+#
+#   From Intel ATM:
+#       FAILURE:[5fbea54a] Unexpected listening port: 623 (Process: LMS)
+#       FAILURE:[58582cc2] Unexpected listening port: 16992 (Process: LMS)
+
+    $domainRole = (Get-CimInstance Win32_ComputerSystem).DomainRole
+    $isHostServer = ($domainRole  -in 3,4,5)
+
+    # 1. Get all listening connections
+    $AllListening = Get-NetTCPConnection -State Listen
+
+    # 2. Filter out connections where the LocalAddress is *only* the localhost loopback (127.0.0.1 or ::1)
+    $ExternalListening = $AllListening | Where-Object {
+        $_.LocalAddress -ne '127.0.0.1' -and $_.LocalAddress -ne '::1'
+    }
+
+    # 3. Group the connections by port number. This ensures each port is checked only once.
+    # This replaces the old method of selecting only the port number, so we retain the process ID.
+    $listeningPortGroups = $ExternalListening | Group-Object -Property LocalPort
+
+    $bad = $false
+    # 4. Loop through each group of connections (one group per unique port).
+    foreach ($portGroup in $listeningPortGroups) {
+        $comment = ""
+        $p = [int]$portGroup.Name # The port number is the 'Name' of the group
+
+        if ($p -ge $DynamicStart -and $p -le $DynamicEnd) { continue } # ignore ephemeral
+        if ($AllowedPorts -contains $p) { continue }
+
+        # For optional and unexpected ports, we'll find the process name.
+        # Get the Process ID from the first connection object in the group.
+        $procID = $portGroup.Group[0].OwningProcess
+        # Use the ID to get the process name. ErrorAction handles cases where the process might have just ended.
+        $vendor="(failed to find)"
+        if ($procID -eq 4) {
+            $procDescr="Process=SYSTEM(PID=4)"
+            $vendor="Microsoft Windows" # PID 4 is Microsoft Windows system process
+        } else {
+            $proc = (Get-Process -Id $procID -ErrorAction SilentlyContinue)
+            if (-not $proc) {
+                $procDescr = "PID $procID not found"
+                $comment = "The process that was listening terminated before we had the chance to query it. That's unusual."
+            } else {
+                if ($proc.path) {$procPath=Resolve-ExecutablePath $proc.path} else {$procPath=Resolve-ExecutablePath $proc.ProcessName}
+                try {$vendor=Get-ExeVendor $procPath} catch {}
+                $procDescr="$($proc.ProcessName)"
+                $comment = "Vendor: '$vendor'; Process Path: '$procPath'"
+            }
+        }
+
+        if ($OptionalNoticePorts -contains $p) {
+            # Added process name to the notice message for extra context.
+            Write-Warning "[notice] Optional baseline port is listening: $p ($procDescr)"
+            continue
+        }
+
+        $bad = $true
+
+        if ($vendor.PSObject.Properties.Name -contains 'Vendor') {
+            $vendorDescr=$vendor.Vendor
+        } else {
+            $vendorDescr=$vendor
+        }
+
+        # Display the unexpected port along with the listening process name.
+        # If vendor is like "Microsoft Windows*" then level becomes "WARNING" for servers and "NOTICE" for workstations
+        if ($vendorDescr -like "Microsoft Windows*") {
+            if($isHostServer){
+                Write-Warning ("[warning] Unexpected listening port: $p (Process: $procDescr, Vendor: $vendor)`n$comment")
+            } else {
+                Write-Warning ("[notice] Unexpected listening port: $p (Process: $procDescr, Vendor: $vendor)`n$comment")
+            }
+        } else {
+            Write-Warning ("[failure] Unexpected listening port: $p (Process: $procDescr, Vendor: $vendor)`n$comment")
+        }
+    }
+
+    if (-not $bad) { Write-Warning "[pass] Listening ports are within baseline"}
+}
+
+function HealthTest-UnusedEnabledAdapters{
+  $nics=Get-NetAdapter | Where-Object {$_.AdminStatus -eq 'Up' -and $_.Status -ne 'Up'}
+  foreach($n in $nics){ Write-Warning "[warning] Enabled network adapter is disconnected: $($n.Name) ($($n.Status))" }
+  if(($nics | Measure-Object).Count -eq 0){ Write-Warning "[pass] No enabled-but-disconnected network adapters detected" } else { Write-Warning "[failure] There are enabled-but-disconnected network adapters present" }
 }

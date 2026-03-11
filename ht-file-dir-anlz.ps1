@@ -37,20 +37,6 @@ function Find-LargeDirectory {
         [Parameter(Mandatory = $false)]
         [string[]]$SkipPaths = @()
     )
-
-    function Normalize-DirectoryPath {
-        param(
-            [Parameter(Mandatory)]
-            [string]$CandidatePath
-        )
-
-        if ($CandidatePath -match '^[a-zA-Z]:\\$') {
-            return $CandidatePath
-        }
-
-        return $CandidatePath.TrimEnd('\\')
-    }
-
     $normalizedSkipPaths = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::OrdinalIgnoreCase)
 
     foreach ($skipPath in $SkipPaths) {

@@ -150,55 +150,6 @@ function HealthTest-DnsRecursionConfig {
     }
 }
 
-
-function HealthTest-DhcpScopeUtilization {
-    $svc = Get-Service -Name 'DHCPServer' -ErrorAction SilentlyContinue
-    if (-not $svc) {
-        Write-Output "Host is not a DHCP server (DHCPServer service missing); skipping DHCP scope utilization test"
-        return
-    }
-
-    if (-not (Get-Command Get-DhcpServerv4ScopeStatistics -ErrorAction SilentlyContinue)) {
-        Write-Warning "[warning] DHCP server cmdlets not available on this DHCP server; skipping DHCP scope utilization test"
-        return
-    }
-
-    $stats = Get-DhcpServerv4ScopeStatistics -ErrorAction SilentlyContinue
-    if (-not $stats) {
-        Write-Warning "[warning] DHCP server role present but no DHCPv4 scopes found"
-        return
-    }
-
-    $over = @()
-    foreach ($s in $stats) {
-        if ($s.PercentageInUse -ge 90) {
-            $over += $s.ScopeId
-            Write-Warning "[failure] DHCP scope is >=90% used: $($s.ScopeId)"
-        } elseif ($s.PercentageInUse -ge 80) {
-            $over += $s.ScopeId
-            Write-Warning "[warning] DHCP scope is >=80% used: $($s.ScopeId)"
-        }
-    }
-
-    if ($over.Count -gt 0) {
-        Write-Warning "[pass] DHCP scope utilization OK (<80% in use)"
-    }
-
-}
-
-
-function HealthTest-RequiredSrvRecords{
-  $dom=(Get-CimInstance Win32_ComputerSystem).Domain
-  $labels=@("_ldap._tcp.dc._msdcs.$dom","_kerberos._tcp.$dom","_kerberos._udp.$dom")
-  $missing=$false
-  foreach($q in $labels){
-    try{ $r=Resolve-DnsName -Type SRV $q -ErrorAction Stop }catch{$r=$null}
-    if(-not $r){ $missing=$true; Write-Warning "[failure] $("Required SRV record missing")`n$($q)" }
-  }
-  if(-not $missing){ Write-Warning "[pass] Required AD SRV records present" }
-}
-
-
 function HealthTest-DnsSuffixMatchesDomain {
   [CmdletBinding()] param()
   $cs = Get-CimInstance Win32_ComputerSystem
@@ -217,6 +168,151 @@ function HealthTest-DnsSuffixMatchesDomain {
   }
 }
 
+function HealthTest-DnsClientService{
+  $s=Get-Service Dnscache -ErrorAction Stop
+  if($s.Status -eq 'Running'){ Write-Warning "[pass] DNS Client service running" } else { Write-Warning "[failure] DNS Client service is not running`nStatus=$($s.Status)" }
+}
+
+function HealthTest-DcDnsARecords{
+  $bad=@()
+  foreach($dc in (Get-ADDomainController -Filter *)){
+    $hn=$dc.HostName; $ip=$dc.IPv4Address
+    if(-not $hn -or -not $ip){ continue }
+    $ares=(Resolve-DnsName -Name $hn -Type A -ErrorAction SilentlyContinue).IPAddress
+    if(-not $ares){ $msg="$hn has no A records in DNS"; $bad+=$msg; Write-Warning "[failure] $($msg)"; continue }
+    if($ares -notcontains $ip){ $msg="$hn A record mismatch: AD IP=$ip, DNS IPs="+($ares -join ','); $bad+=$msg; Write-Warning "[failure] $($msg)" }
+  }
+  if($bad.Count -eq 0){ Write-Warning "[pass] DC DNS A records match AD IPs for all DCs" }
+}
+
+function HealthTest-DcDnsRegistration {
+    [CmdletBinding()]
+    param()
+
+    $domain = $env:USERDNSDOMAIN
+    $dcFqdn = "$($env:COMPUTERNAME).$domain"
+
+    if (-not $domain) {
+        Write-Warning "[debug] USERDNSDOMAIN is not set`nThis computer does not appear to have a domain DNS context in the current session."
+        return
+    }
+
+    $checks = @(
+        [pscustomobject]@{
+            Name = 'HostARecord'
+            QueryName = $dcFqdn
+            Type = 'A'
+            Test = {
+                @(Resolve-DnsName $dcFqdn -Type A -ErrorAction Stop)
+            }
+            Detail = {
+                param($result)
+                (($result | Select-Object -ExpandProperty IPAddress) -join ', ')
+            }
+        }
+        [pscustomobject]@{
+            Name = 'LdapDcSrv'
+            QueryName = "_ldap._tcp.dc._msdcs.$domain"
+            Type = 'SRV'
+            Test = {
+                @(Resolve-DnsName "_ldap._tcp.dc._msdcs.$domain" -Type SRV -ErrorAction Stop | Where-Object { $_.NameTarget -eq $dcFqdn })
+            }
+            Detail = {
+                param($result)
+                (($result | ForEach-Object { "$($_.NameTarget):$($_.Port)" }) -join ', ')
+            }
+        }
+        [pscustomobject]@{
+            Name = 'KerberosDcSrv'
+            QueryName = "_kerberos._tcp.dc._msdcs.$domain"
+            Type = 'SRV'
+            Test = {
+                @(Resolve-DnsName "_kerberos._tcp.dc._msdcs.$domain" -Type SRV -ErrorAction Stop | Where-Object { $_.NameTarget -eq $dcFqdn })
+            }
+            Detail = {
+                param($result)
+                (($result | ForEach-Object { "$($_.NameTarget):$($_.Port)" }) -join ', ')
+            }
+        }
+    )
+
+    $issueFound = $false
+
+    foreach ($check in $checks) {
+        $result = $null
+        try {
+            $result = & $check.Test
+        } catch {
+            $issueFound = $true
+            $synopsis = "DNS record $($check.Name) for this domain controller is missing or unresolved"
+            $details = "`nQuery: $($check.QueryName)`nType: $($check.Type)`nError: $($_.Exception.Message)"
+            Write-Warning ("[notice] " + $synopsis + $details)
+            continue
+        }
+
+        if (-not $result) {
+            $issueFound = $true
+            $synopsis = "DNS record $($check.Name) for this domain controller is missing"
+            $details = "`nQuery: $($check.QueryName)`nType: $($check.Type)`nExpected target: $dcFqdn"
+            Write-Warning ("[notice] " + $synopsis + $details)
+            continue
+        }
+
+        $synopsis = "DNS record $($check.Name) for this domain controller exists"
+        $details = "`nQuery: $($check.QueryName)`nType: $($check.Type)`nValue: $(& $check.Detail $result)"
+        Write-Warning ("[debug] " + $synopsis + $details)
+    }
+
+    if (-not $issueFound) {
+        $synopsis = "All tested DNS records for this domain controller exist"
+        $details = "`nDomain controller: $dcFqdn"
+        Write-Warning ("[pass] " + $synopsis + $details)
+    }
+}
+
+function HealthTest-DhcpDnsCredential{
+  [CmdletBinding()] param([int]$MaxPwdAgeDays=365)
+  $dhcp=Get-WindowsFeature -Name DHCP -ErrorAction SilentlyContinue
+  if(-not $dhcp -or -not $dhcp.Installed){ Write-Warning "[pass] DHCP role not installed on this server"; return }
+  $cred=Get-DhcpServerDnsCredential -ErrorAction SilentlyContinue
+  if(-not $cred -or -not $cred.UserName){ Write-Warning "[failure] No DHCP DNS update credentials configured"; return }
+  $u=Get-ADUser -Identity $cred.UserName -Properties Enabled,pwdLastSet
+  $age=[int]((Get-Date) - [DateTime]::FromFileTime($u.pwdLastSet)).TotalDays
+  if(-not $u.Enabled){ Write-Warning "[failure] DHCP DNS credential account is disabled: $($cred.UserName)"; return }
+  if($age -gt $MaxPwdAgeDays){ Write-Warning "[failure] DHCP DNS credential password age too high ($age days > $MaxPwdAgeDays): $($cred.UserName)" } else { Write-Warning "[pass] DHCP DNS credential healthy (Enabled, pwd age $age days <= $MaxPwdAgeDays)" }
+}
+
+function HealthTest-DhcpScopeUtilization {
+    $svc = Get-Service -Name 'DHCPServer' -ErrorAction SilentlyContinue
+    if (-not $svc) {
+        Write-Output "Host is not a DHCP server (DHCPServer service missing); skipping DHCP scope utilization test"
+        return
+    }
+
+    if (-not (Get-Command Get-DhcpServerv4ScopeStatistics -ErrorAction SilentlyContinue)) {
+        Write-Warning "[warning] DHCP server cmdlets not available on this DHCP server; skipping DHCP scope utilization test"; return
+    }
+
+    $stats = Get-DhcpServerv4ScopeStatistics -ErrorAction SilentlyContinue
+    if (-not $stats) {
+        Write-Warning "[warning] DHCP server role present but no DHCPv4 scopes found"; return
+    }
+
+    $over = @()
+    foreach ($s in $stats) {
+        if ($s.PercentageInUse -ge 90) {
+            $over += $s.ScopeId
+            Write-Warning "[failure] DHCP scope is >=90% used: $($s.ScopeId)"
+        } elseif ($s.PercentageInUse -ge 80) {
+            $over += $s.ScopeId
+            Write-Warning "[warning] DHCP scope is >=80% used: $($s.ScopeId)"
+        }
+    }
+
+    if ($over.Count -gt 0) {
+        Write-Warning "[pass] DHCP scope utilization OK (<80% in use)"}
+
+}
 
 function HealthTest-DnsSuffixBaseline {
     $DomainName=(Get-CimInstance Win32_ComputerSystem).Domain
@@ -226,24 +322,25 @@ function HealthTest-DnsSuffixBaseline {
     $primarySuffix = $ipg.DomainName
 
     if ([string]::IsNullOrWhiteSpace($primarySuffix)) {
-        Write-Warning "[failure] Primary DNS suffix" "Current is empty" "Ensure the system has a primary DNS suffix (normally set by domain join)."
+        Write-Warning "[failure] Primary DNS suffix: Current is empty" "Ensure the system has a primary DNS suffix (normally set by domain join)."
     } elseif ($primarySuffix -ieq $DomainName) {
-        Write-Warning "[pass] Primary DNS suffix" $primarySuffix
+        Write-Warning "[pass] Primary DNS suffix`n$primarySuffix"
     } else {
-        Write-Warning "[failure] Primary DNS suffix" ("Current='{0}' Expected='{1}'" -f $primarySuffix,$DomainName) "Ensure primary DNS suffix equals the AD DNS name (normally set by domain join)."
+        Write-Warning "[failure] Primary DNS suffix"("Current='{0}' Expected='{1}'" -f $primarySuffix,$DomainName) "Ensure primary DNS suffix equals the AD DNS name (normally set by domain join)."
     }
 
     # 2) DNS devolution is enabled (boolean only)
     try {
         $g = Get-DnsClientGlobalSetting -ErrorAction Stop
         if ($g.UseDevolution -eq $true) {
-            Write-Warning "[pass] DNS devolution enabled" "UseDevolution=True"
+            Write-Warning "[pass] DNS devolution enabled`nUseDevolution=True"
         } else {
-            Write-Warning "[failure] DNS devolution enabled" "UseDevolution=False" "Enable devolution (GPO: Computer Configuration/Administrative Templates/Network/DNS Client/Turn off DNS devolution = Disabled)."
+            Write-Warning "[failure] DNS devolution enabled`nUseDevolution=False`nEnable devolution (GPO: Computer Configuration/Administrative Templates/Network/DNS Client/Turn off DNS devolution = Disabled)."
         }
     } catch {
         $err = $_
-        Write-Warning "[failure] DNS devolution enabled" ("Unable to query global DNS client settings: {0}" -f $err.Exception.Message) "Check OS support for Get-DnsClientGlobalSetting and that the DNS Client service is running."
+        $comment = ("Unable to query global DNS client settings: {0}" -f $err.Exception.Message) + "`nCheck OS support for Get-DnsClientGlobalSetting and that the DNS Client service is running."
+        Write-Warning "[failure] DNS devolution enabled`n$comment"
     }
 
     # 3) Per-NIC checks (only PASS/FAIL; no discovery warning if none found)
@@ -253,7 +350,8 @@ function HealthTest-DnsSuffixBaseline {
                 Where-Object { $_.InterfaceOperationalStatus -eq "Up" -and $_.ConnectionSpecificSuffix -ne "localdomain" }
     } catch {
         $err = $_
-        Write-Warning (("[failure] NIC DNS settings`nUnable to query DNS client interfaces: {0}`nConfirm OS supports Get-DnsClient and you have sufficient privileges." -f $err.Exception.Message))
+        $comment = "Unable to query DNS client interfaces: $($err.Exception.Message)`nConfirm OS supports Get-DnsClient and you have sufficient privileges."
+        Write-Warning "[failure] NIC DNS settings`n$comment"
         $nics = @()
     }
 
@@ -279,8 +377,53 @@ function HealthTest-DnsSuffixBaseline {
     }
 }
 
+function HealthTest-InterfaceDnsServersUseDcs {
 
-function HealthTest-DnsClientService{
-  $s=Get-Service Dnscache -ErrorAction Stop
-  if($s.Status -eq 'Running'){ Write-Warning "[pass] DNS Client service running" } else { Write-Warning "[failure] DNS Client service is not running`nStatus=$($s.Status)" }
+  $cs = Get-CimInstance Win32_ComputerSystem
+  $role = $cs.DomainRole
+  $fn = $MyInvocation.MyCommand.Name
+  if ($role -in 0,2) { Write-Warning "[notice] This test ($fn) is not applicable to non-domain joined hosts"; return }
+  if ($role -in 4,5) { Write-Warning "[notice] This test ($fn) is not applicable to Domain Controllers"; return }
+  $dcIps = @($Global:GetComputerHealthDataQMTA.IpsOfAllDcs)
+
+  $nets = Get-CimInstance Win32_NetworkAdapterConfiguration -Filter "IPEnabled=TRUE"
+  if (-not $nets) {
+    Write-Warning "[failure] No IP-enabled network adapters found."; return
+  }
+
+  $anyClean = $false
+  $anyBad   = $false
+
+  foreach ($net in $nets) {
+    $dns  = $net.DNSServerSearchOrder
+    $desc = $net.Description
+    if (-not $dns -or $dns.Count -eq 0) {
+      Write-Warning "[notice] Interface has no DNS servers configured.`n$desc"
+      continue
+    }
+
+    $dnsList = $dns -join ', '
+    $allDomain = $true
+    $allNonDomain = $true
+    foreach ($s in $dns) {
+      if ($dcIps -notcontains $s) { $allDomain = $false; break }
+    }
+    foreach ($s in $dns) {
+      if ($dcIps -contains $s) { $allNonDomain = $false; break }
+    }
+
+    if ($allDomain) {
+      $anyClean = $true
+      Write-Warning "[pass] Interface has only DCs as DNS servers.`nInterface: $desc; DNS=$dnsList"
+    } elseif ($allNonDomain) {
+      # Ignoring this interface that only has non-domain DNS servers
+    } else {
+      $anyBad = $true
+      Write-Warning "[failure] Interface DNS servers include non-DC addresses.`nInterface: $desc; DNS=$dnsList; DC IPs=$($dcIps -join ', ')"
+    }
+  }
+
+  if (-not $anyClean) {
+    Write-Warning "[failure] No interface found where all DNS servers are DC IPs."} elseif (-not $anyBad) {
+    Write-Warning "[pass] All interfaces with DNS configured use only DC IPs."}
 }
