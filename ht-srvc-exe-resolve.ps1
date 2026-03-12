@@ -24,176 +24,14 @@ public static class Win32SvcPath {
 }
 "@
 }
-<#
-.SYNOPSIS
-Verifies DFS Namespace (domain-based) objects enumerate without error. OnlyForDomainServers
-#>
-<#
-.SYNOPSIS
-Lists SYSTEM-scheduled tasks that are disabled, stale, or failing.
-#>
-
-<#
-.SYNOPSIS
-Checks SYSVOL NTFS ACLs do not grant write to broad principals. OnlyForDCs
-#>
-
-<#
-.SYNOPSIS
-Reports accounts permitting RC4 via msDS-SupportedEncryptionTypes. OnlyForDomainServers
-#>
-
-<#
-.SYNOPSIS
-Ensures DHCP server presence/authorization sane if role installed. OnlyForDomainServers
-#>
-
-<#
-.SYNOPSIS
-Flags enabled NICs that are disconnected (cleanup). OnlyForDomainServers
-#>
-
-<#
-.SYNOPSIS
-Checks active interface metrics for sane binding preference. OnlyForDomainServers
-#>
-
-<#
-.SYNOPSIS
-Detects disabled GPO links at domain root (policy choice). OnlyForDCs
-#>
-<#
-.SYNOPSIS
-Ensures event log max sizes meet baseline without reading events. OnlyForDomainServers
-#>
-
-<#
-.SYNOPSIS
-Runs DCDIAG RIDManager and checks for failures or low pool signals. OnlyForDCs
-#>
-
-<#
-.SYNOPSIS
-Checks presence of EFS Data Recovery Agents policy/certs. OnlyForDomainServers
-#>
-
-<#
-.SYNOPSIS
-Verifies DNS zone transfers are restricted. OnlyForDCs
-#>
-
-<#
-.SYNOPSIS
-Flags stale krbtgt (pwdLastSet age above threshold). OnlyForDomainServers
-.NOTES
-What a failure means: The KRBTGT account key hasn't been rotated for years. Windows keeps the previous KRBTGT key to validate existing TGTs; never rotating extends the window for 'golden ticket' persistence if the key ever leaked.
-Risk: If an attacker ever accessed the KRBTGT key, they can mint TGTs and persist. Rotating twice (with replication time in between) is the standard mitigation.
-Severity: Critical.
-#>
-<#
-.SYNOPSIS
-Ensures NTDS log volume free space above threshold. OnlyForDCs
-#>
-<#
-.SYNOPSIS
-Verifies required hotfix baseline is present. OnlyForDomainServers
-#>
-
-<#
-.SYNOPSIS
-Validates DHCP DNS update credential account health. OnlyForDomainServers
-#>
-
-<#
-.SYNOPSIS
-Validates GPT vs GPC version numbers for GPO consistency. OnlyForDomainServers
-#>
-
-<#
-.SYNOPSIS
-Compares SYSVOL policy tree manifest across DCs (count+hash). OnlyForDCs
-.NOTES 
-Stresses Network: SMB directory tree walks to each DC's SYSVOL\Policies across sites.
-#>
-<#
-.SYNOPSIS
-Reviews RODC PRP (allow/deny) presence where RODCs exist. OnlyForDomainServers
-#>
-
-<#
-.SYNOPSIS
-Reports members of 'Pre-Windows 2000 Compatible Access' (should be empty). OnlyForDomainServers
-#>
-
-<#
-.SYNOPSIS
-Validates GP WMI filters use namespaces that exist on this host. OnlyForDomainServers
-#>
-<#
-.SYNOPSIS
-Verifies Windows are Licensed.
-#>
-<#
-.SYNOPSIS
-Checks if TPM is activated. OnlyForMobile
-#>
 
 
-
-<#
-.SYNOPSIS
-Checks DNS suffix for the AD domain. OnlyForDomain,NotForDCs
-#>
-<#
-.SYNOPSIS
-Checks that the domain DNS name A record points to at least one DC IP. OnlyForDomain,NotForDCs
-
-IMPORTANT: Invoke-GetHealthDomainComputers.ps1 must pass all DC IPs via
-	`-IpsOfAllDcs`. E.g:
-	@("192.168.0.1","192.168.0.2")
-#>
-<#
-.SYNOPSIS
-Ensures each interface DNS server list contains only DC IPs. OnlyForDomain,NotForDCs
-
-IMPORTANT: Invoke-GetHealthDomainComputers.ps1 must pass all DC IPs via
-	`-IpsOfAllDcs`. E.g:
-	@("192.168.0.1","192.168.0.2")
-#>
-<#
-.SYNOPSIS
-Verifies NLTEST /dsgetsite can determine the client AD site. OnlyForDomain,NotForDCs
-#>
-<#
-.SYNOPSIS
-Runs gpupdate and validates computer and user policy application. OnlyForDomain,NotForDCs
-#>
 #--------------------------------------------------------
 # xxx new tests 20205-11-26
 
-<# .SYNOPSIS Checks recent critical disk/NTFS/storage errors in the System event log. #>
-
-<# .SYNOPSIS Looks for crash dumps and bugcheck events as indicators of recent system crashes. #>
-<# .SYNOPSIS Detects unexpected members in the local Administrators group. #>
-
-<# .SYNOPSIS Checks physical NICs for link problems and significant error rates. #>
-<# .SYNOPSIS Summarizes BitLocker protection status for local volumes. #>
-<# .SYNOPSIS Detects DHCP scopes whose utilization is close to exhaustion. #>
-<#
-.SYNOPSIS
-  Verifies key DNS suffix/devolution/registration settings for a small, single-domain AD.
-#>
-<#
-.SYNOPSIS
-HealthTest-ADReplicationDomainRepadmin: Domain-wide AD replication health using repadmin.exe (replsum + showreps). DC-only; fails if repadmin or AD DS prerequisites are missing.
-#>
-
-<#
-.SYNOPSIS
-HealthTest-ADReplicationLocalRSAT: Local DC AD replication partner health using RSAT AD cmdlets (Get-ADReplicationPartnerMetadata). DC-only; fails if AD module/ADWS prerequisites are missing.
-#>
 
 function Expand-EnvVarsWin32 {
+
   [CmdletBinding()]
   param([Parameter(Mandatory)][string]$Text)
   $sb = New-Object System.Text.StringBuilder 32768
@@ -295,82 +133,8 @@ function Normalize-SystemRootPrefix {
   }
   $Text
 }
-<#
-.SYNOPSIS
-Returns a list of all Domain Controllers(FQDNs) using DNS SRV records.
-
-.DESCRIPTION
-Queries _ldap._tcp.dc._msdcs.<domain> via Resolve-DnsName and returns a unique set of DC hostnames.
-
-.OUTPUTS
-[System.String[]] hostnames (no trailing dot), case-insensitive unique list.
-
-.EXAMPLE
-Get-DomainControllers
-Gets DCs for the current logon domain.
-
-.NOTES
-Throws if no domain can be inferred. Requires DNS reachability.
-#>
-<#
-.SYNOPSIS
-Lists all Windows services along with their executable paths and vendor information. Also detects services with broken executable paths.
-
-.DESCRIPTION
-Enumerates all services on the system using Win32_Service, resolves each service's executable path from its PathName,
-and inspects the executable's Authenticode signature to extract the vendor/publisher name.
-Also emits failures if the executable is missing.
-Returns a list of objects with ServiceName, Vendor, and ExePath properties.
-#>
-<#
-.SYNOPSIS
- Return free space in GB for a drive or path.
-.OUTPUTS   System.Double (GB) or $null if undeterminable.
-.NOTES     Resolves a path to its drive root; tries PSDrive then .NET DriveInfo.
-#>
-<#
-.SYNOPSIS  Check a drive/path and emit a status; returns an object with details.
-.PARAMETER PathOrDrive  Drive letter or any path.
-.PARAMETER WarnPct      Warning threshold (default 10).
-.PARAMETER ErrorPct     Error threshold (default 5).
-.OUTPUTS   PSCustomObject with Drive,Type,FreeGB,TotalGB,PercentFree,Level; or nothing if not applicable.
-#>
-<#
-.SYNOPSIS
-Returns directories under Path whose observed child-item count is greater
-than Threshold.
-
-.OUTPUTS
-Produces a psCustomObject for each qualifying directory:
-  Path       : Full directory path
-  ItemsCount : Observed count of immediate child items
-
-.DESCRIPTION
-Recursively scans the directory tree rooted at Path.
-Directories that cannot be enumerated or read are skipped without a
-terminating error, and results may be incomplete for that reason.
-#>
-<#
-.SYNOPSIS
-Tests if the most recent Windows Defender scan is within a given number of days.
-
-.DESCRIPTION
-This function queries Microsoft Defender Antivirus status with Get-MpComputerStatus.
-It checks available scan end times (Full and Quick scans) and falls back to age counters
-if no timestamps exist. It then compares the most recent scan against a threshold.
-Returns this info:
-[pscustomobject]@{Pass=$true/$false; DaysSinceScan=N; Details='Human readable details'}
-
-.PARAMETER Days
-Number of days allowed since the last scan (default 3).
-
-.NOTES
-- On Windows Server, Defender does not schedule scans by default. If none were run,
-  this function may report "No scan timestamps or ages".
-- Requires Microsoft Defender Antivirus (Get-MpComputerStatus).
-#>
-
 function Split-FirstTokenSmart {
+
   [CmdletBinding()]
   param([Parameter(Mandatory)][string]$CommandLine)
 
@@ -867,6 +631,7 @@ function Resolve-ExecutablePath {
 
   $null
 }
+function Get-DomainControllers {
 <#
 .SYNOPSIS
 Returns a list of all Domain Controllers(FQDNs) using DNS SRV records.
@@ -884,7 +649,7 @@ Gets DCs for the current logon domain.
 .NOTES
 Throws if no domain can be inferred. Requires DNS reachability.
 #>
-function Get-DomainControllers {
+
   $Domain = (Get-CimInstance Win32_ComputerSystem).Domain
 
   if (-not $Domain) { throw "No domain detected." }
@@ -901,6 +666,7 @@ function Get-DomainControllers {
   return $results
 }
 
+function Get-ServiceVendors {
 <#
 .SYNOPSIS
 Lists all Windows services along with their executable paths and vendor information. Also detects services with broken executable paths.
@@ -911,7 +677,7 @@ and inspects the executable's Authenticode signature to extract the vendor/publi
 Also emits failures if the executable is missing.
 Returns a list of objects with ServiceName, Vendor, and ExePath properties.
 #>
-function Get-ServiceVendors {
+
   [CmdletBinding()]
   [OutputType([pscustomobject])]
   param()
@@ -949,196 +715,9 @@ function Get-ServiceVendors {
   }
 }
 
-<#
-.SYNOPSIS
- Return free space in GB for a drive or path.
-.OUTPUTS   System.Double (GB) or $null if undeterminable.
-.NOTES     Resolves a path to its drive root; tries PSDrive then .NET DriveInfo.
-#>
-Function Get-WindowsOriginalInstallDate {
-    <#
-    .SYNOPSIS
-        Robustly determines the Windows Installation date.
-    .DESCRIPTION
-        Aggregates dates from Registry History (for original install),
-        Current Registry, and WMI. Returns the oldest valid date found.
-        If history is missing, it gracefully falls back to the latest
-        feature update date.
-    #>
-    [CmdletBinding()]
-    param()
-
-    process {
-        # List to hold all potential dates found
-        $candidateDates = New-Object System.Collections.Generic.List[DateTime]
-
-        # Unix Epoch for converting Registry timestamps
-        $unixEpoch = (Get-Date -Date "01/01/1970").ToLocalTime()
-
-        # --- LAYER 1: The "Source OS" History (The Real Original Date) ---
-        # Windows archives old install dates here during feature updates.
-        try {
-            $setupKey = "HKLM:\SYSTEM\Setup"
-            if (Test-Path $setupKey) {
-                # Find keys like "Source OS (Updated on...)"
-                $sourceKeys = Get-ChildItem -Path $setupKey -ErrorAction SilentlyContinue |
-                              Where-Object { $_.Name -like "*Source OS*" }
-
-                foreach ($key in $sourceKeys) {
-                    $prop = Get-ItemProperty -Path $key.PSPath -Name "InstallDate" -ErrorAction SilentlyContinue
-                    if ($prop -and $prop.InstallDate -is [Int32] -or $prop.InstallDate -is [Int64]) {
-                        # Add to candidates
-                        $candidateDates.Add($unixEpoch.AddSeconds($prop.InstallDate))
-                    }
-                }
-            }
-        }
-        catch {
-            Write-Verbose "Could not access Registry History: $_"
-        }
-
-        # --- LAYER 2: The Current Registry (The Feature Update Date) ---
-        # Usually represents the last major update (e.g., 22H2).
-        try {
-            $currentPath = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion"
-            $currentProp = Get-ItemProperty -Path $currentPath -Name "InstallDate" -ErrorAction SilentlyContinue
-
-            if ($currentProp -and $currentProp.InstallDate) {
-                $candidateDates.Add($unixEpoch.AddSeconds($currentProp.InstallDate))
-            }
-        }
-        catch {
-            Write-Verbose "Could not access Current Registry: $_"
-        }
-
-        # --- LAYER 3: WMI Fallback (The Safety Net) ---
-        # If Registry is totally unreadable, WMI usually works.
-        # This usually matches Layer 2, but serves as a backup.
-        try {
-            $wmiOS = Get-CimInstance -ClassName Win32_OperatingSystem -ErrorAction SilentlyContinue
-            if ($wmiOS -and $wmiOS.InstallDate) {
-                $candidateDates.Add($wmiOS.InstallDate)
-            }
-        }
-        catch {
-            Write-Verbose "Could not access WMI: $_"
-        }
-
-        # --- FINAL DECISION ---
-        # 1. Remove duplicates and Sort
-        # 2. Pick the FIRST one (The Oldest)
-
-        if ($candidateDates.Count -gt 0) {
-            $finalDate = ($candidateDates | Sort-Object)[0]
-
-            # Determine confidence level for the output
-            $methodUsed = if ($candidateDates.Count -gt 1) { "Historical Analysis" } else { "Current Feature Update (Fallback)" }
-
-            return [PSCustomObject]@{
-                InstallDate = $finalDate
-                Confidence  = $methodUsed
-                AgeDays     = (New-TimeSpan -Start $finalDate -End (Get-Date)).Days
-            }
-        }
-        else {
-            # Absolute worst case: return current time (should theoretically never happen on a working OS)
-            Write-Warning "Critical Failure: No install date found in Registry or WMI."
-            return [PSCustomObject]@{
-                InstallDate = (Get-Date)
-                Confidence  = "Error - Date Not Found"
-                AgeDays     = 0
-            }
-        }
-    }
-}
-
-function Get-PropValue {
-# returns a default value if object does not have a property with that name.
-# The default value for the default value returned is $null but you can Set
-# $default to anything else.
-    param($obj, [string]$name, $default=$null)
-    if ($obj -and $obj.PSObject -and $obj.PSObject.Properties[$name]) {
-        return $obj.PSObject.Properties[$name].Value
-    }
-    return $default
-}
-<#
-.SYNOPSIS  Check a drive/path and emit a status; returns an object with details.
-.PARAMETER PathOrDrive  Drive letter or any path.
-.PARAMETER WarnPct      Warning threshold (default 10).
-.PARAMETER ErrorPct     Error threshold (default 5).
-.OUTPUTS   PSCustomObject with Drive,Type,FreeGB,TotalGB,PercentFree,Level; or nothing if not applicable.
-#>
-<#
-.SYNOPSIS
-Returns directories under Path whose observed child-item count is greater
-than Threshold.
-
-.OUTPUTS
-Produces a psCustomObject for each qualifying directory:
-  Path       : Full directory path
-  ItemsCount : Observed count of immediate child items
-
-.DESCRIPTION
-Recursively scans the directory tree rooted at Path.
-Directories that cannot be enumerated or read are skipped without a
-terminating error, and results may be incomplete for that reason.
-#>
-<#
-.SYNOPSIS
-Tests if the most recent Windows Defender scan is within a given number of days.
-
-.DESCRIPTION
-This function queries Microsoft Defender Antivirus status with Get-MpComputerStatus.
-It checks available scan end times (Full and Quick scans) and falls back to age counters
-if no timestamps exist. It then compares the most recent scan against a threshold.
-Returns this info:
-[pscustomobject]@{Pass=$true/$false; DaysSinceScan=N; Details='Human readable details'}
-
-.PARAMETER Days
-Number of days allowed since the last scan (default 3).
-
-.NOTES
-- On Windows Server, Defender does not schedule scans by default. If none were run,
-  this function may report "No scan timestamps or ages".
-- Requires Microsoft Defender Antivirus (Get-MpComputerStatus).
-#>
-function Get-DaysSinceLastVirusScan {
-  [CmdletBinding()] param([int]$Days=3)
-  try { $mp = Get-MpComputerStatus -ErrorAction Stop } catch {
-    return [pscustomobject]@{DaysSinceScan=$null;Details="Get-MpComputerStatus failed with error $_.Exception.Message"}
-  }
-
-  $ts = @()
-  foreach($p in 'FullScanEndTime','QuickScanEndTime','FullScanStartTime','QuickScanStartTime'){
-    $v = $mp.$p
-    if ($v) { try { $ts += [datetime]$v } catch {} }
-  }
-  $last = $null
-  if ($ts.Count -gt 0) { $last = ($ts | Sort-Object -Descending)[0] }
-
-  if ($last) {
-    $ageDays = ((Get-Date) - $last).TotalDays
-    $ok = ($ageDays -le $Days)
-    return [pscustomobject]@{DaysSinceScan=[math]::Round($ageDays,1);Details='Source: Time'}
-  }
-
-  $ages = @()
-  foreach($ap in 'FullScanAge','QuickScanAge'){
-    $av = $mp.$ap
-    if ($null -ne $av) { $ages += [int64]$av }
-  }
-  if ($ages.Count -gt 0) {
-    $minAge = ($ages | Measure-Object -Minimum).Minimum
-    $ok = ($minAge -le $Days)
-    return [pscustomobject]@{DaysSinceScan=$minAge;Details='Source: Age'}
-  }
-
-  return [pscustomobject]@{DaysSinceScan=$null;Details='No scan timestamps or ages'}
-}
-
 
 function Test-HasInvalidPathChars {
+
   [CmdletBinding()]
   param([Parameter(Mandatory)][string]$Text)
   if ($Text -match '[\x00-\x1F"<>|]') { return $true }     # control chars + common illegal
@@ -1160,19 +739,6 @@ function Test-LooksLikePath {
   try { $isRooted=[IO.Path]::IsPathRooted($s) } catch { $isRooted=$false }
   ($isRooted -or ($s -match '[\\/]') -or $s.StartsWith('\SystemRoot\',[StringComparison]::OrdinalIgnoreCase))
 }
-
-function Normalize-DirectoryPath {
-        param(
-            [Parameter(Mandatory)]
-            [string]$CandidatePath
-        )
-
-        if ($CandidatePath -match '^[a-zA-Z]:\\$') {
-            return $CandidatePath
-        }
-
-        return $CandidatePath.TrimEnd('\\')
-    }
 
 
 function HealthTest-AutoStartServicesRunning {
