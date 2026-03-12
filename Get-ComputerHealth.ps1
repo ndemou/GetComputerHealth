@@ -8,7 +8,7 @@ Executes many health-test functions (named `HealthTest-*`) and emits their resul
 Supports:
 - Listing available built-in tests (`-ListAllBuiltInTests`).
 - Running only selected tests (`-OnlyTheseTests`) and/or skipping specific tests (`-ExcludeTests`).
-- Loading and running custom tests from `.ps1` files in an isolated module scope (`-IncludeTestsFromFolder`) and invoking any `CustomHealthTest-*` functions they define.
+- Loading and running custom tests from `.ps1` files in an isolated module scope (`-IncludeTestsFromFolder`) and invoking any `HealthTest-*` functions they define.
 - Suppressing expected notices/warnings/failures by 8-hex "signature" hashes, either temporarily for the current run (`-WhitelistSigs`) or by appending a permanent suppression entry (`-AddWhitelisting`) to a suppression file.
 
 Notable side effects:
@@ -50,7 +50,7 @@ Default: empty (show all). Typical value: `DIP`
 (Parameter set: Run) One or more function names to skip (treated as a list; values may be space/comma separated).
 
 .PARAMETER IncludeTestsFromFolder
-(Parameter set: Run) Path to a folder containing `.ps1` files (or a single `.ps1` path). Files are loaded in an isolated module scope; any functions named `CustomHealthTest-*` discovered are invoked.
+(Parameter set: Run) Path to a folder containing `.ps1` files (or a single `.ps1` path). Files are loaded in an isolated module scope; any functions named `HealthTest-*` discovered are invoked.
 
 .PARAMETER DebugSkipSlowTests
 (Parameter set: Run) Skips a predefined subset of "slow" built-in tests (those gated by the script's `$DebugSkipSlowTests` check).
@@ -103,7 +103,7 @@ $out | Out-GridView
 .NOTES
 - Elevation is enforced for normal runs and for whitelisting operations.
 - Permanent suppression file: `C:\it\config\Get-ComputerHealth.sigs-to-suppress.txt`.
-- Custom tests: scripts may execute arbitrary code on import; files are loaded in temporary module scope and only functions named `CustomHealthTest-*` are invoked automatically.
+- Custom tests: scripts may execute arbitrary code on import; files are loaded in temporary module scope and functions named `HealthTest-*` are invoked automatically.
 #>
 
 [CmdletBinding(DefaultParameterSetName='Run')]
@@ -509,18 +509,27 @@ function Invoke-HealthTestsFromFolder {
         . $Path
       }
 
-      $custom = & $m {
+      $customHealthTests = @(& $m {
+        Get-Command -CommandType Function -Name 'HealthTest-*' -Module $ExecutionContext.SessionState.Module -ErrorAction SilentlyContinue
+      })
+      $legacyCustomHealthTests = @(& $m {
         Get-Command -CommandType Function -Name 'CustomHealthTest-*' -Module $ExecutionContext.SessionState.Module -ErrorAction SilentlyContinue
+      })
+
+      $allCustomTests = @($customHealthTests) + @($legacyCustomHealthTests) | Group-Object -Property Name | ForEach-Object { $_.Group[0] }
+
+      if (-not $allCustomTests) {
+        Log-debug "No HealthTest-* or CustomHealthTest-* functions found in $($f.FullName)"
+        continue
       }
 
-      if (-not $custom) {
-        Log-debug "No CustomHealthTest-* functions found in $($f.FullName)"
-        continue
+      if ($legacyCustomHealthTests.Count -gt 0) {
+        Log-Notice "$($f.Name) uses legacy CustomHealthTest-* prefix. Please rename to HealthTest-*"
       }
 
       $fileImported = $true
 
-      foreach($fn in $custom){
+      foreach($fn in $allCustomTests){
         $existing = Get-Item -Path ("Function:\{0}" -f $fn.Name) -ErrorAction SilentlyContinue
         try {
           Set-Item -Path ("Function:\{0}" -f $fn.Name) -Value $fn.ScriptBlock -Force
@@ -559,7 +568,7 @@ function Invoke-HealthTestsFromFolder {
   }
   if (!$fileImported) {return}
 
-  log-info "Invoke-HealthTestsFromFolder imported at least one file with CustomHealthTest-* functions."
+  log-info "Invoke-HealthTestsFromFolder imported at least one file with HealthTest-* functions."
 }
 
 function Write-UsageHelp {
@@ -804,6 +813,7 @@ Invoke-HealthTest "HealthTest-StartupItems"
 Invoke-HealthTest "HealthTest-RamPressure"
 Invoke-HealthTest "HealthTest-UpdateAge"
 if (!$DebugSkipSlowTests) { Invoke-HealthTest "HealthTest-SingleDefaultGateway" }
+Invoke-HealthTest "HealthTest-NetworkConnectionProfiles"
 Invoke-HealthTest "HealthTest-ScheduledTasks"
 Invoke-HealthTest "HealthTest-SystemScheduledTasks"
 if (!$DebugSkipSlowTests) { Invoke-HealthTest "HealthTest-VssWriters" }

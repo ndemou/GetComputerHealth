@@ -50,6 +50,41 @@ function HealthTest-ConnectivityToDCs {
   }
 }
 
+
+function HealthTest-NetworkConnectionProfiles {
+  [CmdletBinding()]
+  param()
+
+  $profiles = @(Get-NetConnectionProfile -ErrorAction SilentlyContinue)
+  if (-not $profiles) {
+    Write-Warning "[warning] Could not read network connection profiles"
+    return
+  }
+
+  $internetProfiles = @($profiles | Where-Object { $_.IPv4Connectivity -eq 'Internet' -or $_.IPv6Connectivity -eq 'Internet' })
+  if ($internetProfiles.Count -gt 0) {
+    Write-Warning "[pass] At least one network connection profile has Internet connectivity"
+  } else {
+    Write-Warning "[failure] No network connection profile has Internet connectivity"
+  }
+
+  $isServer = ((Get-CimInstance Win32_ComputerSystem -ErrorAction SilentlyContinue).DomainRole -ge 2)
+  if (-not $isServer) { return }
+
+  $isDomainJoined = [bool]((Get-CimInstance Win32_ComputerSystem -ErrorAction SilentlyContinue).PartOfDomain)
+  $allowedCategories = @('Private')
+  if ($isDomainJoined -and -not $global:IsPdcRole) {
+    $allowedCategories = @('DomainAuthenticated')
+  }
+
+  $matchingServerProfiles = @($profiles | Where-Object { $allowedCategories -contains $_.NetworkCategory.ToString() })
+  if ($matchingServerProfiles.Count -gt 0) {
+    Write-Warning "[pass] Server has at least one interface with allowed network category: $(($allowedCategories -join ', '))"
+  } else {
+    Write-Warning "[failure] Server has no interface with allowed network category: $(($allowedCategories -join ', '))"
+  }
+}
+
 function HealthTest-SingleDefaultGateway{
   [CmdletBinding()] param([switch]$AllowOnePerFamily)
   $cfg = Get-NetIPConfiguration

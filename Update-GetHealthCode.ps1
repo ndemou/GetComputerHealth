@@ -12,6 +12,10 @@ Will set PSGallery as Trusted.
 .OUTPUTS
 None.
 #>
+param(
+  [switch]$Reinstall
+)
+
 ####################################################################
 #
 #  START OF CONFIG
@@ -266,9 +270,12 @@ if ($latestReleaseMarker) {
       Write-Warning ("Failed reading release marker file {0}: {1}" -f $LATEST_RELEASE_MARKER_PATH, $_.Exception.Message)
     }
   }
-  if ($storedReleaseMarker -and ($storedReleaseMarker -eq $latestReleaseMarker)) {
+  if ((-not $Reinstall) -and $storedReleaseMarker -and ($storedReleaseMarker -eq $latestReleaseMarker)) {
     Write-Host -ForegroundColor DarkGray "Latest release already downloaded. Skipping update download."
     return
+  }
+  if ($Reinstall -and $storedReleaseMarker -and ($storedReleaseMarker -eq $latestReleaseMarker)) {
+    Write-Host -ForegroundColor Yellow "-Reinstall was specified; re-downloading current latest release."
   }
 }
 
