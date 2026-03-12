@@ -418,7 +418,23 @@ function Log-Msg {
   }
   Write-Output $out
 
-  if ((-not $script:cfgOutputConsoleMessages) -or $Hide -or $must_suppress_sig) { return }
+  if ((-not $script:cfgOutputConsoleMessages) -or $Hide) { return }
+
+  if ($must_suppress_sig) {
+    Write-Host -ForegroundColor Blue -NoNewline '  SUPPRESS :'
+    Write-Host -ForegroundColor $SigColor -NoNewline (" [{0}] " -f $sig)
+    Write-Host -ForegroundColor $MsgColor $Msg
+
+    if ($Comment -and ($script:cfgHideStr -notlike '*C*')) {
+      if ($Comment -match '\n') {
+        ($Comment -replace '^(?:\s*\r?\n)+|(?:\s*\r?\n)+$', '') -split '\n' | %{ Write-Host -ForegroundColor DarkGray "  #       $_" }
+      } else {
+        Write-Host -ForegroundColor DarkGray "  #       $Comment"
+      }
+    }
+    return
+  }
+
   #------------------------------------------------------------------
   # Console output below -- if you edit me put nothing else here
   #

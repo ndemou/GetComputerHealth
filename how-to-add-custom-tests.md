@@ -2,7 +2,7 @@
 
 ## TL;DR
 
-`.ps1` files in `C:\IT\config\Custom-HealthTests\` are dot-sourced, all functions with a name starting with `CustomHealthTest-` are executed, and these functions should call either `Write-Warning "[pass] $message"` if all is well or `Write-Warning "[failure] $message` or `Write-Warning "[failure] $message" + [Environment]::NewLine + "$optionalDetails"`. The code you write will be executed with *high privileges* and appart from temporary files or similar, it *should not make any changes* to the system state.
+`.ps1` files in `C:\IT\config\Custom-HealthTests\` are dot-sourced, all functions with a name starting with `HealthTest-` are executed, and these functions should call either `Write-Warning "[pass] $message"` if all is well or `Write-Warning "[failure] $message` or `Write-Warning "[failure] $message" + [Environment]::NewLine + "$optionalDetails"`. The code you write will be executed with *high privileges* and appart from temporary files or similar, it *should not make any changes* to the system state.
 
 ## Step by step
 
@@ -13,9 +13,9 @@
    # If you wish, you can have helper functions (or dot-source them).
      
    # This is the function that implemets the test.
-   # It's name starts with CustomHealthTest-. and it doesn't return anything.
+   # It's name starts with HealthTest-. and it doesn't return anything.
    # It outputs either information for a passed test or findings using  Write-Warning.
-   function CustomHealthTest-LargeDirectories {
+   function HealthTest-LargeDirectories {
        $issueFound = $false
        foreach ($dir in Find-LargeDirectory -Path 'C:\' -Threshold 10000) {
            $issueFound = $true
@@ -44,14 +44,14 @@
        }
    }
 
-   # You can have more than one CustomHealthTest-... functions.
+   # You can have more than one HealthTest-... functions.
    
    # Do not write any other code outside of functions. 
    ```
 3. Test your function:
    ```powershell
    . "C:\IT\config\Custom-HealthTests\tests-for-$env:COMPUTERNAME.ps1" # <-- the name of your ps1 file here
-   CustomHealthTest-LargeDirectories # <-- the name of your function here
+   HealthTest-LargeDirectories # <-- the name of your function here
    ```
 
 If you wish you can have more than one .ps1 files in `C:\IT\config\Custom-HealthTests\`
@@ -78,7 +78,7 @@ test-path C:\IT\ # must exist
 test-path C:\IT\config\ # we must create it if it doesn't exist
 test-path C:\IT\config\Custom-HealthTests\ # we must create it if it doesn't exist
 Get-ChildItem C:\IT\config\Custom-HealthTests\
-if (test-path C:\IT\config\Custom-HealthTests\*.ps1) {sls '^ *function CustomHealthTest-' C:\IT\config\Custom-HealthTests\*.ps1 -context 10}
+if (test-path C:\IT\config\Custom-HealthTests\*.ps1) {sls '^ *function HealthTest-' C:\IT\config\Custom-HealthTests\*.ps1 -context 10}
 ```
 
 Then ask your human to describe the test they want you to implement.
