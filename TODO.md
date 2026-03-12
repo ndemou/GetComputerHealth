@@ -1,12 +1,16 @@
 # TODO
 
-## New tests
+## 1. Custom health tests(functions) must use the `HealthTest-` prefix instead of `CustomHealthTest-`
 
-Get-NetConnectionProfile: 
-  1. both for Servers & workstations: at least one interface must have IPv4Connectivity or IPv4Connectivity equal to "Internet".
-  2. For servers at least one interface must have NetworkCategory that is: a) private if it's either a DC/PDC or not domain joined b) DomainAuthenticated if domain joined
+Document only this prefix in official documentation but keep supporting `CustomHealthTest-` in order to not break already deployed code.
 
-## Add option -Reinstall in updater
+## 2. (Console output) Show suppressed findings with a nice blue `"SUPPRESS : "` prefix.
+
+## 3. New networking test with `Get-NetConnectionProfile`
+  1. For all computers: At least one interface must have IPv4Connectivity or IPv4Connectivity equal to "Internet".
+  2. For servers: At least one interface must have NetworkCategory that is either "private" or "domain joined": a) "private" for non-domain-joined and for DC/PDC b) "DomainAuthenticated" for domain joined (except DC/PDC)
+
+## 4. Add option -Reinstall in updater
 
 Will re-download and update even if already at the latest release.
 
@@ -14,14 +18,13 @@ Will re-download and update even if already at the latest release.
 
 See also : .\tests\script-analysis.ps1
 
-## How can I automate tests in GitHub?
+## Automate tests in GitHub
 
 ChatGPT said: GitHub Actions can run Windows PowerShell 5.1 by using the powershell shell (which invokes powershell.exe on Windows runners).
 See also: https://docs.github.com/actions/automating-builds-and-tests/building-and-testing-powershell
 
 ## Use tags in HealthTest- function names 
 
-### Tags
 E.g. "HealthTest-CheckSomething__sD-V__tS" means:
   - Only perform this test on a system(s) that is 
     domain joined(D) but not a VM (-V)
@@ -39,10 +42,7 @@ Possible types:
    S: Slow
    B: Relative (see below)
 ```
-
-### End game
-
-With these changes in place I can greatly simplify the main part of the code that execute the built in tests.
+Then I can greatly simplify the main part of the code that execute the built in tests.
 
 **About relative Tests**
 relative tests don't produce absolute pass/fail results.
