@@ -617,7 +617,7 @@ Runs gpupdate and validates computer and user policy application. OnlyForDomain,
 
 
 function HealthTest-CrashDumpSignals {
-<# .SYNOPSIS Looks for crash dumps and bugcheck events as indicators of recent system crashes. #>
+<# .SYNOPSIS Looks for crash dump files as indicators of recent system crashes. #>
 
     param([int]$Hours = 48)
 
@@ -627,21 +627,68 @@ function HealthTest-CrashDumpSignals {
 
     Get-ChildItem "$env:SystemRoot\Minidump" -Filter *.dmp -ErrorAction SilentlyContinue | ?{ $_.LastWriteTime -gt $cutoff } | %{
         Write-Warning "[failure] Found $env:SystemRoot\Minidump\ file(s) within the last N hours`nN=$Hours hours. File: $env:SystemRoot\Minidump\$($_.name))"
-    }
-    if ($pass) {
-        Write-Warning "[pass] No recent minidumps"}
-
-    $pass = $true
-    Get-WinEvent -FilterHashtable @{
-            LogName   = 'System'
-            Id        = 1001  # BugCheck
-            StartTime = $cutoff
-    } -ErrorAction SilentlyContinue | %{
-        Write-Warning "[failure] Found System Event #1001 within the last N hours (this event often indicates a crash)`nN=$Hours hours. Event: $($_.TimeCreated), $($_.LevelDisplayName), $($_.Message)"
+        $pass = $false
     }
 
     if ($pass) {
-        Write-Warning "[pass] No recent System #1001 events"}
+        Write-Warning "[pass] No recent minidumps"
+    }
+}
+
+function HealthTest-SeriousRecentEventLogs {
+<# .SYNOPSIS Scans the last N hours of event logs and reports only serious failures/warnings/notices. #>
+
+    [CmdletBinding()]
+    param([int]$Hours = 24)
+
+    if ($Hours -lt 1) { $Hours = 1 }
+    $cutoff = (Get-Date).AddHours(-$Hours)
+    $totalFindings = 0
+
+    function Get-FirstLine([string]$Text) {
+        if ([string]::IsNullOrWhiteSpace($Text)) { return "" }
+        return (($Text -split "`r?`n")[0]).Trim()
+    }
+
+    function Write-EventFinding([string]$Severity, [string]$Synopsis, $EventRecord) {
+        $msg = Get-FirstLine -Text $EventRecord.Message
+        Write-Warning "[$Severity] $Synopsis`n$($EventRecord.TimeCreated) | $($EventRecord.ProviderName) | Event ID $($EventRecord.Id)`n$msg"
+    }
+
+    # [failure] Blue screen / bugcheck / unexpected shutdown
+    $failureFilters = @(
+        @{ LogName = 'System'; Id = 41;   ProviderName = 'Microsoft-Windows-Kernel-Power';          StartTime = $cutoff },
+        @{ LogName = 'System'; Id = 6008; ProviderName = 'EventLog';                                 StartTime = $cutoff },
+        @{ LogName = 'System'; Id = 1001; ProviderName = 'Microsoft-Windows-WER-SystemErrorReporting'; StartTime = $cutoff }
+    )
+    foreach ($filter in $failureFilters) {
+        Get-WinEvent -FilterHashtable $filter -ErrorAction SilentlyContinue | ForEach-Object {
+            $totalFindings++
+            $synopsis = if ($_.Id -eq 1001) { 'Detected blue screen / bugcheck event in System log' } else { 'Detected unexpected system shutdown event in System log' }
+            Write-EventFinding -Severity 'failure' -Synopsis $synopsis -EventRecord $_
+        }
+    }
+
+    # [warning] Disk errors
+    $diskProviders = @('disk', 'Ntfs', 'stornvme', 'storahci', 'iaStorA', 'iaStorAVC', 'iaStorV')
+    $diskEventIds = @(7, 51, 52, 55, 98, 129, 153, 157)
+    Get-WinEvent -FilterHashtable @{ LogName = 'System'; StartTime = $cutoff; Level = 2 } -ErrorAction SilentlyContinue |
+        Where-Object { ($diskProviders -contains $_.ProviderName) -or ($diskEventIds -contains $_.Id) } |
+        ForEach-Object {
+            $totalFindings++
+            Write-EventFinding -Severity 'warning' -Synopsis 'Detected serious disk error in System log' -EventRecord $_
+        }
+
+    # [notice] Application crashes
+    Get-WinEvent -FilterHashtable @{ LogName = 'Application'; Id = 1000; ProviderName = 'Application Error'; StartTime = $cutoff } -ErrorAction SilentlyContinue |
+        ForEach-Object {
+            $totalFindings++
+            Write-EventFinding -Severity 'notice' -Synopsis 'Detected application crash in Application log' -EventRecord $_
+        }
+
+    if ($totalFindings -eq 0) {
+        Write-Warning "[pass] No serious shutdown, bugcheck, disk error, or application crash events found in the last $Hours hour(s)"
+    }
 }
 
 
