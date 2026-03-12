@@ -57,15 +57,15 @@ function HealthTest-NetworkConnectionProfiles {
 
   $profiles = @(Get-NetConnectionProfile -ErrorAction SilentlyContinue)
   if (-not $profiles) {
-    Write-Warning "[warning] Could not read network connection profiles"
+    Write-Warning "[warning] Could not read network connection profiles (Get-NetConnectionProfile failed)"
     return
   }
 
   $internetProfiles = @($profiles | Where-Object { $_.IPv4Connectivity -eq 'Internet' -or $_.IPv6Connectivity -eq 'Internet' })
   if ($internetProfiles.Count -gt 0) {
-    Write-Warning "[pass] At least one network connection profile has Internet connectivity"
+    Write-Warning "[pass] Connected to the Internet"
   } else {
-    Write-Warning "[failure] No network connection profile has Internet connectivity"
+    Write-Warning "[failure] No Internet connection" + "`n" + "According to windows (Get-NetConnectionProfile)"
   }
 
   $isServer = ((Get-CimInstance Win32_ComputerSystem -ErrorAction SilentlyContinue).DomainRole -ge 2)
@@ -79,9 +79,9 @@ function HealthTest-NetworkConnectionProfiles {
 
   $matchingServerProfiles = @($profiles | Where-Object { $allowedCategories -contains $_.NetworkCategory.ToString() })
   if ($matchingServerProfiles.Count -gt 0) {
-    Write-Warning "[pass] Server has at least one interface with allowed network category: $(($allowedCategories -join ', '))"
+    Write-Warning "[pass] Expected network category: $(($allowedCategories -join ', '))"
   } else {
-    Write-Warning "[failure] Server has no interface with allowed network category: $(($allowedCategories -join ', '))"
+    Write-Warning "[failure] No connection with an expected network category: $(($allowedCategories -join ', '))"
   }
 }
 
