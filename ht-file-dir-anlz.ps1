@@ -2,6 +2,20 @@
 File & Directory Analysis
 #>
 
+
+function Normalize-DirectoryPath {
+        param(
+            [Parameter(Mandatory)]
+            [string]$CandidatePath
+        )
+
+        if ($CandidatePath -match '^[a-zA-Z]:\\$') {
+            return $CandidatePath
+        }
+
+        return $CandidatePath.TrimEnd('\\')
+    }
+
 function HealthTest-LargeDirectories {
     $foundLargeDirectory = $false
 

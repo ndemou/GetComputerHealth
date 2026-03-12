@@ -2,6 +2,50 @@
 OS Performance & Hardware
 #>
 
+
+function Get-PropValue {
+# returns a default value if object does not have a property with that name.
+# The default value for the default value returned is $null but you can Set
+# $default to anything else.
+    param($obj, [string]$name, $default=$null)
+    if ($obj -and $obj.PSObject -and $obj.PSObject.Properties[$name]) {
+        return $obj.PSObject.Properties[$name].Value
+    }
+    return $default
+}
+
+function Test-IsRdsLicensingServer {
+<#
+.SYNOPSIS
+Flags unexpected listening TCP ports; ignores 49152-65535 and notes optional baseline ports (3389, 47001, 593). OnlyForDomainServers
+.DESCRIPTION
+Filters out ports listening only on the loopback addresses (127.0.0.1 and ::1) before checking against allowed ports.
+#>
+
+  [CmdletBinding()]
+  [OutputType([bool])]
+  param()
+
+  # 1 = Workstation 2 = Domain Controller 3 = Windows Server
+  $host_type = (Get-CimInstance Win32_OperatingSystem).ProductType
+  if ($host_type -eq 1) { return $false }
+
+  # Detect by service first (works on Server Core and PS7+)
+  try {
+    $svc = Get-Service -Name 'TermServLicensing' -ErrorAction SilentlyContinue
+    if ($svc) { return $true }
+  } catch {}
+
+  # Fallback to ServerManager feature check (only works if ServerManager module exists)
+  try {
+    Import-Module ServerManager -ErrorAction Stop
+    $feat = Get-WindowsFeature -Name RDS-Licensing -ErrorAction SilentlyContinue
+    if ($feat -and $feat.Installed) { return $true }
+  } catch {}
+
+  return $false
+}
+
 function HealthTest-TimeSyncPolicy {
 <#
 .SYNOPSIS
@@ -285,50 +329,8 @@ Reads w32tm /query /source and registry VMICTimeProvider; uses Log-pass/Failure/
     }
 }
 
-<#
-.SYNOPSIS
-Measures time offset vs. a time source and compares against thresholds.
 
-.DESCRIPTION
-By default targets the current w32time Source (from w32tm /query /status), unless -AlwaysUseRef
-is specified, in which case it targets -RefTimeServer. Uses w32tm /stripchart with 1 sample,
-parses the offset in seconds, and evaluates against -WarnOffsetSeconds and -FailOffsetSeconds.
-
-.PARAMETER WarnOffsetSeconds
-Warning threshold for absolute offset seconds. Default 2.
-
-.PARAMETER FailOffsetSeconds
-Failure threshold for absolute offset seconds. Default 15.
-
-.PARAMETER RefTimeServer
-Fallback/explicit NTP server to test when AlwaysUseRef or no usable Source. Default time.windows.com.
-
-.PARAMETER AlwaysUseRef
-Force testing against RefTimeServer instead of the current Source.
-
-.EXAMPLE
-HealthTest-TimeSyncAccuracy
-Uses the current time source and warns/fails on excessive offset.
-
-.EXAMPLE
-HealthTest-TimeSyncAccuracy -RefTimeServer 'pool.ntp.org' -AlwaysUseRef -WarnOffsetSeconds 1 -FailOffsetSeconds 5
-Tests against a specific NTP pool with stricter thresholds.
-#>
-<#
-.SYNOPSIS
-Detects whether a reboot is pending on this host.
-
-.DESCRIPTION
-Checks common reboot indicators:
-- CBS: HKLM\...\Component Based Servicing\RebootPending
-- Windows Update: HKLM\...\WindowsUpdate\Auto Update\RebootRequired
-- Pending file rename operations in Session Manager
-Emits Log-Notice if a reboot is pending; Log-pass otherwise.
-
-.EXAMPLE
-if (-not (HealthTest-PendingReboot)) { 'Schedule a reboot.' }
-#>
-
+function HealthTest-UpdateAge {
 <#
 .SYNOPSIS
 Flags stale Windows Update posture based on last successful install date.
@@ -350,7 +352,7 @@ Fail when last success is >= this many days. Default 45.
 .EXAMPLE
 HealthTest-UpdateAge -WarnDays 21 -FailDays 35
 #>
-function HealthTest-UpdateAge {
+
     param([int]$WarnDays=30,[int]$FailDays=45)
     $lastUpdateDate = $null
     $reg = Get-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\Results\Install' -ErrorAction SilentlyContinue
@@ -366,28 +368,8 @@ function HealthTest-UpdateAge {
     Write-Warning "[pass] We have a recent successful installation of a Windows Update ($($age.Days)d ago at $lastUpdateDate)"
 }
 
-<#
-.SYNOPSIS
-Checks Microsoft Defender signature freshness and reports status.
 
-.DESCRIPTION
-Reads Get-MpComputerStatus and compares AntispywareSignatureAge and AntivirusSignatureAge
-to thresholds. Fails when either age >= FailSigAgeDays; warns when either >= WarnSigAgeDays.
-On success, reports current AV signature version.
-
-.PARAMETER WarnSigAgeDays
-Warn threshold for signature age (days). Default 1.
-
-.PARAMETER FailSigAgeDays
-Fail threshold for signature age (days). Default 7.
-
-.OUTPUTS
-[bool] $true if signatures are fresh; $false otherwise. Emits messages.
-
-.EXAMPLE
-HealthTest-DefenderStatus -WarnSigAgeDays 2 -FailSigAgeDays 5
-#>
-
+function HealthTest-CertExpiry {
 <#
 .SYNOPSIS
 Alerts on soon-to-expire or expired machine certificates (LocalMachine\My).
@@ -408,7 +390,7 @@ Fail when expiration is within this many days. Default 30.
 .EXAMPLE
 HealthTest-CertExpiry -WarnDays 90 -FailDays 21
 #>
-function HealthTest-CertExpiry {
+
     param([int]$WarnDays=60,[int]$FailDays=30)
     $now = Get-Date
     $certs = Get-ChildItem Cert:\LocalMachine\My -ErrorAction SilentlyContinue
@@ -429,55 +411,9 @@ function HealthTest-CertExpiry {
 
 # TODO: consolidate this and HealthTest-ScheduledTasksLastResult
 # I think the later seems does more robust detection of issues based on Last Result
-<#
-.SYNOPSIS
-Health check for non-Microsoft scheduled tasks (failures and missed runs).
-.DESCRIPTION
-Enumerates scheduled tasks excluding Microsoft/Windows built-ins and some noisy patterns. For each
-task, flags non-success LastTaskResult values and any NumberOfMissedRuns > 0. Emits Log-Warning
-entries with compact task details and returns $false if any problems are found; otherwise reports OK.
-.OUTPUTS
-[bool] $true if all checked tasks are healthy; $false if any failures/missed runs or on errors.
-.EXAMPLE
-HealthTest-ScheduledTasks
-.NOTES
-Uses Convert-TaskResultCode and Get-ScheduledTaskDeepInfo.
-#>
 
-<#
-.SYNOPSIS
-Evaluates scheduled task "Last Result" codes on the local host, suppressing informational values, and reports only meaningful warnings and failures.
 
-.DESCRIPTION
-Queries all scheduled tasks on the local computer via SCHTASKS /V, normalizes
-and interprets Last Result codes (including HRESULTs and bare Win32 values),
-suppresses informational and benign results, and emits only actionable warnings
-and failures. For each problematic task it outputs a summary message plus a
-multiline comment block describing the task and execution details.
-#>
-
-<#
-.SYNOPSIS
-    Performs a comprehensive health check of all local physical disks using Windows Storage APIs.
-
-.DESCRIPTION
-    HealthTest-Storage examines each physical disk via Get-PhysicalDisk and (where available)
-    Get-StorageReliabilityCounter to detect early signs of storage degradation. It evaluates
-    parameters such as HealthStatus, temperature, media/uncorrectable errors, and SSD wear
-    percentage, returning $true if all drives are within safe limits or $false otherwise.
-#>
-
-<#
-.SYNOPSIS
-Check NTFS volumes for the "dirty" bit.
-.DESCRIPTION
-Enumerates NTFS volumes via Get-Volume and runs `fsutil dirty query` per drive. If any volumes are
-marked dirty, emits Log-Warning listing the drive letters and returns $false; otherwise returns $true.
-.OUTPUTS
-[bool] $true if no dirty volumes; $false if any volume is dirty or on error.
-.EXAMPLE
-HealthTest-NtfsDirtyBit
-#>
+function HealthTest-IisBindings {
 <#
 .SYNOPSIS
 Sanity-check IIS site bindings for common misconfigurations.
@@ -493,7 +429,7 @@ HealthTest-IisBindings
 .NOTES
 Requires WebAdministration module (Get-Website/Get-WebBinding) when present; otherwise no-op success.
 #>
-function HealthTest-IisBindings {
+
     # Skip test on workstations
     # 1 = Workstation 2 = Domain Controller 3 = Windows Server
     $host_type = (Get-CimInstance Win32_OperatingSystem).ProductType
@@ -529,22 +465,7 @@ function HealthTest-IisBindings {
     Write-Warning "[pass] IIS bindings look sane"
 }
 
-<#
-.SYNOPSIS
-Flag high DFS-R backlog for a replication group.
-.DESCRIPTION
-For the given replication group (default 'Domain System Volume'), enumerates DFS-R connections and
-retrieves backlog counts per source->destination. Warns when any backlog exceeds 1000 items; returns
-$false if any threshold exceeded, $true otherwise.
-.PARAMETER RGName
-DFSR Replication Group name. Default: 'Domain System Volume'.
-.OUTPUTS
-[bool] $true when backlog is within limits or cmdlets unavailable; $false if high backlog detected.
-.EXAMPLE
-HealthTest-DfsrBacklog -RGName 'Domain System Volume'
-.NOTES
-Requires DFSR PowerShell cmdlets (Get-DfsrConnection/Get-DfsrBacklog) when present.
-#>
+function HealthTest-RamPressure {
 <#
 .SYNOPSIS
 Snapshot test for low free RAM.
@@ -562,7 +483,7 @@ Delay in milliseconds between samples. Default 500.
 .EXAMPLE
 HealthTest-RamPressure -Samples 5 -SampleDelayMs 250
 #>
-function HealthTest-RamPressure {
+
   [CmdletBinding()]
   [OutputType([bool])]
   param(
@@ -613,21 +534,8 @@ function HealthTest-RamPressure {
   return
 }
 
-<#
-.SYNOPSIS
-Baseline check for key Windows Exploit Protection (system) mitigations.
-.DESCRIPTION
-Reads Get-ProcessMitigation -System and verifies core mitigations:
-DEP enabled, ASLR force-relocate, and SEHOP. Emits notices for missing items and returns $false if
-any are off; $true only when all are enabled or cmdlets unavailable (soft pass).
-.OUTPUTS
-[bool] $true if mitigations meet baseline; $false if any are missing or on errors.
-.EXAMPLE
-HealthTest-ExploitProtectionBaseline
-.NOTES
-Requires Windows 10/Server 2016+ with Exploit Protection cmdlets.
-#>
 
+function HealthTest-ShareReasonableness {
 <#
 .SYNOPSIS
     Audits SMB shares for broad access and hygiene issues.
@@ -686,7 +594,7 @@ Requires Windows 10/Server 2016+ with Exploit Protection cmdlets.
 .LINK
     https://learn.microsoft.com/powershell/module/cimcmdlets/get-ciminstance
 #>
-function HealthTest-ShareReasonableness {
+
   [CmdletBinding()]param(
     [string[]]$BroadPrincipals = @(
       'Everyone',
@@ -865,40 +773,8 @@ function HealthTest-ShareReasonableness {
   if (!$riskFound) {Write-Warning "[pass] No risks related to SMB shares were detected"}
 }
 
-<#
-.SYNOPSIS
-Checks if there are any non-default file or print shares on this machine.
 
-.DESCRIPTION
-Warns if any non-hidden shares (not ending in $) exist besides SYSVOL.
-If none exist, outputs a good status. Also suggests disabling the LanmanServer
-service if file and print sharing is not needed on non-domain controllers.
-#>
-<#
-.SYNOPSIS
-Checks for services set to start automatically but are not currently running.
-
-.DESCRIPTION
-Warns about any services with StartType=Automatic that are stopped (excluding a few known exceptions).
-Reports success if all automatic services are running.
-#>
-
-<#
-.SYNOPSIS
-Checks if the system default locale (ACP/OEMCP) matches expected values.
-
-.DESCRIPTION
-Validates the system's ANSI (ACP) and OEM code pages. Warns if they are not the usual Greek (1253/737) or English (1252/437) combinations.
-#>
-
-<#
-.SYNOPSIS
-Checks if any local user accounts have PasswordRequired set to False.
-
-.DESCRIPTION
-Finds enabled local accounts without required passwords and reports them as failures.
-#>
-
+function HealthTest-DisksHaveFreeSpace {
 <#
 .SYNOPSIS
 Checks if any fixed, removable, or network drives are low on free space.
@@ -906,7 +782,7 @@ Checks if any fixed, removable, or network drives are low on free space.
 .NOTES
 Relies on Test-DiskHasFreeSpace to perform the actual threshold check.
 #>
-function HealthTest-DisksHaveFreeSpace {
+
     foreach ($d in [System.IO.DriveInfo]::GetDrives()) {
         if (-not $d.IsReady) { continue }
         $t = $d.DriveType.ToString()
@@ -923,59 +799,8 @@ function HealthTest-DisksHaveFreeSpace {
     }
 }
 
-<#
-.SYNOPSIS
-Warns for every directory that has more than 10,000 immediate child items.
 
-.DESCRIPTION
-Uses Find-LargeDirectory to locate directories with high item counts under C:\.
-Each matching directory is logged as a warning with the item count in -Comment.
-#>
-<#
-.SYNOPSIS
-Reports a warning for any non Microsoft service it finds
-#>
-
-<#
-.SYNOPSIS
-Checks if any Hyper-V VMs that should auto-start are not currently running.
-
-.DESCRIPTION
-Lists all VMs where AutomaticStartAction is "Start" but their state is not "Running" and reports them as failures.
-#>
-<#
-.SYNOPSIS
-Checks running Hyper-V VMs for unexpected property values.
-
-.DESCRIPTION
-Iterates through running VMs and compares selected properties against the expected values stored in $EXPECTED_VALUES_FOR_VM_PROPERTIES.
-Warns if any property value does not match the expected value.
-#>
-<#
-.SYNOPSIS
-Checks if all Microsoft Defender (Malware Protection) features are enabled.
-
-.DESCRIPTION
-Evaluates the output of Get-MpComputerStatus and reports the state of several protection-related properties using Write-BasedOnTestResult.
-#>
-<#
-.SYNOPSIS
-Checks if the firewall service is running and enabled for all profiles.
-
-.DESCRIPTION
-Confirms the Windows Firewall (mpssvc) service is running and that the firewall is enabled on each network profile.
-#>
-<#
-.SYNOPSIS
-Checks if Windows Defender performed a quick scan recently
-#>
-<#
-.SYNOPSIS
-Tests SYSVOL/NETLOGON accessibility across DCs.
-.DESCRIPTION
-Checks UNC reachability for \\<DC>\SYSVOL and \\<DC>\NETLOGON.
-#>
-
+function HealthTest-SchemaVersionConsistency{
 <#
 .SYNOPSIS
 Ensures AD schema objectVersion matches across all DCs.
@@ -984,7 +809,7 @@ Ensures AD schema objectVersion matches across all DCs.
 Reads objectVersion from the Schema NC via each DC and normalizes to [int].
 Passes if there is exactly one distinct version. Returns details per-DC and a summary.
 #>
-function HealthTest-SchemaVersionConsistency{
+
   $schemaNC=(Get-ADRootDSE).schemaNamingContext
   $vers=@{}; $errs=@()
   foreach($dc in (Get-ADDomainController -Filter *)){
@@ -1027,13 +852,14 @@ function HealthTest-SchemaVersionConsistency{
   }
 }
 
+function HealthTest-NtdsPathsLocation{
 <#
 .SYNOPSIS
 Verifies NTDS.dit and log paths are on intended volumes.
 .DESCRIPTION
 Reads NTDS parameters and returns their current locations.
 #>
-function HealthTest-NtdsPathsLocation{
+
   [CmdletBinding()]
   param(
     [string[]]$ExpectedDbRoots,
@@ -1056,11 +882,12 @@ function HealthTest-NtdsPathsLocation{
   if($dbOk -and $lgOk){ Write-Warning "[pass] NTDS database/log paths sane (DB=$db; LOGS=$lg)" }
 }
 
+function HealthTest-TombstoneLifetime{
 <#
 .SYNOPSIS
 Checks tombstoneLifetime and links interval sanity.
 #>
-function HealthTest-TombstoneLifetime{
+
   [CmdletBinding()] param([int]$MinDays=60)
   $ds="CN=Directory Service,CN=Windows NT,CN=Services,$((Get-ADRootDSE).ConfigurationNamingContext)"
   $tl=(Get-ADObject $ds -Properties tombstoneLifetime).tombstoneLifetime
@@ -1069,25 +896,23 @@ function HealthTest-TombstoneLifetime{
   else{ Write-Warning "[failure] AD tombstoneLifetime below threshold`nCurrent=$tl; Min=$MinDays" }
 }
 
+function HealthTest-RecycleBinEnabled{
 <#
 .SYNOPSIS
 Confirms AD Recycle Bin is enabled.
 #>
-function HealthTest-RecycleBinEnabled{
+
   $f=Get-ADOptionalFeature 'Recycle Bin Feature' -ErrorAction Stop
   $enabled=($f.EnabledScopes -ne $null -and $f.EnabledScopes.Count -gt 0)
   if($enabled){ Write-Warning "[pass] AD Recycle Bin enabled" } else { Write-Warning "[notice] AD Recycle Bin is not enabled -- consider enabling it." }
 }
 
-<#
-.SYNOPSIS
-Verifies domain trusts and performs netdom /verify.
-#>
+function HealthTest-ReplicationLatency{
 <#
 .SYNOPSIS
 Checks replication latency on schema/config partitions.
 #>
-function HealthTest-ReplicationLatency{
+
   [CmdletBinding()] param([int]$MaxMinutes=30)
   $parts=@((Get-ADRootDSE).schemaNamingContext,(Get-ADRootDSE).configurationNamingContext)
   $anyFail=$false
@@ -1103,10 +928,7 @@ function HealthTest-ReplicationLatency{
   if(-not $anyFail){ Write-Warning "[pass] AD replication latency acceptable (<= $MaxMinutes min on schema/config)" }
 }
 
-<#
-.SYNOPSIS
-Validates DNS zone replication scope for AD-integrated zones.
-#>
+function HealthTest-RequiredSrvRecords{
 <#
 .SYNOPSIS
 Confirms some important SRV records exist:
@@ -1114,7 +936,7 @@ _ldap._tcp.dc._msdcs.<domain> = where are the Domain Controllers (LDAP over TCP)
 _kerberos._tcp.<domain> = where are Kerberos KDCs over TCP?
 _kerberos._udp.<domain> = where are Kerberos KDCs over UDP?
 #>
-function HealthTest-RequiredSrvRecords{
+
   $dom=(Get-CimInstance Win32_ComputerSystem).Domain
   $labels=@("_ldap._tcp.dc._msdcs.$dom","_kerberos._tcp.$dom","_kerberos._udp.$dom")
   $missing=$false
@@ -1125,22 +947,12 @@ function HealthTest-RequiredSrvRecords{
   if(-not $missing){ Write-Warning "[pass] Required AD SRV records present" }
 }
 
-<#
-.SYNOPSIS
-Checks DNS scavenging/aging configuration (server + per-zone).
-.DESCRIPTION
-Returns Pass=$true only if server scavenging is enabled AND all AD-integrated primary zones have AgingEnabled=$true.
-Details list server state and zones with/without aging.
-#>
-<#
-.SYNOPSIS
-Validates DNS forwarders reachability and forbids loopback.
-#>
+function HealthTest-LdapSigningChannelBinding {
 <#
 .SYNOPSIS
 Ensures LDAP signing and channel binding settings are enforced.
 #>
-function HealthTest-LdapSigningChannelBinding {
+
     $p = 'HKLM:\SYSTEM\CurrentControlSet\Services\NTDS\Parameters'
 
     # Read all registry values in one shot (avoids repeated calls)
@@ -1165,17 +977,10 @@ function HealthTest-LdapSigningChannelBinding {
     }
 }
 
-<#
-.SYNOPSIS
-Requires SMB signing on the server.
-#>
 
 # TODO this test is repeated in HealthTest-ShareReasonableness
-<#
-.SYNOPSIS
-Verifies SMBv1 is disabled.
-#>
 
+function HealthTest-UnconstrainedDelegationAccounts{
 <#
 .SYNOPSIS
 Finds accounts with unconstrained delegation (excludes DCs by default).
@@ -1185,7 +990,7 @@ Flags user/computer objects where userAccountControl has TRUSTED_FOR_DELEGATION 
 By default excludes Domain Controllers (SERVER_TRUST_ACCOUNT 0x2000), since DCs are inherently trusted.
 Use -IncludeDomainControllers to include them in the results.
 #>
-function HealthTest-UnconstrainedDelegationAccounts{
+
   [CmdletBinding()] param([switch]$IncludeDomainControllers)
 
   $bitTrusted  = 524288    # 0x80000 TRUSTED_FOR_DELEGATION
@@ -1234,64 +1039,8 @@ function HealthTest-UnconstrainedDelegationAccounts{
   }
 }
 
-<#
-.SYNOPSIS
-Flags service accounts with PasswordNeverExpires.
-#>
 
-<#
-.SYNOPSIS
-Checks anonymous access hardening against modern baselines.
-
-.DESCRIPTION
-Pass when:
-  - RestrictAnonymousSAM = 1  (Do not allow anonymous enumeration of SAM accounts)
-  - EveryoneIncludesAnonymous = 0 (Anonymous not included in Everyone)
-RestrictAnonymous (legacy 'SAM and shares') is informational:
-  - 0 (baseline) -> OK
-  - 1 (stricter) -> Warn: may break legacy browsing/trust; rarely needed today
-  - 2 -> Obsolete/unsupported on modern Windows; treat as warn/fail
-#>
-<#
-.SYNOPSIS
-Checks that a pagefile exists and meets a minimum size.
-
-.DESCRIPTION
-Handles both explicit and system-managed pagefiles.
-- Primary source: Win32_PageFileUsage (current allocated size).
-- Fallback: 'PagingFiles' registry (C:\pagefile.sys 0 0 means system-managed).
-Pass=$true when total AllocMB >= MinMB, and (optionally) one pagefile is on the system drive.
-#>
-<#
-.SYNOPSIS
-Confirms WinRM is running and responsive.
-#>
-<#
-.SYNOPSIS
-Verifies IPv6 binding state per policy (PS5.1-safe).
-#>
-
-<#
-.SYNOPSIS
-Verifies DNS Client service is running.
-#>
-<#
-.SYNOPSIS
-Verifies WMI repository consistency.
-#>
-<#
-.SYNOPSIS
-Lists VSS writers and flags non-stable states.
-#>
-<#
-.SYNOPSIS
-Checks shadow storage presence and size info.
-#>
-<#
-.SYNOPSIS
-Scrapes common auto-start locations for rogues.
-#>
-
+function HealthTest-DuplicateSpn{
 <#
 .SYNOPSIS
 Detects duplicate SPNs by querying AD directly (no setspn parsing).
@@ -1303,7 +1052,7 @@ and flags any SPN that appears on more than one distinct object.
 RETURNS
 [pscustomobject]@{ Pass=bool; Details=string }
 #>
-function HealthTest-DuplicateSpn{
+
   $objs = Get-ADObject -LDAPFilter "(servicePrincipalName=*)" -Properties servicePrincipalName,sAMAccountName,distinguishedName -ErrorAction Stop
   if(-not $objs){ Write-Warning "[pass] No objects with SPN found"; return }
 
@@ -1326,33 +1075,14 @@ function HealthTest-DuplicateSpn{
   }
   if(-not $dupsFound){ Write-Warning "[pass] No duplicate SPNs detected" }
 }
-<#
-.SYNOPSIS
-Ensures the host does not have multiple default gateways.
 
-.DESCRIPTION
-Collects IPv4/IPv6 default gateways from Get-NetIPConfiguration. By default Pass=$true only if the
-total count of default gateways (v4+v6) <= 1. Use -AllowOnePerFamily to permit up to one v4 and one v6.
-#>
-<#
-.SYNOPSIS
-Checks for stale/mismatched DC DNS A records vs. AD DC IPs. OnlyForDCs
-#>
 
-<#
-.SYNOPSIS
-Validates DNS recursion configuration (enabled/forwarders/EDNS). OnlyForDCs
-#>
-
-<#
-.SYNOPSIS
-Confirms reverse lookup zones exist for known subnets. OnlyForDCs
-#>
+function HealthTest-GcPlacement{
 <#
 .SYNOPSIS
 Checks GC placement (at least one per site or per-domain policy). OnlyForDCs
 #>
-function HealthTest-GcPlacement{
+
   [CmdletBinding()] param([switch]$AtLeastOnePerSite=$true)
   $dcs=Get-ADDomainController -Filter *
   if(-not $AtLeastOnePerSite){
@@ -1368,133 +1098,17 @@ function HealthTest-GcPlacement{
   if($bad.Count -eq 0){ Write-Warning "[pass] Each AD site has at least one Global Catalog" }
 }
 
-<#
-.SYNOPSIS
-Checks AdminSDHolder applied to protected groups reasonably. OnlyForDomainServers
-#>
 
-<#
-.SYNOPSIS
-DFSR backlog for SYSVOL within threshold. OnlyForDCs
-.NOTES Stesses Network: Potentially noticeable on the WAN if run frequently or in parallel
-#>
-<#
-.SYNOPSIS
-Flags unsigned PnP drivers, ignoring common false positives from core system components.
-  OnlyForDomainServers
-#>
-<#
-.SYNOPSIS
-Flags unexpected listening TCP ports; ignores 49152-65535 and notes optional baseline ports (3389, 47001, 593). OnlyForDomainServers
-.DESCRIPTION
-Filters out ports listening only on the loopback addresses (127.0.0.1 and ::1) before checking against allowed ports.
-#>
-<#
-.SYNOPSIS
-Verifies DFS Namespace (domain-based) objects enumerate without error. OnlyForDomainServers
-#>
-<#
-.SYNOPSIS
-Lists SYSTEM-scheduled tasks that are disabled, stale, or failing.
-#>
-
-<#
-.SYNOPSIS
-Checks SYSVOL NTFS ACLs do not grant write to broad principals. OnlyForDCs
-#>
-
-<#
-.SYNOPSIS
-Reports accounts permitting RC4 via msDS-SupportedEncryptionTypes. OnlyForDomainServers
-#>
-
-<#
-.SYNOPSIS
-Ensures DHCP server presence/authorization sane if role installed. OnlyForDomainServers
-#>
-
-<#
-.SYNOPSIS
-Flags enabled NICs that are disconnected (cleanup). OnlyForDomainServers
-#>
-
-<#
-.SYNOPSIS
-Checks active interface metrics for sane binding preference. OnlyForDomainServers
-#>
-
-<#
-.SYNOPSIS
-Detects disabled GPO links at domain root (policy choice). OnlyForDCs
-#>
-<#
-.SYNOPSIS
-Ensures event log max sizes meet baseline without reading events. OnlyForDomainServers
-#>
-
-<#
-.SYNOPSIS
-Runs DCDIAG RIDManager and checks for failures or low pool signals. OnlyForDCs
-#>
-
-<#
-.SYNOPSIS
-Checks presence of EFS Data Recovery Agents policy/certs. OnlyForDomainServers
-#>
-
-<#
-.SYNOPSIS
-Verifies DNS zone transfers are restricted. OnlyForDCs
-#>
-
-<#
-.SYNOPSIS
-Flags stale krbtgt (pwdLastSet age above threshold). OnlyForDomainServers
-.NOTES
-What a failure means: The KRBTGT account key hasn't been rotated for years. Windows keeps the previous KRBTGT key to validate existing TGTs; never rotating extends the window for 'golden ticket' persistence if the key ever leaked.
-Risk: If an attacker ever accessed the KRBTGT key, they can mint TGTs and persist. Rotating twice (with replication time in between) is the standard mitigation.
-Severity: Critical.
-#>
-<#
-.SYNOPSIS
-Ensures NTDS log volume free space above threshold. OnlyForDCs
-#>
-<#
-.SYNOPSIS
-Verifies required hotfix baseline is present. OnlyForDomainServers
-#>
-
-<#
-.SYNOPSIS
-Validates DHCP DNS update credential account health. OnlyForDomainServers
-#>
-
-<#
-.SYNOPSIS
-Validates GPT vs GPC version numbers for GPO consistency. OnlyForDomainServers
-#>
-
-<#
-.SYNOPSIS
-Compares SYSVOL policy tree manifest across DCs (count+hash). OnlyForDCs
-.NOTES
-Stresses Network: SMB directory tree walks to each DC's SYSVOL\Policies across sites.
-#>
-<#
-.SYNOPSIS
-Reviews RODC PRP (allow/deny) presence where RODCs exist. OnlyForDomainServers
-#>
-
-<#
-.SYNOPSIS
-Reports members of 'Pre-Windows 2000 Compatible Access' (should be empty). OnlyForDomainServers
-#>
-
-<#
-.SYNOPSIS
-Validates GP WMI filters use namespaces that exist on this host. OnlyForDomainServers
-#>
 function Get-SoftwareLicensing {
+<#
+.SYNOPSIS
+Retrieves Windows software licensing product status for the local or remote host.
+
+.DESCRIPTION
+Queries `SoftwareLicensingProduct` over CIM, normalizes key properties,
+and returns friendly licensing status fields for reporting.
+#>
+
     [CmdletBinding()]
     param([string]$ComputerName = $env:COMPUTERNAME)
 
@@ -1548,81 +1162,42 @@ function Get-SoftwareLicensing {
     $objects | Sort-Object ProductName, LicenseStatus
 }
 
+function HealthTest-SoftwareLicensing{
 <#
 .SYNOPSIS
 Verifies Windows are Licensed.
 #>
-function HealthTest-SoftwareLicensing{
+
     Get-SoftwareLicensing | %{
         # ($_ | Format-List * -Force | Out-String).Trim()|write-host -f green
         Write-BasedOnTestResult "Is $($_.ProductName) Licensed?" -Test $_.IsLicensed -comment "$_"
     }
 }
 
+function HealthTest-IsTPMActivated {
 <#
 .SYNOPSIS
 Checks if TPM is activated. OnlyForMobile
 #>
-function HealthTest-IsTPMActivated {
+
   Write-BasedOnTestResult "Is TPM Activated?" -Test (Get-Tpm).TpmActivated
 }
 
 
-
-
-<#
-.SYNOPSIS
-Checks DNS suffix for the AD domain. OnlyForDomain,NotForDCs
-#>
-<#
-.SYNOPSIS
-Checks that the domain DNS name A record points to at least one DC IP. OnlyForDomain,NotForDCs
-
-IMPORTANT: Invoke-GetHealthDomainComputers.ps1 must pass all DC IPs via
-	`-IpsOfAllDcs`. E.g:
-	@("192.168.0.1","192.168.0.2")
-#>
-<#
-.SYNOPSIS
-Ensures each interface DNS server list contains only DC IPs. OnlyForDomain,NotForDCs
-
-IMPORTANT: Invoke-GetHealthDomainComputers.ps1 must pass all DC IPs via
-	`-IpsOfAllDcs`. E.g:
-	@("192.168.0.1","192.168.0.2")
-#>
-<#
-.SYNOPSIS
-Verifies NLTEST /dsgetsite can determine the client AD site. OnlyForDomain,NotForDCs
-#>
-<#
-.SYNOPSIS
-Runs gpupdate and validates computer and user policy application. OnlyForDomain,NotForDCs
-#>
 #--------------------------------------------------------
 # xxx new tests 20205-11-26
 
-<# .SYNOPSIS Checks recent critical disk/NTFS/storage errors in the System event log. #>
-<# .SYNOPSIS Looks for crash dumps and bugcheck events as indicators of recent system crashes. #>
-<# .SYNOPSIS Detects unexpected members in the local Administrators group. #>
-
-<# .SYNOPSIS Checks physical NICs for link problems and significant error rates. #>
-<# .SYNOPSIS Summarizes BitLocker protection status for local volumes. #>
-<# .SYNOPSIS Detects DHCP scopes whose utilization is close to exhaustion. #>
-<#
-.SYNOPSIS
-  Verifies key DNS suffix/devolution/registration settings for a small, single-domain AD.
-#>
-<#
-.SYNOPSIS
-HealthTest-ADReplicationDomainRepadmin: Domain-wide AD replication health using repadmin.exe (replsum + showreps). DC-only; fails if repadmin or AD DS prerequisites are missing.
-#>
-
-<#
-.SYNOPSIS
-HealthTest-ADReplicationLocalRSAT: Local DC AD replication partner health using RSAT AD cmdlets (Get-ADReplicationPartnerMetadata). DC-only; fails if AD module/ADWS prerequisites are missing.
-#>
 
 function HealthTest-TimeSyncAccuracy {
+<#
+.SYNOPSIS
+Measures local clock offset against the current time source (or a reference NTP server).
+
+.DESCRIPTION
+Uses `w32tm /stripchart` to collect a small sample and compares absolute offset
+to warning/failure thresholds.
+#>
+
   param(
     [int]$WarnOffsetSeconds=15,
     [int]$FailOffsetSeconds=30,
