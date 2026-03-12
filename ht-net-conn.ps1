@@ -67,7 +67,7 @@ function HealthTest-NetworkConnectionProfiles {
   if ($internetProfiles.Count -gt 0) {
     Write-Warning "[pass] Connected to the Internet"
   } else {
-    Write-Warning "[failure] No Internet connection" + "`n" + "According to windows (Get-NetConnectionProfile)"
+    Write-Warning ("[failure] No Internet connection" + "`n" + "According to windows (Get-NetConnectionProfile)")
   }
 
   $isServer = [bool]$hostFacts.isHostServer
