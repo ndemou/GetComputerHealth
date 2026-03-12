@@ -421,7 +421,7 @@ function Log-Msg {
   if ((-not $script:cfgOutputConsoleMessages) -or $Hide) { return }
 
   if ($must_suppress_sig) {
-    Write-Host -ForegroundColor Blue -NoNewline '  SUPPRESS :'
+    Write-Host -ForegroundColor Blue -NoNewline 'SUPPRESS :'
     Write-Host -ForegroundColor $SigColor -NoNewline (" [{0}] " -f $sig)
     Write-Host -ForegroundColor $MsgColor $Msg
 
@@ -506,3 +506,4 @@ function Export-HealthMessagesToExcel {
 		}
 	} | Export-Excel -Path $FileName -WorksheetName 'Messages' -AutoSize -BoldTopRow
 }
+
