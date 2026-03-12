@@ -10,12 +10,6 @@ Get-NetConnectionProfile:
 
 Will re-download and update even if already at the latest release.
 
-## Stop using C:\it\config\ips-of-all-DCs.conf
-
-Instead add parameter -IpsOfAllDcs to `\Invoke-GetComputerHealth.ps1`.
-It will be used by `Invoke-GetHealthDomainComputers.ps1` (document it).
-This array will be added to `$Global:GetComputerHealthDataQMTA`.
-
 ## Review the hundrends of warnings from Invoke-ScriptAnalyzer (and 3 errors)
 
 See also : .\tests\script-analysis.ps1
@@ -25,7 +19,7 @@ See also : .\tests\script-analysis.ps1
 ChatGPT said: GitHub Actions can run Windows PowerShell 5.1 by using the powershell shell (which invokes powershell.exe on Windows runners).
 See also: https://docs.github.com/actions/automating-builds-and-tests/building-and-testing-powershell
 
-## Allow tags in HealthTest- function names 
+## Use tags in HealthTest- function names 
 
 ### Tags
 E.g. "HealthTest-CheckSomething__sD-V__tS" means:
