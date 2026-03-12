@@ -1,5 +1,7 @@
 # How to Add Custom Tests
 
+These instrunction are also valid for contributing health tests in the core library. The only difference is that ps1 scripts for custom tests are stored in a special folder.
+
 ## TL;DR
 
 `.ps1` files in `C:\IT\config\Custom-HealthTests\` are dot-sourced, all functions with a name starting with `HealthTest-` are executed, and these functions should call either `Write-Warning "[pass] $message"` if all is well or `Write-Warning "[failure] $message` or `Write-Warning "[failure] $message" + [Environment]::NewLine + "$optionalDetails"`. The code you write will be executed with *high privileges* and appart from temporary files or similar, it *should not make any changes* to the system state.
@@ -20,27 +22,40 @@
        foreach ($dir in Find-LargeDirectory -Path 'C:\' -Threshold 10000) {
            $issueFound = $true
 
-           # The synopsis should be one terse line, that uniqely identifies the problem.
+           # The synopsis should be a single terse line, that uniqely identifies the problem.
            # The synopsis should not change if the essense of the issue remains the same.
-           # This is good:
+           # So this is good:
            $synopsis = "Directory $($dir.Path) has more than 10000 child items"
-           # This is a bad: (it changes everytime files are added or deleted)
+		   #
+           # And this is a bad:
            # $synopsis = "Directory $($dir.Path) has $($dir.ItemsCount) items"
+		   #
+		   # Note that both the bad and the good synopsis contain variables but
+		   # the variable on the good message ($dir.path) is an essential part of 
+		   # the finding (which folder has too many files), while the variable
+		   # in the bad synopsis is not. Rather it adds information that may change
+           # even if the issue remains (e.g. if a file is added, ItemsCount will
+		   # increase while the fact that this specific folder has too many files 
+		   # will not change).
    
-           # The optional details can contain one or more lines.
+           # The optional details can contain one or more lines(up to 32K characters)
+		   # and there's no other limitation on what you can include in them. 
+		   # If you do include details you must prefix them with a newline:
            $details = "`n" +"$($dir.ItemsCount) items" + "`n" + `
                "Most of them ($(dir.MostCommonExtCount)) are .$(dir.MostCommonExt)"
+		   # If you don't want to include details, set $details = ""
    
            # We use [notice] here, which is the lightest level for a finding.
            # You can also use [warning], and [failure] for more sever findings
            # and [info] for non-findings (informational messages).
-           Write-Warning ("[notice] " + $synopsis + $details)
+		   Write-Warning "[notice] $synopsis$details"
        }
        if (-not $issueFound) {
            $synopsis = "No directories found with >10000 items"
-           $details = "" # (no details no new line needed)
-           # Yes, we always use Write-Warning (even for passed tests)
-           Write-Warning ("[pass] " + $synopsis + $details)
+           $details = "" 
+           Write-Warning "[pass] $synopsis$details"
+           # Note a counter-intuitive fact: we *always* report using Write-Warning, 
+		   # even for *passed* tests.
        }
    }
 
@@ -61,8 +76,8 @@ If you wish you can have more than one .ps1 files in `C:\IT\config\Custom-Health
 When `Get-ComputerHealth.ps1` runs, it populates a global variable named `$Global:GetComputerHealthDataQMTA` so all health tests can reuse these host facts without re-computing.
 
 Available properties include these self-documenting booleans:
-- `.isHostVM`
-- `.isHostMobile`
+- `.isHostVM` (based on heuristics)
+- `.isHostMobile` (based on heuristics)
 - `.isHostDomainJoined`
 - `.isHostServer`
 - `.isHostDC`
