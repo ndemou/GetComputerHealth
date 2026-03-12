@@ -831,7 +831,6 @@ Invoke-HealthTest "HealthTest-RequiredSrvRecords"
 
 if (-not $isHostVM) {
     Invoke-HealthTest "HealthTest-BitLockerStatus"
-    Invoke-HealthTest "HealthTest-RecentDiskErrors"
 }
 
 # Tests that take >1sec (Not including ones for DCs):
@@ -853,6 +852,7 @@ if (-not $isHostVM) {
 #   4.0s  HealthTest-UnexpectedListeningPorts
 #   5.0s  HealthTest-Storage
 #   5.9s  HealthTest-NonMicrosoftServices
+#   6.0s  HealthTest-SeriousRecentEventLogs
 #  26.3s  HealthTest-GpupdatePolicyApply
 
 if (!$DebugSkipSlowTests) {
@@ -864,6 +864,7 @@ if (!$DebugSkipSlowTests) {
     Invoke-HealthTest "HealthTest-UnexpectedListeningPorts"
     Invoke-HealthTest "HealthTest-IPv6Binding"
     Invoke-HealthTest "HealthTest-NonMicrosoftServices"
+    Invoke-HealthTest "HealthTest-SeriousRecentEventLogs"
     Invoke-HealthTest "HealthTest-LargeDirectories"
 }
 
