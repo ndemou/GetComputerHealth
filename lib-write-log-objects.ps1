@@ -421,9 +421,9 @@ function Log-Msg {
   if ((-not $script:cfgOutputConsoleMessages) -or $Hide) { return }
 
   if ($must_suppress_sig) {
-    Write-Host -ForegroundColor Blue -NoNewline 'SUPPRESS :'
-    Write-Host -ForegroundColor $SigColor -NoNewline (" [{0}] " -f $sig)
-    Write-Host -ForegroundColor $MsgColor $Msg
+    Write-Host -ForegroundColor DarkGreen -NoNewline '  SUPRSD :'
+    Write-Host -ForegroundColor DarkGray -NoNewline (" [{0}] " -f $sig)
+    Write-Host -ForegroundColor DarkGray $Msg
 
     if ($Comment -and ($script:cfgHideStr -notlike '*C*')) {
       if ($Comment -match '\n') {
@@ -506,4 +506,5 @@ function Export-HealthMessagesToExcel {
 		}
 	} | Export-Excel -Path $FileName -WorksheetName 'Messages' -AutoSize -BoldTopRow
 }
+
 
