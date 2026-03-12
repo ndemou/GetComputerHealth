@@ -55,6 +55,8 @@ function HealthTest-NetworkConnectionProfiles {
   [CmdletBinding()]
   param()
 
+  $hostFacts = $Global:GetComputerHealthDataQMTA
+
   $profiles = @(Get-NetConnectionProfile -ErrorAction SilentlyContinue)
   if (-not $profiles) {
     Write-Warning "[warning] Could not read network connection profiles (Get-NetConnectionProfile failed)"
@@ -68,12 +70,15 @@ function HealthTest-NetworkConnectionProfiles {
     Write-Warning "[failure] No Internet connection" + "`n" + "According to windows (Get-NetConnectionProfile)"
   }
 
-  $isServer = ((Get-CimInstance Win32_ComputerSystem -ErrorAction SilentlyContinue).DomainRole -ge 2)
+  $isServer = [bool]$hostFacts.isHostServer
   if (-not $isServer) { return }
 
-  $isDomainJoined = [bool]((Get-CimInstance Win32_ComputerSystem -ErrorAction SilentlyContinue).PartOfDomain)
+  $isDomainJoined = [bool]$hostFacts.isHostDomainJoined
+  $isHostDC = [bool]$hostFacts.isHostDC
+  $isHostPDC = [bool]$hostFacts.isHostPDC
+
   $allowedCategories = @('Private')
-  if ($isDomainJoined -and -not $global:IsPdcRole) {
+  if ($isDomainJoined -and -not $isHostDC -and -not $isHostPDC) {
     $allowedCategories = @('DomainAuthenticated')
   }
 
