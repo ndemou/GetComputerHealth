@@ -67,7 +67,12 @@ function HealthTest-NetworkConnectionProfiles {
   if ($internetProfiles.Count -gt 0) {
     Write-Warning "[pass] Connected to the Internet"
   } else {
-    Write-Warning ("[failure] No Internet connection" + "`n" + "According to windows (Get-NetConnectionProfile)")
+    $aliveHosts = Test-NetConnectivityToNetwork -NetworkDescription "Internet" -KnownHostIps @('8.8.8.8','8.8.4.4','1.1.1.1','1.1.1.2') -ReturnListOfAliveHosts
+    if ($aliveHosts) {
+      Write-Warning "[notice] System seems connected to the Internet but windows report it is not (Get-NetConnectionProfile)"
+    } else {
+      Write-Warning "[failure] No Internet connection"
+    }
   }
 
   $isServer = [bool]$hostFacts.isHostServer
