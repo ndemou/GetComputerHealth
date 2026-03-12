@@ -397,7 +397,9 @@ FunctionName, Time, ElapsedMilliseconds, Output, Success, Error, Category, Reaso
     }
 
     if ($legacyLogDetected) {
-      Log-Notice "Consider modernizing the code of $FunctionName to use Write-Warning instead of Log-Pass/Log-Failure/..."
+      $sourceScript = $cmd.ScriptBlock.File
+      $sourceLabel = if ([string]::IsNullOrWhiteSpace($sourceScript)) { "function '$FunctionName'" } else { "script '$sourceScript'" }
+      Log-Notice "Consider modernizing the code in $sourceLabel to use Write-Warning instead of Log-Pass/Log-Failure/..."
     }
 
     if ($cntProperRecord -eq 0 -and $cntImproperRecord -eq 0) {
@@ -532,7 +534,23 @@ function Invoke-HealthTestsFromFolder {
         }
       }
     } catch {
-      Log-failure "Custom test import failed for $($f.FullName): $($_.Exception.Message)"
+      $errorRecord = $_
+      $rootException = $errorRecord.Exception
+      while ($rootException.InnerException) {
+        $rootException = $rootException.InnerException
+      }
+
+      $importErrorDetails = @(
+        "Primary error: $($errorRecord.Exception.Message)"
+        "Root cause: $($rootException.Message)"
+        "ErrorId: $($errorRecord.FullyQualifiedErrorId)"
+        "Category: $($errorRecord.CategoryInfo)"
+        "Script: $($f.FullName)"
+        "--- Full error record ---"
+        ($errorRecord | Out-String).Trim()
+      ) -join [Environment]::NewLine
+
+      Log-failure "Custom test import failed for $($f.FullName)" -Comment $importErrorDetails
     } finally {
       if ($m) {
         Remove-Module -ModuleInfo $m -Force -ErrorAction SilentlyContinue
