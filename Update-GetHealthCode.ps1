@@ -27,7 +27,6 @@ $REPO_URL = 'https://github.com/ndemou/GetComputerHealth'
 $REPO_REF = 'main'
 $LATEST_RELEASE_MARKER_PATH = 'c:\it\config\Get-ComputerHealth-latest-release.dat'
 $repoSlug = (($REPO_URL -replace '^https?://github\.com/','') -replace '\.git$','').Trim('/')
-$URI      = "https://raw.githubusercontent.com/$repoSlug/refs/heads/$REPO_REF"
 #
 #  END OF CONFIG
 #
@@ -139,13 +138,64 @@ Returns "owner/repo|tag|id" when available, otherwise $null on non-terminating f
   }
 }
 
-function Sync-WebFile {
+function Get-GetComputerHealthLatestRelease {
+<#.SYNOPSIS
+Gets latest GitHub release metadata for the configured repository.
+#>
+  [CmdletBinding()]
+  param([Parameter(Mandatory)][string]$RepositoryUrl)
+  $slug = Convert-GitHubRepoUrlToSlug -RepoUrl $RepositoryUrl
+  $api = "https://api.github.com/repos/$slug/releases/latest"
+  $headers = @{
+    'User-Agent' = 'PowerShell'
+    'Accept'     = 'application/vnd.github+json'
+  }
+  return (Invoke-RestMethod -Method Get -Uri $api -Headers $headers -ErrorAction Stop)
+}
+
+function Expand-GetComputerHealthLatestRelease {
+<#.SYNOPSIS
+Downloads and extracts the latest release zip into a temporary folder.
+.OUTPUTS
+System.String. Full path to extracted release root directory.
+#>
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)][string]$RepositoryUrl,
+    [Parameter(Mandatory)][string]$TempPath
+  )
+
+  $release = Get-GetComputerHealthLatestRelease -RepositoryUrl $RepositoryUrl
+  if (-not $release.zipball_url) {
+    throw "Latest release does not include zipball_url."
+  }
+
+  $zipPath = Join-Path $TempPath 'latest-release.zip'
+  $extractPath = Join-Path $TempPath 'latest-release'
+  if (-not (Test-Path $extractPath)) { $null = New-Item -ItemType Directory -Path $extractPath }
+
+  $headers = @{
+    'User-Agent' = 'PowerShell'
+    'Accept'     = 'application/vnd.github+json'
+  }
+  Invoke-WebRequest -Uri $release.zipball_url -OutFile $zipPath -Headers $headers -UseBasicParsing -ErrorAction Stop
+  Expand-Archive -LiteralPath $zipPath -DestinationPath $extractPath -Force
+
+  $root = Get-ChildItem -LiteralPath $extractPath -Directory | Select-Object -First 1
+  if (-not $root) {
+    throw "Release zip extracted but no top-level folder was found."
+  }
+
+  return $root.FullName
+}
+
+function Sync-LocalFile {
 <#
 .SYNOPSIS
-Downloads a file and updates the local copy if they differ.
+Copies a file from the extracted release and updates local copy if they differ.
 
 .DESCRIPTION
-Downloads file to TempPath and compares it to the file in DestinationPath.
+Compares SourcePath\FileName to DestinationPath\FileName.
 
 If the destination file does not exist, the downloaded file is placed into
 DestinationPath.
@@ -158,7 +208,7 @@ replaced with the downloaded file and the function returns $true. When
 replacing an existing file, the function attempts to create a per-file
 backup archive in BackupPath; backup failures do not prevent the update.
 
-Warnings are emitted on download or update failures.
+Warnings are emitted on copy or update failures.
 
 .OUTPUTS
 System.Boolean
@@ -168,19 +218,22 @@ $false - No change occurred or the operation failed.
   [CmdletBinding()]
   param (
     [Parameter(Mandatory=$true)][string]$FileName,
-    [Parameter(Mandatory=$true)][string]$BaseUri,
-    [Parameter(Mandatory=$true)][string]$TempPath, # This is the Directory
+    [Parameter(Mandatory=$true)][string]$SourcePath,
+    [Parameter(Mandatory=$true)][string]$TempPath,
     [Parameter(Mandatory=$true)][string]$DestinationPath,
     [Parameter(Mandatory=$true)][string]$BackupPath
   )
 
-  $srcUrl = "$BaseUri/$FileName"
+  $releaseFilePath = Join-Path $SourcePath $FileName
   $DownloadPath = Join-Path $TempPath $FileName 
   $finalPath    = Join-Path $DestinationPath $FileName
   $updated      = $false
 
   try {
-    Invoke-WebRequest -Uri $srcUrl -OutFile $DownloadPath -UseBasicParsing -ErrorAction Stop
+    if (-not (Test-Path -LiteralPath $releaseFilePath -PathType Leaf)) {
+      throw "Expected file not found in release zip: $FileName"
+    }
+    Copy-Item -LiteralPath $releaseFilePath -Destination $DownloadPath -Force -ErrorAction Stop
 
     $newHash = (Get-FileHash -Path $DownloadPath -Algorithm SHA256).Hash
     $existingHash = $null
@@ -227,7 +280,7 @@ $false - No change occurred or the operation failed.
       $updated = $false
     }
   } catch {
-    Write-Warning ("Failed to download {0}: {1}" -f $srcUrl, $_.Exception.Message)
+    Write-Warning ("Failed to stage {0} from extracted release: {1}" -f $FileName, $_.Exception.Message)
     try { if (Test-Path $DownloadPath) { Remove-Item -LiteralPath $DownloadPath -Force } } catch {}
     $updated = $false
   }
@@ -282,24 +335,31 @@ if ($latestReleaseMarker) {
 # Download/update scripts
 Write-Host -for DarkGray "Checking for code updates (I will backup local files before update)"
 $tmdDir = New-EmptyTempDirectory -Name "Update-GetHealthCode"
-$_=Sync-WebFile -FileName 'lib-write-log-objects.ps1'    -BaseUri $URI -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
-$_=Sync-WebFile -FileName 'ht-AD-GPO-mgmt.ps1'        -BaseUri $URI -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
-$_=Sync-WebFile -FileName 'ht-DNS-DHCP-srvc.ps1'       -BaseUri $URI -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
-$_=Sync-WebFile -FileName 'ht-syscfg-featdisc.ps1'     -BaseUri $URI -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
-$_=Sync-WebFile -FileName 'ht-srvc-exe-resolve.ps1'    -BaseUri $URI -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
-$_=Sync-WebFile -FileName 'ht-file-dir-anlz.ps1'       -BaseUri $URI -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
-$_=Sync-WebFile -FileName 'ht-schtasks-master.ps1'     -BaseUri $URI -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
-$_=Sync-WebFile -FileName 'ht-net-conn.ps1'            -BaseUri $URI -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
-$_=Sync-WebFile -FileName 'ht-os-perf-hw.ps1'          -BaseUri $URI -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
-$_=Sync-WebFile -FileName 'ht-win-os-hyg.ps1'          -BaseUri $URI -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
-$_=Sync-WebFile -FileName 'ht-hyperv-mgmt.ps1'         -BaseUri $URI -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
-$_=Sync-WebFile -FileName 'ht-special.ps1'             -BaseUri $URI -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
-$_=Sync-WebFile -FileName 'Get-ComputerHealth.ps1'       -BaseUri $URI -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
-$_=Sync-WebFile -FileName 'Invoke-GetComputerHealth.ps1' -BaseUri $URI -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
-$_=Sync-WebFile -FileName 'Send-Message.ps1'             -BaseUri $URI -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
-$_=Sync-WebFile -FileName 'helpers-processes.ps1'        -BaseUri $URI -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
-$_=Sync-WebFile -FileName 'helpers-networking.ps1'       -BaseUri $URI -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
-$updated = Sync-WebFile -FileName 'Update-GetHealthCode.ps1' -BaseUri $URI -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+$releaseRoot = $null
+try {
+  $releaseRoot = Expand-GetComputerHealthLatestRelease -RepositoryUrl $REPO_URL -TempPath $tmdDir
+} catch {
+  throw "Unable to download/extract latest release zip: $($_.Exception.Message)"
+}
+
+$_=Sync-LocalFile -FileName 'lib-write-log-objects.ps1'      -SourcePath $releaseRoot -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+$_=Sync-LocalFile -FileName 'ht-AD-GPO-mgmt.ps1'             -SourcePath $releaseRoot -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+$_=Sync-LocalFile -FileName 'ht-DNS-DHCP-srvc.ps1'           -SourcePath $releaseRoot -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+$_=Sync-LocalFile -FileName 'ht-syscfg-featdisc.ps1'         -SourcePath $releaseRoot -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+$_=Sync-LocalFile -FileName 'ht-srvc-exe-resolve.ps1'        -SourcePath $releaseRoot -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+$_=Sync-LocalFile -FileName 'ht-file-dir-anlz.ps1'           -SourcePath $releaseRoot -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+$_=Sync-LocalFile -FileName 'ht-schtasks-master.ps1'         -SourcePath $releaseRoot -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+$_=Sync-LocalFile -FileName 'ht-net-conn.ps1'                -SourcePath $releaseRoot -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+$_=Sync-LocalFile -FileName 'ht-os-perf-hw.ps1'              -SourcePath $releaseRoot -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+$_=Sync-LocalFile -FileName 'ht-win-os-hyg.ps1'              -SourcePath $releaseRoot -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+$_=Sync-LocalFile -FileName 'ht-hyperv-mgmt.ps1'             -SourcePath $releaseRoot -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+$_=Sync-LocalFile -FileName 'ht-special.ps1'                 -SourcePath $releaseRoot -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+$_=Sync-LocalFile -FileName 'Get-ComputerHealth.ps1'         -SourcePath $releaseRoot -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+$_=Sync-LocalFile -FileName 'Invoke-GetComputerHealth.ps1'   -SourcePath $releaseRoot -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+$_=Sync-LocalFile -FileName 'Send-Message.ps1'               -SourcePath $releaseRoot -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+$_=Sync-LocalFile -FileName 'helpers-processes.ps1'          -SourcePath $releaseRoot -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+$_=Sync-LocalFile -FileName 'helpers-networking.ps1'         -SourcePath $releaseRoot -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+$updated = Sync-LocalFile -FileName 'Update-GetHealthCode.ps1' -SourcePath $releaseRoot -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
 if ($updated) {
     if ($latestReleaseMarker) {
       try {
@@ -325,4 +385,14 @@ if ($latestReleaseMarker) {
 if ((Get-Date) -le [datetime]'2026-04-30') {
 	if (test-path $DEST_DIR\lib-health-tests.ps1) {rm $DEST_DIR\lib-health-tests.ps1}
 	if (test-path $DEST_DIR\lib-helpers-for-health-tests.ps1) {rm $DEST_DIR\lib-helpers-for-health-tests.ps1}
+}
+
+# Delete automatically created backup zips older than 1 month
+try {
+  $backupRetentionCutoff = (Get-Date).AddMonths(-1)
+  Get-ChildItem -LiteralPath $BAK_DIR -File -Filter '*.zip' -ErrorAction Stop |
+    Where-Object { $_.LastWriteTime -lt $backupRetentionCutoff } |
+    Remove-Item -Force -ErrorAction Stop
+} catch {
+  Write-Warning ("Failed pruning old backups in {0}: {1}" -f $BAK_DIR, $_.Exception.Message)
 }
