@@ -298,6 +298,7 @@ $_=Sync-WebFile -FileName 'Get-ComputerHealth.ps1'       -BaseUri $URI -TempPath
 $_=Sync-WebFile -FileName 'Invoke-GetComputerHealth.ps1' -BaseUri $URI -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
 $_=Sync-WebFile -FileName 'Send-Message.ps1'             -BaseUri $URI -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
 $_=Sync-WebFile -FileName 'helpers-processes.ps1'        -BaseUri $URI -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+$_=Sync-WebFile -FileName 'helpers-networking.ps1'       -BaseUri $URI -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
 $updated = Sync-WebFile -FileName 'Update-GetHealthCode.ps1' -BaseUri $URI -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
 if ($updated) {
     if ($latestReleaseMarker) {
@@ -325,4 +326,3 @@ if ((Get-Date) -le [datetime]'2026-04-30') {
 	if (test-path $DEST_DIR\lib-health-tests.ps1) {rm $DEST_DIR\lib-health-tests.ps1}
 	if (test-path $DEST_DIR\lib-helpers-for-health-tests.ps1) {rm $DEST_DIR\lib-helpers-for-health-tests.ps1}
 }
-
