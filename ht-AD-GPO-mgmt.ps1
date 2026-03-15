@@ -405,81 +405,226 @@ function HealthTest-AdminSDHolderCoverage{
 }
 
 function HealthTest-ADReplicationDomainRepadmin {
+  [CmdletBinding()]
+  param(
+    [TimeSpan]$WarnLargestDelta = ([TimeSpan]::FromHours(1)),
+    [TimeSpan]$FailLargestDelta = ([TimeSpan]::FromHours(4))
+  )
+
   $domainRole = (Get-CimInstance Win32_ComputerSystem -ErrorAction Stop).DomainRole
   $isHostDC = ($domainRole -in 4,5)
-
   if (-not $isHostDC) { return }
 
   $repadminCmd = Get-Command repadmin.exe -ErrorAction SilentlyContinue
   $repadmin = if ($repadminCmd -and $repadminCmd.Source) { $repadminCmd.Source } else { "$env:windir\system32\repadmin.exe" }
 
   if (-not (Test-Path -LiteralPath $repadmin)) {
-    Write-Warning "[failure] AD replication (repadmin): repadmin.exe not found; cannot run domain-wide checks."; return
+    $synopsis = "repadmin.exe not found"
+    $details = "`nCannot run domain-wide AD replication checks."
+    Write-Warning "[failure] $synopsis$details"
+    return
   }
 
   $ok = $true
 
-  # --- Test 1: repadmin /replsum -> ensure all 'fails' are 0
+  function Convert-RepadminDeltaToTimeSpan {
+    param([string]$Text)
+
+    if (-not $Text) { return $null }
+    $t = $Text.Trim()
+
+    $m = [regex]::Match($t, '^(?:(?<d>\d+)d:)?(?:(?<h>\d+)h:)?(?<m>\d+)m:(?<s>\d+)s$')
+    if ($m.Success) {
+      $days    = if ($m.Groups['d'].Success) { [int]$m.Groups['d'].Value } else { 0 }
+      $hours   = if ($m.Groups['h'].Success) { [int]$m.Groups['h'].Value } else { 0 }
+      $minutes = [int]$m.Groups['m'].Value
+      $seconds = [int]$m.Groups['s'].Value
+      return (New-TimeSpan -Days $days -Hours $hours -Minutes $minutes -Seconds $seconds)
+    }
+
+    $m = [regex]::Match($t, '^(?<s>\d+)s$')
+    if ($m.Success) {
+      return (New-TimeSpan -Seconds ([int]$m.Groups['s'].Value))
+    }
+
+    return $null
+  }
+
+  function Get-MaxTimeSpan {
+    param([System.Collections.IEnumerable]$Values)
+
+    $max = $null
+    foreach ($v in $Values) {
+      if ($null -eq $v) { continue }
+      if ($null -eq $max -or $v -gt $max) { $max = $v }
+    }
+    $max
+  }
+
   try {
-    $sumOut = (& $repadmin /replsum 2>&1 | Out-String)
+    $sumOut = (& $repadmin /replsummary 2>&1 | Out-String)
   } catch {
-    Write-Warning "[failure] AD replication (repadmin): failed to execute 'repadmin /replsum'.`n$($_.Exception.Message)"
+    $synopsis = "repadmin /replsummary could not be executed"
+    $details = "`n$($_.Exception.Message)"
+    Write-Warning "[failure] $synopsis$details"
     return
   }
 
   if (-not $sumOut) {
-    Write-Warning "[failure] AD replication (repadmin): no output from 'repadmin /replsum'."
+    $synopsis = "repadmin /replsummary returned no output"
+    $details = ""
+    Write-Warning "[failure] $synopsis$details"
     $ok = $false
   } else {
-    $bad = @()
+    $rows = @()
     foreach ($ln in ($sumOut -split '\r?\n')) {
-      if ($ln -match '^\s*(?<DSA>\S+)\s+(?<Delta>(?:\d+d:)?(?:\d+h:)?\d+m:\d+s|\d+s)\s+(?<Fails>\d+)\s*/\s*(?<Total>\d+)\b') {
-        $dsa = $Matches.DSA
-        $fails = [int]$Matches.Fails
-        $total = [int]$Matches.Total
-        if ($fails -gt 0) { $bad += [pscustomobject]@{ DSA=$dsa; Fails=$fails; Total=$total } }
+      if ($ln -match '^\s*(?<DSA>\S+)\s+(?<Delta>(?:\d+d:)?(?:\d+h:)?\d+m:\d+s|\d+s)\s+(?<Fails>\d+)\s*/\s*(?<Total>\d+)\s+(?<Pct>\d+)\b') {
+        $rows += [pscustomobject]@{
+          DSA       = $Matches.DSA
+          DeltaText = $Matches.Delta
+          Delta     = Convert-RepadminDeltaToTimeSpan $Matches.Delta
+          Fails     = [int]$Matches.Fails
+          Total     = [int]$Matches.Total
+          Percent   = [int]$Matches.Pct
+        }
       }
     }
 
-    if ($bad.Count -gt 0) {
-      foreach ($b in $bad) {
-        Write-Warning "[failure] AD replication (repadmin): replsum reports failures on '$($b.DSA)'`n$($b.Fails) fail(s) out of $($b.Total) neighbors."
-      }
+    if ($rows.Count -eq 0) {
+      $synopsis = "repadmin /replsummary output could not be parsed"
+      $details = "`nRun repadmin /replsummary manually and inspect the output."
+      Write-Warning "[failure] $synopsis$details"
       $ok = $false
     } else {
-      Write-Warning "[pass] AD replication (repadmin): replsum shows 0 fails for all DSAs."}
+      $badFails = @($rows | Where-Object { $_.Fails -gt 0 })
+      foreach ($b in $badFails) {
+        $synopsis = "Replication failures reported for DSA $($b.DSA)"
+        $details =
+          "`nFails: $($b.Fails) / $($b.Total)" +
+          "`nLargest delta: $($b.DeltaText)" +
+          "`nError percentage: $($b.Percent)%"
+        Write-Warning "[failure] $synopsis$details"
+      }
+      if ($badFails.Count -gt 0) { $ok = $false }
+
+      $badDeltaFail = @($rows | Where-Object { $null -ne $_.Delta -and $_.Delta -ge $FailLargestDelta })
+      foreach ($b in $badDeltaFail) {
+        $synopsis = "Replication largest delta too high for DSA $($b.DSA)"
+        $details =
+          "`nLargest delta: $($b.DeltaText)" +
+          "`nFail threshold: $($FailLargestDelta.ToString())" +
+          "`nFails: $($b.Fails) / $($b.Total)"
+        Write-Warning "[failure] $synopsis$details"
+      }
+      if ($badDeltaFail.Count -gt 0) { $ok = $false }
+
+      $badDeltaWarn = @(
+        $rows |
+        Where-Object {
+          $null -ne $_.Delta -and
+          $_.Delta -ge $WarnLargestDelta -and
+          $_.Delta -lt $FailLargestDelta
+        }
+      )
+      foreach ($b in $badDeltaWarn) {
+        $synopsis = "Replication largest delta elevated for DSA $($b.DSA)"
+        $details =
+          "`nLargest delta: $($b.DeltaText)" +
+          "`nWarning threshold: $($WarnLargestDelta.ToString())" +
+          "`nFail threshold: $($FailLargestDelta.ToString())" +
+          "`nFails: $($b.Fails) / $($b.Total)"
+        Write-Warning "[warning] $synopsis$details"
+      }
+
+      if ($badFails.Count -eq 0 -and $badDeltaFail.Count -eq 0) {
+        $maxDelta = Get-MaxTimeSpan ($rows | Select-Object -ExpandProperty Delta)
+        $maxDeltaText = if ($null -ne $maxDelta) { $maxDelta.ToString() } else { 'unknown' }
+        $synopsis = "repadmin /replsummary found no replication failures"
+        $details = "`nLargest parsed delta: $maxDeltaText"
+        Write-Warning "[pass] $synopsis$details"
+      }
+    }
   }
 
-  # --- Test 2: repadmin /showreps -> all latest attempts 'was successful.'
   try {
-    $showOut = (& $repadmin /showreps 2>&1 | Out-String)
+    $showOut = (& $repadmin /showrepl * 2>&1 | Out-String)
   } catch {
-    Write-Warning "[failure] AD replication (repadmin): failed to execute 'repadmin /showreps'.`n$($_.Exception.Message)"
+    $synopsis = "repadmin /showrepl * could not be executed"
+    $details = "`n$($_.Exception.Message)"
+    Write-Warning "[failure] $synopsis$details"
     return
   }
 
   if (-not $showOut) {
-    Write-Warning "[failure] AD replication (repadmin): no output from 'repadmin /showreps'."
+    $synopsis = "repadmin /showrepl * returned no output"
+    $details = ""
+    Write-Warning "[failure] $synopsis$details"
     $ok = $false
   } else {
-    $attemptLines = ($showOut -split '\r?\n') | Where-Object { $_ -match 'Last attempt @' }
-    if (-not $attemptLines -or $attemptLines.Count -eq 0) {
-      Write-Warning "[warning] AD replication (repadmin): showreps produced no 'Last attempt' lines.`nRun 'repadmin /showreps' manually to inspect output."
+    $lines = @($showOut -split '\r?\n')
+    $currentDc = $null
+    $currentNc = $null
+    $currentVia = $null
+    $attempts = @()
+
+    foreach ($ln in $lines) {
+      if ($ln -match '^Repadmin:\s+running command /showrepl against full DC\s+(?<dc>\S+)') {
+        $currentDc = $Matches.dc
+        $currentNc = $null
+        $currentVia = $null
+        continue
+      }
+
+      if ($ln -match '^\s*([A-Z]{2}=|CN=).+$') {
+        $currentNc = $ln.Trim()
+        $currentVia = $null
+        continue
+      }
+
+      if ($ln -match '^\s+(?<partner>\S+)\s+via\s+(?<transport>\S+)\s*$') {
+        $currentVia = $ln.Trim()
+        continue
+      }
+
+      if ($ln -match 'Last attempt @') {
+        $attempts += [pscustomobject]@{
+          DC          = $currentDc
+          NamingCtx   = $currentNc
+          Neighbor    = $currentVia
+          AttemptLine = $ln.Trim()
+          Successful  = ($ln -match 'was successful\.$')
+        }
+      }
+    }
+
+    if ($attempts.Count -eq 0) {
+      $synopsis = "repadmin /showrepl * produced no last-attempt lines"
+      $details = "`nRun repadmin /showrepl * manually and inspect the output."
+      Write-Warning "[warning] $synopsis$details"
       $ok = $false
     } else {
-      $notOk = @($attemptLines | Where-Object { $_ -notmatch 'was successful\.$' })
+      $notOk = @($attempts | Where-Object { -not $_.Successful })
+      foreach ($a in $notOk) {
+        $synopsis = "Replication last attempt was unsuccessful"
+        $details =
+          "`nDC: $($a.DC)" +
+          "`nNaming context: $($a.NamingCtx)" +
+          "`nNeighbor: $($a.Neighbor)" +
+          "`n$a.AttemptLine"
+        Write-Warning "[failure] $synopsis$details"
+      }
       if ($notOk.Count -gt 0) {
-        foreach ($ln in $notOk) {
-          Write-Warning "[failure] AD replication (repadmin): showreps has unsuccessful last attempt`n$($ln.Trim())"
-        }
         $ok = $false
       } else {
-        Write-Warning "[pass] AD replication (repadmin): showreps indicates all last attempts were successful."}
+        $dcCount = (@($attempts | Select-Object -ExpandProperty DC -Unique) | Measure-Object).Count
+        $synopsis = "repadmin /showrepl * found all last attempts successful"
+        $details =
+          "`nChecked $($attempts.Count) inbound neighbor attempt line(s)" +
+          "`nAcross $dcCount DC(s)"
+        Write-Warning "[pass] $synopsis$details"
+      }
     }
   }
-
-  if (-not $ok) {
-    Write-Warning "[notice] AD replication (repadmin): issues detected."}
 }
 
 function HealthTest-ADReplicationLocalRSAT {
