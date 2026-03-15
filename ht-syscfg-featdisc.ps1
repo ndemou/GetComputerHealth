@@ -3,6 +3,18 @@ System Configuration & Feature Discovery
 #>
 
 function HealthTest-InstalledRolesFeatures {
+<#
+.SYNOPSIS
+Checks Installed Roles Features and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+
+.DESCRIPTION
+Uses: PowerShell cmdlets used by this test.
+AppliesTo: All Windows hosts.
+TestScope: Computer.
+Category: Primary: Audit / Compliance / Informational.
+Impact: Medium.
+FalsePositives: Environment-specific hardening baselines can intentionally differ.
+#>
   [CmdletBinding()]
   param([string[]]$DisallowedRoles = @('Web-Server','DHCP','WDS'))
 
@@ -26,10 +38,15 @@ function HealthTest-InstalledRolesFeatures {
 function HealthTest-MalwareProtectionFeatures {
 <#
 .SYNOPSIS
-Checks if all Microsoft Defender (Malware Protection) features are enabled.
+Checks Malware Protection Features and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Evaluates the output of Get-MpComputerStatus and reports the state of several protection-related properties using Write-BasedOnTestResult.
+Uses: Get-MpComputerStatus, Get-MpPreference, Windows Security cmdlets.
+AppliesTo: All Windows hosts.
+TestScope: Computer.
+Category: Primary: Configuration Hygiene & Best Practices.
+Impact: Medium.
+FalsePositives: Environment-specific hardening baselines can intentionally differ.
 #>
 
     # $MPs holds the Malware Protection status
@@ -52,6 +69,18 @@ Evaluates the output of Get-MpComputerStatus and reports the state of several pr
 
 
 function HealthTest-ExploitProtectionBaseline {
+<#
+.SYNOPSIS
+Checks Exploit Protection Baseline and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+
+.DESCRIPTION
+Uses: Get-MpComputerStatus, Get-MpPreference, Windows Security cmdlets.
+AppliesTo: All Windows hosts.
+TestScope: Computer.
+Category: Primary: Audit / Compliance / Informational.
+Impact: Medium.
+FalsePositives: Environment-specific hardening baselines can intentionally differ.
+#>
     if (-not (Get-Command Get-ProcessMitigation -ErrorAction SilentlyContinue)) { Write-Warning "[notice] Exploit Protection cmdlets unavailable"; return }
     $sys = Get-ProcessMitigation -System -ErrorAction SilentlyContinue
     if (-not $sys) { Write-Warning "[warning] Could not read system process mitigations"; return }
@@ -63,6 +92,18 @@ function HealthTest-ExploitProtectionBaseline {
 }
 
 function HealthTest-StartupItems{
+<#
+.SYNOPSIS
+Checks Startup Items and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+
+.DESCRIPTION
+Uses: Get-Service, Get-CimInstance Win32_Service, registry startup keys.
+AppliesTo: All Windows hosts.
+TestScope: Computer.
+Category: Primary: Configuration Hygiene & Best Practices.
+Impact: Medium.
+FalsePositives: Environment-specific hardening baselines can intentionally differ.
+#>
   $paths=@(
     'HKLM:\Software\Microsoft\Windows\CurrentVersion\Run',
     'HKLM:\Software\Microsoft\Windows\CurrentVersion\RunOnce',

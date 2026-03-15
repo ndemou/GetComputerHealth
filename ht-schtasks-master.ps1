@@ -3,6 +3,18 @@ Scheduled Task Master Cluster
 #>
 
 function HealthTest-ScheduledTasks {
+<#
+.SYNOPSIS
+Checks Scheduled Tasks and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+
+.DESCRIPTION
+Uses: Get-ScheduledTask, schtasks.exe, Task Scheduler APIs.
+AppliesTo: All Windows hosts.
+TestScope: Computer.
+Category: Primary: Configuration Hygiene & Best Practices.
+Impact: High (Time/CPU/Network may increase on large environments).
+FalsePositives: Environment-specific hardening baselines can intentionally differ.
+#>
     $task_name_paterns_to_ignore = @(
       'OneDrive Per-Machine Standalone Update Task*',
       'OneDrive Reporting Task*',
@@ -77,6 +89,18 @@ function HealthTest-ScheduledTasks {
 }
 
 function HealthTest-SystemScheduledTasks{
+<#
+.SYNOPSIS
+Checks System Scheduled Tasks and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+
+.DESCRIPTION
+Uses: Get-ScheduledTask, schtasks.exe, Task Scheduler APIs.
+AppliesTo: All Windows hosts.
+TestScope: Computer.
+Category: Primary: Configuration Hygiene & Best Practices.
+Impact: High (Time/CPU/Network may increase on large environments).
+FalsePositives: Environment-specific hardening baselines can intentionally differ.
+#>
   [CmdletBinding()] param(
     [string[]]$MustBeEnabled = @(),  # exact paths or regex
     [string[]]$Ignore = @(
@@ -291,6 +315,18 @@ function Get-ScheduledTaskDeepInfo{
 }
 
 function HealthTest-ScheduledTasksLastResult {
+<#
+.SYNOPSIS
+Checks Scheduled Tasks Last Result and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+
+.DESCRIPTION
+Uses: Get-ScheduledTask, schtasks.exe, Task Scheduler APIs.
+AppliesTo: All Windows hosts.
+TestScope: Computer.
+Category: Primary: Configuration Hygiene & Best Practices.
+Impact: High (Time/CPU/Network may increase on large environments).
+FalsePositives: Environment-specific hardening baselines can intentionally differ.
+#>
   $mapHresult = @{
     0x40010004=@{d='Process terminated externally'}
     0x80070001=@{d='Incorrect function'}
