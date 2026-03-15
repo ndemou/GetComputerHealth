@@ -742,6 +742,18 @@ function Test-LooksLikePath {
 
 
 function HealthTest-AutoStartServicesRunning {
+<#
+.SYNOPSIS
+Checks Auto Start Services Running and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+
+.DESCRIPTION
+Uses: Get-Service, Get-CimInstance Win32_Service, registry startup keys.
+AppliesTo: All Windows hosts.
+TestScope: Computer.
+Category: Primary: Configuration Hygiene & Best Practices.
+Impact: Medium.
+FalsePositives: Environment-specific hardening baselines can intentionally differ.
+#>
   function Get-ServiceExitCodeMessage {
       param([int]$ExitCode)
 
@@ -824,6 +836,18 @@ function HealthTest-AutoStartServicesRunning {
 }
 
 function HealthTest-NonMicrosoftServices {
+<#
+.SYNOPSIS
+Checks Non Microsoft Services and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+
+.DESCRIPTION
+Uses: Get-Service, Get-CimInstance Win32_Service, registry startup keys.
+AppliesTo: All Windows hosts.
+TestScope: Computer.
+Category: Primary: Configuration Hygiene & Best Practices.
+Impact: Medium.
+FalsePositives: Environment-specific hardening baselines can intentionally differ.
+#>
     $ok = $true
     $CORE_MICROSOFT_VENDORS = @('Microsoft Windows','Microsoft Windows Publisher','Microsoft Corporation','Microsoft Windows Hardware Compatibility Publisher')
     $COMMON_VENDORS_FOR_WORKSTATIONS = @('Adobe Inc.', 'Cisco Systems, Inc.', 'Google LLC', 'Lenovo', 'Mozilla Corporation')
@@ -849,6 +873,18 @@ function HealthTest-NonMicrosoftServices {
 }
 
 function HealthTest-ServiceAccountsPwdNeverExpires{
+<#
+.SYNOPSIS
+Checks Service Accounts Pwd Never Expires and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+
+.DESCRIPTION
+Uses: Get-Service, Get-CimInstance Win32_Service, registry startup keys.
+AppliesTo: All Windows hosts.
+TestScope: Computer.
+Category: Primary: Configuration Hygiene & Best Practices.
+Impact: Medium.
+FalsePositives: Environment-specific hardening baselines can intentionally differ.
+#>
   $filter='(servicePrincipalName=*)'
   $objs=Get-ADUser -LDAPFilter $filter -Properties PasswordNeverExpires,PasswordLastSet
   $bad=@($objs | Where-Object {$_.PasswordNeverExpires -eq $true})

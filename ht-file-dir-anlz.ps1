@@ -17,6 +17,18 @@ function Normalize-DirectoryPath {
     }
 
 function HealthTest-LargeDirectories {
+<#
+.SYNOPSIS
+Checks Large Directories and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+
+.DESCRIPTION
+Uses: PowerShell cmdlets used by this test.
+AppliesTo: All Windows hosts.
+TestScope: Computer.
+Category: Primary: Configuration Hygiene & Best Practices.
+Impact: High (Time/CPU/Network may increase on large environments).
+FalsePositives: Environment-specific hardening baselines can intentionally differ.
+#>
     $foundLargeDirectory = $false
 
     foreach ($dir in Find-LargeDirectory -Path 'C:\' -Threshold 10000 -SkipPaths @("C:\windows\servicing","C:\windows\WinSxS")) {

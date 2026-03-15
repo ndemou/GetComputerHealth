@@ -5,7 +5,15 @@ Special
 function HealthTest-Dummy {
 <#
 .SYNOPSIS
-Emits sample warning-stream messages in the new [level] format for integration testing.
+Checks Dummy and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+
+.DESCRIPTION
+Uses: PowerShell cmdlets used by this test.
+AppliesTo: All Windows hosts.
+TestScope: Computer.
+Category: Primary: Audit / Compliance / Informational.
+Impact: Medium.
+FalsePositives: Environment-specific hardening baselines can intentionally differ.
 #>
     Write-Output "Dummy debug message"
     Write-Warning "[info] Dummy info message"

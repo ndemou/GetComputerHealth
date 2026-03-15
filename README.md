@@ -288,12 +288,26 @@ Open the relevant `ht-*.ps1` module and model your function after nearby tests:
 
 ```powershell
 function HealthTest-YourTestName {
+<#
+.SYNOPSIS
+Short purpose and key signal logic (<=320 chars).
+
+.DESCRIPTION
+Uses: CmdletA, CmdletB.
+AppliesTo: Domain Controllers.
+TestScope: Domain.
+Category: Primary: Security & Stability Risks.
+Impact: Medium (Time/Network).
+FalsePositives: Short note.
+#>
     # no params or params with defaults
     # gather data
     # evaluate data
     # Write-Warning "[pass] ..." or Write-Warning "[failure] ..."
 }
 ```
+
+For the exact contributor rules (placement, required sections, max lengths, and field order), see [`how-to-add-custom-tests.md`](./how-to-add-custom-tests.md#required-help-block-format-for-every-healthtest--function).
 
 Use **PascalCase** after the `HealthTest-` prefix (example: `HealthTest-PagefileSanity`).
 

@@ -3,6 +3,18 @@ DNS & DHCP Services
 #>
 
 function HealthTest-DnsScavenging{
+<#
+.SYNOPSIS
+Checks Dns Scavenging and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+
+.DESCRIPTION
+Uses: Resolve-DnsName, Get-DnsServer cmdlets, ipconfig.exe.
+AppliesTo: All Windows hosts.
+TestScope: Computer.
+Category: Primary: Configuration Hygiene & Best Practices.
+Impact: Medium (primarily Time/Network).
+FalsePositives: Environment-specific hardening baselines can intentionally differ.
+#>
   $sv = Get-DnsServerScavenging -ErrorAction Stop
   $zones = Get-DnsServerZone -ErrorAction Stop | Where-Object { $_.IsDsIntegrated -and $_.ZoneType -eq 'Primary' }
   $comment = "Severity: Medium.`nWhat it means: Server-level scavenging is off, so stale dynamic records never age out.`nRisk: Stale A/PTR clutter, service discovery problems, and opportunities for name re-use confusion. In secure-updates AD zones, outright hijack is harder, but operational pain is real."
@@ -23,6 +35,18 @@ function HealthTest-DnsScavenging{
 
 
 function HealthTest-DnsZoneReplicationScope{
+<#
+.SYNOPSIS
+Checks Dns Zone Replication Scope and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+
+.DESCRIPTION
+Uses: repadmin.exe, Get-ADReplication cmdlets, Get-ADDomainController.
+AppliesTo: Domain Controllers (or domain management hosts with required RSAT tools).
+TestScope: Domain.
+Category: Primary: Configuration Hygiene & Best Practices.
+Impact: High (Time/CPU/Network may increase on large environments).
+FalsePositives: Environment-specific hardening baselines can intentionally differ.
+#>
   $zones = Get-DnsServerZone -ErrorAction Stop | Where-Object { $_.IsDsIntegrated }
   if(-not $zones){ Write-Warning "[pass] No AD-integrated zones present"; return }
   $lines = ($zones | ForEach-Object { "{0}:{1}" -f $_.ZoneName, $_.ReplicationScope })
@@ -31,6 +55,18 @@ function HealthTest-DnsZoneReplicationScope{
 
 
 function HealthTest-DnsZoneTransfers{
+<#
+.SYNOPSIS
+Checks Dns Zone Transfers and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+
+.DESCRIPTION
+Uses: Resolve-DnsName, Get-DnsServer cmdlets, ipconfig.exe.
+AppliesTo: Domain Controllers (or domain management hosts with required RSAT tools).
+TestScope: Domain.
+Category: Primary: Configuration Hygiene & Best Practices.
+Impact: Medium (primarily Time/Network).
+FalsePositives: Environment-specific hardening baselines can intentionally differ.
+#>
   $zones=Get-DnsServerZone | Where-Object { -not $_.IsAutoCreated }
   $bad=$false
   foreach($z in $zones){
@@ -41,6 +77,18 @@ function HealthTest-DnsZoneTransfers{
 
 
 function HealthTest-ReverseZonesPresent{
+<#
+.SYNOPSIS
+Checks Reverse Zones Present and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+
+.DESCRIPTION
+Uses: PowerShell cmdlets used by this test.
+AppliesTo: All Windows hosts.
+TestScope: Computer.
+Category: Primary: Configuration Hygiene & Best Practices.
+Impact: Medium.
+FalsePositives: Environment-specific hardening baselines can intentionally differ.
+#>
   [CmdletBinding()] param([string[]]$ExpectedReverseZones)
   $zones=Get-DnsServerZone | Where-Object {$_.IsReverseLookupZone} | Select-Object -ExpandProperty ZoneName
   if(-not $ExpectedReverseZones){ Write-Warning "[pass] $(("Reverse zones present: "+(($zones -join ', ')-replace '^$','<none>')))"; return }
@@ -53,6 +101,18 @@ function HealthTest-ReverseZonesPresent{
 
 
 function HealthTest-DcDnsServerForwarder {
+<#
+.SYNOPSIS
+Checks Dc Dns Server Forwarder and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+
+.DESCRIPTION
+Uses: Resolve-DnsName, Get-DnsServer cmdlets, ipconfig.exe.
+AppliesTo: Domain Controllers (or domain management hosts with required RSAT tools).
+TestScope: Domain.
+Category: Primary: Configuration Hygiene & Best Practices.
+Impact: Medium (primarily Time/Network).
+FalsePositives: Environment-specific hardening baselines can intentionally differ.
+#>
   [CmdletBinding()]
   [OutputType([bool])]
   param()
@@ -84,6 +144,18 @@ function HealthTest-DcDnsServerForwarder {
 
 
 function HealthTest-DnsForwarders{
+<#
+.SYNOPSIS
+Checks Dns Forwarders and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+
+.DESCRIPTION
+Uses: Resolve-DnsName, Get-DnsServer cmdlets, ipconfig.exe.
+AppliesTo: All Windows hosts.
+TestScope: Computer.
+Category: Primary: Configuration Hygiene & Best Practices.
+Impact: Medium (primarily Time/Network).
+FalsePositives: Environment-specific hardening baselines can intentionally differ.
+#>
   $f=Get-DnsServerForwarder -ErrorAction Stop
   if(-not $f -or -not $f.IPAddress){ Write-Warning "[pass] No DNS forwarders configured"; return }
   $ips=$f.IPAddress
@@ -98,6 +170,18 @@ function HealthTest-DnsForwarders{
 
 
 function HealthTest-DnsRecursionConfig {
+<#
+.SYNOPSIS
+Checks Dns Recursion Config and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+
+.DESCRIPTION
+Uses: Resolve-DnsName, Get-DnsServer cmdlets, ipconfig.exe.
+AppliesTo: All Windows hosts.
+TestScope: Computer.
+Category: Primary: Configuration Hygiene & Best Practices.
+Impact: Medium (primarily Time/Network).
+FalsePositives: Environment-specific hardening baselines can intentionally differ.
+#>
     if (-not (Get-Command Get-DnsServerRecursion -ErrorAction SilentlyContinue)) {
         Write-Warning "[notice] DNS Server tools not available`nDNS role/RSAT missing?"
         return
@@ -151,6 +235,18 @@ function HealthTest-DnsRecursionConfig {
 }
 
 function HealthTest-DnsSuffixMatchesDomain {
+<#
+.SYNOPSIS
+Checks Dns Suffix Matches Domain and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+
+.DESCRIPTION
+Uses: Resolve-DnsName, Get-DnsServer cmdlets, ipconfig.exe.
+AppliesTo: Domain Controllers (or domain management hosts with required RSAT tools).
+TestScope: Domain.
+Category: Primary: Configuration Hygiene & Best Practices.
+Impact: Medium (primarily Time/Network).
+FalsePositives: Environment-specific hardening baselines can intentionally differ.
+#>
   [CmdletBinding()] param()
   $cs = Get-CimInstance Win32_ComputerSystem
   $role = $cs.DomainRole
@@ -169,11 +265,35 @@ function HealthTest-DnsSuffixMatchesDomain {
 }
 
 function HealthTest-DnsClientService{
+<#
+.SYNOPSIS
+Checks Dns Client Service and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+
+.DESCRIPTION
+Uses: Resolve-DnsName, Get-DnsServer cmdlets, ipconfig.exe.
+AppliesTo: All Windows hosts.
+TestScope: Computer.
+Category: Primary: Configuration Hygiene & Best Practices.
+Impact: Medium (primarily Time/Network).
+FalsePositives: Environment-specific hardening baselines can intentionally differ.
+#>
   $s=Get-Service Dnscache -ErrorAction Stop
   if($s.Status -eq 'Running'){ Write-Warning "[pass] DNS Client service running" } else { Write-Warning "[failure] DNS Client service is not running`nStatus=$($s.Status)" }
 }
 
 function HealthTest-DcDnsARecords{
+<#
+.SYNOPSIS
+Checks Dc Dns A Records and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+
+.DESCRIPTION
+Uses: Resolve-DnsName, Get-DnsServer cmdlets, ipconfig.exe.
+AppliesTo: Domain Controllers (or domain management hosts with required RSAT tools).
+TestScope: Domain.
+Category: Primary: Configuration Hygiene & Best Practices.
+Impact: Medium (primarily Time/Network).
+FalsePositives: Environment-specific hardening baselines can intentionally differ.
+#>
   $bad=@()
   foreach($dc in (Get-ADDomainController -Filter *)){
     $hn=$dc.HostName; $ip=$dc.IPv4Address
@@ -186,6 +306,18 @@ function HealthTest-DcDnsARecords{
 }
 
 function HealthTest-DcDnsRegistration {
+<#
+.SYNOPSIS
+Checks Dc Dns Registration and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+
+.DESCRIPTION
+Uses: Resolve-DnsName, Get-DnsServer cmdlets, ipconfig.exe.
+AppliesTo: Domain Controllers (or domain management hosts with required RSAT tools).
+TestScope: Domain.
+Category: Primary: Configuration Hygiene & Best Practices.
+Impact: Medium (primarily Time/Network).
+FalsePositives: Environment-specific hardening baselines can intentionally differ.
+#>
     [CmdletBinding()]
     param()
 
@@ -271,6 +403,18 @@ function HealthTest-DcDnsRegistration {
 }
 
 function HealthTest-DhcpDnsCredential{
+<#
+.SYNOPSIS
+Checks Dhcp Dns Credential and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+
+.DESCRIPTION
+Uses: Resolve-DnsName, Get-DnsServer cmdlets, ipconfig.exe.
+AppliesTo: Domain Controllers (or domain management hosts with required RSAT tools).
+TestScope: Domain.
+Category: Primary: Configuration Hygiene & Best Practices.
+Impact: Medium (primarily Time/Network).
+FalsePositives: Environment-specific hardening baselines can intentionally differ.
+#>
   [CmdletBinding()] param([int]$MaxPwdAgeDays=365)
   $dhcp=Get-WindowsFeature -Name DHCP -ErrorAction SilentlyContinue
   if(-not $dhcp -or -not $dhcp.Installed){ Write-Warning "[pass] DHCP role not installed on this server"; return }
@@ -283,6 +427,18 @@ function HealthTest-DhcpDnsCredential{
 }
 
 function HealthTest-DhcpScopeUtilization {
+<#
+.SYNOPSIS
+Checks Dhcp Scope Utilization and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+
+.DESCRIPTION
+Uses: Get-DhcpServer cmdlets, Get-ADObject, Get-CimInstance.
+AppliesTo: Domain Controllers (or domain management hosts with required RSAT tools).
+TestScope: Domain.
+Category: Primary: Configuration Hygiene & Best Practices.
+Impact: Medium.
+FalsePositives: Environment-specific hardening baselines can intentionally differ.
+#>
     $svc = Get-Service -Name 'DHCPServer' -ErrorAction SilentlyContinue
     if (-not $svc) {
         Write-Output "Host is not a DHCP server (DHCPServer service missing); skipping DHCP scope utilization test"
@@ -315,6 +471,18 @@ function HealthTest-DhcpScopeUtilization {
 }
 
 function HealthTest-DnsSuffixBaseline {
+<#
+.SYNOPSIS
+Checks Dns Suffix Baseline and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+
+.DESCRIPTION
+Uses: Resolve-DnsName, Get-DnsServer cmdlets, ipconfig.exe.
+AppliesTo: All Windows hosts.
+TestScope: Computer.
+Category: Primary: Audit / Compliance / Informational.
+Impact: Medium (primarily Time/Network).
+FalsePositives: Environment-specific hardening baselines can intentionally differ.
+#>
     $DomainName=(Get-CimInstance Win32_ComputerSystem).Domain
 
     # 1) Primary DNS suffix equals the AD DNS name
@@ -379,6 +547,18 @@ function HealthTest-DnsSuffixBaseline {
 
 function HealthTest-InterfaceDnsServersUseDcs {
 
+<#
+.SYNOPSIS
+Checks Interface Dns Servers Use Dcs and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+
+.DESCRIPTION
+Uses: Resolve-DnsName, Get-DnsServer cmdlets, ipconfig.exe.
+AppliesTo: Domain Controllers (or domain management hosts with required RSAT tools).
+TestScope: Domain.
+Category: Primary: Configuration Hygiene & Best Practices.
+Impact: Medium (primarily Time/Network).
+FalsePositives: Environment-specific hardening baselines can intentionally differ.
+#>
   $cs = Get-CimInstance Win32_ComputerSystem
   $role = $cs.DomainRole
   $fn = $MyInvocation.MyCommand.Name
