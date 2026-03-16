@@ -492,7 +492,7 @@ Keeps only the latest N cached release zips.
   }
 }
 
-function Sync-LocalFile {
+function Replace-FileFromSource {
 <#
 .SYNOPSIS
 Copies a file from the extracted release and updates local copy if they differ.
@@ -532,32 +532,23 @@ $false - No change occurred or the operation failed.
   $finalPath    = Join-Path $DestinationPath $FileName
   $updated      = $false
 
-  Write-Verbose "Synchronizing file '$FileName'"
-  Write-Verbose "  Source      : $releaseFilePath"
-  Write-Verbose "  Temp        : $DownloadPath"
-  Write-Verbose "  Destination : $finalPath"
-
   try {
     if (-not (Test-Path -LiteralPath $releaseFilePath -PathType Leaf)) {
       throw "Expected file not found in release zip: $FileName"
     }
 
-    Write-Verbose "Copying release file to temporary staging path"
     Copy-Item -LiteralPath $releaseFilePath -Destination $DownloadPath -Force -ErrorAction Stop
 
     $newHash = (Get-FileHash -Path $DownloadPath -Algorithm SHA256).Hash
     $existingHash = $null
 
     if (Test-Path $finalPath) {
-      Write-Verbose "Destination file already exists; computing current hash"
       try {
         $existingHash = (Get-FileHash -Path $finalPath -Algorithm SHA256).Hash
       } catch {
-        Write-Verbose "Failed computing existing hash for '$finalPath'; proceeding as different"
+        Write-Warning "Failed computing existing hash for '$finalPath'; proceeding as different"
         $existingHash = $null
       }
-    } else {
-      Write-Verbose "Destination file does not exist and will be created"
     }
 
     $isDifferent = $true
@@ -566,7 +557,6 @@ $false - No change occurred or the operation failed.
     }
 
     if ($isDifferent) {
-      Write-Verbose "File content differs or destination is missing; update is required"
 
       if (Test-Path $finalPath) {
         $leaf    = Split-Path $finalPath -Leaf
@@ -581,7 +571,6 @@ $false - No change occurred or the operation failed.
         }
 
         try {
-          Write-Verbose "Creating per-file backup archive '$perFileZip'"
           Copy-Item -LiteralPath $finalPath -Destination $stageFile -Force
           Compress-Archive -Path $stageFile -DestinationPath $perFileZip -Force
           Write-Verbose "Per-file backup created: '$perFileZip'"
@@ -591,7 +580,6 @@ $false - No change occurred or the operation failed.
       }
 
       try {
-        Write-Verbose "Replacing destination file '$finalPath'"
         Move-Item -LiteralPath $DownloadPath -Destination $finalPath -Force
         Write-Verbose "Updated '$finalPath'"
         $updated = $true
@@ -738,7 +726,7 @@ try {
   throw "Unable to prepare release zip: $($_.Exception.Message)"
 }
 
-$updated = Sync-LocalFile -FileName 'Update-GetHealthCode.ps1' -SourcePath $releaseRoot -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+$updated = Replace-FileFromSource -FileName 'Update-GetHealthCode.ps1' -SourcePath $releaseRoot -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
 
 if ($updated) {
   Write-Verbose "$passLabel This script updated itself"
@@ -765,23 +753,23 @@ if ($updated) {
   return
 }
 
-$_ = Sync-LocalFile -FileName 'lib-write-log-objects.ps1'      -SourcePath $releaseRoot -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
-$_ = Sync-LocalFile -FileName 'ht-AD-GPO-mgmt.ps1'             -SourcePath $releaseRoot -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
-$_ = Sync-LocalFile -FileName 'ht-DNS-DHCP-srvc.ps1'           -SourcePath $releaseRoot -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
-$_ = Sync-LocalFile -FileName 'ht-syscfg-featdisc.ps1'         -SourcePath $releaseRoot -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
-$_ = Sync-LocalFile -FileName 'ht-srvc-exe-resolve.ps1'        -SourcePath $releaseRoot -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
-$_ = Sync-LocalFile -FileName 'ht-file-dir-anlz.ps1'           -SourcePath $releaseRoot -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
-$_ = Sync-LocalFile -FileName 'ht-schtasks-master.ps1'         -SourcePath $releaseRoot -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
-$_ = Sync-LocalFile -FileName 'ht-net-conn.ps1'                -SourcePath $releaseRoot -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
-$_ = Sync-LocalFile -FileName 'ht-os-perf-hw.ps1'              -SourcePath $releaseRoot -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
-$_ = Sync-LocalFile -FileName 'ht-win-os-hyg.ps1'              -SourcePath $releaseRoot -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
-$_ = Sync-LocalFile -FileName 'ht-hyperv-mgmt.ps1'             -SourcePath $releaseRoot -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
-$_ = Sync-LocalFile -FileName 'ht-special.ps1'                 -SourcePath $releaseRoot -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
-$_ = Sync-LocalFile -FileName 'Get-ComputerHealth.ps1'         -SourcePath $releaseRoot -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
-$_ = Sync-LocalFile -FileName 'Invoke-GetComputerHealth.ps1'   -SourcePath $releaseRoot -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
-$_ = Sync-LocalFile -FileName 'Send-Message.ps1'               -SourcePath $releaseRoot -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
-$_ = Sync-LocalFile -FileName 'helpers-processes.ps1'          -SourcePath $releaseRoot -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
-$_ = Sync-LocalFile -FileName 'helpers-networking.ps1'         -SourcePath $releaseRoot -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+$_ = Replace-FileFromSource -FileName 'lib-write-log-objects.ps1'      -SourcePath $releaseRoot -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+$_ = Replace-FileFromSource -FileName 'ht-AD-GPO-mgmt.ps1'             -SourcePath $releaseRoot -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+$_ = Replace-FileFromSource -FileName 'ht-DNS-DHCP-srvc.ps1'           -SourcePath $releaseRoot -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+$_ = Replace-FileFromSource -FileName 'ht-syscfg-featdisc.ps1'         -SourcePath $releaseRoot -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+$_ = Replace-FileFromSource -FileName 'ht-srvc-exe-resolve.ps1'        -SourcePath $releaseRoot -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+$_ = Replace-FileFromSource -FileName 'ht-file-dir-anlz.ps1'           -SourcePath $releaseRoot -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+$_ = Replace-FileFromSource -FileName 'ht-schtasks-master.ps1'         -SourcePath $releaseRoot -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+$_ = Replace-FileFromSource -FileName 'ht-net-conn.ps1'                -SourcePath $releaseRoot -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+$_ = Replace-FileFromSource -FileName 'ht-os-perf-hw.ps1'              -SourcePath $releaseRoot -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+$_ = Replace-FileFromSource -FileName 'ht-win-os-hyg.ps1'              -SourcePath $releaseRoot -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+$_ = Replace-FileFromSource -FileName 'ht-hyperv-mgmt.ps1'             -SourcePath $releaseRoot -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+$_ = Replace-FileFromSource -FileName 'ht-special.ps1'                 -SourcePath $releaseRoot -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+$_ = Replace-FileFromSource -FileName 'Get-ComputerHealth.ps1'         -SourcePath $releaseRoot -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+$_ = Replace-FileFromSource -FileName 'Invoke-GetComputerHealth.ps1'   -SourcePath $releaseRoot -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+$_ = Replace-FileFromSource -FileName 'Send-Message.ps1'               -SourcePath $releaseRoot -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+$_ = Replace-FileFromSource -FileName 'helpers-processes.ps1'          -SourcePath $releaseRoot -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+$_ = Replace-FileFromSource -FileName 'helpers-networking.ps1'         -SourcePath $releaseRoot -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
 
 if ($latestReleaseMarker) {
   Set-GetComputerHealthInstalledReleaseMarker -CachePath $LATEST_RELEASE_METADATA_CACHE_PATH -Marker $latestReleaseMarker
