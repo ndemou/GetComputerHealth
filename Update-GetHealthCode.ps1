@@ -13,7 +13,8 @@ Will set PSGallery as Trusted.
 None.
 #>
 param(
-  [switch]$Reinstall
+  [switch]$Reinstall,
+  [string]$UpdateFromZip
 )
 
 ####################################################################
@@ -26,6 +27,7 @@ $CFG_DIR  = 'c:\it\config'
 $REPO_URL = 'https://github.com/ndemou/GetComputerHealth'
 $REPO_REF = 'main'
 $LATEST_RELEASE_MARKER_PATH = 'c:\it\config\Get-ComputerHealth-latest-release.dat'
+$ZIP_CACHE_PATTERN = 'GetComputerHealth-release-*.zip'
 $repoSlug = (($REPO_URL -replace '^https?://github\.com/','') -replace '\.git$','').Trim('/')
 #
 #  END OF CONFIG
@@ -162,7 +164,8 @@ System.String. Full path to extracted release root directory.
   [CmdletBinding()]
   param(
     [Parameter(Mandatory)][string]$RepositoryUrl,
-    [Parameter(Mandatory)][string]$TempPath
+    [Parameter(Mandatory)][string]$TempPath,
+    [Parameter(Mandatory)][string]$ZipCacheDir
   )
 
   $release = Get-GetComputerHealthLatestRelease -RepositoryUrl $RepositoryUrl
@@ -170,7 +173,9 @@ System.String. Full path to extracted release root directory.
     throw "Latest release does not include zipball_url."
   }
 
-  $zipPath = Join-Path $TempPath 'latest-release.zip'
+  $zipNameSafeTag = ([string]$release.tag_name -replace '[^a-zA-Z0-9._-]', '_').Trim('_')
+  if ([string]::IsNullOrWhiteSpace($zipNameSafeTag)) { $zipNameSafeTag = 'untagged' }
+  $zipPath = Join-Path $ZipCacheDir ("GetComputerHealth-release-{0}-{1}.zip" -f $zipNameSafeTag, $release.id)
   $extractPath = Join-Path $TempPath 'latest-release'
   if (-not (Test-Path $extractPath)) { $null = New-Item -ItemType Directory -Path $extractPath }
 
@@ -187,6 +192,53 @@ System.String. Full path to extracted release root directory.
   }
 
   return $root.FullName
+}
+
+function Expand-ReleaseFromZipFile {
+<#.SYNOPSIS
+Extracts a provided release zip into a temporary folder and returns extracted root path.
+#>
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)][string]$ZipPath,
+    [Parameter(Mandatory)][string]$TempPath
+  )
+
+  if (-not (Test-Path -LiteralPath $ZipPath -PathType Leaf)) {
+    throw "Zip file not found: $ZipPath"
+  }
+
+  $extractPath = Join-Path $TempPath 'provided-release'
+  if (-not (Test-Path $extractPath)) { $null = New-Item -ItemType Directory -Path $extractPath }
+
+  Expand-Archive -LiteralPath $ZipPath -DestinationPath $extractPath -Force
+  $root = Get-ChildItem -LiteralPath $extractPath -Directory | Select-Object -First 1
+  if (-not $root) {
+    throw "Provided zip extracted but no top-level folder was found."
+  }
+  return $root.FullName
+}
+
+function Keep-OnlyLatestReleaseZips {
+<#.SYNOPSIS
+Keeps only the latest N cached release zips.
+#>
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)][string]$CacheDir,
+    [Parameter(Mandatory)][string]$Pattern,
+    [int]$KeepCount = 2
+  )
+
+  try {
+    $cachedZips = Get-ChildItem -LiteralPath $CacheDir -File -Filter $Pattern -ErrorAction Stop |
+      Sort-Object -Property LastWriteTime -Descending
+    if ($cachedZips.Count -gt $KeepCount) {
+      $cachedZips | Select-Object -Skip $KeepCount | Remove-Item -Force -ErrorAction Stop
+    }
+  } catch {
+    Write-Warning ("Failed pruning cached release zips in {0}: {1}" -f $CacheDir, $_.Exception.Message)
+  }
 }
 
 function Sync-LocalFile {
@@ -313,7 +365,10 @@ if (-not (Test-Path $p)) {
 }
 
 # Check latest release marker to avoid redownloading the same release repeatedly
-$latestReleaseMarker = Get-GetComputerHealthLatestReleaseMarker -RepositoryUrl $REPO_URL
+$latestReleaseMarker = $null
+if (-not $UpdateFromZip) {
+  $latestReleaseMarker = Get-GetComputerHealthLatestReleaseMarker -RepositoryUrl $REPO_URL
+}
 if ($latestReleaseMarker) {
   $storedReleaseMarker = $null
   if (Test-Path -LiteralPath $LATEST_RELEASE_MARKER_PATH -PathType Leaf) {
@@ -337,9 +392,15 @@ Write-Host -for DarkGray "Checking for code updates (I will backup local files b
 $tmdDir = New-EmptyTempDirectory -Name "Update-GetHealthCode"
 $releaseRoot = $null
 try {
-  $releaseRoot = Expand-GetComputerHealthLatestRelease -RepositoryUrl $REPO_URL -TempPath $tmdDir
+  if ($UpdateFromZip) {
+    Write-Host -ForegroundColor DarkGray ("Updating from provided zip: {0}" -f $UpdateFromZip)
+    $releaseRoot = Expand-ReleaseFromZipFile -ZipPath $UpdateFromZip -TempPath $tmdDir
+  } else {
+    $releaseRoot = Expand-GetComputerHealthLatestRelease -RepositoryUrl $REPO_URL -TempPath $tmdDir -ZipCacheDir $BAK_DIR
+    Keep-OnlyLatestReleaseZips -CacheDir $BAK_DIR -Pattern $ZIP_CACHE_PATTERN -KeepCount 2
+  }
 } catch {
-  throw "Unable to download/extract latest release zip: $($_.Exception.Message)"
+  throw "Unable to prepare release zip: $($_.Exception.Message)"
 }
 
 $_=Sync-LocalFile -FileName 'lib-write-log-objects.ps1'      -SourcePath $releaseRoot -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR

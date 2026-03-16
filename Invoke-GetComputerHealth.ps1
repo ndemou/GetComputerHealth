@@ -53,6 +53,9 @@ Passed through to Get-ComputerHealth as `-ExcludeTests` (skips selected tests).
 .PARAMETER NoUpdate
 Skips execution of `C:\IT\bin\Update-GetHealthCode.ps1` before running `Get-ComputerHealth.ps1` on each target.
 
+.PARAMETER PushUpdate
+When targeting remote computers, copies the latest locally cached release zip from `C:\IT\temp` to each target and runs `Update-GetHealthCode.ps1 -UpdateFromZip <copied-zip>` before tests.
+
 .EXAMPLE
 # Run against the local computer, export Excel, and email if notable messages exist:
 .\Invoke-GetComputerHealth.ps1
@@ -81,6 +84,7 @@ param(
     [string[]]$ExcludeServers = @(),
     [switch]$DebugSkipSlowTests,
     [switch]$NoUpdate,
+    [switch]$PushUpdate,
     [switch]$NoSendMessage,
     [string[]]$IpsOfAllDcs = @(),
     [string[]]$Computers
@@ -238,6 +242,22 @@ function Ensure-ModuleInstalled {
   }
 }
 
+function Get-LatestLocalReleaseZip {
+  [CmdletBinding()]
+  param(
+    [string]$CacheDir = 'C:\IT\temp',
+    [string]$Pattern = 'GetComputerHealth-release-*.zip'
+  )
+
+  try {
+    return (Get-ChildItem -LiteralPath $CacheDir -File -Filter $Pattern -ErrorAction Stop |
+      Sort-Object -Property LastWriteTime -Descending |
+      Select-Object -First 1 -ExpandProperty FullName)
+  } catch {
+    return $null
+  }
+}
+
 #------------------------------------------------------------------------
 # MAIN CODE
 #------------------------------------------------------------------------
@@ -259,7 +279,7 @@ if (-not $Computers) {
     $targets = $Computers | %{ $_ -split '[,\s]+' } | %{$_ -replace '\s'} | ?{ $_}
 }
 if ('ALL_DOMAIN_SERVERS' -in $targets) {
-    write-verbose "Adding domain servers: $($domain_servers -join ';')"
+    write-verbose "Adding domain servers"
     $domainServers = (Get-DomainServers | %{$_ -replace '[.].*' -replace '\s'} | ?{$_ -notin $ExcludeServers})
     $targets = ($targets | ?{$_ -ne 'ALL_DOMAIN_SERVERS'}) + $domainServers
 }
@@ -268,6 +288,14 @@ $targets = ($targets | sort)
 write-verbose "Targets: $($targets -join ';')"
 $SmtpSubject = $SmtpSubject -replace 'LIST_OF_COMPUTERS', ($targets -join ',')
 $SmtpSubjectAllGood = $SmtpSubjectAllGood -replace 'LIST_OF_COMPUTERS', ($targets -join ',')
+
+$localReleaseZip = $null
+if ($PushUpdate) {
+    $localReleaseZip = Get-LatestLocalReleaseZip
+    if (-not $localReleaseZip) {
+        Write-Warning "-PushUpdate was requested but no local release zip cache was found in C:\IT\temp. Falling back to normal update behavior."
+    }
+}
 
 $all_messages = @()
 Write-host "`n`n`n"
@@ -289,7 +317,9 @@ foreach ($target in $targets) {
           $WhitelistSigs,
           $DebugSkipSlowTests,
           $NoUpdate,
-          $IpsOfAllDcs
+          $IpsOfAllDcs,
+          $PushUpdate,
+          $UpdateZipPath
       )
 
       if (-not (Test-Path "C:\IT\bin\Update-GetHealthCode.ps1")){
@@ -297,7 +327,11 @@ foreach ($target in $targets) {
           Invoke-WebRequest -useb "https://raw.githubusercontent.com/ndemou/GetComputerHealth/refs/heads/main/Update-GetHealthCode.ps1" -OutFile "C:\IT\bin\Update-GetHealthCode.ps1"
 	  }
       if (-not $NoUpdate) {
-          & C:\IT\bin\Update-GetHealthCode.ps1
+          if ($PushUpdate -and $UpdateZipPath) {
+              & C:\IT\bin\Update-GetHealthCode.ps1 -UpdateFromZip $UpdateZipPath
+          } else {
+              & C:\IT\bin\Update-GetHealthCode.ps1
+          }
       }
       & C:\IT\bin\Get-ComputerHealth.ps1 `
           -OutputObjects -OutputConsoleMessages `
@@ -312,16 +346,24 @@ foreach ($target in $targets) {
   }
 
   if ($target -eq $env:COMPUTERNAME) {
-      $output = & $healthCheckBlock $Hide $OnlyTheseTests $ExcludeTests $WhitelistSigs $DebugSkipSlowTests $NoUpdate $IpsOfAllDcs
+      $output = & $healthCheckBlock $Hide $OnlyTheseTests $ExcludeTests $WhitelistSigs $DebugSkipSlowTests $NoUpdate $IpsOfAllDcs $PushUpdate $localReleaseZip
   }
   else {
       if (Get-TcpPortStateFast $target @(5985, 5986, 80, 443, 88, 135, 389, 636, 445, 3268, 3269) | ?{$_.open}) {
         Write-Progress -Activity "Checking $target" -Status "Phase #2 (running Get-ComputerHealth.ps1)"
         $session = New-PSSession -ComputerName $target
-        $output = Invoke-Command -Session $session -ScriptBlock $healthCheckBlock -ArgumentList $Hide, $OnlyTheseTests, $ExcludeTests, $WhitelistSigs, $DebugSkipSlowTests, $NoUpdate, $IpsOfAllDcs
+        $remoteZipPath = $null
+        if ($PushUpdate -and $localReleaseZip) {
+          $remoteZipPath = 'C:\IT\temp\' + (Split-Path -Path $localReleaseZip -Leaf)
+          Invoke-Command -Session $session -ScriptBlock {
+            if (-not (Test-Path 'C:\IT\temp')) { New-Item -Path 'C:\IT\temp' -ItemType Directory -Force | Out-Null }
+          }
+          Copy-Item -Path $localReleaseZip -Destination $remoteZipPath -ToSession $session -Force
+        }
+        $output = Invoke-Command -Session $session -ScriptBlock $healthCheckBlock -ArgumentList $Hide, $OnlyTheseTests, $ExcludeTests, $WhitelistSigs, $DebugSkipSlowTests, $NoUpdate, $IpsOfAllDcs, $PushUpdate, $remoteZipPath
         Remove-PSSession $session
       } else {
-          if ($target -in $domain_servers) {
+          if ($target -in $domainServers) {
               $comment =" (either it is down or you have a stale entry in your AD)"} else {$comment ="(are you sure a computer with that name exists?)"
           }
           $_ = Log-failure "Target $target is unreachable $comment"
