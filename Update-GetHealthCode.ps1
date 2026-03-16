@@ -24,12 +24,18 @@ param(
 #
 #  START OF CONFIG
 #
-$DEST_DIR = 'C:\it\bin'
-$BAK_DIR  = 'C:\it\temp'
-$CFG_DIR  = 'c:\it\config'
+$SCRIPT_BIN_DIR = (Resolve-Path -LiteralPath $PSScriptRoot).Path
+if ((Split-Path -Leaf $SCRIPT_BIN_DIR) -ine 'bin') {
+  throw "Refusing to run. Update-GetHealthCode.ps1 must be located in and executed from a 'bin' folder. Current script location: '$SCRIPT_BIN_DIR'."
+}
+$ROOT_DIR = Split-Path -Parent $SCRIPT_BIN_DIR
+
+$DEST_DIR = $SCRIPT_BIN_DIR
+$BAK_DIR  = Join-Path $ROOT_DIR 'temp'
+$CFG_DIR  = Join-Path $ROOT_DIR 'config'
 $REPO_URL = 'https://github.com/ndemou/GetComputerHealth'
 $REPO_REF = 'main'
-$LATEST_RELEASE_METADATA_CACHE_PATH = 'c:\it\config\Get-ComputerHealth-latest-release-meta.json'
+$LATEST_RELEASE_METADATA_CACHE_PATH = Join-Path $CFG_DIR 'Get-ComputerHealth-latest-release-meta.json'
 $RELEASE_METADATA_CACHE_TTL_MINUTES = 60
 $ZIP_CACHE_PATTERN = 'GetComputerHealth-release-*.zip'
 $repoSlug = (($REPO_URL -replace '^https?://github\.com/','') -replace '\.git$','').Trim('/')
@@ -605,10 +611,10 @@ if (-not (Test-Path $CFG_DIR)) {
 
 Ensure-PSModuleInstalled -Name ImportExcel
 
-$p = 'C:\it\config\Get-ComputerHealth.sigs-to-suppress.txt'
+$p = Join-Path $CFG_DIR 'Get-ComputerHealth.sigs-to-suppress.txt'
 if (-not (Test-Path $p)) {
   Write-Verbose "Creating default suppressions file '$p'"
-  $null = mkdir C:\it\config -Force -ErrorAction Ignore
+  $null = mkdir $CFG_DIR -Force -ErrorAction Ignore
   "# $($env:COMPUTERNAME)" | Out-File $p -Encoding UTF8
 } else {
   Write-Verbose "Suppressions file already exists: '$p'"
