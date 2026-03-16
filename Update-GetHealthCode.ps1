@@ -299,9 +299,9 @@ Writes the installed-release marker into the shared metadata cache file.
 }
 
 function Expand-GetComputerHealthLatestRelease {
-
 <#.SYNOPSIS
 Downloads and extracts the latest release zip into a temporary folder.
+If a cached zip is corrupt or incomplete, it is deleted and downloaded again once.
 .OUTPUTS
 System.Collections.Hashtable with keys RootPath and ZipPath.
 #>
@@ -329,8 +329,8 @@ System.Collections.Hashtable with keys RootPath and ZipPath.
   Write-Verbose "Release zip will be cached at '$zipPath'"
   Write-Verbose "Release zip will be extracted to '$extractPath'"
 
-  if (-not (Test-Path $extractPath)) {
-    $null = New-Item -ItemType Directory -Path $extractPath
+  if (-not (Test-Path -LiteralPath $extractPath -PathType Container)) {
+    $null = New-Item -ItemType Directory -Path $extractPath -Force
   }
 
   $headers = @{
@@ -338,15 +338,72 @@ System.Collections.Hashtable with keys RootPath and ZipPath.
     'Accept'     = 'application/vnd.github+json'
   }
 
-  if ((-not $ForceDownload) -and (Test-Path -LiteralPath $zipPath -PathType Leaf)) {
-    Write-Verbose "Reusing cached release zip '$zipPath'"
-  } else {
+  function Invoke-DownloadReleaseZip {
+    param(
+      [Parameter(Mandatory)][string]$Uri,
+      [Parameter(Mandatory)][string]$OutFile,
+      [Parameter(Mandatory)][hashtable]$Headers
+    )
+
+    if (Test-Path -LiteralPath $OutFile -PathType Leaf) {
+      Write-Verbose "Deleting existing zip before download: '$OutFile'"
+      Remove-Item -LiteralPath $OutFile -Force -ErrorAction Stop
+    }
+
     Write-Verbose "Downloading release zip from GitHub"
-    Invoke-WebRequest -Uri $release.zipball_url -OutFile $zipPath -Headers $headers -UseBasicParsing -ErrorAction Stop
+    Invoke-WebRequest -Uri $Uri -OutFile $OutFile -Headers $Headers -UseBasicParsing -ErrorAction Stop
   }
 
-  Write-Verbose "Expanding release zip '$zipPath'"
-  Expand-Archive -LiteralPath $zipPath -DestinationPath $extractPath -Force
+  function Invoke-ExpandReleaseZip {
+    param(
+      [Parameter(Mandatory)][string]$LiteralZipPath,
+      [Parameter(Mandatory)][string]$DestinationPath
+    )
+
+    if (Test-Path -LiteralPath $DestinationPath -PathType Container) {
+      Get-ChildItem -LiteralPath $DestinationPath -Force -ErrorAction SilentlyContinue |
+        Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+    } else {
+      $null = New-Item -ItemType Directory -Path $DestinationPath -Force
+    }
+
+    Write-Verbose "Expanding release zip '$LiteralZipPath'"
+    Expand-Archive -LiteralPath $LiteralZipPath -DestinationPath $DestinationPath -Force -ErrorAction Stop
+  }
+
+  if ($ForceDownload -or (-not (Test-Path -LiteralPath $zipPath -PathType Leaf))) {
+    Invoke-DownloadReleaseZip -Uri $release.zipball_url -OutFile $zipPath -Headers $headers
+  } else {
+    Write-Verbose "Reusing cached release zip '$zipPath'"
+  }
+
+  $expanded = $false
+  $firstExpandError = $null
+
+  try {
+    Invoke-ExpandReleaseZip -LiteralZipPath $zipPath -DestinationPath $extractPath
+    $expanded = $true
+  } catch {
+    $firstExpandError = $_
+    Write-Warning ("Cached or downloaded zip appears invalid: {0}" -f $_.Exception.Message)
+
+    try {
+      if (Test-Path -LiteralPath $zipPath -PathType Leaf) {
+        Write-Warning "Deleting bad cached zip '$zipPath' and retrying download once"
+        Remove-Item -LiteralPath $zipPath -Force -ErrorAction Stop
+      }
+    } catch {
+      Write-Warning ("Failed to delete bad zip '{0}': {1}" -f $zipPath, $_.Exception.Message)
+    }
+
+    Invoke-DownloadReleaseZip -Uri $release.zipball_url -OutFile $zipPath -Headers $headers
+    Invoke-ExpandReleaseZip -LiteralZipPath $zipPath -DestinationPath $extractPath
+    $expanded = $true
+  }
+
+  if (-not $expanded) {
+    throw $firstExpandError
+  }
 
   $root = Get-ChildItem -LiteralPath $extractPath -Directory | Select-Object -First 1
   if (-not $root) {
@@ -679,6 +736,12 @@ $updated = Sync-LocalFile -FileName 'Update-GetHealthCode.ps1' -SourcePath $rele
 
 if ($updated) {
   Write-Verbose "$passLabel This script updated itself"
+
+  if ($latestReleaseMarker) {
+    Write-Verbose "$passLabel Persisting installed release marker before self-rerun"
+    Set-GetComputerHealthInstalledReleaseMarker -CachePath $LATEST_RELEASE_METADATA_CACHE_PATH -Marker $latestReleaseMarker
+  }
+
   if ($SelfRerunCount -ge 1) {
     Write-Verbose "$passLabel Self-rerun already performed once; skipping additional rerun"
     return
@@ -720,14 +783,15 @@ if ($latestReleaseMarker) {
 
 if ((Get-Date) -le [datetime]'2026-04-30') {
   Write-Verbose "Executing temporary cleanup for obsolete files"
-  if (Test-Path $DEST_DIR\lib-health-tests.ps1) {
-    Write-Verbose "Removing obsolete file '$DEST_DIR\lib-health-tests.ps1'"
-    Remove-Item $DEST_DIR\lib-health-tests.ps1
-  }
-  if (Test-Path $DEST_DIR\lib-helpers-for-health-tests.ps1) {
-    Write-Verbose "Removing obsolete file '$DEST_DIR\lib-helpers-for-health-tests.ps1'"
-    Remove-Item $DEST_DIR\lib-helpers-for-health-tests.ps1
-  }
+
+  $fpath = "$CFG_DIR\Get-ComputerHealth-latest-release.dat"
+  if (Test-Path $fpath) {Write-Verbose "Removing obsolete file '$fpath'"; Remove-Item $fpath}
+  
+  $fpath = "$DEST_DIR\lib-helpers-for-health-tests.ps1"
+  if (Test-Path $fpath) {Write-Verbose "Removing obsolete file '$fpath'"; Remove-Item $fpath}
+
+  $fpath = "$DEST_DIR\lib-health-tests.ps1"
+  if (Test-Path $fpath) {Write-Verbose "Removing obsolete file '$fpath'"; Remove-Item $fpath}
 }
 
 try {
