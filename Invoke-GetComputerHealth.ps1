@@ -302,10 +302,10 @@ Write-host "`n`n`n"
 foreach ($target in $targets) {
   Write-Progress -Activity "Checking $target" -Status "Phase #1 (copy Get-ComputerHealth.ps1)"
   if ($targets.count -gt 1) {
-    Write-host ""
-    Write-host -for darkgray "Checking " -nonew
-    Write-host -for cyan "$target" -nonew
-    Write-host -for darkgray " at $(get-date -Format 'yyyy-MM-dd HH:mm:ss')"
+    Write-Host ""
+    Write-Host -ForegroundColor DarkGray "Checking " -NoNewline
+    Write-Host -ForegroundColor Cyan "$target" -NoNewline
+    Write-Host -ForegroundColor DarkGray " at $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
   }
 
   # The code to run on the target Computer
@@ -322,10 +322,6 @@ foreach ($target in $targets) {
           $UpdateZipPath
       )
 
-      if (-not (Test-Path "C:\IT\bin\Update-GetHealthCode.ps1")){
-          if (-not (Test-Path "C:\IT\bin")) { New-Item -Path "C:\IT\bin" -ItemType Directory -Force }
-          Invoke-WebRequest -useb "https://raw.githubusercontent.com/ndemou/GetComputerHealth/refs/heads/main/Update-GetHealthCode.ps1" -OutFile "C:\IT\bin\Update-GetHealthCode.ps1"
-	  }
       if (-not $NoUpdate) {
           if ($PushUpdate -and $UpdateZipPath) {
               & C:\IT\bin\Update-GetHealthCode.ps1 -UpdateFromZip $UpdateZipPath
@@ -333,6 +329,7 @@ foreach ($target in $targets) {
               & C:\IT\bin\Update-GetHealthCode.ps1
           }
       }
+
       & C:\IT\bin\Get-ComputerHealth.ps1 `
           -OutputObjects -OutputConsoleMessages `
           -Hide $Hide `
@@ -349,22 +346,43 @@ foreach ($target in $targets) {
       $output = & $healthCheckBlock $Hide $OnlyTheseTests $ExcludeTests $WhitelistSigs $DebugSkipSlowTests $NoUpdate $IpsOfAllDcs $PushUpdate $localReleaseZip
   }
   else {
-      if (Get-TcpPortStateFast $target @(5985, 5986, 80, 443, 88, 135, 389, 636, 445, 3268, 3269) | ?{$_.open}) {
-        Write-Progress -Activity "Checking $target" -Status "Phase #2 (running Get-ComputerHealth.ps1)"
-        $session = New-PSSession -ComputerName $target
-        $remoteZipPath = $null
-        if ($PushUpdate -and $localReleaseZip) {
-          $remoteZipPath = 'C:\IT\temp\' + (Split-Path -Path $localReleaseZip -Leaf)
+      if (Get-TcpPortStateFast $target @(5985, 5986, 80, 443, 88, 135, 389, 636, 445, 3268, 3269) | Where-Object { $_.Open }) {
+        Write-Progress -Activity "Checking $target" -Status "Phase #2 (copying updater and running Get-ComputerHealth.ps1)"
+
+        $session = $null
+        try {
+          $session = New-PSSession -ComputerName $target
+
           Invoke-Command -Session $session -ScriptBlock {
+            if (-not (Test-Path 'C:\IT\bin'))  { New-Item -Path 'C:\IT\bin'  -ItemType Directory -Force | Out-Null }
             if (-not (Test-Path 'C:\IT\temp')) { New-Item -Path 'C:\IT\temp' -ItemType Directory -Force | Out-Null }
           }
-          Copy-Item -Path $localReleaseZip -Destination $remoteZipPath -ToSession $session -Force
+
+          $localUpdaterPath  = 'C:\IT\bin\Update-GetHealthCode.ps1'
+          $remoteUpdaterPath = 'C:\IT\bin\Update-GetHealthCode.ps1'
+
+          if (-not (Test-Path -LiteralPath $localUpdaterPath)) {
+            throw "Local updater file not found: $localUpdaterPath"
+          }
+
+          Copy-Item -Path $localUpdaterPath -Destination $remoteUpdaterPath -ToSession $session -Force
+
+          $remoteZipPath = $null
+          if ($PushUpdate -and $localReleaseZip) {
+            $remoteZipPath = 'C:\IT\temp\' + (Split-Path -Path $localReleaseZip -Leaf)
+            Copy-Item -Path $localReleaseZip -Destination $remoteZipPath -ToSession $session -Force
+          }
+
+          $output = Invoke-Command -Session $session -ScriptBlock $healthCheckBlock -ArgumentList $Hide, $OnlyTheseTests, $ExcludeTests, $WhitelistSigs, $DebugSkipSlowTests, $NoUpdate, $IpsOfAllDcs, $PushUpdate, $remoteZipPath
         }
-        $output = Invoke-Command -Session $session -ScriptBlock $healthCheckBlock -ArgumentList $Hide, $OnlyTheseTests, $ExcludeTests, $WhitelistSigs, $DebugSkipSlowTests, $NoUpdate, $IpsOfAllDcs, $PushUpdate, $remoteZipPath
-        Remove-PSSession $session
+        finally {
+          if ($session) { Remove-PSSession $session }
+        }
       } else {
           if ($target -in $domainServers) {
-              $comment =" (either it is down or you have a stale entry in your AD)"} else {$comment ="(are you sure a computer with that name exists?)"
+              $comment = " (either it is down or you have a stale entry in your AD)"
+          } else {
+              $comment = " (are you sure a computer with that name exists?)"
           }
           $_ = Log-failure "Target $target is unreachable $comment"
           $all_messages += [pscustomobject]@{
@@ -374,11 +392,12 @@ foreach ($target in $targets) {
               Suppressed = $false
               Message    = "Target is unreachable $comment"
               Comment    = ""
-			  Emitter    = $null
-            }
+              Emitter    = $null
+          }
           continue
       }
   }
+
   $all_messages += $output
   Write-Progress -Activity "Checking $target" -Completed
 }
