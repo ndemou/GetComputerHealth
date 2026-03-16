@@ -168,6 +168,7 @@ Uses a local metadata cache to avoid querying GitHub too frequently.
 
   if ((-not $ForceRefresh) -and $CachePath -and (Test-Path -LiteralPath $CachePath -PathType Leaf)) {
     try {
+      Write-Verbose "Reading cached data from $CachePath"
       $cachedRaw = Get-Content -LiteralPath $CachePath -Raw -ErrorAction Stop
       $cached = $cachedRaw | ConvertFrom-Json -ErrorAction Stop
       if ($cached.fetchedAt -and $cached.release) {
@@ -209,6 +210,7 @@ Uses a local metadata cache to avoid querying GitHub too frequently.
 
       if (Test-Path -LiteralPath $CachePath -PathType Leaf) {
         try {
+          Write-Verbose "Reading installedReleaseMarker from $CachePath"
           $existingRaw = Get-Content -LiteralPath $CachePath -Raw -ErrorAction Stop
           $existingCache = $existingRaw | ConvertFrom-Json -ErrorAction Stop
           if ($existingCache.installedReleaseMarker) {
@@ -243,6 +245,7 @@ Reads the installed-release marker from the shared metadata cache file.
       return $null
     }
 
+    Write-Verbose "Reading release marker from $CachePath"
     $cachedRaw = Get-Content -LiteralPath $CachePath -Raw -ErrorAction Stop
     $cached = $cachedRaw | ConvertFrom-Json -ErrorAction Stop
     $marker = [string]$cached.installedReleaseMarker
