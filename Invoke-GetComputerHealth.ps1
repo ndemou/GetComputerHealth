@@ -15,7 +15,7 @@ After collection:
 - Sends email via `C:\IT\bin\Send-Message.ps1` (with attachment when notable messages exist)
 
 Other effects:
-- Installs the PowerShell module `ImportExcel` from PSGallery if missing (may register PSGallery and set it to Trusted; uses `Install-Module`).
+- Requires the PowerShell module `ImportExcel` to be already installed (typically by `Update-GetHealthCode.ps1`).
 - Starts a transcript at `C:\IT\log\Invoke-GetHealthDomainComputers-<timestamp>.log`.
 - Sends email and may attach the notable-messages workbook.
 
@@ -219,29 +219,6 @@ function Get-TcpPortStateFast ($hostname,$ports,$timeout=100) {
         }
 }
 
-function Ensure-ModuleInstalled {
-  [CmdletBinding()]
-  param(
-    [Parameter(Mandatory)][string]$Name,
-    [string]$Scope = 'AllUsers'
-  )
-  if (Get-Module -ListAvailable -Name $Name) {return}
-  try {
-    Write-Host "Installing PS Module $Name" -ForegroundColor Yellow
-    Install-Module -Name $Name -Scope $Scope -Force -ErrorAction Stop
-  } catch {
-    if ($_.Exception.Message -like "*No repository with the Name 'PSGallery'*") {
-      Write-Host "Registering PSGallery" -ForegroundColor Yellow
-      Register-PSRepository -Default -ErrorAction Stop
-      Set-PSRepository -Name PSGallery -InstallationPolicy Trusted -ErrorAction Stop
-      Write-Host "Installing PS Module $Name (previous attempt failed)" -ForegroundColor Yellow
-      Install-Module -Name $Name -Scope $Scope -Force -ErrorAction Stop
-    } else {
-      throw
-    }
-  }
-}
-
 function Get-LatestLocalReleaseZip {
   [CmdletBinding()]
   param(
@@ -266,7 +243,9 @@ $timestamp = $(get-date -Format 'yyyy-MM-dd_HH.mm')
 Start-Transcript "C:\IT\log\Invoke-GetHealthDomainComputers-$timestamp.log"
 . "C:\IT\bin\lib-write-log-objects.ps1"
 
-Ensure-ModuleInstalled ImportExcel
+if (-not (Get-Module -ListAvailable -Name ImportExcel)) {
+    throw "Required module 'ImportExcel' is missing. Run C:\IT\bin\Update-GetHealthCode.ps1 to install prerequisites."
+}
 
 if ($ExcludeServers) {
     $ExcludeServers = $ExcludeServers | %{ $_ -split '[,\s]+' } | ?{ $_ }
