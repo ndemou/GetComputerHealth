@@ -174,12 +174,20 @@ param(
 
 $VERSION="2.0.5"
 
+
+$SCRIPT_BIN_DIR = (Resolve-Path -LiteralPath $PSScriptRoot).Path
+if ((Split-Path -Leaf $SCRIPT_BIN_DIR) -ine 'bin') {
+  throw "Refusing to run. Get-ComputerHealth.ps1 must be located in and executed from a 'bin' folder. Current script location: '$SCRIPT_BIN_DIR'."
+}
+$ROOT_DIR = Split-Path -Parent $SCRIPT_BIN_DIR
+$CONFIG_DIR = Join-Path $ROOT_DIR 'config'
+
 #------------------------------------------
 # Configuration
 #
 
 $script:Config = [pscustomobject]@{
-  SuppressSignaturesPath = 'C:\it\config\Get-ComputerHealth.sigs-to-suppress.txt'
+  SuppressSignaturesPath = Join-Path $CONFIG_DIR 'Get-ComputerHealth.sigs-to-suppress.txt'
 }
 
 #------------------------------------------

@@ -10,8 +10,8 @@ Per target:
 - For remote targets, checks basic TCP reachability and if reachable, uses `New-PSSession` to run the tests.
 
 After collection:
-- Exports all messages to `C:\IT\temp\all-messages-<timestamp>.xlsx`
-- Exports notable messages (if any) to `C:\IT\temp\notable-messages-<timestamp>.xlsx`
+- Exports all messages to `${TEMP_DIR}\all-messages-<timestamp>.xlsx`
+- Exports notable messages (if any) to `${TEMP_DIR}\notable-messages-<timestamp>.xlsx`
 - Sends email via `C:\IT\bin\Send-Message.ps1` (with attachment when notable messages exist)
 
 Other effects:
@@ -54,7 +54,7 @@ Passed through to Get-ComputerHealth as `-ExcludeTests` (skips selected tests).
 Skips execution of `C:\IT\bin\Update-GetHealthCode.ps1` before running `Get-ComputerHealth.ps1` on each target.
 
 .PARAMETER PushUpdate
-When targeting remote computers, copies the latest locally cached release zip from `C:\IT\temp` to each target and runs `Update-GetHealthCode.ps1 -UpdateFromZip <copied-zip>` before tests.
+When targeting remote computers, copies the latest locally cached release zip from `${TEMP_DIR}` to each target and runs `Update-GetHealthCode.ps1 -UpdateFromZip <copied-zip>` before tests.
 
 .EXAMPLE
 # Run against the local computer, export Excel, and email if notable messages exist:
@@ -73,7 +73,7 @@ When targeting remote computers, copies the latest locally cached release zip fr
 - Remote targets are executed via PowerShell remoting sessions; ensure WinRM is enabled and reachable (5985/5986) and that `C:\IT\bin\` and `C:\IT\config\` content exists on the remote machines as referenced.
 - Output paths used:
   - Transcript: `C:\IT\log\Invoke-GetHealthDomainComputers-<timestamp>.log`
-  - Excel: `C:\IT\temp\all-messages-<timestamp>.xlsx`, `C:\IT\temp\notable-messages-<timestamp>.xlsx`
+  - Excel: `${TEMP_DIR}\all-messages-<timestamp>.xlsx`, `${TEMP_DIR}\notable-messages-<timestamp>.xlsx`
 #>
 
 param(
@@ -93,10 +93,25 @@ param(
 #------------------------------------------------------------------------
 # Configuration
 #------------------------------------------------------------------------
+
+$SCRIPT_BIN_DIR = (Resolve-Path -LiteralPath $PSScriptRoot).Path
+if ((Split-Path -Leaf $SCRIPT_BIN_DIR) -ine 'bin') {
+  throw "Refusing to run. Invoke-GetComputerHealth.ps1 must be located in and executed from a 'bin' folder. Current script location: '$SCRIPT_BIN_DIR'."
+}
+$ROOT_DIR = Split-Path -Parent $SCRIPT_BIN_DIR
+$CONFIG_DIR = Join-Path $ROOT_DIR 'config'
+$TEMP_DIR = Join-Path $ROOT_DIR 'temp'
+$LOG_DIR = Join-Path $ROOT_DIR 'log'
+$UPDATE_SCRIPT_PATH = Join-Path $SCRIPT_BIN_DIR 'Update-GetHealthCode.ps1'
+$GET_HEALTH_SCRIPT_PATH = Join-Path $SCRIPT_BIN_DIR 'Get-ComputerHealth.ps1'
+$SEND_MESSAGE_SCRIPT_PATH = Join-Path $SCRIPT_BIN_DIR 'Send-Message.ps1'
+$LIB_LOG_OBJECTS_PATH = Join-Path $SCRIPT_BIN_DIR 'lib-write-log-objects.ps1'
+$CUSTOM_TESTS_DIR = Join-Path $CONFIG_DIR 'Custom-HealthTests'
+
 $OutputConsoleMessages = $true
 $SmtpSubject = 'Notable Messages from Get-ComputerHealth of LIST_OF_COMPUTERS'
 $SmtpSubjectAllGood = 'RELAX. No notable Messages from Get-ComputerHealth of LIST_OF_COMPUTERS'
-$SmtpConfig = "C:\IT\config\Send-Message.conf"
+$SmtpConfig = Join-Path $CONFIG_DIR 'Send-Message.conf'
 #------------------------------------------------------------------------
 # Functions
 #------------------------------------------------------------------------
@@ -127,7 +142,7 @@ function Invoke-HealthEmail {
   if ($BodyAsHtml) { $mailParams['BodyAsHtml'] = $true }
   if ($Attachments -and $Attachments.Count) { $mailParams['Attachments'] = $Attachments }
   Write-host -for gray   "Sending email... " -NoNewLine
-  & 'C:\IT\bin\Send-Message.ps1' @mailParams
+  & $SEND_MESSAGE_SCRIPT_PATH @mailParams
   Write-host -for gray   "email sent."
 }
 
@@ -245,7 +260,7 @@ function Ensure-ModuleInstalled {
 function Get-LatestLocalReleaseZip {
   [CmdletBinding()]
   param(
-    [string]$CacheDir = 'C:\IT\temp',
+    [string]$CacheDir = $TEMP_DIR,
     [string]$Pattern = 'GetComputerHealth-release-*.zip'
   )
 
@@ -263,8 +278,9 @@ function Get-LatestLocalReleaseZip {
 #------------------------------------------------------------------------
 
 $timestamp = $(get-date -Format 'yyyy-MM-dd_HH.mm')
-Start-Transcript "C:\IT\log\Invoke-GetHealthDomainComputers-$timestamp.log"
-. "C:\IT\bin\lib-write-log-objects.ps1"
+if (-not (Test-Path -LiteralPath $LOG_DIR)) { New-Item -ItemType Directory -Path $LOG_DIR -Force | Out-Null }
+Start-Transcript (Join-Path $LOG_DIR "Invoke-GetHealthDomainComputers-$timestamp.log")
+. $LIB_LOG_OBJECTS_PATH
 
 Ensure-ModuleInstalled ImportExcel
 
@@ -293,7 +309,7 @@ $localReleaseZip = $null
 if ($PushUpdate) {
     $localReleaseZip = Get-LatestLocalReleaseZip
     if (-not $localReleaseZip) {
-        Write-Warning "-PushUpdate was requested but no local release zip cache was found in C:\IT\temp. Falling back to normal update behavior."
+        Write-Warning "-PushUpdate was requested but no local release zip cache was found in ${TEMP_DIR}. Falling back to normal update behavior."
     }
 }
 
@@ -311,6 +327,7 @@ foreach ($target in $targets) {
   # The code to run on the target Computer
   $healthCheckBlock = {
       param(
+          $RootDir,
           $Hide,
           $OnlyTheseTests,
           $ExcludeTests,
@@ -322,20 +339,26 @@ foreach ($target in $targets) {
           $UpdateZipPath
       )
 
+      $binDir = Join-Path $RootDir 'bin'
+      $configDir = Join-Path $RootDir 'config'
+      $updateScriptPath = Join-Path $binDir 'Update-GetHealthCode.ps1'
+      $getHealthScriptPath = Join-Path $binDir 'Get-ComputerHealth.ps1'
+      $customTestsDir = Join-Path $configDir 'Custom-HealthTests'
+
       if (-not $NoUpdate) {
           if ($PushUpdate -and $UpdateZipPath) {
-              & C:\IT\bin\Update-GetHealthCode.ps1 -UpdateFromZip $UpdateZipPath
+              & $updateScriptPath -UpdateFromZip $UpdateZipPath
           } else {
-              & C:\IT\bin\Update-GetHealthCode.ps1
+              & $updateScriptPath
           }
       }
 
-      & C:\IT\bin\Get-ComputerHealth.ps1 `
+      & $getHealthScriptPath `
           -OutputObjects -OutputConsoleMessages `
           -Hide $Hide `
           -OnlyTheseTests $OnlyTheseTests `
           -ExcludeTests $ExcludeTests `
-          -IncludeTestsFromFolder C:\IT\config\Custom-HealthTests\ `
+          -IncludeTestsFromFolder $customTestsDir `
           -SuppressSigs $WhitelistSigs `
           -DebugSkipSlowTests:$DebugSkipSlowTests `
           -IpsOfAllDcs $IpsOfAllDcs |
@@ -343,7 +366,7 @@ foreach ($target in $targets) {
   }
 
   if ($target -eq $env:COMPUTERNAME) {
-      $output = & $healthCheckBlock $Hide $OnlyTheseTests $ExcludeTests $WhitelistSigs $DebugSkipSlowTests $NoUpdate $IpsOfAllDcs $PushUpdate $localReleaseZip
+      $output = & $healthCheckBlock $ROOT_DIR $Hide $OnlyTheseTests $ExcludeTests $WhitelistSigs $DebugSkipSlowTests $NoUpdate $IpsOfAllDcs $PushUpdate $localReleaseZip
   }
   else {
       if (Get-TcpPortStateFast $target @(5985, 5986, 80, 443, 88, 135, 389, 636, 445, 3268, 3269) | Where-Object { $_.Open }) {
@@ -354,12 +377,15 @@ foreach ($target in $targets) {
           $session = New-PSSession -ComputerName $target
 
           Invoke-Command -Session $session -ScriptBlock {
-            if (-not (Test-Path 'C:\IT\bin'))  { New-Item -Path 'C:\IT\bin'  -ItemType Directory -Force | Out-Null }
-            if (-not (Test-Path 'C:\IT\temp')) { New-Item -Path 'C:\IT\temp' -ItemType Directory -Force | Out-Null }
-          }
+            param($RootDir)
+            $remoteBinDir = Join-Path $RootDir 'bin'
+            $remoteTempDir = Join-Path $RootDir 'temp'
+            if (-not (Test-Path $remoteBinDir))  { New-Item -Path $remoteBinDir  -ItemType Directory -Force | Out-Null }
+            if (-not (Test-Path $remoteTempDir)) { New-Item -Path $remoteTempDir -ItemType Directory -Force | Out-Null }
+          } -ArgumentList $ROOT_DIR
 
-          $localUpdaterPath  = 'C:\IT\bin\Update-GetHealthCode.ps1'
-          $remoteUpdaterPath = 'C:\IT\bin\Update-GetHealthCode.ps1'
+          $localUpdaterPath  = $UPDATE_SCRIPT_PATH
+          $remoteUpdaterPath = Join-Path (Join-Path $ROOT_DIR 'bin') 'Update-GetHealthCode.ps1'
 
           if (-not (Test-Path -LiteralPath $localUpdaterPath)) {
             throw "Local updater file not found: $localUpdaterPath"
@@ -369,11 +395,11 @@ foreach ($target in $targets) {
 
           $remoteZipPath = $null
           if ($PushUpdate -and $localReleaseZip) {
-            $remoteZipPath = 'C:\IT\temp\' + (Split-Path -Path $localReleaseZip -Leaf)
+            $remoteZipPath = Join-Path (Join-Path $ROOT_DIR 'temp') (Split-Path -Path $localReleaseZip -Leaf)
             Copy-Item -Path $localReleaseZip -Destination $remoteZipPath -ToSession $session -Force
           }
 
-          $output = Invoke-Command -Session $session -ScriptBlock $healthCheckBlock -ArgumentList $Hide, $OnlyTheseTests, $ExcludeTests, $WhitelistSigs, $DebugSkipSlowTests, $NoUpdate, $IpsOfAllDcs, $PushUpdate, $remoteZipPath
+          $output = Invoke-Command -Session $session -ScriptBlock $healthCheckBlock -ArgumentList $ROOT_DIR, $Hide, $OnlyTheseTests, $ExcludeTests, $WhitelistSigs, $DebugSkipSlowTests, $NoUpdate, $IpsOfAllDcs, $PushUpdate, $remoteZipPath
         }
         finally {
           if ($session) { Remove-PSSession $session }
@@ -406,14 +432,14 @@ $SortOrder = @{'failure' = 1; 'warning' = 2; 'notice' = 3; 'info'=4; 'pass'=5; '
 $notable_msgs = @()
 if ($all_messages){
   # save
-  Export-HealthMessagesToExcel -Data $all_messages -FileName "C:\IT\temp\all-messages-$($timestamp).xlsx"
+  Export-HealthMessagesToExcel -Data $all_messages -FileName "${TEMP_DIR}\all-messages-$($timestamp).xlsx"
   $notable_msgs = (`
     $all_messages `
         | Where-Object { -not($_.Suppressed) -and $_.level -notin @('debug','help','pass','info') } `
         | Sort-Object -Property @{ Expression = { $SortOrder[$_.Level] } }, Computer `
   )
   if ($notable_msgs) {
-      Export-HealthMessagesToExcel -Data $notable_msgs -FileName "C:\IT\temp\notable-messages-$($timestamp).xlsx"
+      Export-HealthMessagesToExcel -Data $notable_msgs -FileName "${TEMP_DIR}\notable-messages-$($timestamp).xlsx"
   }
 
   $synopsis = " " +($notable_msgs | Where-Object {$_.Level} |
@@ -430,10 +456,10 @@ if ($all_messages){
   write-host ""
   if ($notable_msgs) {
       Write-host -for yellow "Found notable messages. I have saved them in these files:"
-      Write-host -for yellow "    C:\IT\temp\notable-messages-$($timestamp).xlsx"
-      Write-host -for gray   "    C:\IT\temp\all-messages-$($timestamp).xlsx"
+      Write-host -for yellow "    ${TEMP_DIR}\notable-messages-$($timestamp).xlsx"
+      Write-host -for gray   "    ${TEMP_DIR}\all-messages-$($timestamp).xlsx"
       Write-host -for gray   "Open them on Excel or if you prefer PowerShell load them like this:"
-      Write-host -for gray   "    `$data = Import-Excel C:\IT\temp\notable-messages-$($timestamp).xlsx"
+      Write-host -for gray   "    `$data = Import-Excel ${TEMP_DIR}\notable-messages-$($timestamp).xlsx"
       Write-host -for gray   '    $data|ogv # GUI review'
       Write-host -for gray   '    $data|select -Property Computer,Level,Message # Console review'
 
@@ -456,10 +482,10 @@ if ($all_messages){
       $encoded = [System.Net.WebUtility]::HtmlEncode($body)
       $html = "<pre style='font-family: Consolas, ""Courier New"", monospace; white-space:pre-wrap; margin:0; font-size:12px; line-height:1.35'>$encoded</pre>"
 
-      Invoke-HealthEmail -Subject $SmtpSubject -Body $html -BodyAsHtml -Attachments "C:\IT\temp\notable-messages-$($timestamp).xlsx" -ConfigFile $SmtpConfig -NoSendMessage:$NoSendMessage
+      Invoke-HealthEmail -Subject $SmtpSubject -Body $html -BodyAsHtml -Attachments "${TEMP_DIR}\notable-messages-$($timestamp).xlsx" -ConfigFile $SmtpConfig -NoSendMessage:$NoSendMessage
   } else {
     Write-host -for green    "GOOD, Nothing notable to record. I have saved less notable messages here:"
-    Write-host -for gray     "    C:\IT\temp\all-messages-$($timestamp).xlsx"
+    Write-host -for gray     "    ${TEMP_DIR}\all-messages-$($timestamp).xlsx"
     Invoke-HealthEmail -Subject $SmtpSubjectAllGood -Body 'Relax :-)' -ConfigFile $SmtpConfig -NoSendMessage:$NoSendMessage
   }
 } else {
