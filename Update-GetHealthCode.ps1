@@ -15,7 +15,9 @@ None.
 [CmdletBinding()]
 param(
   [switch]$Reinstall,
-  [string]$UpdateFromZip
+  [string]$UpdateFromZip,
+  [switch]$ForceRefreshReleaseMetadata,
+  [Parameter(DontShow=$true)][int]$SelfRerunCount = 0
 )
 
 ####################################################################
@@ -27,7 +29,8 @@ $BAK_DIR  = 'C:\it\temp'
 $CFG_DIR  = 'c:\it\config'
 $REPO_URL = 'https://github.com/ndemou/GetComputerHealth'
 $REPO_REF = 'main'
-$LATEST_RELEASE_MARKER_PATH = 'c:\it\config\Get-ComputerHealth-latest-release.dat'
+$LATEST_RELEASE_METADATA_CACHE_PATH = 'c:\it\config\Get-ComputerHealth-latest-release-meta.json'
+$RELEASE_METADATA_CACHE_TTL_MINUTES = 60
 $ZIP_CACHE_PATTERN = 'GetComputerHealth-release-*.zip'
 $repoSlug = (($REPO_URL -replace '^https?://github\.com/','') -replace '\.git$','').Trim('/')
 #
@@ -131,46 +134,58 @@ Converts a GitHub repo URL into "owner/repo" format.
   return $slug
 }
 
-function Get-GetComputerHealthLatestReleaseMarker {
+function Convert-GetComputerHealthReleaseToMarker {
 <#
 .SYNOPSIS
-Gets a stable marker string for the latest GitHub release.
-.DESCRIPTION
-Returns "owner/repo|tag|id" when available, otherwise $null on non-terminating failures.
+Converts release metadata to a stable marker string.
 #>
   [CmdletBinding()]
-  param([Parameter(Mandatory)][string]$RepositoryUrl)
+  param(
+    [Parameter(Mandatory)][string]$RepositoryUrl,
+    [Parameter(Mandatory)]$Release
+  )
 
-  try {
-    Write-Verbose "Querying latest release marker for '$RepositoryUrl'"
-    $slug = Convert-GitHubRepoUrlToSlug -RepoUrl $RepositoryUrl
-    $api = "https://api.github.com/repos/$slug/releases/latest"
-    $headers = @{
-      'User-Agent' = 'PowerShell'
-      'Accept'     = 'application/vnd.github+json'
-    }
-    $rel = Invoke-RestMethod -Method Get -Uri $api -Headers $headers -ErrorAction Stop
-    $tag = [string]$rel.tag_name
-    if ([string]::IsNullOrWhiteSpace($tag)) { $tag = 'untagged' }
-    $id = [string]$rel.id
-    if ([string]::IsNullOrWhiteSpace($id)) { $id = 'noid' }
-    $marker = ("{0}|{1}|{2}" -f $slug, $tag, $id)
-    Write-Verbose "Latest release marker is '$marker'"
-    return $marker
-  } catch {
-    Write-Warning ("Could not query latest release metadata from {0}: {1}" -f $RepositoryUrl, $_.Exception.Message)
-    return $null
-  }
+  $slug = Convert-GitHubRepoUrlToSlug -RepoUrl $RepositoryUrl
+  $tag = [string]$Release.tag_name
+  if ([string]::IsNullOrWhiteSpace($tag)) { $tag = 'untagged' }
+  $id = [string]$Release.id
+  if ([string]::IsNullOrWhiteSpace($id)) { $id = 'noid' }
+  return ("{0}|{1}|{2}" -f $slug, $tag, $id)
 }
 
 function Get-GetComputerHealthLatestRelease {
 <#.SYNOPSIS
 Gets latest GitHub release metadata for the configured repository.
+Uses a local metadata cache to avoid querying GitHub too frequently.
 #>
   [CmdletBinding()]
-  param([Parameter(Mandatory)][string]$RepositoryUrl)
+  param(
+    [Parameter(Mandatory)][string]$RepositoryUrl,
+    [string]$CachePath,
+    [int]$CacheTtlMinutes = 60,
+    [switch]$ForceRefresh
+  )
 
-  Write-Verbose "Querying latest release metadata for '$RepositoryUrl'"
+  if ((-not $ForceRefresh) -and $CachePath -and (Test-Path -LiteralPath $CachePath -PathType Leaf)) {
+    try {
+      $cachedRaw = Get-Content -LiteralPath $CachePath -Raw -ErrorAction Stop
+      $cached = $cachedRaw | ConvertFrom-Json -ErrorAction Stop
+      if ($cached.fetchedAt -and $cached.release) {
+        $ageMinutes = ((Get-Date) - ([datetime]$cached.fetchedAt)).TotalMinutes
+        if ($ageMinutes -lt $CacheTtlMinutes) {
+          Write-Verbose ("Using cached release metadata from '{0}' (age {1:N1} minutes, TTL {2} minutes)" -f $CachePath, $ageMinutes, $CacheTtlMinutes)
+          return $cached.release
+        }
+        Write-Verbose ("Cached release metadata is stale (age {0:N1} minutes >= TTL {1} minutes)" -f $ageMinutes, $CacheTtlMinutes)
+      }
+    } catch {
+      Write-Warning ("Failed to read cached release metadata from {0}: {1}" -f $CachePath, $_.Exception.Message)
+    }
+  } elseif ($ForceRefresh) {
+    Write-Verbose "Force refresh requested; bypassing cached release metadata"
+  }
+
+  Write-Verbose "Querying latest release metadata for '$RepositoryUrl' from GitHub"
   $slug = Convert-GitHubRepoUrlToSlug -RepoUrl $RepositoryUrl
   $api = "https://api.github.com/repos/$slug/releases/latest"
   $headers = @{
@@ -179,24 +194,125 @@ Gets latest GitHub release metadata for the configured repository.
   }
   $release = Invoke-RestMethod -Method Get -Uri $api -Headers $headers -ErrorAction Stop
   Write-Verbose ("Latest release metadata retrieved: tag='{0}', id='{1}'" -f $release.tag_name, $release.id)
+
+  if ($CachePath) {
+    try {
+      $cacheDir = Split-Path -Parent $CachePath
+      if ($cacheDir -and (-not (Test-Path -LiteralPath $cacheDir))) {
+        $null = New-Item -ItemType Directory -Path $cacheDir -Force
+      }
+
+      $cachePayload = @{
+        fetchedAt = (Get-Date).ToString('o')
+        release   = $release
+      }
+
+      if (Test-Path -LiteralPath $CachePath -PathType Leaf) {
+        try {
+          $existingRaw = Get-Content -LiteralPath $CachePath -Raw -ErrorAction Stop
+          $existingCache = $existingRaw | ConvertFrom-Json -ErrorAction Stop
+          if ($existingCache.installedReleaseMarker) {
+            $cachePayload['installedReleaseMarker'] = [string]$existingCache.installedReleaseMarker
+          }
+        } catch {
+          Write-Warning ("Failed to preserve installed release marker from {0}: {1}" -f $CachePath, $_.Exception.Message)
+        }
+      }
+
+      $cachePayload | ConvertTo-Json -Depth 20 | Out-File -LiteralPath $CachePath -Encoding UTF8 -Force
+
+      Write-Verbose "Updated release metadata cache at '$CachePath'"
+    } catch {
+      Write-Warning ("Failed to write release metadata cache to {0}: {1}" -f $CachePath, $_.Exception.Message)
+    }
+  }
+
   return $release
 }
 
+function Get-GetComputerHealthInstalledReleaseMarker {
+<#
+.SYNOPSIS
+Reads the installed-release marker from the shared metadata cache file.
+#>
+  [CmdletBinding()]
+  param([Parameter(Mandatory)][string]$CachePath)
+
+  try {
+    if (-not (Test-Path -LiteralPath $CachePath -PathType Leaf)) {
+      return $null
+    }
+
+    $cachedRaw = Get-Content -LiteralPath $CachePath -Raw -ErrorAction Stop
+    $cached = $cachedRaw | ConvertFrom-Json -ErrorAction Stop
+    $marker = [string]$cached.installedReleaseMarker
+    if ([string]::IsNullOrWhiteSpace($marker)) {
+      return $null
+    }
+
+    return $marker.Trim()
+  } catch {
+    Write-Warning ("Failed to read installed release marker from {0}: {1}" -f $CachePath, $_.Exception.Message)
+    return $null
+  }
+}
+
+function Set-GetComputerHealthInstalledReleaseMarker {
+<#
+.SYNOPSIS
+Writes the installed-release marker into the shared metadata cache file.
+#>
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)][string]$CachePath,
+    [Parameter(Mandatory)][string]$Marker
+  )
+
+  try {
+    $cacheDir = Split-Path -Parent $CachePath
+    if ($cacheDir -and (-not (Test-Path -LiteralPath $cacheDir))) {
+      $null = New-Item -ItemType Directory -Path $cacheDir -Force
+    }
+
+    $cachePayload = @{}
+    if (Test-Path -LiteralPath $CachePath -PathType Leaf) {
+      try {
+        $cachedRaw = Get-Content -LiteralPath $CachePath -Raw -ErrorAction Stop
+        $cached = $cachedRaw | ConvertFrom-Json -ErrorAction Stop
+        if ($cached.fetchedAt) { $cachePayload['fetchedAt'] = $cached.fetchedAt }
+        if ($cached.release) { $cachePayload['release'] = $cached.release }
+      } catch {
+        Write-Warning ("Failed to parse existing metadata cache before writing marker to {0}: {1}" -f $CachePath, $_.Exception.Message)
+      }
+    }
+
+    $cachePayload['installedReleaseMarker'] = $Marker
+
+    $cachePayload | ConvertTo-Json -Depth 20 | Out-File -LiteralPath $CachePath -Encoding UTF8 -Force
+    Write-Verbose "Updated installed release marker in metadata cache '$CachePath'"
+  } catch {
+    Write-Warning ("Failed writing installed release marker to {0}: {1}" -f $CachePath, $_.Exception.Message)
+  }
+}
+
 function Expand-GetComputerHealthLatestRelease {
+
 <#.SYNOPSIS
 Downloads and extracts the latest release zip into a temporary folder.
 .OUTPUTS
-System.String. Full path to extracted release root directory.
+System.Collections.Hashtable with keys RootPath and ZipPath.
 #>
   [CmdletBinding()]
   param(
     [Parameter(Mandatory)][string]$RepositoryUrl,
     [Parameter(Mandatory)][string]$TempPath,
-    [Parameter(Mandatory)][string]$ZipCacheDir
+    [Parameter(Mandatory)][string]$ZipCacheDir,
+    [Parameter(Mandatory)]$Release,
+    [switch]$ForceDownload
   )
 
   Write-Verbose "Preparing latest release from GitHub"
-  $release = Get-GetComputerHealthLatestRelease -RepositoryUrl $RepositoryUrl
+  $release = $Release
   if (-not $release.zipball_url) {
     throw "Latest release does not include zipball_url."
   }
@@ -219,8 +335,12 @@ System.String. Full path to extracted release root directory.
     'Accept'     = 'application/vnd.github+json'
   }
 
-  Write-Verbose "Downloading release zip from GitHub"
-  Invoke-WebRequest -Uri $release.zipball_url -OutFile $zipPath -Headers $headers -UseBasicParsing -ErrorAction Stop
+  if ((-not $ForceDownload) -and (Test-Path -LiteralPath $zipPath -PathType Leaf)) {
+    Write-Verbose "Reusing cached release zip '$zipPath'"
+  } else {
+    Write-Verbose "Downloading release zip from GitHub"
+    Invoke-WebRequest -Uri $release.zipball_url -OutFile $zipPath -Headers $headers -UseBasicParsing -ErrorAction Stop
+  }
 
   Write-Verbose "Expanding release zip '$zipPath'"
   Expand-Archive -LiteralPath $zipPath -DestinationPath $extractPath -Force
@@ -231,7 +351,10 @@ System.String. Full path to extracted release root directory.
   }
 
   Write-Verbose "Extracted release root is '$($root.FullName)'"
-  return $root.FullName
+  return @{
+    RootPath = $root.FullName
+    ZipPath  = $zipPath
+  }
 }
 
 function Expand-ReleaseFromZipFile {
@@ -265,7 +388,10 @@ Extracts a provided release zip into a temporary folder and returns extracted ro
   }
 
   Write-Verbose "Extracted provided release root is '$($root.FullName)'"
-  return $root.FullName
+  return @{
+    RootPath = $root.FullName
+    ZipPath  = $ZipPath
+  }
 }
 
 function Keep-OnlyLatestReleaseZips {
@@ -437,15 +563,19 @@ $false - No change occurred or the operation failed.
 #
 #  MAIN CODE
 #
-Write-Verbose "Starting Update-GetHealthCode"
-Write-Verbose "Parameters: Reinstall=$Reinstall UpdateFromZip='$UpdateFromZip'"
+$passNumber = $SelfRerunCount + 1
+$passLabel = "[pass $passNumber/2]"
+
+Write-Verbose "$passLabel Starting Update-GetHealthCode"
+Write-Verbose "$passLabel Parameters: Reinstall=$Reinstall UpdateFromZip='$UpdateFromZip' ForceRefreshReleaseMetadata=$ForceRefreshReleaseMetadata SelfRerunCount=$SelfRerunCount"
 Write-Verbose "Configuration:"
 Write-Verbose "  DEST_DIR                    : $DEST_DIR"
 Write-Verbose "  BAK_DIR                     : $BAK_DIR"
 Write-Verbose "  CFG_DIR                     : $CFG_DIR"
 Write-Verbose "  REPO_URL                    : $REPO_URL"
 Write-Verbose "  REPO_REF                    : $REPO_REF"
-Write-Verbose "  LATEST_RELEASE_MARKER_PATH  : $LATEST_RELEASE_MARKER_PATH"
+Write-Verbose "  LATEST_RELEASE_METADATA_CACHE_PATH : $LATEST_RELEASE_METADATA_CACHE_PATH"
+Write-Verbose "  RELEASE_METADATA_CACHE_TTL_MINUTES : $RELEASE_METADATA_CACHE_TTL_MINUTES"
 Write-Verbose "  ZIP_CACHE_PATTERN           : $ZIP_CACHE_PATTERN"
 Write-Verbose "  repoSlug                    : $repoSlug"
 
@@ -481,27 +611,28 @@ if (-not (Test-Path $p)) {
   Write-Verbose "Suppressions file already exists: '$p'"
 }
 
+$latestRelease = $null
 $latestReleaseMarker = $null
 if (-not $UpdateFromZip) {
-  Write-Verbose "No -UpdateFromZip specified; querying latest GitHub release marker"
-  $latestReleaseMarker = Get-GetComputerHealthLatestReleaseMarker -RepositoryUrl $REPO_URL
+  Write-Verbose "$passLabel Resolving latest release metadata (cache TTL $RELEASE_METADATA_CACHE_TTL_MINUTES minutes)"
+  try {
+    $latestRelease = Get-GetComputerHealthLatestRelease -RepositoryUrl $REPO_URL -CachePath $LATEST_RELEASE_METADATA_CACHE_PATH -CacheTtlMinutes $RELEASE_METADATA_CACHE_TTL_MINUTES -ForceRefresh:$ForceRefreshReleaseMetadata
+    $latestReleaseMarker = Convert-GetComputerHealthReleaseToMarker -RepositoryUrl $REPO_URL -Release $latestRelease
+    Write-Verbose "$passLabel Latest release marker is '$latestReleaseMarker'"
+  } catch {
+    Write-Warning ("Could not query latest release metadata from {0}: {1}" -f $REPO_URL, $_.Exception.Message)
+  }
 } else {
   Write-Verbose "-UpdateFromZip specified; skipping latest release marker query"
 }
 
 if ($latestReleaseMarker) {
-  $storedReleaseMarker = $null
+  $storedReleaseMarker = Get-GetComputerHealthInstalledReleaseMarker -CachePath $LATEST_RELEASE_METADATA_CACHE_PATH
 
-  if (Test-Path -LiteralPath $LATEST_RELEASE_MARKER_PATH -PathType Leaf) {
-    Write-Verbose "Reading stored release marker from '$LATEST_RELEASE_MARKER_PATH'"
-    try {
-      $storedReleaseMarker = (Get-Content -LiteralPath $LATEST_RELEASE_MARKER_PATH -ErrorAction Stop | Select-Object -First 1).Trim()
-      Write-Verbose "Stored release marker is '$storedReleaseMarker'"
-    } catch {
-      Write-Warning ("Failed reading release marker file {0}: {1}" -f $LATEST_RELEASE_MARKER_PATH, $_.Exception.Message)
-    }
+  if ($storedReleaseMarker) {
+    Write-Verbose "Stored installed release marker is '$storedReleaseMarker'"
   } else {
-    Write-Verbose "Stored release marker file does not exist yet"
+    Write-Verbose "No stored installed release marker is available yet"
   }
 
   if ((-not $Reinstall) -and $storedReleaseMarker -and ($storedReleaseMarker -eq $latestReleaseMarker)) {
@@ -513,25 +644,53 @@ if ($latestReleaseMarker) {
     Write-Verbose "-Reinstall was specified; re-downloading current latest release"
   }
 } else {
-  Write-Verbose "No latest release marker is available"
+  Write-Verbose "$passLabel No latest release marker is available"
 }
 
-Write-Verbose "Checking for code updates; local files will be backed up before replacement if needed"
+Write-Verbose "$passLabel Checking for code updates; local files will be backed up before replacement if needed"
 $tmdDir = New-EmptyTempDirectory -Name "Update-GetHealthCode"
 $releaseRoot = $null
+$preparedZipPath = $null
 
 try {
   if ($UpdateFromZip) {
-    Write-Verbose "Updating from provided zip '$UpdateFromZip'"
-    $releaseRoot = Expand-ReleaseFromZipFile -ZipPath $UpdateFromZip -TempPath $tmdDir
+    Write-Verbose "$passLabel Updating from provided zip '$UpdateFromZip'"
+    $preparedRelease = Expand-ReleaseFromZipFile -ZipPath $UpdateFromZip -TempPath $tmdDir
   } else {
-    Write-Verbose "Updating from latest GitHub release"
-    $releaseRoot = Expand-GetComputerHealthLatestRelease -RepositoryUrl $REPO_URL -TempPath $tmdDir -ZipCacheDir $BAK_DIR
+    Write-Verbose "$passLabel Updating from latest GitHub release"
+    if (-not $latestRelease) {
+      $latestRelease = Get-GetComputerHealthLatestRelease -RepositoryUrl $REPO_URL -CachePath $LATEST_RELEASE_METADATA_CACHE_PATH -CacheTtlMinutes $RELEASE_METADATA_CACHE_TTL_MINUTES -ForceRefresh:$ForceRefreshReleaseMetadata
+    }
+    $preparedRelease = Expand-GetComputerHealthLatestRelease -RepositoryUrl $REPO_URL -TempPath $tmdDir -ZipCacheDir $BAK_DIR -Release $latestRelease -ForceDownload:$Reinstall
     Keep-OnlyLatestReleaseZips -CacheDir $BAK_DIR -Pattern $ZIP_CACHE_PATTERN -KeepCount 2
   }
-  Write-Verbose "Release root resolved to '$releaseRoot'"
+  $releaseRoot = $preparedRelease.RootPath
+  $preparedZipPath = $preparedRelease.ZipPath
+  Write-Verbose "$passLabel Release root resolved to '$releaseRoot'"
+  Write-Verbose "$passLabel Prepared zip path is '$preparedZipPath'"
 } catch {
   throw "Unable to prepare release zip: $($_.Exception.Message)"
+}
+
+$updated = Sync-LocalFile -FileName 'Update-GetHealthCode.ps1' -SourcePath $releaseRoot -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+
+if ($updated) {
+  Write-Verbose "$passLabel This script updated itself"
+  if ($SelfRerunCount -ge 1) {
+    Write-Verbose "$passLabel Self-rerun already performed once; skipping additional rerun"
+    return
+  }
+
+  $rerunPath = Join-Path $DEST_DIR 'Update-GetHealthCode.ps1'
+  $rerunParameters = @{} + $PSBoundParameters
+  $rerunParameters['SelfRerunCount'] = $SelfRerunCount + 1
+  if ($preparedZipPath) {
+    $rerunParameters['UpdateFromZip'] = $preparedZipPath
+  }
+
+  Write-Verbose "$passLabel Rerunning updated copy '$rerunPath' with one-time self-rerun guard"
+  & $rerunPath @rerunParameters
+  return
 }
 
 $_ = Sync-LocalFile -FileName 'lib-write-log-objects.ps1'      -SourcePath $releaseRoot -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
@@ -551,32 +710,9 @@ $_ = Sync-LocalFile -FileName 'Invoke-GetComputerHealth.ps1'   -SourcePath $rele
 $_ = Sync-LocalFile -FileName 'Send-Message.ps1'               -SourcePath $releaseRoot -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
 $_ = Sync-LocalFile -FileName 'helpers-processes.ps1'          -SourcePath $releaseRoot -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
 $_ = Sync-LocalFile -FileName 'helpers-networking.ps1'         -SourcePath $releaseRoot -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
-$updated = Sync-LocalFile -FileName 'Update-GetHealthCode.ps1' -SourcePath $releaseRoot -TempPath $tmdDir -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
-
-if ($updated) {
-  Write-Verbose "This script updated itself"
-
-  if ($latestReleaseMarker) {
-    try {
-      Write-Verbose "Writing latest release marker to '$LATEST_RELEASE_MARKER_PATH'"
-      $latestReleaseMarker | Out-File -LiteralPath $LATEST_RELEASE_MARKER_PATH -Encoding UTF8 -Force
-    } catch {
-      Write-Warning ("Failed writing latest release marker to {0}: {1}" -f $LATEST_RELEASE_MARKER_PATH, $_.Exception.Message)
-    }
-  }
-
-#  Write-Verbose "Rerunning updated copy 'C:\it\bin\Update-GetHealthCode.ps1'"
-#  & C:\it\bin\Update-GetHealthCode.ps1 @PSBoundParameters
-  return
-}
 
 if ($latestReleaseMarker) {
-  try {
-    Write-Verbose "Writing latest release marker to '$LATEST_RELEASE_MARKER_PATH'"
-    $latestReleaseMarker | Out-File -LiteralPath $LATEST_RELEASE_MARKER_PATH -Encoding UTF8 -Force
-  } catch {
-    Write-Warning ("Failed writing latest release marker to {0}: {1}" -f $LATEST_RELEASE_MARKER_PATH, $_.Exception.Message)
-  }
+  Set-GetComputerHealthInstalledReleaseMarker -CachePath $LATEST_RELEASE_METADATA_CACHE_PATH -Marker $latestReleaseMarker
 }
 
 if ((Get-Date) -le [datetime]'2026-04-30') {
