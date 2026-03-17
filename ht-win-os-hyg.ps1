@@ -809,6 +809,17 @@ FalsePositives: Environment-specific hardening baselines can intentionally diffe
         Write-Warning "[$Severity] $Synopsis`n$($EventRecord.TimeCreated) | $($EventRecord.ProviderName) | Event ID $($EventRecord.Id)`n$msg"
     }
 
+    function Get-FaultingApplicationName($EventRecord) {
+        if ($null -eq $EventRecord -or [string]::IsNullOrWhiteSpace($EventRecord.Message)) { return "" }
+
+        $match = [regex]::Match($EventRecord.Message, '(?im)^\s*Faulting application name:\s*([^,\r\n]+)')
+        if ($match.Success) {
+            return $match.Groups[1].Value.Trim()
+        }
+
+        return ""
+    }
+
     # [failure] Blue screen / bugcheck / unexpected shutdown
     $failureFilters = @(
         @{ LogName = 'System'; Id = 41;   ProviderName = 'Microsoft-Windows-Kernel-Power';          StartTime = $cutoff },
@@ -837,7 +848,9 @@ FalsePositives: Environment-specific hardening baselines can intentionally diffe
     Get-WinEvent -FilterHashtable @{ LogName = 'Application'; Id = 1000; ProviderName = 'Application Error'; StartTime = $cutoff } -ErrorAction SilentlyContinue |
         ForEach-Object {
             $totalFindings++
-            Write-EventFinding -Severity 'notice' -Synopsis 'Detected application crash in Application log' -EventRecord $_
+            $appName = Get-FaultingApplicationName -EventRecord $_
+            $synopsis = if ($appName) { "Detected application crash in Application log: $appName" } else { 'Detected application crash in Application log' }
+            Write-EventFinding -Severity 'notice' -Synopsis $synopsis -EventRecord $_
         }
 
     if ($totalFindings -eq 0) {
