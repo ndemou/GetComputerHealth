@@ -33,7 +33,7 @@ Accepts whitespace/comma-separated input (e.g. `"srv1,srv2"` or `"srv1 srv2"`).
 Special token `ALL_DOMAIN_SERVERS` expands to all AD computer objects with `operatingSystem=*Server*` (optionally excluding some via `-ExcludeServers`).
 
 .PARAMETER IpsOfAllDcs
-Array of IPv4 addresses for all domain controllers. Passed through to `Get-ComputerHealth.ps1` as `-IpsOfAllDcs` so tests can use this list without reading `C:\it\config\ips-of-all-DCs.conf`.
+Array of IPv4 addresses for all domain controllers. Passed through to `Get-ComputerHealth.ps1` as `-IpsOfAllDcs`.
 
 .PARAMETER ExcludeServers
 One or more hostnames to remove from the `ALL_DOMAIN_SERVERS` expansion.
