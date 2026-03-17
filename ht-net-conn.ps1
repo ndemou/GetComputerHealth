@@ -69,7 +69,7 @@ function HealthTest-NetworkConnectionProfiles {
 Checks Network Connection Profiles and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: Get-NetAdapter/Get-NetIPConfiguration, Test-Connection, Resolve-DnsName.
+Uses: Get-NetConnectionProfile, Test-NetConnectivityToNetwork.
 AppliesTo: All Windows hosts.
 TestScope: Computer.
 Category: Primary: Availability / Server Down Signals.
@@ -78,44 +78,46 @@ FalsePositives: Environment-specific hardening baselines can intentionally diffe
 #>
   [CmdletBinding()]
   param()
-
+  
+  $POPULAR_HOSTS = @('8.8.8.8','8.8.4.4','1.1.1.1','1.1.1.2')
   $hostFacts = $Global:GetComputerHealthDataQMTA
 
-  $profiles = @(Get-NetConnectionProfile -ErrorAction SilentlyContinue)
+  # Phase 1, Collect Data
+  $profiles = @(Get-NetConnectionProfile) # We'll let an unexpected exception bubble up -- the caller catches and displays exceptions nicely
+  $details = "`n" + "Get-NetConnectionProfile output:`n" + ($profiles|Format-List|Out-String).Trim()
   if (-not $profiles) {
-    Write-Warning "[warning] Could not read network connection profiles (Get-NetConnectionProfile failed)"
+    Write-Warning "[warning] Could not read network connection profiles$details"
     return
   }
 
+  # Phase 2, Check Internet Connectivity
   $internetProfiles = @($profiles | Where-Object { $_.IPv4Connectivity -eq 'Internet' -or $_.IPv6Connectivity -eq 'Internet' })
   if ($internetProfiles.Count -gt 0) {
     Write-Warning "[pass] Connected to the Internet"
   } else {
-    $aliveHosts = Test-NetConnectivityToNetwork -NetworkDescription "Internet" -KnownHostIps @('8.8.8.8','8.8.4.4','1.1.1.1','1.1.1.2') -ReturnListOfAliveHosts
+    $aliveHosts = Test-NetConnectivityToNetwork -NetworkDescription "Internet" -KnownHostIps $POPULAR_HOSTS -ReturnListOfAliveHosts
     if ($aliveHosts) {
-      Write-Warning "[notice] System seems connected to the Internet but windows report it is not (Get-NetConnectionProfile)"
+      Write-Warning "[notice] System seems connected to the Internet but windows report it is not$details`nBut these hosts reply to pings $aliveHosts"
     } else {
-      Write-Warning "[failure] No Internet connection"
+      Write-Warning "[failure] No Internet connection$details`nAlso non of these hosts replied to pings: $POPULAR_HOSTS"
     }
   }
 
-  $isServer = [bool]$hostFacts.isHostServer
-  if (-not $isServer) { return }
+  # Phase 3, Check if NLA category(public, private, domain) is proper.
+  if (-not $hostFacts.isHostServer) { return } # N/A for workstations
 
-  $isDomainJoined = [bool]$hostFacts.isHostDomainJoined
-  $isHostDC = [bool]$hostFacts.isHostDC
-  $isHostPDC = [bool]$hostFacts.isHostPDC
-
-  $allowedCategories = @('Private')
-  if ($isDomainJoined -and -not $isHostDC -and -not $isHostPDC) {
+  if ($hostFacts.isHostDomainJoined) {
     $allowedCategories = @('DomainAuthenticated')
+  } else {
+    $allowedCategories = @('Private')
   }
 
   $matchingServerProfiles = @($profiles | Where-Object { $allowedCategories -contains $_.NetworkCategory.ToString() })
   if ($matchingServerProfiles.Count -gt 0) {
-    Write-Warning "[pass] Expected network category: $(($allowedCategories -join ', '))"
+    Write-Warning "[pass] Found interface on expected NLA category"
   } else {
-    Write-Warning "[failure] No connection with an expected network category: $(($allowedCategories -join ', '))"
+    $synopsis = "No connection with a proper NLA category: $(($allowedCategories -join ', '))"
+    Write-Warning "[failure] $synopsis$details"
   }
 }
 

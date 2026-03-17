@@ -638,11 +638,110 @@ if ($AddWhitelisting ){
     return
 }
 
+#+-----------------------------------------------------------
+#| Collect system information
+#|
+
+#     Domain Role                              |
+#  ------------------------------------------- |
+#  Value | Meaning                             |
+#  ----- | ----------------------------------- |
+#  0     | Workstation not joined to a domain  |
+#  1     | Workstation joined to a domain      |
+#  2     | Server not joined to a domain       |
+#  3     | Server joined to a domain           |
+#  4     | Domain controller (non-FSMO)        |
+#  5     | Domain controller (PDC Emulator)    |
+#
+$domainRole = (Get-CimInstance Win32_ComputerSystem).DomainRole
+#------------------------------------------
+# What type of system are we running on
+#------------------------------------------
+$isHostVM = Test-IsVirtualMachine                # V   (based on heuristics)
+$isHostMobile = Test-IsLaptopOrMobile            # L   (based on heuristics)
+$isHostDomainJoined = ($domainRole  -in 1,3,4,5) # J (N = Not domain joines)
+$isHostServer = ($domainRole  -in 3,4,5)         # S (W = not a server (Workstation))
+$isHostDC = ($domainRole -in 4,5)                # C   (by definition also JS)
+$isHostPDC = $false
+$currentDomain = $null
+if($isHostDC){$isHostPDC=$false                  # P   (by definition also CJS)
+    $domainInfo=$null
+    try{
+        $domainInfo=[System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain()
+        $currentDomain = $domainInfo
+        $isHostPDC=(($domainInfo.PdcRoleOwner.Name -replace '[.].*') -eq $env:COMPUTERNAME)
+    } catch {
+        Log-Warning "Could not determine if host is the PDC emulator for its domain."
+    }
+}
+
+$normalizedIpsOfAllDcs = @(
+    $IpsOfAllDcs |
+        Where-Object { $_ } |
+        ForEach-Object { $_.ToString().Trim() } |
+        Where-Object { $_ }
+)
+
+$ipCounts = @{}
+$validIpsList = New-Object System.Collections.Generic.List[string]
+$invalidIps = New-Object System.Collections.Generic.List[string]
+
+foreach ($ip in $normalizedIpsOfAllDcs) {
+    if ($ipCounts.ContainsKey($ip)) { $ipCounts[$ip]++ } else { $ipCounts[$ip] = 1 }
+
+    $parsed = $ip -as [ipaddress]
+    $isValidV4 = ($parsed -and ($parsed.AddressFamily -eq [System.Net.Sockets.AddressFamily]::InterNetwork))
+
+    if ($isValidV4) {
+        if (-not $validIpsList.Contains($ip)) {
+            [void]$validIpsList.Add($ip)
+        }
+    } else {
+        if (-not $invalidIps.Contains($ip)) {
+            [void]$invalidIps.Add($ip)
+        }
+    }
+}
+
+foreach ($entry in $ipCounts.GetEnumerator() | Where-Object { $_.Value -gt 1 } | Sort-Object Key) {
+    Log-Warning "Duplicate IP '$($entry.Key)' provided in -IpsOfAllDcs $($entry.Value) times; using one instance."
+}
+
+if ($invalidIps.Count -gt 0) {
+    throw "Invalid IPv4 value(s) supplied in -IpsOfAllDcs: $($invalidIps -join ', ')"
+}
+
+$validIpsOfAllDcs = @($validIpsList)
+
+# Explicitly created so host-fact values are publicly accessible to all health tests,
+# including custom health tests loaded at runtime.
+$Global:GetComputerHealthDataQMTA = [pscustomobject]@{
+    isHostVM           = $isHostVM
+    isHostMobile       = $isHostMobile
+    isHostDomainJoined = $isHostDomainJoined
+    isHostServer       = $isHostServer
+    isHostDC           = $isHostDC
+    isHostPDC          = $isHostPDC
+    GetCurrentDomain   = $currentDomain
+    IpsOfAllDcs        = @($validIpsOfAllDcs)
+}
+#|
+#| Collect system information
+#+-----------------------------------------------------------
+
 if ($DoNothing){return}
 
+if ($isHostDomainJoined -and $validIpsOfAllDcs.Count -eq 0) {
+    Log-failure "Cannot run many domain-related tests because no valid IPv4 addresses were provided in -IpsOfAllDcs. Marking this host as non-domain for test applicability."
+    $isHostDomainJoined = $false
+    $isHostDC = $false
+    $isHostPDC = $false
+    $currentDomain = $null
+}
+
 if (-not $OutputConsoleMessages -and -not $OutputObjects) {
-	Write-UsageHelp
-	return
+    Write-UsageHelp
+    return
 }
 
 # To reach this line either one or both of these switches where passed:
@@ -692,108 +791,15 @@ if ($OnlyTheseTests) {
     return
 }
 
-
-#     Domain Role                              |
-#  ------------------------------------------- |
-#  Value | Meaning                             |
-#  ----- | ----------------------------------- |
-#  0     | Workstation not joined to a domain  |
-#  1     | Workstation joined to a domain      |
-#  2     | Server not joined to a domain       |
-#  3     | Server joined to a domain           |
-#  4     | Domain controller (non-FSMO)        |
-#  5     | Domain controller (PDC Emulator)    |
-#
-$domainRole = (Get-CimInstance Win32_ComputerSystem).DomainRole
-#------------------------------------------
-# What type of system are we running on
-#------------------------------------------
-$isHostVM = Test-IsVirtualMachine                # V   (based on heuristics)
-$isHostMobile = Test-IsLaptopOrMobile            # L   (based on heuristics)
-$isHostDomainJoined = ($domainRole  -in 1,3,4,5) # J (N = Not domain joines)
-$isHostServer = ($domainRole  -in 3,4,5)         # S (W = not a server (Workstation))
-$isHostDC = ($domainRole -in 4,5)                # C   (by definition also JS)
-$isHostPDC = $false
-$currentDomain = $null
-if($isHostDC){$isHostPDC=$false                  # P   (by definition also CJS)
-	$domainInfo=$null
-    try{
-        $domainInfo=[System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain()
-        $currentDomain = $domainInfo
-        $isHostPDC=(($domainInfo.PdcRoleOwner.Name -replace '[.].*') -eq $env:COMPUTERNAME)
-    } catch {
-        Log-Warning "Could not determine if host is the PDC emulator for its domain."
-	}
-}
-
-$normalizedIpsOfAllDcs = @(
-    $IpsOfAllDcs |
-        Where-Object { $_ } |
-        ForEach-Object { $_.ToString().Trim() } |
-        Where-Object { $_ }
-)
-
-$ipCounts = @{}
-$validIpsList = New-Object System.Collections.Generic.List[string]
-$invalidIps = New-Object System.Collections.Generic.List[string]
-
-foreach ($ip in $normalizedIpsOfAllDcs) {
-    if ($ipCounts.ContainsKey($ip)) { $ipCounts[$ip]++ } else { $ipCounts[$ip] = 1 }
-
-    $parsed = $ip -as [ipaddress]
-    $isValidV4 = ($parsed -and ($parsed.AddressFamily -eq [System.Net.Sockets.AddressFamily]::InterNetwork))
-
-    if ($isValidV4) {
-        if (-not $validIpsList.Contains($ip)) {
-            [void]$validIpsList.Add($ip)
-        }
-    } else {
-        if (-not $invalidIps.Contains($ip)) {
-            [void]$invalidIps.Add($ip)
-        }
-    }
-}
-
-foreach ($entry in $ipCounts.GetEnumerator() | Where-Object { $_.Value -gt 1 } | Sort-Object Key) {
-    Log-Warning "Duplicate IP '$($entry.Key)' provided in -IpsOfAllDcs $($entry.Value) times; using one instance."
-}
-
-if ($invalidIps.Count -gt 0) {
-    throw "Invalid IPv4 value(s) supplied in -IpsOfAllDcs: $($invalidIps -join ', ')"
-}
-
-$validIpsOfAllDcs = @($validIpsList)
-
-if ($isHostDomainJoined -and $validIpsOfAllDcs.Count -eq 0) {
-    Log-failure "Cannot run many domain-related tests because no valid IPv4 addresses were provided in -IpsOfAllDcs. Marking this host as non-domain for test applicability."
-    $isHostDomainJoined = $false
-    $isHostDC = $false
-    $isHostPDC = $false
-    $currentDomain = $null
-}
-
-# Explicitly created so host-fact values are publicly accessible to all health tests,
-# including custom health tests loaded at runtime.
-$Global:GetComputerHealthDataQMTA = [pscustomobject]@{
-    isHostVM           = $isHostVM
-    isHostMobile       = $isHostMobile
-    isHostDomainJoined = $isHostDomainJoined
-    isHostServer       = $isHostServer
-    isHostDC           = $isHostDC
-    isHostPDC          = $isHostPDC
-    GetCurrentDomain   = $currentDomain
-    IpsOfAllDcs        = @($validIpsOfAllDcs)
-}
-
-if ($isHostMobile) {
-    Invoke-HealthTest "HealthTest-IsTPMActivated"
-}
-
 #=============================================================================
 #
 # START OF TESTS
 #
 #=============================================================================
+
+if ($isHostMobile) {
+    Invoke-HealthTest "HealthTest-IsTPMActivated"
+}
 
 #--------------------------------------------------------
 # For any computer (Generic)
@@ -865,8 +871,8 @@ if (-not $isHostVM) {
 #  26.3s  HealthTest-GpupdatePolicyApply
 
 if (!$DebugSkipSlowTests) {
-	Invoke-HealthTest "HealthTest-SoftwareLicensing"
-	Invoke-HealthTest "HealthTest-ScheduledTasksLastResult"
+    Invoke-HealthTest "HealthTest-SoftwareLicensing"
+    Invoke-HealthTest "HealthTest-ScheduledTasksLastResult"
     Invoke-HealthTest "HealthTest-FirewallEnabled"
     Invoke-HealthTest "HealthTest-Storage"
     Invoke-HealthTest "HealthTest-ShareReasonableness"
@@ -891,10 +897,10 @@ if ($isHostDomainJoined) {
 
 if ($isHostDC) {
     if (!$DebugSkipSlowTests) {
-		Invoke-HealthTest "HealthTest-DfsDiagTestDCs"
-		Invoke-HealthTest "HealthTest-Dcdiag"
-	}
-	Invoke-HealthTest "HealthTest-DcDnsRegistration"
+        Invoke-HealthTest "HealthTest-DfsDiagTestDCs"
+        Invoke-HealthTest "HealthTest-Dcdiag"
+    }
+    Invoke-HealthTest "HealthTest-DcDnsRegistration"
     Invoke-HealthTest "HealthTest-ADViewConsistency"
     Invoke-HealthTest "HealthTest-DfsReplicationState"
     Invoke-HealthTest "HealthTest-ADReplicationLocalRSAT"
