@@ -1323,3 +1323,272 @@ Impact: Medium(Time).
   foreach($n in $nics){ Write-Warning "[warning] Enabled network adapter is disconnected: $($n.Name) ($($n.Status))" }
   if(($nics | Measure-Object).Count -eq 0){ Write-Warning "[pass] No enabled-but-disconnected network adapters detected" } else { Write-Warning "[failure] There are enabled-but-disconnected network adapters present" }
 }
+
+#--------------------------------------------------------
+# Moved domain and AD governance checks from other categories
+
+function HealthTest-SchemaVersionConsistency{
+<#
+.SYNOPSIS
+Checks Schema Version Consistency and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+
+.DESCRIPTION
+Uses: Get-ADRootDSE, Get-ADReplicationPartnerMetadata, Get-ADOptionalFeature, Get-ADObject.
+AppliesTo: DC
+Scope: Forest
+Category: Configuration Hygiene & Best Practices.
+Impact: Medium(Time).
+#>
+
+  $schemaNC=(Get-ADRootDSE).schemaNamingContext
+  $vers=@{}; $errs=@()
+  foreach($dc in (Get-ADDomainController -Filter *)){
+    try{
+      $ov=(Get-ADObject -Identity $schemaNC -Server $dc.HostName -Properties objectVersion -ErrorAction Stop).objectVersion
+      if($null -eq $ov -or "$ov" -eq ''){
+        $msg="$($dc.HostName): objectVersion missing"; $errs+=$msg; Write-Warning "[failure] $($msg)"; continue
+      }
+      $ov=[int]("$ov".Trim()); $vers[$dc.HostName]=$ov
+    }catch{
+      $msg="$($dc.HostName): $($_.Exception.Message)"; $errs+=$msg; Write-Warning "[failure] $($msg)"
+    }
+  }
+
+  if($vers.Count -eq 0){
+    Write-Warning "[failure] $("AD schema version consistency")`n$(("No schema versions retrieved. Errors: "+($errs -join ' | ')))"
+    return
+  }
+
+  # Force array so .Count and [0] are always valid even when only one element
+  $distinct = @($vers.Values | Sort-Object -Unique)
+  $distinctCount = $distinct.Count
+
+  $perDc = ($vers.GetEnumerator() | Sort-Object Name | ForEach-Object { "$($_.Name)=$($_.Value)" }) -join '; '
+
+  $det = if ($distinctCount -eq 1) {
+    "SchemaVersion=$($distinct[0]); $perDc"
+  } else {
+    "Mismatch: "+($distinct -join ', ')+" | "+$perDc
+  }
+
+  if($errs){ $det += " | Errors: "+($errs -join ' | ') }
+
+  $pass = ($distinctCount -eq 1 -and $errs.Count -eq 0)
+
+  if($pass){
+    Write-Warning "[pass] AD schema version consistent across DCs ($det)"
+  } else {
+    Write-Warning "[failure] $("AD schema version consistent across DCs")`n$($det)"
+  }
+}
+
+function HealthTest-TombstoneLifetime{
+<#
+.SYNOPSIS
+Checks Tombstone Lifetime and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+
+.DESCRIPTION
+Uses: Get-ADRootDSE, Get-ADReplicationPartnerMetadata, Get-ADOptionalFeature.
+AppliesTo: DC
+Scope: Domain
+Category: Configuration Hygiene & Best Practices.
+Impact: Medium(Time).
+#>
+
+  [CmdletBinding()] param([int]$MinDays=60)
+  $ds="CN=Directory Service,CN=Windows NT,CN=Services,$((Get-ADRootDSE).ConfigurationNamingContext)"
+  $tl=(Get-ADObject $ds -Properties tombstoneLifetime).tombstoneLifetime
+  if(-not $tl){$tl=60}
+  if($tl -ge $MinDays){ Write-Warning "[pass] AD tombstoneLifetime is sufficient ($tl days >= $MinDays)" }
+  else{ Write-Warning "[failure] AD tombstoneLifetime below threshold`nCurrent=$tl; Min=$MinDays" }
+}
+
+function HealthTest-RecycleBinEnabled{
+<#
+.SYNOPSIS
+Checks Recycle Bin Enabled and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+
+.DESCRIPTION
+Uses: Get-ADObject, Get-ADRootDSE, Get-ADReplicationPartnerMetadata.
+AppliesTo: DC
+Scope: Domain
+Category: Configuration Hygiene & Best Practices.
+Impact: Medium(Time).
+#>
+
+  $f=Get-ADOptionalFeature 'Recycle Bin Feature' -ErrorAction Stop
+  $enabled=($f.EnabledScopes -ne $null -and $f.EnabledScopes.Count -gt 0)
+  if($enabled){ Write-Warning "[pass] AD Recycle Bin enabled" } else { Write-Warning "[notice] AD Recycle Bin is not enabled -- consider enabling it." }
+}
+
+function HealthTest-ReplicationLatency{
+<#
+.SYNOPSIS
+Checks Replication Latency and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+
+.DESCRIPTION
+Uses: Get-ADObject.
+AppliesTo: DC
+Scope: Domain
+Category: Configuration Hygiene & Best Practices.
+Impact: High(Time).
+#>
+
+  [CmdletBinding()] param([int]$MaxMinutes=30)
+  $parts=@((Get-ADRootDSE).schemaNamingContext,(Get-ADRootDSE).configurationNamingContext)
+  $anyFail=$false
+  foreach($dc in (Get-ADDomainController -Filter *)){
+    foreach($p in $parts){
+      $m=Get-ADReplicationPartnerMetadata -Target $dc.HostName -Partition $p -ErrorAction Stop
+      foreach($row in $m){
+        $mins = [int](((Get-Date)-$row.LastReplicationSuccess).TotalMinutes)
+        if($mins -gt $MaxMinutes){ $anyFail=$true; Write-Warning "[failure] Replication latency above threshold`n$($dc.HostName) partition '$p' latency=$mins min (Max=$MaxMinutes)" }
+      }
+    }
+  }
+  if(-not $anyFail){ Write-Warning "[pass] AD replication latency acceptable (<= $MaxMinutes min on schema/config)" }
+}
+
+function HealthTest-DomainARecordPointsToDcIp {
+<#
+.SYNOPSIS
+Checks Domain A Record Points To Dc Ip and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+
+.DESCRIPTION
+Uses: Get-WinEvent, Get-FirstLine, Test-ComputerSecureChannel, wevtutil.exe.
+AppliesTo: DC
+Scope: Domain
+Category: Security & Stability Risks.
+Impact: Medium(Time).
+#>
+
+  $cs = Get-CimInstance Win32_ComputerSystem
+  $role = $cs.DomainRole
+  $fn = $MyInvocation.MyCommand.Name
+  if ($role -in 0,2) { Write-Warning "[notice] This test ($fn) is not applicable to non-domain joined hosts"; return }
+  if ($role -in 4,5) { Write-Warning "[notice] This test ($fn) is not applicable to Domain Controllers"; return }
+  $dcIps = @($Global:GetComputerHealthDataQMTA.IpsOfAllDcs)
+
+  $domain = $cs.Domain
+  $ares = $null
+  try { $ares = Resolve-DnsName -Name $domain -Type A -ErrorAction Stop } catch {}
+  if (-not $ares) {
+    Write-Warning "[failure] No A records found for domain DNS name.`n$domain"
+    return
+  }
+
+  $aIps = @($ares | Where-Object { $_.IPAddress } | ForEach-Object { $_.IPAddress })
+  $intersection = @()
+  foreach ($ip in $aIps) { if ($dcIps -contains $ip) { $intersection += $ip } }
+
+  $comment = "Domain=$domain; DC IPs=" + ($dcIps -join ', ') + "; Domain A IPs=" + ($aIps -join ', ')
+  if ($intersection.Count -gt 0) {
+    Write-Warning ("[pass] Domain DNS name resolves to at least one DC IP.`n$comment")
+  } else {
+    Write-Warning ("[failure] Domain DNS name does not resolve to any known DC IPv4 address.`n$comment")
+  }
+}
+
+function HealthTest-NltestSiteDiscovery {
+<#
+.SYNOPSIS
+Checks Nltest Site Discovery and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+
+.DESCRIPTION
+Uses: Get-WinEvent, Get-FirstLine, Test-ComputerSecureChannel, wevtutil.exe.
+AppliesTo: All
+Scope: Computer
+Category: Configuration Hygiene & Best Practices.
+Impact: Medium(Time).
+#>
+
+  [CmdletBinding()] param()
+  $cs = Get-CimInstance Win32_ComputerSystem
+  $role = $cs.DomainRole
+  $fn = $MyInvocation.MyCommand.Name
+  if ($role -in 0,2) { Write-Warning "[notice] This test ($fn) is not applicable to non-domain joined hosts"; return }
+  if ($role -in 4,5) { Write-Warning "[notice] This test ($fn) is not applicable to Domain Controllers"; return }
+
+  $out  = nltest /dsgetsite 2>&1
+  $exit = $LASTEXITCODE
+  $txt  = ($out | Out-String).Trim()
+
+  if ($exit -eq 0 -and $txt -match 'The command completed successfully') {
+    $lines = $txt -split "`r?`n"
+    $site  = $null
+    foreach ($l in $lines) {
+      if (-not $site -and $l -and $l -notmatch 'The command completed successfully') {
+        $site = $l.Trim()
+        break
+      }
+    }
+    if (-not $site) { $site = '(unknown)' }
+    Write-Warning "[pass] NLTEST /dsgetsite succeeded.`nSite: $site"
+  } else {
+    $hex = '0x{0:X}' -f ($exit -band 0xFFFFFFFF)
+    Write-Warning "[failure] NLTEST /dsgetsite failed.`nExitCode=$hex; Output=`n$txt"
+  }
+}
+
+function HealthTest-GpupdatePolicyApply {
+<#
+.SYNOPSIS
+Checks Gpupdate Policy Apply and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+
+.DESCRIPTION
+Uses: Get-BitLockerVolume, Get-HotFix, Get-FirstLine, Get-WinEvent.
+AppliesTo: All
+Scope: Computer
+Category: Configuration Hygiene & Best Practices.
+Impact: Medium(Time).
+#>
+
+  [CmdletBinding()] param()
+  $cs   = Get-CimInstance Win32_ComputerSystem
+  $role = $cs.DomainRole
+  $fn   = $MyInvocation.MyCommand.Name
+  if ($role -in 0,2) { Write-Warning "[notice] This test ($fn) is not applicable to non-domain joined hosts"; return }
+  if ($role -in 4,5) { Write-Warning "[notice] This test ($fn) is not applicable to Domain Controllers"; return }
+
+
+  if (!(Test-ComputerSecureChannel)) {
+      Write-Warning "[warning] Can't connected to any Domain Controller. Can not run gpupdate.`nMake sure you are on the domain LAN or connected via VPN."
+    return
+  }
+
+  $id = [Security.Principal.WindowsIdentity]::GetCurrent()
+  $isSystem = $false
+  try {
+    if ($id -and $id.User -and $id.User.Value -eq 'S-1-5-18') { $isSystem = $true }
+  } catch {}
+
+  $out  = gpupdate 2>&1
+  $text = ($out | sls -notmatch '^ *$' | Out-String)
+
+  $compOk = ($text -like "*Computer Policy update has completed successfully*")
+  $userOk = ($text -like "*User Policy update has completed successfully*")
+
+  if ($compOk -and $userOk) {
+    Write-Warning "[pass] Computer and user policy updates completed successfully (gpupdate)."; return
+  }
+
+  if ($compOk) {
+    Write-Warning "[pass] Computer policy update completed successfully (gpupdate)."
+  } else {
+    Write-Warning ("[failure] Computer policy update did not report success.`ngpupdate output:`n" + $text)
+  }
+
+  if (-not $userOk) {
+    if ($isSystem) {
+      Write-Warning ("[notice] User policy update did not report success (gpupdate running under SYSTEM/non-interactive).`nThis can be expected when no interactive user is logged on.`nRaw gpupdate output:`n" + $text)
+    } else {
+      Write-Warning ("[failure] User policy update did not report success.`nExpected success for interactive user.`nRaw gpupdate output:`n" + $text)
+    }
+  } else {
+    Write-Warning "[pass] User policy update completed successfully (gpupdate)."
+  }
+}
+
+#--------------------------------------------------------
+# xxx new tests 20205-11-26
+
