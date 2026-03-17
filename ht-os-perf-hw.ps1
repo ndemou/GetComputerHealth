@@ -721,60 +721,6 @@ Impact: Medium(Time).
 }
 
 
-function HealthTest-SchemaVersionConsistency{
-<#
-.SYNOPSIS
-Checks Schema Version Consistency and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
-
-.DESCRIPTION
-Uses: Get-ADRootDSE, Get-ADReplicationPartnerMetadata, Get-ADOptionalFeature, Get-ADObject.
-AppliesTo: DC
-Scope: Forest
-Category: Configuration Hygiene & Best Practices.
-Impact: Medium(Time).
-#>
-
-  $schemaNC=(Get-ADRootDSE).schemaNamingContext
-  $vers=@{}; $errs=@()
-  foreach($dc in (Get-ADDomainController -Filter *)){
-    try{
-      $ov=(Get-ADObject -Identity $schemaNC -Server $dc.HostName -Properties objectVersion -ErrorAction Stop).objectVersion
-      if($null -eq $ov -or "$ov" -eq ''){
-        $msg="$($dc.HostName): objectVersion missing"; $errs+=$msg; Write-Warning "[failure] $($msg)"; continue
-      }
-      $ov=[int]("$ov".Trim()); $vers[$dc.HostName]=$ov
-    }catch{
-      $msg="$($dc.HostName): $($_.Exception.Message)"; $errs+=$msg; Write-Warning "[failure] $($msg)"
-    }
-  }
-
-  if($vers.Count -eq 0){
-    Write-Warning "[failure] $("AD schema version consistency")`n$(("No schema versions retrieved. Errors: "+($errs -join ' | ')))"
-    return
-  }
-
-  # Force array so .Count and [0] are always valid even when only one element
-  $distinct = @($vers.Values | Sort-Object -Unique)
-  $distinctCount = $distinct.Count
-
-  $perDc = ($vers.GetEnumerator() | Sort-Object Name | ForEach-Object { "$($_.Name)=$($_.Value)" }) -join '; '
-
-  $det = if ($distinctCount -eq 1) {
-    "SchemaVersion=$($distinct[0]); $perDc"
-  } else {
-    "Mismatch: "+($distinct -join ', ')+" | "+$perDc
-  }
-
-  if($errs){ $det += " | Errors: "+($errs -join ' | ') }
-
-  $pass = ($distinctCount -eq 1 -and $errs.Count -eq 0)
-
-  if($pass){
-    Write-Warning "[pass] AD schema version consistent across DCs ($det)"
-  } else {
-    Write-Warning "[failure] $("AD schema version consistent across DCs")`n$($det)"
-  }
-}
 
 function HealthTest-NtdsPathsLocation{
 <#
@@ -811,72 +757,8 @@ Impact: Medium(Time).
   if($dbOk -and $lgOk){ Write-Warning "[pass] NTDS database/log paths sane (DB=$db; LOGS=$lg)" }
 }
 
-function HealthTest-TombstoneLifetime{
-<#
-.SYNOPSIS
-Checks Tombstone Lifetime and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
-.DESCRIPTION
-Uses: Get-ADRootDSE, Get-ADReplicationPartnerMetadata, Get-ADOptionalFeature.
-AppliesTo: DC
-Scope: Domain
-Category: Configuration Hygiene & Best Practices.
-Impact: Medium(Time).
-#>
 
-  [CmdletBinding()] param([int]$MinDays=60)
-  $ds="CN=Directory Service,CN=Windows NT,CN=Services,$((Get-ADRootDSE).ConfigurationNamingContext)"
-  $tl=(Get-ADObject $ds -Properties tombstoneLifetime).tombstoneLifetime
-  if(-not $tl){$tl=60}
-  if($tl -ge $MinDays){ Write-Warning "[pass] AD tombstoneLifetime is sufficient ($tl days >= $MinDays)" }
-  else{ Write-Warning "[failure] AD tombstoneLifetime below threshold`nCurrent=$tl; Min=$MinDays" }
-}
-
-function HealthTest-RecycleBinEnabled{
-<#
-.SYNOPSIS
-Checks Recycle Bin Enabled and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
-
-.DESCRIPTION
-Uses: Get-ADObject, Get-ADRootDSE, Get-ADReplicationPartnerMetadata.
-AppliesTo: DC
-Scope: Domain
-Category: Configuration Hygiene & Best Practices.
-Impact: Medium(Time).
-#>
-
-  $f=Get-ADOptionalFeature 'Recycle Bin Feature' -ErrorAction Stop
-  $enabled=($f.EnabledScopes -ne $null -and $f.EnabledScopes.Count -gt 0)
-  if($enabled){ Write-Warning "[pass] AD Recycle Bin enabled" } else { Write-Warning "[notice] AD Recycle Bin is not enabled -- consider enabling it." }
-}
-
-function HealthTest-ReplicationLatency{
-<#
-.SYNOPSIS
-Checks Replication Latency and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
-
-.DESCRIPTION
-Uses: Get-ADObject.
-AppliesTo: DC
-Scope: Domain
-Category: Configuration Hygiene & Best Practices.
-Impact: High(Time).
-#>
-
-  [CmdletBinding()] param([int]$MaxMinutes=30)
-  $parts=@((Get-ADRootDSE).schemaNamingContext,(Get-ADRootDSE).configurationNamingContext)
-  $anyFail=$false
-  foreach($dc in (Get-ADDomainController -Filter *)){
-    foreach($p in $parts){
-      $m=Get-ADReplicationPartnerMetadata -Target $dc.HostName -Partition $p -ErrorAction Stop
-      foreach($row in $m){
-        $mins = [int](((Get-Date)-$row.LastReplicationSuccess).TotalMinutes)
-        if($mins -gt $MaxMinutes){ $anyFail=$true; Write-Warning "[failure] Replication latency above threshold`n$($dc.HostName) partition '$p' latency=$mins min (Max=$MaxMinutes)" }
-      }
-    }
-  }
-  if(-not $anyFail){ Write-Warning "[pass] AD replication latency acceptable (<= $MaxMinutes min on schema/config)" }
-}
 
 function HealthTest-RequiredSrvRecords{
 <#
