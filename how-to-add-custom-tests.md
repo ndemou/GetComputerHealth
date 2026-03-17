@@ -101,11 +101,11 @@ function HealthTest-Example {
 Checks if foo is of type bar
 
 .DESCRIPTION
-Uses: Get-FooType.
-AppliesTo: Domain Controllers.
-TestScope: Domain.
-Category: Primary: Availability / Server Down Signals; Secondary: Security & Stability Risks.
-Impact: Medium (Time/Network).
+Uses: Get-FooType
+AppliesTo: Domain Controllers
+TestScope: Computer
+Category: Availability / Server Down Signals, Security & Stability Risks.
+Impact: Medium(Time), High(Network)
 #>
   # ...
 }
@@ -117,14 +117,15 @@ Impact: Medium (Time/Network).
   
 For the `.DESCRIPTION` use plain text with one field per line in this exact order, so it is easy to lint with regex:
 
-1. `Uses:` major executables/cmdlets only (top 1-3)
-2. `AppliesTo:` host scope (All Windows / Server / DC / PDC / Laptop / etc.)
-3. `TestScope:` `Computer` or `Domain` or `Forest`
-4. `Category:` Primary + optional Secondary
-5. `Impact:` `Medium` or `High`, and include resource dimension only if not low (`CPU`, `Disk`, `Network`, `Time`)
-6. `FalsePositives:` short note (optional but strongly recommended)
+1. `AppliesTo:` Type of computer (One of: `All`, `VM`, `Mobile`, `DomainJoined`, `Server`, `Workstation`, `DC`, `PDC` )
+2. `TestScope:` `Computer`, `Domain`, `Forest`
+3. `Category:` Primary + optional Secondary (see below for list)
+4. `Impact:` `Medium` or `High`, and include resource dimension only if not low (`CPU`, `Disk`, `Network`, `Time`)
+5. `Uses:` List of up to three essential for the test external cmdlets/executables. E.g. Get-Services, Get-ADComputer,...
+  > This field is intended for essential dependency metadata, not implementation details. Include only essential external commands (e.g., `ipconfig.exe`, `Get-DnsServerZone`) that are both required to execute the test and return the core information that determines if the test passes. Do not list a) a function defined within this repository b) helper calls c) broad commands like `Get-Service`, or `Get-ADUser` unless they represent the **sole** essential dependency of the test. Avoid descriptive sentences. Use `Uses: None.` for empty dependencies.
+6. `FalsePositives:` short note (optional)
 
-Allowed baseline categories:
+Allowed values for `Category`:
 - `Availability / Server Down Signals`
 - `Security & Stability Risks`
 - `Configuration Hygiene & Best Practices`
