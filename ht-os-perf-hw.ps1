@@ -52,12 +52,11 @@ function HealthTest-TimeSyncPolicy {
 Checks Time Sync Policy and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: w32tm.exe, Get-ItemProperty, Get-Date.
-AppliesTo: All Windows hosts.
-TestScope: Computer.
-Category: Primary: Configuration Hygiene & Best Practices.
-Impact: Medium.
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: w32tm.exe.
+AppliesTo: All
+Scope: Computer
+Category: Configuration Hygiene & Best Practices.
+Impact: Medium(Time).
 #>
     [CmdletBinding()]
     param()
@@ -330,12 +329,11 @@ function HealthTest-UpdateAge {
 Checks Update Age and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: PowerShell cmdlets used by this test.
-AppliesTo: All Windows hosts.
-TestScope: Computer.
-Category: Primary: Configuration Hygiene & Best Practices.
-Impact: Medium.
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-AvailMB, Get-Counter, Start-Sleep, Get-WindowsFeature, Get-Website, Get-WebBinding.
+AppliesTo: All
+Scope: Computer
+Category: Configuration Hygiene & Best Practices.
+Impact: Medium(Time).
 #>
 
     param([int]$WarnDays=30,[int]$FailDays=45)
@@ -360,12 +358,11 @@ function HealthTest-CertExpiry {
 Checks Cert Expiry and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: Get-ChildItem Cert:\, Get-TlsCipherSuite, registry TLS settings.
-AppliesTo: All Windows hosts.
-TestScope: Computer.
-Category: Primary: Configuration Hygiene & Best Practices.
-Impact: Medium.
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-SmbShare, Get-SmbShareAccess, Get-Acl, Get-SmbServerConfiguration, Set-SmbServerConfiguration, Get-AvailMB, Get-Counter, Start-Sleep, Get-WindowsFeature, Get-Website, Get-WebBinding.
+AppliesTo: All
+Scope: Computer
+Category: Configuration Hygiene & Best Practices.
+Impact: Medium(Time).
 #>
 
     param([int]$WarnDays=60,[int]$FailDays=30)
@@ -396,12 +393,11 @@ function HealthTest-IisBindings {
 Checks Iis Bindings and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: Get-WebBinding, Get-Website, WebAdministration module.
-AppliesTo: Windows servers with IIS role installed.
-TestScope: Computer.
-Category: Primary: Configuration Hygiene & Best Practices.
-Impact: Medium.
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-ADRootDSE, Get-ADObject, Get-SmbShare, Get-SmbShareAccess, Get-Acl, Get-SmbServerConfiguration, Set-SmbServerConfiguration, Get-AvailMB, Get-Counter, Start-Sleep.
+AppliesTo: Server
+Scope: Computer
+Category: Configuration Hygiene & Best Practices.
+Impact: Medium(Time).
 #>
 
     # Skip test on workstations
@@ -445,12 +441,11 @@ function HealthTest-RamPressure {
 Checks Ram Pressure and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: PowerShell cmdlets used by this test.
-AppliesTo: All Windows hosts.
-TestScope: Computer.
-Category: Primary: Configuration Hygiene & Best Practices.
-Impact: Medium.
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-ADRootDSE, Get-ADObject, Get-SmbShare, Get-SmbShareAccess, Get-Acl, Get-SmbServerConfiguration, Set-SmbServerConfiguration.
+AppliesTo: All
+Scope: Computer
+Category: Configuration Hygiene & Best Practices.
+Impact: Medium(Time).
 #>
 
   [CmdletBinding()]
@@ -510,12 +505,11 @@ function HealthTest-ShareReasonableness {
 Checks Share Reasonableness and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: PowerShell cmdlets used by this test.
-AppliesTo: All Windows hosts.
-TestScope: Computer.
-Category: Primary: Configuration Hygiene & Best Practices.
-Impact: Medium.
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-ADRootDSE, Get-ADObject.
+AppliesTo: All
+Scope: Computer
+Category: Configuration Hygiene & Best Practices.
+Impact: Medium(Time).
 #>
 
   [CmdletBinding()]param(
@@ -703,12 +697,11 @@ function HealthTest-DisksHaveFreeSpace {
 Checks Disks Have Free Space and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: Get-CimInstance, Get-Volume, chkdsk.exe.
-AppliesTo: All Windows hosts.
-TestScope: Computer.
-Category: Primary: Configuration Hygiene & Best Practices.
-Impact: Medium.
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-ADOptionalFeature, Get-ADRootDSE, Get-ADObject.
+AppliesTo: All
+Scope: Computer
+Category: Configuration Hygiene & Best Practices.
+Impact: Medium(Time).
 #>
 
     foreach ($d in [System.IO.DriveInfo]::GetDrives()) {
@@ -734,12 +727,11 @@ function HealthTest-SchemaVersionConsistency{
 Checks Schema Version Consistency and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: PowerShell cmdlets used by this test.
-AppliesTo: Domain Controllers (or domain management hosts with required RSAT tools).
-TestScope: Forest.
-Category: Primary: Configuration Hygiene & Best Practices.
-Impact: Medium.
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-ADRootDSE, Get-ADReplicationPartnerMetadata, Get-ADOptionalFeature, Get-ADObject.
+AppliesTo: DC
+Scope: Forest
+Category: Configuration Hygiene & Best Practices.
+Impact: Medium(Time).
 #>
 
   $schemaNC=(Get-ADRootDSE).schemaNamingContext
@@ -790,12 +782,11 @@ function HealthTest-NtdsPathsLocation{
 Checks Ntds Paths Location and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: PowerShell cmdlets used by this test.
-AppliesTo: All Windows hosts.
-TestScope: Computer.
-Category: Primary: Security & Stability Risks.
-Impact: Medium.
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-ADRootDSE, Get-ADReplicationPartnerMetadata, Get-ADOptionalFeature, Get-ADObject.
+AppliesTo: All
+Scope: Computer
+Category: Security & Stability Risks.
+Impact: Medium(Time).
 #>
 
   [CmdletBinding()]
@@ -826,12 +817,11 @@ function HealthTest-TombstoneLifetime{
 Checks Tombstone Lifetime and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: w32tm.exe, Get-ItemProperty, Get-Date.
-AppliesTo: Domain Controllers (or domain management hosts with required RSAT tools).
-TestScope: Domain.
-Category: Primary: Configuration Hygiene & Best Practices.
-Impact: Medium.
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-ADRootDSE, Get-ADReplicationPartnerMetadata, Get-ADOptionalFeature.
+AppliesTo: DC
+Scope: Domain
+Category: Configuration Hygiene & Best Practices.
+Impact: Medium(Time).
 #>
 
   [CmdletBinding()] param([int]$MinDays=60)
@@ -848,12 +838,11 @@ function HealthTest-RecycleBinEnabled{
 Checks Recycle Bin Enabled and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: PowerShell cmdlets used by this test.
-AppliesTo: Domain Controllers (or domain management hosts with required RSAT tools).
-TestScope: Domain.
-Category: Primary: Configuration Hygiene & Best Practices.
-Impact: Medium.
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-ADObject, Get-ADRootDSE, Get-ADReplicationPartnerMetadata.
+AppliesTo: DC
+Scope: Domain
+Category: Configuration Hygiene & Best Practices.
+Impact: Medium(Time).
 #>
 
   $f=Get-ADOptionalFeature 'Recycle Bin Feature' -ErrorAction Stop
@@ -867,12 +856,11 @@ function HealthTest-ReplicationLatency{
 Checks Replication Latency and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: repadmin.exe, Get-ADReplication cmdlets, Get-ADDomainController.
-AppliesTo: Domain Controllers (or domain management hosts with required RSAT tools).
-TestScope: Domain.
-Category: Primary: Configuration Hygiene & Best Practices.
-Impact: High (Time/CPU/Network may increase on large environments).
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-ADObject.
+AppliesTo: DC
+Scope: Domain
+Category: Configuration Hygiene & Best Practices.
+Impact: High(Time).
 #>
 
   [CmdletBinding()] param([int]$MaxMinutes=30)
@@ -896,12 +884,11 @@ function HealthTest-RequiredSrvRecords{
 Checks Required Srv Records and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: PowerShell cmdlets used by this test.
-AppliesTo: All Windows hosts.
-TestScope: Computer.
-Category: Primary: Configuration Hygiene & Best Practices.
-Impact: Medium.
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-ADObject.
+AppliesTo: All
+Scope: Computer
+Category: Configuration Hygiene & Best Practices.
+Impact: Medium(Time).
 #>
 
   $dom=(Get-CimInstance Win32_ComputerSystem).Domain
@@ -920,12 +907,11 @@ function HealthTest-LdapSigningChannelBinding {
 Checks Ldap Signing Channel Binding and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: PowerShell cmdlets used by this test.
-AppliesTo: Domain Controllers (or domain management hosts with required RSAT tools).
-TestScope: Domain.
-Category: Primary: Configuration Hygiene & Best Practices.
-Impact: Medium.
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-ADObject.
+AppliesTo: DC
+Scope: Domain
+Category: Configuration Hygiene & Best Practices.
+Impact: Medium(Time).
 #>
 
     $p = 'HKLM:\SYSTEM\CurrentControlSet\Services\NTDS\Parameters'
@@ -961,12 +947,11 @@ function HealthTest-UnconstrainedDelegationAccounts{
 Checks Unconstrained Delegation Accounts and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: PowerShell cmdlets used by this test.
-AppliesTo: All Windows hosts.
-TestScope: Computer.
-Category: Primary: Security & Stability Risks.
-Impact: Medium.
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-ADObject.
+AppliesTo: All
+Scope: Computer
+Category: Security & Stability Risks.
+Impact: Medium(Time).
 #>
 
   [CmdletBinding()] param([switch]$IncludeDomainControllers)
@@ -1024,12 +1009,11 @@ function HealthTest-DuplicateSpn{
 Checks Duplicate Spn and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: PowerShell cmdlets used by this test.
-AppliesTo: Domain Controllers (or domain management hosts with required RSAT tools).
-TestScope: Domain.
-Category: Primary: Configuration Hygiene & Best Practices.
-Impact: Medium.
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-ADDomainController.
+AppliesTo: DC
+Scope: Domain
+Category: Configuration Hygiene & Best Practices.
+Impact: Medium(Time).
 #>
 
   $objs = Get-ADObject -LDAPFilter "(servicePrincipalName=*)" -Properties servicePrincipalName,sAMAccountName,distinguishedName -ErrorAction Stop
@@ -1062,12 +1046,11 @@ function HealthTest-GcPlacement{
 Checks Gc Placement and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: PowerShell cmdlets used by this test.
-AppliesTo: Domain Controllers (or domain management hosts with required RSAT tools).
-TestScope: Domain.
-Category: Primary: Configuration Hygiene & Best Practices.
-Impact: Medium.
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-Tpm, w32tm.exe.
+AppliesTo: DC
+Scope: Domain
+Category: Configuration Hygiene & Best Practices.
+Impact: Medium(Time).
 #>
 
   [CmdletBinding()] param([switch]$AtLeastOnePerSite=$true)
@@ -1155,12 +1138,11 @@ function HealthTest-SoftwareLicensing{
 Checks Software Licensing and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: PowerShell cmdlets used by this test.
-AppliesTo: All Windows hosts.
-TestScope: Computer.
-Category: Primary: Audit / Compliance / Informational.
-Impact: Medium.
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-Tpm, chkdsk.exe.
+AppliesTo: All
+Scope: Computer
+Category: Audit / Compliance / Informational.
+Impact: Medium(Time).
 #>
 
     Get-SoftwareLicensing | %{
@@ -1175,12 +1157,11 @@ function HealthTest-IsTPMActivated {
 Checks Is TPM Activated and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: Get-Tpm/Get-BitLockerVolume, certutil.exe, Get-CimInstance.
-AppliesTo: Laptops/mobile-capable Windows devices.
-TestScope: Computer.
-Category: Primary: Configuration Hygiene & Best Practices.
-Impact: Medium.
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: chkdsk.exe.
+AppliesTo: Mobile
+Scope: Computer
+Category: Configuration Hygiene & Best Practices.
+Impact: Medium(Time).
 #>
 
   Write-BasedOnTestResult "Is TPM Activated?" -Test (Get-Tpm).TpmActivated
@@ -1197,12 +1178,11 @@ function HealthTest-TimeSyncAccuracy {
 Checks Time Sync Accuracy and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: w32tm.exe, Get-ItemProperty, Get-Date.
-AppliesTo: All Windows hosts.
-TestScope: Computer.
-Category: Primary: Configuration Hygiene & Best Practices.
-Impact: Medium.
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-WinEvent, Get-PhysicalDisk, Get-StorageReliabilityCounter, chkdsk.exe.
+AppliesTo: All
+Scope: Computer
+Category: Configuration Hygiene & Best Practices.
+Impact: Medium(Time).
 #>
 
   param(
@@ -1282,12 +1262,11 @@ function HealthTest-PagefileSanity{
 Checks Pagefile Sanity and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: Get-CimInstance, Get-Volume, chkdsk.exe.
-AppliesTo: All Windows hosts.
-TestScope: Computer.
-Category: Primary: Configuration Hygiene & Best Practices.
-Impact: Medium.
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-WinEvent, Get-PhysicalDisk, Get-StorageReliabilityCounter, chkdsk.exe.
+AppliesTo: All
+Scope: Computer
+Category: Configuration Hygiene & Best Practices.
+Impact: Medium(Time).
 #>
   [CmdletBinding()] param([int]$MinMB=1024,[switch]$RequireOnSystemDrive)
   $cs   = Get-CimInstance Win32_ComputerSystem -ErrorAction Stop
@@ -1337,12 +1316,11 @@ function HealthTest-Storage {
 Checks Storage and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: Get-CimInstance, Get-Volume, chkdsk.exe.
-AppliesTo: All Windows hosts.
-TestScope: Computer.
-Category: Primary: Configuration Hygiene & Best Practices.
-Impact: High (Time/CPU/Network may increase on large environments).
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-WinEvent, wevtutil.exe.
+AppliesTo: All
+Scope: Computer
+Category: Configuration Hygiene & Best Practices.
+Impact: High(Time).
 #>
     [CmdletBinding()]
     param([int]$MaxTemperatureC = 70,[int]$MaxPercentUsed = 95)
@@ -1418,12 +1396,11 @@ function HealthTest-NtfsDirtyBit {
 Checks Ntfs Dirty Bit and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: Get-CimInstance, Get-Volume, chkdsk.exe.
-AppliesTo: All Windows hosts.
-TestScope: Computer.
-Category: Primary: Configuration Hygiene & Best Practices.
-Impact: Medium.
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-WinEvent, wevtutil.exe.
+AppliesTo: All
+Scope: Computer
+Category: Configuration Hygiene & Best Practices.
+Impact: Medium(Time).
 #>
     $dirty = @()
     $drives = Get-Volume -FileSystem NTFS -ErrorAction SilentlyContinue
@@ -1441,12 +1418,11 @@ function HealthTest-RecentDiskErrors {
 Checks Recent Disk Errors and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: Get-CimInstance, Get-Volume, chkdsk.exe.
-AppliesTo: All Windows hosts.
-TestScope: Computer.
-Category: Primary: Configuration Hygiene & Best Practices.
-Impact: High (Time/CPU/Network may increase on large environments).
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-WinEvent, wevtutil.exe.
+AppliesTo: All
+Scope: Computer
+Category: Configuration Hygiene & Best Practices.
+Impact: High(Time).
 #>
     param([int]$Hours = 48)
 
@@ -1564,12 +1540,11 @@ function HealthTest-EventLogMaxSizes{
 Checks Event Log Max Sizes and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: Get-WinEvent, Get-ItemProperty, wevtutil.exe.
-AppliesTo: All Windows hosts.
-TestScope: Computer.
-Category: Primary: Configuration Hygiene & Best Practices; Secondary: Audit / Compliance / Informational.
-Impact: Medium (primarily Time/Network).
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-WinEvent, wevtutil.exe.
+AppliesTo: All
+Scope: Computer
+Category: Configuration Hygiene & Best Practices, Audit / Compliance / Informational.
+Impact: Medium(Network).
 #>
   [CmdletBinding()]
   param([hashtable]$OverrideMinSizesMB)

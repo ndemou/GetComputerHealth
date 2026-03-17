@@ -8,12 +8,11 @@ function HealthTest-Dummy {
 Checks Dummy and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: PowerShell cmdlets used by this test.
-AppliesTo: All Windows hosts.
-TestScope: Computer.
-Category: Primary: Audit / Compliance / Informational.
-Impact: Medium.
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Write-Output.
+AppliesTo: All
+Scope: Computer
+Category: Audit / Compliance / Informational.
+Impact: Medium(Time).
 #>
     Write-Output "Dummy debug message"
     Write-Warning "[info] Dummy info message"
