@@ -101,11 +101,11 @@ function HealthTest-Example {
 Checks if foo is of type bar
 
 .DESCRIPTION
-Uses: Get-FooType
-AppliesTo: Domain Controllers
-TestScope: Computer
+AppliesTo: DC
+Scope: Computer
 Category: Availability / Server Down Signals, Security & Stability Risks.
 Impact: Medium(Time), High(Network)
+Uses: Get-FooType
 #>
   # ...
 }
@@ -118,7 +118,7 @@ Impact: Medium(Time), High(Network)
 For the `.DESCRIPTION` use plain text with one field per line in this exact order, so it is easy to lint with regex:
 
 1. `AppliesTo:` Type of computer (One of: `All`, `VM`, `Mobile`, `DomainJoined`, `Server`, `Workstation`, `DC`, `PDC` )
-2. `TestScope:` `Computer`, `Domain`, `Forest`
+2. `Scope:` `Computer`, `Domain`, `Forest`
 3. `Category:` Primary + optional Secondary (see below for list)
 4. `Impact:` `Medium` or `High`, and include resource dimension only if not low (`CPU`, `Disk`, `Network`, `Time`)
 5. `Uses:` List of up to three essential for the test external cmdlets/executables. E.g. Get-Services, Get-ADComputer,...
