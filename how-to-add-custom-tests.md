@@ -2,80 +2,6 @@
 
 These instrunction are also valid for contributing health tests in the core library. The only difference is that ps1 scripts for custom tests are stored in a special folder.
 
-## Required help-block format for every `HealthTest-*` function
-
-Every `HealthTest-*` function must include an **in-function** comment-based help block immediately after the opening `{`.
-
-### Position (required)
-
-Use this placement:
-
-```powershell
-function HealthTest-Example {
-<#
-.SYNOPSIS
-...
-
-.DESCRIPTION
-...
-#>
-  # test code
-}
-```
-
-Do **not** place this help block above the `function` line.
-
-### Sections and limits (required)
-
-- `.SYNOPSIS` is mandatory and must be **<= 320 characters**.
-- `.DESCRIPTION` is mandatory and must be **<= 900 characters**.
-- Do not add `.PARAMETER`, `.OUTPUTS`, `.EXAMPLE`, or any other help sections for `HealthTest-*` functions.
-
-### `.SYNOPSIS` content rules
-
-The synopsis must explain:
-- what the test detects/checks, and
-- the key signal logic used to decide healthy vs unhealthy.
-
-It should be concrete and specific to the test, not a generic placeholder sentence.
-
-### `.DESCRIPTION` mini-schema (required order)
-
-Use plain text with one field per line in this exact order, so it is easy to lint with regex:
-
-1. `Uses:` major executables/cmdlets only (top 1-3)
-2. `AppliesTo:` host scope (All Windows / Server / DC / PDC / Laptop / etc.)
-3. `TestScope:` `Computer` or `Domain` or `Forest`
-4. `Category:` Primary + optional Secondary
-5. `Impact:` `Medium` or `High`, and include resource dimension only if not low (`CPU`, `Disk`, `Network`, `Time`)
-6. `FalsePositives:` short note (optional but strongly recommended)
-
-Allowed baseline categories:
-- `Availability / Server Down Signals`
-- `Security & Stability Risks`
-- `Configuration Hygiene & Best Practices`
-- `Audit / Compliance / Informational`
-
-### Example
-
-```powershell
-function HealthTest-Example {
-<#
-.SYNOPSIS
-Checks whether AD replication to this DC is stale by comparing latest successful partner replication timestamps against warning and failure age thresholds.
-
-.DESCRIPTION
-Uses: Get-ADReplicationPartnerMetadata, repadmin.exe, Get-Date.
-AppliesTo: Domain Controllers.
-TestScope: Domain.
-Category: Primary: Availability / Server Down Signals; Secondary: Security & Stability Risks.
-Impact: Medium (Time/Network).
-FalsePositives: Planned maintenance windows or isolated lab links can appear stale.
-#>
-  # ...
-}
-```
-
 ## TL;DR
 
 `.ps1` files in `C:\IT\config\Custom-HealthTests\` are dot-sourced, all functions with a name starting with `HealthTest-` are executed, and these functions should call either `Write-Warning "[pass] $message"` if all is well or `Write-Warning "[failure] $message` or `Write-Warning "[failure] $message" + [Environment]::NewLine + "$optionalDetails"`. The code you write will be executed with *high privileges* and appart from temporary files or similar, it *should not make any changes* to the system state.
@@ -93,6 +19,8 @@ FalsePositives: Planned maintenance windows or isolated lab links can appear sta
    # It outputs either information for a passed test or findings using  Write-Warning.
    function HealthTest-LargeDirectories {
        $issueFound = $false
+       # Don't bother catching exceptions if you can't work around them.
+       # The caller catches and reports them nicely.
        foreach ($dir in Find-LargeDirectory -Path 'C:\' -Threshold 10000) {
            $issueFound = $true
 
@@ -158,6 +86,48 @@ Available properties include these self-documenting booleans:
 - `.isHostPDC`
 
 And `.GetCurrentDomain = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain()`
+
+## Required help-block format for every `HealthTest-*` function
+
+Every `HealthTest-*` function must include an **in-function** comment-based help block immediately after the opening `{`.
+
+### Example
+
+```powershell
+function HealthTest-Example {
+<#
+.SYNOPSIS
+Checks if foo is of type bar
+
+.DESCRIPTION
+Uses: Get-FooType.
+AppliesTo: Domain Controllers.
+TestScope: Domain.
+Category: Primary: Availability / Server Down Signals; Secondary: Security & Stability Risks.
+Impact: Medium (Time/Network).
+#>
+  # ...
+}
+```
+
+- `.SYNOPSIS` is mandatory and must be **<= 320 characters**. It must explain what the test detects/checks, and the key signal logic used to decide healthy vs unhealthy.
+- `.DESCRIPTION` is mandatory and must be **<= 900 characters**.
+- Do not add any other help sections (e.g. `.PARAMETER`, `.OUTPUTS`, `.EXAMPLE`).
+  
+For the `.DESCRIPTION` use plain text with one field per line in this exact order, so it is easy to lint with regex:
+
+1. `Uses:` major executables/cmdlets only (top 1-3)
+2. `AppliesTo:` host scope (All Windows / Server / DC / PDC / Laptop / etc.)
+3. `TestScope:` `Computer` or `Domain` or `Forest`
+4. `Category:` Primary + optional Secondary
+5. `Impact:` `Medium` or `High`, and include resource dimension only if not low (`CPU`, `Disk`, `Network`, `Time`)
+6. `FalsePositives:` short note (optional but strongly recommended)
+
+Allowed baseline categories:
+- `Availability / Server Down Signals`
+- `Security & Stability Risks`
+- `Configuration Hygiene & Best Practices`
+- `Audit / Compliance / Informational`
 
 # Instructions for LLMs helping a novice write a custom test.
 
