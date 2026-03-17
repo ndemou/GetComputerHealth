@@ -8,12 +8,11 @@ function HealthTest-ScheduledTasks {
 Checks Scheduled Tasks and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: Get-ScheduledTask, schtasks.exe, Task Scheduler APIs.
-AppliesTo: All Windows hosts.
-TestScope: Computer.
-Category: Primary: Configuration Hygiene & Best Practices.
-Impact: High (Time/CPU/Network may increase on large environments).
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-ScheduledTask, Get-ScheduledTaskInfo, schtasks.exe.
+AppliesTo: All
+Scope: Computer
+Category: Configuration Hygiene & Best Practices.
+Impact: High(Time).
 #>
     $task_name_paterns_to_ignore = @(
       'OneDrive Per-Machine Standalone Update Task*',
@@ -94,12 +93,11 @@ function HealthTest-SystemScheduledTasks{
 Checks System Scheduled Tasks and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: Get-ScheduledTask, schtasks.exe, Task Scheduler APIs.
-AppliesTo: All Windows hosts.
-TestScope: Computer.
-Category: Primary: Configuration Hygiene & Best Practices.
-Impact: High (Time/CPU/Network may increase on large environments).
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-ScheduledTask, schtasks.exe.
+AppliesTo: All
+Scope: Computer
+Category: Configuration Hygiene & Best Practices.
+Impact: High(Time).
 #>
   [CmdletBinding()] param(
     [string[]]$MustBeEnabled = @(),  # exact paths or regex
@@ -320,12 +318,11 @@ function HealthTest-ScheduledTasksLastResult {
 Checks Scheduled Tasks Last Result and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: Get-ScheduledTask, schtasks.exe, Task Scheduler APIs.
-AppliesTo: All Windows hosts.
-TestScope: Computer.
-Category: Primary: Configuration Hygiene & Best Practices.
-Impact: High (Time/CPU/Network may increase on large environments).
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-ScheduledTask, schtasks.exe.
+AppliesTo: All
+Scope: Computer
+Category: Configuration Hygiene & Best Practices.
+Impact: High(Time).
 #>
   $mapHresult = @{
     0x40010004=@{d='Process terminated externally'}

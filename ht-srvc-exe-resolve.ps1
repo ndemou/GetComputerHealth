@@ -747,12 +747,11 @@ function HealthTest-AutoStartServicesRunning {
 Checks Auto Start Services Running and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: Get-Service, Get-CimInstance Win32_Service, registry startup keys.
-AppliesTo: All Windows hosts.
-TestScope: Computer.
-Category: Primary: Configuration Hygiene & Best Practices.
-Impact: Medium.
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: None.
+AppliesTo: All
+Scope: Computer
+Category: Configuration Hygiene & Best Practices.
+Impact: Medium(Time).
 #>
   function Get-ServiceExitCodeMessage {
       param([int]$ExitCode)
@@ -841,12 +840,11 @@ function HealthTest-NonMicrosoftServices {
 Checks Non Microsoft Services and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: Get-Service, Get-CimInstance Win32_Service, registry startup keys.
-AppliesTo: All Windows hosts.
-TestScope: Computer.
-Category: Primary: Configuration Hygiene & Best Practices.
-Impact: Medium.
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: None.
+AppliesTo: All
+Scope: Computer
+Category: Configuration Hygiene & Best Practices.
+Impact: Medium(Time).
 #>
     $ok = $true
     $CORE_MICROSOFT_VENDORS = @('Microsoft Windows','Microsoft Windows Publisher','Microsoft Corporation','Microsoft Windows Hardware Compatibility Publisher')
@@ -878,12 +876,11 @@ function HealthTest-ServiceAccountsPwdNeverExpires{
 Checks Service Accounts Pwd Never Expires and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: Get-Service, Get-CimInstance Win32_Service, registry startup keys.
-AppliesTo: All Windows hosts.
-TestScope: Computer.
-Category: Primary: Configuration Hygiene & Best Practices.
-Impact: Medium.
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: None.
+AppliesTo: All
+Scope: Computer
+Category: Configuration Hygiene & Best Practices.
+Impact: Medium(Time).
 #>
   $filter='(servicePrincipalName=*)'
   $objs=Get-ADUser -LDAPFilter $filter -Properties PasswordNeverExpires,PasswordLastSet

@@ -140,12 +140,11 @@ function HealthTest-RecentWindowsScan {
 Checks Recent Windows Scan and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: PowerShell cmdlets used by this test.
-AppliesTo: All Windows hosts.
-TestScope: Computer.
-Category: Primary: Configuration Hygiene & Best Practices.
-Impact: Medium.
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-WindowsOptionalFeature, Get-NetFirewallProfile, Get-MpComputerStatus, Get-EffState.
+AppliesTo: All
+Scope: Computer
+Category: Configuration Hygiene & Best Practices.
+Impact: Medium(Time).
 #>
     $MAX_WARN_DAYS = 4
     $MAX_FAILURE_DAYS = 8
@@ -184,12 +183,11 @@ function HealthTest-SchanelBaseline{
 Checks Schanel Baseline and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: PowerShell cmdlets used by this test.
-AppliesTo: All Windows hosts.
-TestScope: Computer.
-Category: Primary: Audit / Compliance / Informational.
-Impact: Medium.
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-WindowsOptionalFeature, Get-NetFirewallProfile, Get-MpComputerStatus.
+AppliesTo: All
+Scope: Computer
+Category: Audit / Compliance / Informational.
+Impact: Medium(Time).
 #>
   $base='HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols'
   function Get-EffState($proto,$role){
@@ -251,12 +249,11 @@ function HealthTest-DefenderStatus {
 Checks Defender Status and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: Get-MpComputerStatus, Get-MpPreference, Windows Security cmdlets.
-AppliesTo: All Windows hosts.
-TestScope: Computer.
-Category: Primary: Security & Stability Risks.
-Impact: Medium.
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-WindowsOptionalFeature, Get-NetFirewallProfile, vssadmin.exe.
+AppliesTo: All
+Scope: Computer
+Category: Security & Stability Risks.
+Impact: Medium(Time).
 #>
     param([int]$WarnSigAgeDays=2,[int]$FailSigAgeDays=7)
     $s = Get-MpComputerStatus
@@ -280,12 +277,11 @@ function HealthTest-FirewallEnabled {
 Checks Firewall Enabled and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: PowerShell cmdlets used by this test.
-AppliesTo: All Windows hosts.
-TestScope: Computer.
-Category: Primary: Security & Stability Risks.
-Impact: Medium.
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-PnpDevice, Get-PnpDeviceProperty, Get-AuthenticodeSignature, Split-Path, Get-WindowsOptionalFeature.
+AppliesTo: All
+Scope: Computer
+Category: Security & Stability Risks.
+Impact: Medium(Time).
 #>
     Write-BasedOnTestResult "Is mpssvc (the firewall service) enabled?" -Test ((Get-Service -name mpssvc).status -eq 'Running')
     Get-NetFirewallProfile | ForEach-Object {
@@ -300,12 +296,11 @@ function HealthTest-Smb1Disabled{
 Checks Smb 1 Disabled and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: PowerShell cmdlets used by this test.
-AppliesTo: All Windows hosts.
-TestScope: Computer.
-Category: Primary: Security & Stability Risks.
-Impact: Medium.
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-PnpDevice, Get-PnpDeviceProperty, Get-AuthenticodeSignature, Split-Path.
+AppliesTo: All
+Scope: Computer
+Category: Security & Stability Risks.
+Impact: Medium(Time).
 #>
   $f=Get-WindowsOptionalFeature -Online -FeatureName SMB1Protocol -ErrorAction SilentlyContinue
   $state=$f.State
@@ -319,12 +314,11 @@ function HealthTest-WmiRepository{
 Checks Wmi Repository and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: PowerShell cmdlets used by this test.
-AppliesTo: All Windows hosts.
-TestScope: Computer.
-Category: Primary: Configuration Hygiene & Best Practices.
-Impact: Medium.
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-PnpDevice, Get-PnpDeviceProperty, Get-AuthenticodeSignature, Split-Path.
+AppliesTo: All
+Scope: Computer
+Category: Configuration Hygiene & Best Practices.
+Impact: Medium(Time).
 #>
   $out=& winmgmt /verifyrepository 2>&1
   $ok=($out -match 'consistent')
@@ -338,12 +332,11 @@ function HealthTest-VssWriters{
 Checks Vss Writers and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: Get-CimInstance, Get-Volume, chkdsk.exe.
-AppliesTo: All Windows hosts.
-TestScope: Computer.
-Category: Primary: Configuration Hygiene & Best Practices.
-Impact: Medium.
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-PnpDevice, Get-PnpDeviceProperty, Get-AuthenticodeSignature, Split-Path.
+AppliesTo: All
+Scope: Computer
+Category: Configuration Hygiene & Best Practices.
+Impact: Medium(Time).
 #>
   $out=& vssadmin list writers 2>&1
   $bad=($out | Select-String -Pattern 'State: \d+ \((?i:Retryable error|Waiting for completion|Failed)\)')
@@ -359,12 +352,11 @@ function HealthTest-UnsignedDrivers {
 Checks Unsigned Drivers and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: PowerShell cmdlets used by this test.
-AppliesTo: All Windows hosts.
-TestScope: Computer.
-Category: Primary: Security & Stability Risks.
-Impact: Medium.
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: nltest.exe.
+AppliesTo: All
+Scope: Computer
+Category: Security & Stability Risks.
+Impact: Medium(Time).
 #>
   [CmdletBinding()]
   param([string[]]$WhitelistDeviceIdRegex = @('^BTHENUM\\'))
@@ -470,12 +462,11 @@ function HealthTest-NtdsLogVolumeFree{
 Checks Ntds Log Volume Free and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: Get-CimInstance, Get-Volume, chkdsk.exe.
-AppliesTo: All Windows hosts.
-TestScope: Computer.
-Category: Primary: Configuration Hygiene & Best Practices.
-Impact: Medium.
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: nltest.exe.
+AppliesTo: All
+Scope: Computer
+Category: Configuration Hygiene & Best Practices.
+Impact: Medium(Time).
 #>
 
   [CmdletBinding()] param([int]$MinFreeGB=5)
@@ -503,12 +494,11 @@ function HealthTest-GpWmiFiltersNamespaces{
 Checks Gp Wmi Filters Namespaces and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: PowerShell cmdlets used by this test.
-AppliesTo: All Windows hosts.
-TestScope: Computer.
-Category: Primary: Configuration Hygiene & Best Practices.
-Impact: Medium.
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Test-ComputerSecureChannel.
+AppliesTo: All
+Scope: Computer
+Category: Configuration Hygiene & Best Practices.
+Impact: Medium(Time).
 #>
 
   $bad=$false
@@ -606,12 +596,11 @@ function HealthTest-DomainARecordPointsToDcIp {
 Checks Domain A Record Points To Dc Ip and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: PowerShell cmdlets used by this test.
-AppliesTo: Domain Controllers (or domain management hosts with required RSAT tools).
-TestScope: Domain.
-Category: Primary: Security & Stability Risks.
-Impact: Medium.
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-WinEvent, Get-FirstLine, Test-ComputerSecureChannel, wevtutil.exe.
+AppliesTo: DC
+Scope: Domain
+Category: Security & Stability Risks.
+Impact: Medium(Time).
 #>
 
   $cs = Get-CimInstance Win32_ComputerSystem
@@ -648,12 +637,11 @@ function HealthTest-NltestSiteDiscovery {
 Checks Nltest Site Discovery and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: nltest.exe, Get-ADDomainController, Resolve-DnsName.
-AppliesTo: All Windows hosts.
-TestScope: Computer.
-Category: Primary: Configuration Hygiene & Best Practices.
-Impact: Medium.
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-WinEvent, Get-FirstLine, Test-ComputerSecureChannel, wevtutil.exe.
+AppliesTo: All
+Scope: Computer
+Category: Configuration Hygiene & Best Practices.
+Impact: Medium(Time).
 #>
 
   [CmdletBinding()] param()
@@ -690,12 +678,11 @@ function HealthTest-GpupdatePolicyApply {
 Checks Gpupdate Policy Apply and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: PowerShell cmdlets used by this test.
-AppliesTo: All Windows hosts.
-TestScope: Computer.
-Category: Primary: Configuration Hygiene & Best Practices.
-Impact: Medium.
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-BitLockerVolume, Get-HotFix, Get-FirstLine, Get-WinEvent.
+AppliesTo: All
+Scope: Computer
+Category: Configuration Hygiene & Best Practices.
+Impact: Medium(Time).
 #>
 
   [CmdletBinding()] param()
@@ -754,12 +741,11 @@ function HealthTest-CrashDumpSignals {
 Checks Crash Dump Signals and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: Get-WinEvent, Get-ItemProperty, wevtutil.exe.
-AppliesTo: All Windows hosts.
-TestScope: Computer.
-Category: Primary: Configuration Hygiene & Best Practices.
-Impact: Medium.
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-BitLockerVolume, Get-HotFix, Get-FirstLine, Get-WinEvent, certutil.exe.
+AppliesTo: All
+Scope: Computer
+Category: Configuration Hygiene & Best Practices.
+Impact: Medium(Time).
 #>
 
     param([int]$Hours = 48)
@@ -784,12 +770,11 @@ function HealthTest-SeriousRecentEventLogs {
 Checks Serious Recent Event Logs and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: Get-WinEvent, Get-ItemProperty, wevtutil.exe.
-AppliesTo: All Windows hosts.
-TestScope: Computer.
-Category: Primary: Configuration Hygiene & Best Practices.
-Impact: Medium (primarily Time/Network).
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-BitLockerVolume, Get-HotFix, certutil.exe.
+AppliesTo: All
+Scope: Computer
+Category: Configuration Hygiene & Best Practices.
+Impact: Medium(Network).
 #>
 
     [CmdletBinding()]
@@ -852,12 +837,11 @@ function HealthTest-HotfixBaseline{
 Checks Hotfix Baseline and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: PowerShell cmdlets used by this test.
-AppliesTo: All Windows hosts.
-TestScope: Computer.
-Category: Primary: Audit / Compliance / Informational.
-Impact: Medium (primarily Time/Network).
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-BitLockerVolume.
+AppliesTo: All
+Scope: Computer
+Category: Audit / Compliance / Informational.
+Impact: Medium(Network).
 #>
 
   [CmdletBinding()] param([string[]]$RequiredKBs)
@@ -876,12 +860,11 @@ function HealthTest-BitLockerStatus {
 Checks Bit Locker Status and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: Get-Tpm/Get-BitLockerVolume, certutil.exe, Get-CimInstance.
-AppliesTo: Windows hosts with BitLocker/EFS capability.
-TestScope: Computer.
-Category: Primary: Configuration Hygiene & Best Practices.
-Impact: Medium.
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: None.
+AppliesTo: All
+Scope: Computer
+Category: Configuration Hygiene & Best Practices.
+Impact: Medium(Time).
 #>
     if (-not (Get-Command Get-BitLockerVolume -ErrorAction SilentlyContinue)) {
         Write-Warning "[warning] BitLocker PowerShell cmdlets not available; skipping BitLocker status check"; return
@@ -907,12 +890,11 @@ function HealthTest-EfsRecoveryAgents{
 Checks Efs Recovery Agents and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: Get-Tpm/Get-BitLockerVolume, certutil.exe, Get-CimInstance.
-AppliesTo: Windows hosts with BitLocker/EFS capability.
-TestScope: Computer.
-Category: Primary: Configuration Hygiene & Best Practices.
-Impact: Medium.
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: None.
+AppliesTo: All
+Scope: Computer
+Category: Configuration Hygiene & Best Practices.
+Impact: Medium(Time).
 #>
   $out=& certutil -recoveryagent 2>&1
   $has=($out | Select-String -Pattern 'Recovery Agent' -SimpleMatch)
@@ -926,12 +908,11 @@ function HealthTest-NtlmHardening {
 Checks Ntlm Hardening and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: PowerShell cmdlets used by this test.
-AppliesTo: All Windows hosts.
-TestScope: Computer.
-Category: Primary: Security & Stability Risks.
-Impact: Medium.
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: None.
+AppliesTo: All
+Scope: Computer
+Category: Security & Stability Risks.
+Impact: Medium(Time).
 #>
   $lsa = 'HKLM:\SYSTEM\CurrentControlSet\Control\Lsa'
 
@@ -960,12 +941,11 @@ function HealthTest-RdpHardening {
 Checks Rdp Hardening and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: PowerShell cmdlets used by this test.
-AppliesTo: All Windows hosts.
-TestScope: Computer.
-Category: Primary: Security & Stability Risks.
-Impact: Medium.
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: None.
+AppliesTo: All
+Scope: Computer
+Category: Security & Stability Risks.
+Impact: Medium(Time).
 #>
   $k = 'HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp'
 
@@ -997,12 +977,11 @@ function HealthTest-NonDefaultShares {
 Checks Non Default Shares and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: PowerShell cmdlets used by this test.
-AppliesTo: All Windows hosts.
-TestScope: Computer.
-Category: Primary: Configuration Hygiene & Best Practices.
-Impact: Medium.
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-CimInstance.
+AppliesTo: All
+Scope: Computer
+Category: Configuration Hygiene & Best Practices.
+Impact: Medium(Time).
 #>
   # 0(Workstation standalone),  1(Workstation domain joined), 2(Server standalone), 3(Server joined), 4(DC non-FSMO), 5(DC with FSMO role)
   $domainRole = (Get-CimInstance Win32_ComputerSystem).DomainRole
@@ -1033,12 +1012,11 @@ function HealthTest-LocalAcntRequirePass {
 Checks Local Acnt Require Pass and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: PowerShell cmdlets used by this test.
-AppliesTo: All Windows hosts.
-TestScope: Computer.
-Category: Primary: Configuration Hygiene & Best Practices.
-Impact: Medium.
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-SmbServerConfiguration.
+AppliesTo: All
+Scope: Computer
+Category: Configuration Hygiene & Best Practices.
+Impact: Medium(Time).
 #>
     $ok = $true
     $no_req_pass_accounts=Get-CimInstance -Class Win32_UserAccount -Filter `
@@ -1061,12 +1039,11 @@ function HealthTest-RestrictAnonymous {
 Checks Restrict Anonymous and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: PowerShell cmdlets used by this test.
-AppliesTo: All Windows hosts.
-TestScope: Computer.
-Category: Primary: Security & Stability Risks.
-Impact: Medium.
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-SmbServerConfiguration.
+AppliesTo: All
+Scope: Computer
+Category: Security & Stability Risks.
+Impact: Medium(Time).
 #>
   $p  = 'HKLM:\SYSTEM\CurrentControlSet\Control\Lsa'
   $ra = (Get-ItemProperty $p -Name restrictanonymous      -ErrorAction SilentlyContinue).restrictanonymous
@@ -1089,12 +1066,11 @@ function HealthTest-DefaultLocale {
 Checks Default Locale and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: PowerShell cmdlets used by this test.
-AppliesTo: All Windows hosts.
-TestScope: Computer.
-Category: Primary: Audit / Compliance / Informational.
-Impact: Medium.
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-SmbServerConfiguration.
+AppliesTo: All
+Scope: Computer
+Category: Audit / Compliance / Informational.
+Impact: Medium(Time).
 #>
     # see https://newbedev.com/how-can-i-manually-determine-the-codepage-and-locale-of-the-current-os
     $loc = Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Nls\CodePage' | Select-Object ACP,OEMCP
@@ -1114,12 +1090,11 @@ function HealthTest-PendingReboot {
 Checks Pending Reboot and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: PowerShell cmdlets used by this test.
-AppliesTo: All Windows hosts.
-TestScope: Computer.
-Category: Primary: Configuration Hygiene & Best Practices.
-Impact: Medium.
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-SmbServerConfiguration.
+AppliesTo: All
+Scope: Computer
+Category: Configuration Hygiene & Best Practices.
+Impact: Medium(Time).
 #>
     $pending = $false
     if (Test-Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending') { $pending = $true }
@@ -1136,12 +1111,11 @@ function HealthTest-SmbSigningRequired{
 Checks Smb Signing Required and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: PowerShell cmdlets used by this test.
-AppliesTo: All Windows hosts.
-TestScope: Computer.
-Category: Primary: Security & Stability Risks.
-Impact: Medium.
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-SmbServerConfiguration.
+AppliesTo: All
+Scope: Computer
+Category: Security & Stability Risks.
+Impact: Medium(Time).
 #>
   if ((Get-PropValue -obj (Get-Service -Name LanmanServer) -name Status) -ne 'running') {
       Write-Warning "[pass] Skipping HealthTest-SmbSigningRequired; LanmanServer service not running."

@@ -9,12 +9,11 @@ function HealthTest-ConnectivityToDCs {
 Checks Connectivity To D Cs and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: Get-NetAdapter/Get-NetIPConfiguration, Test-Connection, Resolve-DnsName.
-AppliesTo: Domain Controllers (or domain management hosts with required RSAT tools).
-TestScope: Domain.
-Category: Primary: Availability / Server Down Signals.
-Impact: Medium (primarily Time/Network).
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-NetIPConfiguration, Get-NetIPInterface, Get-NetConnectionProfile.
+AppliesTo: DC
+Scope: Domain
+Category: Availability / Server Down Signals.
+Impact: Medium(Network).
 #>
   $dcs  = Get-DomainControllers
 
@@ -69,12 +68,11 @@ function HealthTest-NetworkConnectionProfiles {
 Checks Network Connection Profiles and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: Get-NetConnectionProfile, Test-NetConnectivityToNetwork.
-AppliesTo: All Windows hosts.
-TestScope: Computer.
-Category: Primary: Availability / Server Down Signals.
-Impact: Medium.
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-NetIPConfiguration, Get-NetIPInterface.
+AppliesTo: All
+Scope: Computer
+Category: Availability / Server Down Signals.
+Impact: Medium(Time).
 #>
   [CmdletBinding()]
   param()
@@ -127,12 +125,11 @@ function HealthTest-SingleDefaultGateway{
 Checks Single Default Gateway and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: Get-NetAdapter/Get-NetIPConfiguration, Test-Connection, Resolve-DnsName.
-AppliesTo: All Windows hosts.
-TestScope: Computer.
-Category: Primary: Availability / Server Down Signals.
-Impact: Medium.
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-NetIPConfiguration, Get-NetIPInterface.
+AppliesTo: All
+Scope: Computer
+Category: Availability / Server Down Signals.
+Impact: Medium(Time).
 #>
   [CmdletBinding()] param([switch]$AllowOnePerFamily)
   $cfg = Get-NetIPConfiguration
@@ -175,12 +172,11 @@ function HealthTest-NetworkInterfaceMetrics{
 Checks Network Interface Metrics and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: Get-NetAdapter/Get-NetIPConfiguration, Test-Connection, Resolve-DnsName.
-AppliesTo: All Windows hosts.
-TestScope: Computer.
-Category: Primary: Configuration Hygiene & Best Practices.
-Impact: Medium.
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-NetIPConfiguration, Resolve-DnsName.
+AppliesTo: All
+Scope: Computer
+Category: Configuration Hygiene & Best Practices.
+Impact: Medium(Time).
 #>
   [CmdletBinding()] param([int]$MaxPreferredMetric=25)
   $ifs=Get-NetIPInterface -AddressFamily IPv4 | Where-Object {$_.ConnectionState -eq 'Connected'}
@@ -363,12 +359,11 @@ function HealthTest-IPv6Binding{
 Checks I Pv 6 Binding and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: Get-NetAdapter/Get-NetIPConfiguration, Test-Connection, Resolve-DnsName.
-AppliesTo: All Windows hosts.
-TestScope: Computer.
-Category: Primary: Configuration Hygiene & Best Practices.
-Impact: Medium.
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Test-WSMan, Get-NetAdapterStatistics.
+AppliesTo: All
+Scope: Computer
+Category: Configuration Hygiene & Best Practices.
+Impact: Medium(Time).
 #>
   [CmdletBinding()] param([switch]$RequireEnabled)
   $rows = Get-NetAdapterBinding -ComponentID ms_tcpip6 | Select-Object Name,Enabled
@@ -390,12 +385,11 @@ function HealthTest-Nic {
 Checks Nic and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: Get-NetAdapter/Get-NetIPConfiguration, Test-Connection, Resolve-DnsName.
-AppliesTo: All Windows hosts.
-TestScope: Computer.
-Category: Primary: Configuration Hygiene & Best Practices.
-Impact: Medium.
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Test-WSMan.
+AppliesTo: All
+Scope: Computer
+Category: Configuration Hygiene & Best Practices.
+Impact: Medium(Time).
 #>
     $nics = Get-NetAdapter -Physical -ErrorAction SilentlyContinue | Where-Object { $_.Status -eq 'Up' }
     if (-not $nics) {
@@ -474,12 +468,11 @@ function HealthTest-WinRMListening{
 Checks Win RM Listening and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: Get-Service, Test-WSMan, WinRM listener configuration.
-AppliesTo: All Windows hosts.
-TestScope: Computer.
-Category: Primary: Availability / Server Down Signals.
-Impact: Medium (primarily Time/Network).
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Test-WSMan.
+AppliesTo: All
+Scope: Computer
+Category: Availability / Server Down Signals.
+Impact: Medium(Network).
 #>
   $svc=Get-Service WinRM -ErrorAction Stop
   if($svc.Status -ne 'Running'){ Write-Warning "[failure] WinRM service is not running`nStatus=$($svc.Status)"; return }

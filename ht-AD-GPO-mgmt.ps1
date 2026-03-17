@@ -8,12 +8,11 @@ function HealthTest-ADViewConsistency {
 Checks AD View Consistency and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: PowerShell cmdlets used by this test.
-AppliesTo: Domain Controllers (or domain management hosts with required RSAT tools).
-TestScope: Domain.
-Category: Primary: Configuration Hygiene & Best Practices.
-Impact: Medium.
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-ADReplication, Get-DfsrBacklog, repadmin.exe.
+AppliesTo: DC
+Scope: Domain
+Category: Configuration Hygiene & Best Practices.
+Impact: Medium(Time).
 #>
   [CmdletBinding()]
   param(
@@ -120,12 +119,11 @@ function HealthTest-Dcdiag {
 Checks Dcdiag and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: dcdiag.exe, Get-ADDomainController, Get-ADReplication cmdlets.
-AppliesTo: Domain Controllers (or domain management hosts with required RSAT tools).
-TestScope: Domain.
-Category: Primary: Availability / Server Down Signals.
-Impact: High (Time/CPU/Network may increase on large environments).
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-DfsrBacklog, Get-DfsrConnection.
+AppliesTo: DC
+Scope: Domain
+Category: Availability / Server Down Signals.
+Impact: High(Time).
 #>
     write-progress "Runing DCDIAG /c /v"
     $AllTestResults = Get-DcDiagFailures -Comprehensive
@@ -157,12 +155,11 @@ function HealthTest-RidManager{
 Checks Rid Manager and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: PowerShell cmdlets used by this test.
-AppliesTo: Domain Controllers (or domain management hosts with required RSAT tools).
-TestScope: Domain.
-Category: Primary: Configuration Hygiene & Best Practices.
-Impact: Medium.
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-GPO, Get-Content, Get-DfsrBacklog, Get-DfsrConnection.
+AppliesTo: DC
+Scope: Domain
+Category: Configuration Hygiene & Best Practices.
+Impact: Medium(Time).
 #>
   $out=& dcdiag /test:ridmanager /v 2>&1
   $fail=($out | Select-String -Pattern 'failed test RidManager','is low' -SimpleMatch)
@@ -175,12 +172,11 @@ function HealthTest-DfsrBacklogSysvol{
 Checks Dfsr Backlog Sysvol and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: PowerShell cmdlets used by this test.
-AppliesTo: Domain Controllers (or domain management hosts with required RSAT tools).
-TestScope: Domain.
-Category: Primary: Configuration Hygiene & Best Practices.
-Impact: High (Time/CPU/Network may increase on large environments).
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-NetIPConfiguration, Get-ADReplicationPartnerMetadata, Get-ADObject, Get-GPO, Get-Content, Get-DfsrBacklog, Get-DfsrConnection.
+AppliesTo: DC
+Scope: Domain
+Category: Configuration Hygiene & Best Practices.
+Impact: High(Time).
 #>
   [CmdletBinding()] param([int]$MaxBacklog=100)
   $group='Domain System Volume'; $folder='SYSVOL Share'
@@ -206,12 +202,11 @@ function HealthTest-DfsReplicationState {
 Checks Dfs Replication State and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: repadmin.exe, Get-ADReplication cmdlets, Get-ADDomainController.
-AppliesTo: Domain Controllers (or domain management hosts with required RSAT tools).
-TestScope: Domain.
-Category: Primary: Configuration Hygiene & Best Practices.
-Impact: High (Time/CPU/Network may increase on large environments).
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-NetIPConfiguration, Get-ADReplicationPartnerMetadata, Get-ADObject, Get-GPO, Get-Content, Get-DfsrBacklog, Get-DfsrConnection.
+AppliesTo: DC
+Scope: Domain
+Category: Configuration Hygiene & Best Practices.
+Impact: High(Time).
 #>
   $stateNames = @{0='Uninitialized';1='Initialized';2='Initial_Sync';3='Auto_Recovery';4='Normal';5='Error'}
 
@@ -247,12 +242,11 @@ function HealthTest-DfsrBacklog {
 Checks Dfsr Backlog and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: PowerShell cmdlets used by this test.
-AppliesTo: Domain Controllers (or domain management hosts with required RSAT tools).
-TestScope: Domain.
-Category: Primary: Configuration Hygiene & Best Practices.
-Impact: High (Time/CPU/Network may increase on large environments).
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-ADObject, Get-ADReplicationPartnerMetadata, Get-GPO, Get-Content.
+AppliesTo: DC
+Scope: Domain
+Category: Configuration Hygiene & Best Practices.
+Impact: High(Time).
 #>
     param([string]$RGName='Domain System Volume')
     if (-not(Get-Service DFSR -ErrorAction SilentlyContinue)) {
@@ -282,12 +276,11 @@ function HealthTest-GpoVersionConsistency{
 Checks Gpo Version Consistency and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: PowerShell cmdlets used by this test.
-AppliesTo: Domain Controllers (or domain management hosts with required RSAT tools).
-TestScope: Domain.
-Category: Primary: Configuration Hygiene & Best Practices.
-Impact: Medium.
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-Acl, Get-ADObject, Get-ADReplicationPartnerMetadata.
+AppliesTo: DC
+Scope: Domain
+Category: Configuration Hygiene & Best Practices.
+Impact: Medium(Time).
 #>
     $dom=(Get-CimInstance Win32_ComputerSystem).Domain
     $base="\\$dom\SYSVOL\$dom\Policies"
@@ -312,12 +305,11 @@ function HealthTest-KccConnectivity{
 Checks Kcc Connectivity and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: Get-NetAdapter/Get-NetIPConfiguration, Test-Connection, Resolve-DnsName.
-AppliesTo: Domain Controllers (or domain management hosts with required RSAT tools).
-TestScope: Domain.
-Category: Primary: Availability / Server Down Signals.
-Impact: Medium (primarily Time/Network).
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-Acl, Get-ADObject.
+AppliesTo: DC
+Scope: Domain
+Category: Availability / Server Down Signals.
+Impact: Medium(Network).
 #>
   $dcs = Get-ADDomainController -Filter *
   $anyFail = $false
@@ -364,12 +356,11 @@ function HealthTest-KerberosEncryptionTypes{
 Checks Kerberos Encryption Types and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: PowerShell cmdlets used by this test.
-AppliesTo: All Windows hosts.
-TestScope: Computer.
-Category: Primary: Security & Stability Risks.
-Impact: Medium.
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-DfsnRoot, Get-DfsnFolder, Get-Acl, Get-ADObject.
+AppliesTo: All
+Scope: Computer
+Category: Security & Stability Risks.
+Impact: Medium(Time).
 #>
   $objs=Get-ADObject -LDAPFilter '(msDS-SupportedEncryptionTypes=*)' -Properties msDS-SupportedEncryptionTypes,sAMAccountName,objectClass
   $bad_count = 0
@@ -393,12 +384,11 @@ function HealthTest-RodcPrp{
 Checks Rodc Prp and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: PowerShell cmdlets used by this test.
-AppliesTo: Domain Controllers (or domain management hosts with required RSAT tools).
-TestScope: Domain.
-Category: Primary: Configuration Hygiene & Best Practices.
-Impact: Medium.
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-ADGroup, Get-ADGroupMember, Get-DfsnRoot, Get-DfsnFolder, Get-Acl.
+AppliesTo: DC
+Scope: Domain
+Category: Configuration Hygiene & Best Practices.
+Impact: Medium(Time).
 #>
   $rodcs=Get-ADDomainController -Filter {IsReadOnly -eq $true}
   if(-not $rodcs){ Write-Warning "[pass] No RODCs found (PRP not applicable)"; return }
@@ -415,12 +405,11 @@ function HealthTest-SysvolAclHygiene{
 Checks Sysvol Acl Hygiene and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: PowerShell cmdlets used by this test.
-AppliesTo: Domain Controllers (or domain management hosts with required RSAT tools).
-TestScope: Domain.
-Category: Primary: Configuration Hygiene & Best Practices.
-Impact: Medium.
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-ADTrust, Get-ADGroup, Get-ADGroupMember, Get-DfsnRoot, Get-DfsnFolder, netdom.exe.
+AppliesTo: DC
+Scope: Domain
+Category: Configuration Hygiene & Best Practices.
+Impact: Medium(Time).
 #>
   $path="C:\Windows\SYSVOL\sysvol"
   $acl=Get-Acl -Path $path
@@ -439,12 +428,11 @@ function HealthTest-DfsDiagTestDCs {
 Checks Dfs Diag Test D Cs and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: PowerShell cmdlets used by this test.
-AppliesTo: Domain Controllers (or domain management hosts with required RSAT tools).
-TestScope: Domain.
-Category: Primary: Configuration Hygiene & Best Practices.
-Impact: Medium.
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-ADTrust, Get-ADGroup, Get-ADGroupMember, Get-DfsnRoot, Get-DfsnFolder, netdom.exe.
+AppliesTo: DC
+Scope: Domain
+Category: Configuration Hygiene & Best Practices.
+Impact: Medium(Time).
 #>
     write-progress "Runing 'DFSDIAG /TestDCs'"
     $out=(DFSDIAG /TestDCs | sls -NotMatch '^$|^(Information|[A-Za-z]+ing|Success)[ :]|^Finished TestDcs[.] *$')
@@ -461,12 +449,11 @@ function HealthTest-DfsNamespaceEnumerate{
 Checks Dfs Namespace Enumerate and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: PowerShell cmdlets used by this test.
-AppliesTo: All Windows hosts.
-TestScope: Computer.
-Category: Primary: Configuration Hygiene & Best Practices.
-Impact: Medium.
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-ADReplication, Convert-RepadminDeltaToTimeSpan, New-TimeSpan, Get-MaxTimeSpan, Get-ADTrust, Get-ADGroup, Get-ADGroupMember, repadmin.exe, netdom.exe.
+AppliesTo: All
+Scope: Computer
+Category: Configuration Hygiene & Best Practices.
+Impact: Medium(Time).
 #>
   $roots=Get-DfsnRoot -ErrorAction SilentlyContinue
   if(-not $roots){ Write-Warning "[pass] No DFS Namespace roots found (nothing to check)"; return }
@@ -482,12 +469,11 @@ function HealthTest-PreWin2000Group{
 Checks Pre Win 2000 Group and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: PowerShell cmdlets used by this test.
-AppliesTo: All Windows hosts.
-TestScope: Computer.
-Category: Primary: Configuration Hygiene & Best Practices.
-Impact: Medium.
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-ADReplication, Convert-RepadminDeltaToTimeSpan, New-TimeSpan, Get-MaxTimeSpan, Get-ADTrust, repadmin.exe, netdom.exe.
+AppliesTo: All
+Scope: Computer
+Category: Configuration Hygiene & Best Practices.
+Impact: Medium(Time).
 #>
   $g=Get-ADGroup -Identity 'Pre-Windows 2000 Compatible Access'
   $m=Get-ADGroupMember $g -Recursive -ErrorAction SilentlyContinue
@@ -502,12 +488,11 @@ function HealthTest-TrustsVerify{
 Checks Trusts Verify and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: PowerShell cmdlets used by this test.
-AppliesTo: Domain Controllers (or domain management hosts with required RSAT tools).
-TestScope: Domain.
-Category: Primary: Configuration Hygiene & Best Practices.
-Impact: Medium.
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-ADReplication, Convert-RepadminDeltaToTimeSpan, New-TimeSpan, Get-MaxTimeSpan, repadmin.exe.
+AppliesTo: DC
+Scope: Domain
+Category: Configuration Hygiene & Best Practices.
+Impact: Medium(Time).
 #>
   $trusts=Get-ADTrust -Filter * -ErrorAction Stop
   if(-not $trusts){ Write-Warning "[pass] No inter-domain trusts configured"; return }
@@ -585,12 +570,11 @@ function HealthTest-AdminSDHolderCoverage{
 Checks Admin SD Holder Coverage and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: PowerShell cmdlets used by this test.
-AppliesTo: Domain Controllers (or domain management hosts with required RSAT tools).
-TestScope: Domain.
-Category: Primary: Configuration Hygiene & Best Practices.
-Impact: Medium.
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-ADReplication, Convert-RepadminDeltaToTimeSpan, New-TimeSpan, Get-MaxTimeSpan, repadmin.exe.
+AppliesTo: DC
+Scope: Domain
+Category: Configuration Hygiene & Best Practices.
+Impact: Medium(Time).
 #>
   $prot=Get-ADUser -LDAPFilter '(adminCount=1)' -Properties MemberOf | Select-Object -ExpandProperty SamAccountName
   if($prot){ Write-Warning "[pass] AdminSDHolder applied; protected users: $($prot -join ", ")" } else { Write-Warning "[pass] No users currently protected by AdminSDHolder" }
@@ -602,12 +586,11 @@ function HealthTest-ADReplicationDomainRepadmin {
 Checks AD Replication Domain Repadmin and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: repadmin.exe, Get-ADReplication cmdlets, Get-ADDomainController.
-AppliesTo: Domain Controllers (or domain management hosts with required RSAT tools).
-TestScope: Domain.
-Category: Primary: Configuration Hygiene & Best Practices.
-Impact: High (Time/CPU/Network may increase on large environments).
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: repadmin.exe, Get-ADReplication.
+AppliesTo: DC
+Scope: Domain
+Category: Configuration Hygiene & Best Practices.
+Impact: High(Time).
 #>
   [CmdletBinding()]
   param(
@@ -837,12 +820,11 @@ function HealthTest-ADReplicationLocalRSAT {
 Checks AD Replication Local RSAT and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: repadmin.exe, Get-ADReplication cmdlets, Get-ADDomainController.
-AppliesTo: Domain Controllers (or domain management hosts with required RSAT tools).
-TestScope: Domain.
-Category: Primary: Configuration Hygiene & Best Practices.
-Impact: High (Time/CPU/Network may increase on large environments).
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-GPO, Get-ADDomain, Get-GPOReport, Get-WindowsFeature, Get-DhcpServerInDC.
+AppliesTo: DC
+Scope: Domain
+Category: Configuration Hygiene & Best Practices.
+Impact: High(Time).
 #>
   $domainRole = (Get-CimInstance Win32_ComputerSystem -ErrorAction Stop).DomainRole
   $isHostDC = ($domainRole -in 4,5)
@@ -914,12 +896,11 @@ function HealthTest-DhcpInAd{
 Checks Dhcp In Ad and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: Get-DhcpServer cmdlets, Get-ADObject, Get-CimInstance.
-AppliesTo: Domain Controllers (or domain management hosts with required RSAT tools).
-TestScope: Domain.
-Category: Primary: Configuration Hygiene & Best Practices.
-Impact: Medium.
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-GPO, Get-ADDomain, Get-GPOReport.
+AppliesTo: DC
+Scope: Domain
+Category: Configuration Hygiene & Best Practices.
+Impact: Medium(Time).
 #>
   $dhcp=Get-WindowsFeature -Name DHCP -ErrorAction SilentlyContinue
   if(-not $dhcp -or -not $dhcp.Installed){ Write-Warning "[pass] DHCP role not installed on this server"; return }
@@ -935,12 +916,11 @@ function HealthTest-DisabledGpoLinksAtDomainRoot{
 Checks Disabled Gpo Links At Domain Root and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: PowerShell cmdlets used by this test.
-AppliesTo: Domain Controllers (or domain management hosts with required RSAT tools).
-TestScope: Domain.
-Category: Primary: Configuration Hygiene & Best Practices.
-Impact: Medium.
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: chkdsk.exe.
+AppliesTo: DC
+Scope: Domain
+Category: Configuration Hygiene & Best Practices.
+Impact: Medium(Time).
 #>
   if(-not (Get-Command Get-GPO -ErrorAction SilentlyContinue)){
     Write-Warning "[warning] GroupPolicy cmdlets not available; install RSAT/GPMC (GroupPolicy module)."; return
@@ -1005,12 +985,11 @@ function HealthTest-KrbtgtAge{
 Checks Krbtgt Age and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: PowerShell cmdlets used by this test.
-AppliesTo: Domain Controllers (or domain management hosts with required RSAT tools).
-TestScope: Domain.
-Category: Primary: Configuration Hygiene & Best Practices.
-Impact: Medium.
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: None.
+AppliesTo: DC
+Scope: Domain
+Category: Configuration Hygiene & Best Practices.
+Impact: Medium(Time).
 #>
   [CmdletBinding()] param([int]$MaxDays=720)
   $u=Get-ADUser krbtgt -Properties pwdLastSet
@@ -1028,12 +1007,11 @@ function HealthTest-LocalAdminsBaseline {
 Checks Local Admins Baseline and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: PowerShell cmdlets used by this test.
-AppliesTo: Domain Controllers (or domain management hosts with required RSAT tools).
-TestScope: Domain.
-Category: Primary: Audit / Compliance / Informational.
-Impact: Medium.
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-NetTCPConnection, Get-Process.
+AppliesTo: DC
+Scope: Domain
+Category: Audit / Compliance / Informational.
+Impact: Medium(Time).
 #>
     param(
         [string[]]$Allowed = @(
@@ -1102,12 +1080,11 @@ function HealthTest-ShadowStorage{
 Checks Shadow Storage and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: Get-CimInstance, Get-Volume, chkdsk.exe.
-AppliesTo: Domain Controllers (or domain management hosts with required RSAT tools).
-TestScope: Domain.
-Category: Primary: Configuration Hygiene & Best Practices.
-Impact: High (Time/CPU/Network may increase on large environments).
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-NetTCPConnection, Get-Process.
+AppliesTo: DC
+Scope: Domain
+Category: Configuration Hygiene & Best Practices.
+Impact: High(Time).
 #>
   [CmdletBinding()] param(
     [string[]]$RequireOnVolumes = @()   # e.g. 'D:','E:'; empty = informational only
@@ -1160,12 +1137,11 @@ function HealthTest-SysvolContentConsistency{
 Checks Sysvol Content Consistency and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: PowerShell cmdlets used by this test.
-AppliesTo: Domain Controllers (or domain management hosts with required RSAT tools).
-TestScope: Domain.
-Category: Primary: Configuration Hygiene & Best Practices.
-Impact: High (Time/CPU/Network may increase on large environments).
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-NetTCPConnection, Get-Process.
+AppliesTo: DC
+Scope: Domain
+Category: Configuration Hygiene & Best Practices.
+Impact: High(Time).
 #>
     $dom=(Get-CimInstance Win32_ComputerSystem).Domain
     $dcs=Get-ADDomainController -Filter * | Select-Object -ExpandProperty HostName
@@ -1211,12 +1187,11 @@ function HealthTest-SysvolNetlogonAccessible{
 Checks Sysvol Netlogon Accessible and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: PowerShell cmdlets used by this test.
-AppliesTo: Domain Controllers (or domain management hosts with required RSAT tools).
-TestScope: Domain.
-Category: Primary: Availability / Server Down Signals.
-Impact: Medium.
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-NetTCPConnection, Get-Process.
+AppliesTo: DC
+Scope: Domain
+Category: Availability / Server Down Signals.
+Impact: Medium(Time).
 #>
     $dcs = Get-DomainControllers
     $bad = @()
@@ -1237,12 +1212,11 @@ function HealthTest-UnexpectedListeningPorts {
 Checks Unexpected Listening Ports and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: PowerShell cmdlets used by this test.
-AppliesTo: Domain Controllers (or domain management hosts with required RSAT tools).
-TestScope: Domain.
-Category: Primary: Security & Stability Risks.
-Impact: Medium.
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-NetAdapter.
+AppliesTo: DC
+Scope: Domain
+Category: Security & Stability Risks.
+Impact: Medium(Time).
 #>
     [CmdletBinding()] param(
         [int[]]$AllowedPorts = @(53, 88, 123, 135, 139, 389, 445, 464, 636, 3268, 3269, 5722, 5985, 5986, 9389),
@@ -1339,12 +1313,11 @@ function HealthTest-UnusedEnabledAdapters{
 Checks Unused Enabled Adapters and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: PowerShell cmdlets used by this test.
-AppliesTo: Domain Controllers (or domain management hosts with required RSAT tools).
-TestScope: Domain.
-Category: Primary: Configuration Hygiene & Best Practices.
-Impact: Medium.
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: Get-NetAdapter.
+AppliesTo: DC
+Scope: Domain
+Category: Configuration Hygiene & Best Practices.
+Impact: Medium(Time).
 #>
   $nics=Get-NetAdapter | Where-Object {$_.AdminStatus -eq 'Up' -and $_.Status -ne 'Up'}
   foreach($n in $nics){ Write-Warning "[warning] Enabled network adapter is disconnected: $($n.Name) ($($n.Status))" }

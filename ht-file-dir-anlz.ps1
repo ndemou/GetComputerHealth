@@ -22,12 +22,11 @@ function HealthTest-LargeDirectories {
 Checks Large Directories and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
 
 .DESCRIPTION
-Uses: PowerShell cmdlets used by this test.
-AppliesTo: All Windows hosts.
-TestScope: Computer.
-Category: Primary: Configuration Hygiene & Best Practices.
-Impact: High (Time/CPU/Network may increase on large environments).
-FalsePositives: Environment-specific hardening baselines can intentionally differ.
+Uses: None.
+AppliesTo: All
+Scope: Computer
+Category: Configuration Hygiene & Best Practices.
+Impact: High(Time).
 #>
     $foundLargeDirectory = $false
 
