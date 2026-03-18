@@ -1043,10 +1043,6 @@ FalsePositives: None.
 }
 
 
-#--------------------------------------------------------
-# xxx new tests 20205-11-26
-
-
 function HealthTest-TimeSyncAccuracy {
 <#
 .SYNOPSIS
