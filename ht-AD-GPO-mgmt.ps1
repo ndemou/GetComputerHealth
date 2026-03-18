@@ -1074,80 +1074,127 @@ FalsePositives: None.
         Write-Warning "[pass] No unexpected accounts in Local Administrators"}
 }
 
-function HealthTest-ShadowStorage{
+function HealthTest-ShadowStorage {
 <#
 .SYNOPSIS
-Checks Shadow Storage
+Checks if Shadow Storage is enabled on internal drives (for servers) or on C: (for workstations)
 
 .DESCRIPTION
-AppliesTo: Server, Workstation
-Scope: Domain
+AppliesTo: All
+Scope: Computer
 Category: Configuration Hygiene & Best Practices
-Impact: High(Time)
+Impact: Low
 Uses: Get-CimInstance.
 FalsePositives: None.
 #>
-  [CmdletBinding()] param(
-    [string[]]$RequireOnVolumes = @(),   # e.g. 'D:','E:'; empty = informational only
+  [CmdletBinding()]
+  param(
+    [string[]]$RequireOnVolumes = @(),
     [Nullable[double]]$MinRecommendedGB = $null,
     [Nullable[double]]$MaxRecommendedGB = $null
   )
-  $domainRole = (Get-CimInstance Win32_ComputerSystem).DomainRole
+
+  $domainRole = (Get-CimInstance -ClassName Win32_ComputerSystem).DomainRole
   $isWorkstation = ($domainRole -in 0,1)
+  $isServer = -not $isWorkstation
+
+  $allVolumes = @(Get-CimInstance -ClassName Win32_Volume | Select-Object DeviceID, DriveLetter, DriveType)
+
   if ($isWorkstation) {
     if ($RequireOnVolumes.Count -eq 0) { $RequireOnVolumes = @('C:') }
     if (-not $MinRecommendedGB.HasValue) { $MinRecommendedGB = 5 }
     if (-not $MaxRecommendedGB.HasValue) { $MaxRecommendedGB = 25 }
+  } elseif ($isServer) {
+    if ($RequireOnVolumes.Count -eq 0) {
+      $RequireOnVolumes = @(
+        $allVolumes |
+          Where-Object { $_.DriveType -eq 3 -and $_.DriveLetter } |
+          ForEach-Object { $_.DriveLetter.TrimEnd('\') } |
+          Sort-Object -Unique
+      )
+    }
   }
 
-  $assoc = Get-CimInstance -ClassName Win32_ShadowStorage 2>$null
-  $vols  = Get-CimInstance -ClassName Win32_Volume | Select-Object DeviceID, DriveLetter
+  $assoc = @(Get-CimInstance -ClassName Win32_ShadowStorage 2>$null)
+  $vols = @($allVolumes)
 
   $present = @{}
   $statsByDrive = @{}
-  if ($assoc) {
-    foreach($a in $assoc){
+
+  foreach ($a in $assoc) {
+    $drive = $null
+    $devId = $null
+
+    try {
+      $volObj = $null
+
+      if ($a.Volume -is [Microsoft.Management.Infrastructure.CimInstance]) {
+        $volObj = $a.Volume
+      } elseif ($a.Volume) {
+        $volObj = Get-CimInstance -InputObject $a.Volume -ErrorAction Stop
+      }
+
+      if ($volObj) {
+        $devId = [string]$volObj.DeviceID
+        if ($volObj.DriveLetter) {
+          $drive = [string]$volObj.DriveLetter
+        }
+      }
+    } catch {
+    }
+
+    if (-not $devId -and $a.Volume) {
       $volRef = [string]$a.Volume
-      $devId  = $null
-      if ($volRef -match 'DeviceID="([^"]+)"') { $devId = $Matches[1] }
-      if ($devId) { $devId = ($devId -replace '\\\\','\') }
-      $drive = $null
-      if ($devId -and ($devId -match '^[A-Z]:\\')) {
-        $drive = $devId.Substring(0,2)
-      } else {
-        if ($devId) {
-          $m = $vols | Where-Object { $_.DeviceID -eq $devId }
-          if ($m -and $m.DriveLetter) { $drive = $m.DriveLetter }
-        }
+      if ($volRef -match 'DeviceID\s*=\s*"((?:[^"\\]|\\.)*)"') {
+        $devId = $Matches[1] -replace '\\\\','\'
       }
-      if (-not $drive) { $drive = $devId }
-      if ($drive) {
-        $k = $drive.TrimEnd('\')
-        $present[$k] = $true
-        if (-not $statsByDrive.ContainsKey($k)) {
-          $statsByDrive[$k] = [pscustomobject]@{
-            MaxSpaceBytes = [uint64]0
-            AllocatedSpaceBytes = [uint64]0
-            UsedSpaceBytes = [uint64]0
-          }
-        }
-        if ($null -ne $a.MaxSpace -and [uint64]$a.MaxSpace -gt 0) {
-          $statsByDrive[$k].MaxSpaceBytes += [uint64]$a.MaxSpace
-        }
-        if ($null -ne $a.AllocatedSpace -and [uint64]$a.AllocatedSpace -gt 0) {
-          $statsByDrive[$k].AllocatedSpaceBytes += [uint64]$a.AllocatedSpace
-        }
-        if ($null -ne $a.UsedSpace -and [uint64]$a.UsedSpace -gt 0) {
-          $statsByDrive[$k].UsedSpaceBytes += [uint64]$a.UsedSpace
-        }
+    }
+
+    if (-not $drive -and $devId) {
+      $m = @($vols | Where-Object { $_.DeviceID -eq $devId } | Select-Object -First 1)
+      if ($m.Count -gt 0 -and $m[0].DriveLetter) {
+        $drive = [string]$m[0].DriveLetter
       }
+    }
+
+    if (-not $drive -and $devId -match '^[A-Z]:\\?$') {
+      $drive = $devId.TrimEnd('\')
+    }
+
+    if (-not $drive -and $devId) {
+      $drive = $devId.TrimEnd('\')
+    }
+
+    if (-not $drive) { continue }
+
+    $k = $drive.TrimEnd('\')
+    $present[$k] = $true
+
+    if (-not $statsByDrive.ContainsKey($k)) {
+      $statsByDrive[$k] = [pscustomobject]@{
+        MaxSpaceBytes = [uint64]0
+        AllocatedSpaceBytes = [uint64]0
+        UsedSpaceBytes = [uint64]0
+      }
+    }
+
+    if ($null -ne $a.MaxSpace -and [uint64]$a.MaxSpace -gt 0) {
+      $statsByDrive[$k].MaxSpaceBytes += [uint64]$a.MaxSpace
+    }
+    if ($null -ne $a.AllocatedSpace -and [uint64]$a.AllocatedSpace -gt 0) {
+      $statsByDrive[$k].AllocatedSpaceBytes += [uint64]$a.AllocatedSpace
+    }
+    if ($null -ne $a.UsedSpace -and [uint64]$a.UsedSpace -gt 0) {
+      $statsByDrive[$k].UsedSpaceBytes += [uint64]$a.UsedSpace
     }
   }
 
   $missingLevel = if ($isWorkstation) { 'notice' } else { 'failure' }
+
   $rangeOutOfBounds = New-Object System.Collections.Generic.List[string]
   $rangeUnknown = New-Object System.Collections.Generic.List[string]
   $outOfRange = $false
+
   if ($MinRecommendedGB.HasValue -or $MaxRecommendedGB.HasValue) {
     $targets = if ($RequireOnVolumes.Count -gt 0) {
       @($RequireOnVolumes | ForEach-Object { $_.TrimEnd('\') } | Sort-Object -Unique)
@@ -1157,19 +1204,25 @@ FalsePositives: None.
 
     foreach ($k in $targets) {
       if (-not $statsByDrive.ContainsKey($k)) { continue }
+
       $s = $statsByDrive[$k]
       [uint64]$maxBytes = $s.MaxSpaceBytes
-      if ($maxBytes -le 0 -and $s.AllocatedSpaceBytes -gt 0) { $maxBytes = $s.AllocatedSpaceBytes }
+      if ($maxBytes -le 0 -and $s.AllocatedSpaceBytes -gt 0) {
+        $maxBytes = $s.AllocatedSpaceBytes
+      }
+
       if ($maxBytes -le 0) {
         $rangeUnknown.Add("$k size not available")
         continue
       }
 
       $sizeGB = [math]::Round(($maxBytes / 1GB), 2)
+
       if ($MinRecommendedGB.HasValue -and $sizeGB -lt $MinRecommendedGB.Value) {
         $outOfRange = $true
         $rangeOutOfBounds.Add("$k=$sizeGB GB below min $($MinRecommendedGB.Value) GB")
       }
+
       if ($MaxRecommendedGB.HasValue -and $sizeGB -gt $MaxRecommendedGB.Value) {
         $outOfRange = $true
         $rangeOutOfBounds.Add("$k=$sizeGB GB above max $($MaxRecommendedGB.Value) GB")
@@ -1179,11 +1232,16 @@ FalsePositives: None.
 
   if ($RequireOnVolumes.Count -gt 0) {
     $missing = @()
-    foreach($v in $RequireOnVolumes){
+
+    foreach ($v in $RequireOnVolumes) {
       $k = $v.TrimEnd('\')
-      if (-not $present.ContainsKey($k)) { $missing += $k; Write-Warning "[$missingLevel] Shadow storage not configured on required volume`n$k" }
+      if (-not $present.ContainsKey($k)) {
+        $missing += $k
+        Write-Warning "[$missingLevel] Shadow storage not configured on required volume $k"
+      }
     }
-    if($missing.Count -eq 0){
+
+    if ($missing.Count -eq 0) {
       Write-Warning ("[pass] Shadow storage on required volumes`nConfigured on: " + ((@($present.Keys) | Sort-Object) -join ', '))
     }
   } else {
@@ -1197,6 +1255,7 @@ FalsePositives: None.
   if ($outOfRange -and $rangeOutOfBounds.Count -gt 0) {
     Write-Warning ("[notice] Shadow storage size outside recommended range`n" + ($rangeOutOfBounds -join '; '))
   }
+
   if ($rangeUnknown.Count -gt 0) {
     Write-Warning ("[info] Shadow storage size could not be determined`n" + ($rangeUnknown -join '; '))
   }
