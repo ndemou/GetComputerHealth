@@ -5,14 +5,15 @@ Scheduled Task Master Cluster
 function HealthTest-ScheduledTasks {
 <#
 .SYNOPSIS
-Checks Scheduled Tasks and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+Checks Scheduled Tasks and flags unhealthy or non-baseline states
 
 .DESCRIPTION
-Uses: Get-ScheduledTask, Get-ScheduledTaskInfo, schtasks.exe.
 AppliesTo: All
 Scope: Computer
-Category: Configuration Hygiene & Best Practices.
-Impact: High(Time).
+Category: Configuration Hygiene & Best Practices
+Impact: High(Time)
+Uses: Get-ScheduledTask, Get-ScheduledTaskInfo.
+FalsePositives: None.
 #>
     $task_name_paterns_to_ignore = @(
       'OneDrive Per-Machine Standalone Update Task*',
@@ -90,14 +91,15 @@ Impact: High(Time).
 function HealthTest-SystemScheduledTasks{
 <#
 .SYNOPSIS
-Checks System Scheduled Tasks and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+Checks System Scheduled Tasks and flags unhealthy or non-baseline states
 
 .DESCRIPTION
-Uses: Get-ScheduledTask, schtasks.exe.
 AppliesTo: All
 Scope: Computer
-Category: Configuration Hygiene & Best Practices.
-Impact: High(Time).
+Category: Configuration Hygiene & Best Practices
+Impact: High(Time)
+Uses: Get-ScheduledTask, Get-ScheduledTaskInfo.
+FalsePositives: None.
 #>
   [CmdletBinding()] param(
     [string[]]$MustBeEnabled = @(),  # exact paths or regex
@@ -315,14 +317,15 @@ function Get-ScheduledTaskDeepInfo{
 function HealthTest-ScheduledTasksLastResult {
 <#
 .SYNOPSIS
-Checks Scheduled Tasks Last Result and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+Checks Scheduled Tasks Last Result and flags unhealthy or non-baseline states
 
 .DESCRIPTION
-Uses: Get-ScheduledTask, schtasks.exe.
 AppliesTo: All
 Scope: Computer
-Category: Configuration Hygiene & Best Practices.
-Impact: High(Time).
+Category: Configuration Hygiene & Best Practices
+Impact: High(Time)
+Uses: None.
+FalsePositives: None.
 #>
   $mapHresult = @{
     0x40010004=@{d='Process terminated externally'}

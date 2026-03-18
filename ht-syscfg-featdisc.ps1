@@ -5,14 +5,15 @@ System Configuration & Feature Discovery
 function HealthTest-InstalledRolesFeatures {
 <#
 .SYNOPSIS
-Checks Installed Roles Features and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+Checks Installed Roles Features and flags unhealthy or non-baseline states
 
 .DESCRIPTION
-Uses: Get-ProcessMitigation, Get-MpComputerStatus, Update-MpSignature.
 AppliesTo: All
 Scope: Computer
-Category: Audit / Compliance / Informational.
-Impact: Medium(Time).
+Category: Audit / Compliance / Informational
+Impact: Medium(Time)
+Uses: Get-WindowsFeature.
+FalsePositives: None.
 #>
   [CmdletBinding()]
   param([string[]]$DisallowedRoles = @('Web-Server','DHCP','WDS'))
@@ -37,16 +38,16 @@ Impact: Medium(Time).
 function HealthTest-MalwareProtectionFeatures {
 <#
 .SYNOPSIS
-Checks Malware Protection Features and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+Checks Malware Protection Features and flags unhealthy or non-baseline states
 
 .DESCRIPTION
-Uses: Get-ProcessMitigation.
 AppliesTo: All
 Scope: Computer
-Category: Configuration Hygiene & Best Practices.
-Impact: Medium(Time).
+Category: Configuration Hygiene & Best Practices
+Impact: Medium(Time)
+Uses: Get-MpComputerStatus, Write-BasedOnTestResult, Update-MpSignature.
+FalsePositives: None.
 #>
-
     # $MPs holds the Malware Protection status
     $MPs=(Get-MpComputerStatus)
     Write-BasedOnTestResult "Is (Get-MpComputerStatus).DefenderSignaturesOutOfDate not true?" -Test (!$MPs.DefenderSignaturesOutOfDate) -Comment "You may run`n  Update-MpSignature`n  to update."
@@ -69,14 +70,15 @@ Impact: Medium(Time).
 function HealthTest-ExploitProtectionBaseline {
 <#
 .SYNOPSIS
-Checks Exploit Protection Baseline and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+Checks Exploit Protection Baseline and flags unhealthy or non-baseline states
 
 .DESCRIPTION
-Uses: None.
 AppliesTo: All
 Scope: Computer
-Category: Audit / Compliance / Informational.
-Impact: Medium(Time).
+Category: Audit / Compliance / Informational
+Impact: Medium(Time)
+Uses: Get-ProcessMitigation.
+FalsePositives: None.
 #>
     if (-not (Get-Command Get-ProcessMitigation -ErrorAction SilentlyContinue)) { Write-Warning "[notice] Exploit Protection cmdlets unavailable"; return }
     $sys = Get-ProcessMitigation -System -ErrorAction SilentlyContinue
@@ -91,14 +93,15 @@ Impact: Medium(Time).
 function HealthTest-StartupItems{
 <#
 .SYNOPSIS
-Checks Startup Items and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+Checks Startup Items and flags unhealthy or non-baseline states
 
 .DESCRIPTION
-Uses: None.
 AppliesTo: All
 Scope: Computer
-Category: Configuration Hygiene & Best Practices.
-Impact: Medium(Time).
+Category: Configuration Hygiene & Best Practices
+Impact: Medium(Time)
+Uses: Get-ItemProperty.
+FalsePositives: None.
 #>
   $paths=@(
     'HKLM:\Software\Microsoft\Windows\CurrentVersion\Run',
