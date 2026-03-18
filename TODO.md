@@ -5,37 +5,13 @@
 Also get more explicit about our standards. Both on formatting and meaning. I've seen GPT make a lot of mistakes. 
 Considering one function at a time helped it a lot.
 
-## Review the hundrends of warnings from Invoke-ScriptAnalyzer (and 3 errors)
+## Get-ComputerHealth should auto-detect and invoke HealthTests -- not literally call them one by one
 
-See also : .\tests\script-analysis.ps1
+It should discover them and run them.
+I have done most work. `ht-....ps1` files only define functions if they are applicable. But I must be formal about the way I do it. 
+So I can use the method I use for custom health tests.
 
-## Automate tests in GitHub
-
-ChatGPT said: GitHub Actions can run Windows PowerShell 5.1 by using the powershell shell (which invokes powershell.exe on Windows runners).
-See also: https://docs.github.com/actions/automating-builds-and-tests/building-and-testing-powershell
-
-## Use tags in HealthTest- function names 
-
-E.g. "HealthTest-CheckSomething__sD-V__tS" means:
-  - Only perform this test on a system(s) that is 
-    domain joined(D) but not a VM (-V)
-  - This test is of type(t) slow(S)
-```
-Possible systems: 
-   D: domain joined 
-   W: workstation 
-   S: server 
-   C: domain controller 
-   H: hypervisor 
-   V: virtual machine 
-   L: laptop/mobile
-Possible types: 
-   S: Slow
-   B: Relative (see below)
-```
-Then I can greatly simplify the main part of the code that execute the built in tests.
-
-**About relative Tests**
+## Relative Tests
 relative tests don't produce absolute pass/fail results.
 Rather, they warn for every funding as if it's a failure 
 and the user is responsible to suppress findings that *are* accepted, thus establishing a baseline.
@@ -50,6 +26,16 @@ E.g. for a function named HealthTest-CheckSomething__s_D-V__t_S
 This automatic suppression allows developers of get computer health to add Relative tests without
 anoying their users with new warnings. Code is also emmiting a Notice:
   `Automatically suppressed this finding from new test 'HealthTest-OpenPorts': Found unexpected open port TCP:3389`
+
+## Review the hundrends of warnings from Invoke-ScriptAnalyzer (and 3 errors)
+
+See also : .\tests\script-analysis.ps1
+
+## Automate tests in GitHub
+
+ChatGPT said: GitHub Actions can run Windows PowerShell 5.1 by using the powershell shell (which invokes powershell.exe on Windows runners).
+See also: https://docs.github.com/actions/automating-builds-and-tests/building-and-testing-powershell
+
 
 
 ## HealthTest-SysvolContentConsistency
