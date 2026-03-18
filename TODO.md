@@ -1,5 +1,7 @@
 # TODO
 
+## Add option to hide "SUPPRESSED" lines from console output (maybe -Hide S)
+
 ## Add a test that verifies the help-block of HealthTest- functions follows our standards
 
 Also get more explicit about our standards. Both on formatting and meaning. I've seen GPT make a lot of mistakes. 
