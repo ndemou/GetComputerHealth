@@ -1,19 +1,5 @@
 # TODO
 
-## 1. Custom health tests(functions) must use the `HealthTest-` prefix instead of `CustomHealthTest-`
-
-Document only this prefix in official documentation but keep supporting `CustomHealthTest-` in order to not break already deployed code.
-
-## 2. (Console output) Show suppressed findings with a nice blue `"SUPPRESS : "` prefix.
-
-## 3. New networking test with `Get-NetConnectionProfile`
-  1. For all computers: At least one interface must have IPv4Connectivity or IPv4Connectivity equal to "Internet".
-  2. For servers: At least one interface must have NetworkCategory that is either "private" or "domain joined": a) "private" for non-domain-joined and for DC/PDC b) "DomainAuthenticated" for domain joined (except DC/PDC)
-
-## 4. Add option -Reinstall in updater
-
-Will re-download and update even if already at the latest release.
-
 ## Review the hundrends of warnings from Invoke-ScriptAnalyzer (and 3 errors)
 
 See also : .\tests\script-analysis.ps1
