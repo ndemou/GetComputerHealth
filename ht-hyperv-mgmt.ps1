@@ -64,7 +64,7 @@ Impact: Medium(Time)
 Uses: Get-VM.
 FalsePositives: None.
 #>
-    if (Get-Command -Name Get-VM -ErrorAction SilentlyContinue) {
+    if ((Get-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V).State -eq 'Enabled') {
 		$ok=$true
 		$all_vm = Get-VM
 		$all_vm |?{$_.state -ne 'Running' -and $_.AutomaticStartAction -eq 'Start'} | %{
