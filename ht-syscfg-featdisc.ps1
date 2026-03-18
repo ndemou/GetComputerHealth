@@ -2,39 +2,6 @@
 System Configuration & Feature Discovery
 #>
 
-function HealthTest-InstalledRolesFeatures {
-<#
-.SYNOPSIS
-Checks Installed Roles Features
-
-.DESCRIPTION
-AppliesTo: All
-Scope: Computer
-Category: Audit / Compliance / Informational
-Impact: Medium(Time)
-Uses: Get-WindowsFeature.
-FalsePositives: None.
-#>
-  [CmdletBinding()]
-  param([string[]]$DisallowedRoles = @('Web-Server','DHCP','WDS'))
-
-  $roles = $null
-  try { $roles = Get-WindowsFeature -ErrorAction Stop | Where-Object { $_.Installed } }
-  catch {
-    Write-Output "Get-WindowsFeature not available on this OS; skipping role/feature check"
-    return
-  }
-
-  $hit = @($roles | Where-Object { $DisallowedRoles -contains $_.Name })
-  if ($hit.Count -gt 0) {
-    foreach ($h in $hit) { Write-Warning "[failure] Unintended role/feature installed: $($h.Name)" }
-  } else {
-    Write-Warning "[pass] No unintended roles/features installed"
-  }
-}
-
-
-
 function HealthTest-MalwareProtectionFeatures {
 <#
 .SYNOPSIS

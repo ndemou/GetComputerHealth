@@ -2,6 +2,10 @@
 Hyper-V Management
 #>
 
+# Functions in this file are only going to be defined if the
+# Microsoft-Hyper-V feature is enabled in this computer
+if ((Get-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V).State -eq 'Enabled') {
+
 function HealthTest-HyperVVMProperties {
 <#
 .SYNOPSIS
@@ -64,19 +68,17 @@ Impact: Medium(Time)
 Uses: Get-VM.
 FalsePositives: None.
 #>
-    if ((Get-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V).State -eq 'Enabled') {
-		$ok=$true
-		$all_vm = Get-VM
-		$all_vm |?{$_.state -ne 'Running' -and $_.AutomaticStartAction -eq 'Start'} | %{
-			Write-Warning "[failure] VM $($_.name) should be running but is not"
-			$ok=$false
-		}
-		if ($all_vm |?{$_.AutomaticStartAction -eq 'Start'}) {
-			if ($ok) {Write-Warning "[pass] All VMs that are set to always auto-start are running"}
-		} else {
-			Write-Warning "[info] No VM is set to always auto-start"
-		}
-	} else {
-		Write-Warning "[pass] No Hyper-V here, skipping HealthTest-HyperVRunningVMs"
-	}
+    $ok=$true
+    $all_vm = Get-VM
+    $all_vm |?{$_.state -ne 'Running' -and $_.AutomaticStartAction -eq 'Start'} | %{
+        Write-Warning "[failure] VM $($_.name) should be running but is not"
+        $ok=$false
+    }
+    if ($all_vm |?{$_.AutomaticStartAction -eq 'Start'}) {
+        if ($ok) {Write-Warning "[pass] All VMs that are set to always auto-start are running"}
+    } else {
+        Write-Warning "[info] No VM is set to always auto-start"
+    }
+}
+
 }

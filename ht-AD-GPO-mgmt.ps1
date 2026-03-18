@@ -907,27 +907,6 @@ FalsePositives: None.
   Write-Warning "[pass] AD replication (RSAT): replication partner results healthy for $($me.HostName)."
 }
 
-function HealthTest-DhcpInAd{
-<#
-.SYNOPSIS
-Checks Dhcp In Ad
-
-.DESCRIPTION
-AppliesTo: DC
-Scope: Domain
-Category: Configuration Hygiene & Best Practices
-Impact: Medium(Time)
-Uses: Get-WindowsFeature, Get-DhcpServerInDC.
-FalsePositives: None.
-#>
-  $dhcp=Get-WindowsFeature -Name DHCP -ErrorAction SilentlyContinue
-  if(-not $dhcp -or -not $dhcp.Installed){ Write-Warning "[pass] DHCP role not installed on this server"; return }
-  $auth=Get-DhcpServerInDC -ErrorAction SilentlyContinue
-  $fqdn=[System.Net.Dns]::GetHostByName($env:COMPUTERNAME).HostName
-  $isAuth=($auth | Where-Object { $_.DnsName -ieq $fqdn })
-  if($isAuth){ Write-Warning "[pass] DHCP server is authorized in AD ($fqdn)" } else { Write-Warning "[failure] DHCP server is NOT authorized in AD ($fqdn)" }
-}
-
 function HealthTest-DisabledGpoLinksAtDomainRoot{
 <#
 .SYNOPSIS
