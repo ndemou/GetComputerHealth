@@ -7,6 +7,8 @@
 Also get more explicit about our standards. Both on formatting and meaning. I've seen GPT make a lot of mistakes. 
 Considering one function at a time helped it a lot.
 
+I see plenty of `Scope: Domain` that is plainly wrong
+
 ## Get-ComputerHealth should auto-detect and invoke HealthTests -- not literally call them one by one
 
 It should discover them and run them.
