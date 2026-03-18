@@ -394,21 +394,13 @@ function HealthTest-IisBindings {
 Checks Iis Bindings
 
 .DESCRIPTION
-AppliesTo: Server
+AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time)
 Uses: Get-WindowsFeature, Get-Website, Get-WebBinding.
 FalsePositives: None.
 #>
-    # Skip test on workstations
-    # 1 = Workstation 2 = Domain Controller 3 = Windows Server
-    $host_type = (Get-CimInstance Win32_OperatingSystem).ProductType
-    if ($host_type -eq 1) {
-        Write-Output "ProductType=$host_type; skiping HealthTest-IisBindings"
-        return
-    }
-
     $role = Get-WindowsFeature Web-Server -ErrorAction SilentlyContinue
 
     if (-not($role -and $role.Installed)) {
