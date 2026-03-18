@@ -813,6 +813,7 @@ Invoke-HealthTest "HealthTest-LocalAcntRequirePass"
 Invoke-HealthTest "HealthTest-NonDefaultShares"
 Invoke-HealthTest "HealthTest-CertExpiry"
 Invoke-HealthTest "HealthTest-NtfsDirtyBit"
+Invoke-HealthTest "HealthTest-ShadowStorage"
 Invoke-HealthTest "HealthTest-IisBindings"
 Invoke-HealthTest "HealthTest-DfsrBacklog"
 Invoke-HealthTest "HealthTest-AutoStartServicesRunning"
@@ -886,7 +887,6 @@ if (!$DebugSkipSlowTests) {
 if ($isHostServer) {
     Invoke-HealthTest "HealthTest-InstalledRolesFeatures"
     Invoke-HealthTest "HealthTest-DhcpInAd"
-    Invoke-HealthTest "HealthTest-ShadowStorage"
     Invoke-HealthTest "HealthTest-DhcpScopeUtilization"
 }
 
