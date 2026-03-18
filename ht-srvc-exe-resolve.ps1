@@ -744,14 +744,15 @@ function Test-LooksLikePath {
 function HealthTest-AutoStartServicesRunning {
 <#
 .SYNOPSIS
-Checks Auto Start Services Running and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+Checks Auto Start Services Running and flags unhealthy or non-baseline states
 
 .DESCRIPTION
-Uses: None.
 AppliesTo: All
 Scope: Computer
-Category: Configuration Hygiene & Best Practices.
-Impact: Medium(Time).
+Category: Configuration Hygiene & Best Practices
+Impact: Medium(Time)
+Uses: cmd.exe.
+FalsePositives: None.
 #>
   function Get-ServiceExitCodeMessage {
       param([int]$ExitCode)
@@ -837,14 +838,15 @@ Impact: Medium(Time).
 function HealthTest-NonMicrosoftServices {
 <#
 .SYNOPSIS
-Checks Non Microsoft Services and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+Checks Non Microsoft Services and flags unhealthy or non-baseline states
 
 .DESCRIPTION
-Uses: None.
 AppliesTo: All
 Scope: Computer
-Category: Configuration Hygiene & Best Practices.
-Impact: Medium(Time).
+Category: Configuration Hygiene & Best Practices
+Impact: Medium(Time)
+Uses: Get-CimInstance.
+FalsePositives: None.
 #>
     $ok = $true
     $CORE_MICROSOFT_VENDORS = @('Microsoft Windows','Microsoft Windows Publisher','Microsoft Corporation','Microsoft Windows Hardware Compatibility Publisher')
@@ -873,14 +875,15 @@ Impact: Medium(Time).
 function HealthTest-ServiceAccountsPwdNeverExpires{
 <#
 .SYNOPSIS
-Checks Service Accounts Pwd Never Expires and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+Checks Service Accounts Pwd Never Expires and flags unhealthy or non-baseline states
 
 .DESCRIPTION
-Uses: None.
 AppliesTo: All
 Scope: Computer
-Category: Configuration Hygiene & Best Practices.
-Impact: Medium(Time).
+Category: Configuration Hygiene & Best Practices
+Impact: Medium(Time)
+Uses: Get-ADUser.
+FalsePositives: None.
 #>
   $filter='(servicePrincipalName=*)'
   $objs=Get-ADUser -LDAPFilter $filter -Properties PasswordNeverExpires,PasswordLastSet

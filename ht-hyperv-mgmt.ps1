@@ -5,14 +5,15 @@ Hyper-V Management
 function HealthTest-HyperVVMProperties {
 <#
 .SYNOPSIS
-Checks Hyper VVM Properties and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+Checks Hyper VVM Properties and flags unhealthy or non-baseline states
 
 .DESCRIPTION
-Uses: Get-VM, Get-VMNetworkAdapter.
 AppliesTo: Server
 Scope: Computer
-Category: Configuration Hygiene & Best Practices.
-Impact: Medium(Time).
+Category: Configuration Hygiene & Best Practices
+Impact: Medium(Time)
+Uses: Get-VM.
+FalsePositives: None.
 #>
     # For Hyper-V hosts put here the expected values for these VM properties
     $EXPECTED_VALUES_FOR_VM_PROPERTIES = @{
@@ -53,14 +54,15 @@ Impact: Medium(Time).
 function HealthTest-HyperVRunningVMs {
 <#
 .SYNOPSIS
-Checks Hyper V Running V Ms and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+Checks Hyper V Running V Ms and flags unhealthy or non-baseline states
 
 .DESCRIPTION
-Uses: Get-VM, Get-VMNetworkAdapter.
 AppliesTo: Server
 Scope: Computer
-Category: Configuration Hygiene & Best Practices.
-Impact: Medium(Time).
+Category: Configuration Hygiene & Best Practices
+Impact: Medium(Time)
+Uses: Get-VM.
+FalsePositives: None.
 #>
     $ok=$true
     $all_vm = get-vm

@@ -49,14 +49,15 @@ Filters out ports listening only on the loopback addresses (127.0.0.1 and ::1) b
 function HealthTest-TimeSyncPolicy {
 <#
 .SYNOPSIS
-Checks Time Sync Policy and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+Checks Time Sync Policy and flags unhealthy or non-baseline states
 
 .DESCRIPTION
-Uses: w32tm.exe.
 AppliesTo: All
 Scope: Computer
-Category: Configuration Hygiene & Best Practices.
-Impact: Medium(Time).
+Category: Configuration Hygiene & Best Practices
+Impact: Medium(Time)
+Uses: Resolve-DnsName, Test-IsLaptopOrMobile.
+FalsePositives: None.
 #>
     [CmdletBinding()]
     param()
@@ -326,16 +327,16 @@ Impact: Medium(Time).
 function HealthTest-UpdateAge {
 <#
 .SYNOPSIS
-Checks Update Age and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+Checks Update Age and flags unhealthy or non-baseline states
 
 .DESCRIPTION
-Uses: Get-AvailMB, Get-Counter, Start-Sleep, Get-WindowsFeature, Get-Website, Get-WebBinding.
 AppliesTo: All
 Scope: Computer
-Category: Configuration Hygiene & Best Practices.
-Impact: Medium(Time).
+Category: Configuration Hygiene & Best Practices
+Impact: Medium(Time)
+Uses: Get-HotFix.
+FalsePositives: None.
 #>
-
     param([int]$WarnDays=30,[int]$FailDays=45)
     $lastUpdateDate = $null
     $reg = Get-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\Results\Install' -ErrorAction SilentlyContinue
@@ -355,16 +356,16 @@ Impact: Medium(Time).
 function HealthTest-CertExpiry {
 <#
 .SYNOPSIS
-Checks Cert Expiry and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+Checks Cert Expiry and flags unhealthy or non-baseline states
 
 .DESCRIPTION
-Uses: Get-SmbShare, Get-SmbShareAccess, Get-Acl, Get-SmbServerConfiguration, Set-SmbServerConfiguration, Get-AvailMB, Get-Counter, Start-Sleep, Get-WindowsFeature, Get-Website, Get-WebBinding.
 AppliesTo: All
 Scope: Computer
-Category: Configuration Hygiene & Best Practices.
-Impact: Medium(Time).
+Category: Configuration Hygiene & Best Practices
+Impact: Medium(Time)
+Uses: None.
+FalsePositives: None.
 #>
-
     param([int]$WarnDays=60,[int]$FailDays=30)
     $now = Get-Date
     $certs = Get-ChildItem Cert:\LocalMachine\My -ErrorAction SilentlyContinue
@@ -390,16 +391,16 @@ Impact: Medium(Time).
 function HealthTest-IisBindings {
 <#
 .SYNOPSIS
-Checks Iis Bindings and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+Checks Iis Bindings and flags unhealthy or non-baseline states
 
 .DESCRIPTION
-Uses: Get-ADRootDSE, Get-ADObject, Get-SmbShare, Get-SmbShareAccess, Get-Acl, Get-SmbServerConfiguration, Set-SmbServerConfiguration, Get-AvailMB, Get-Counter, Start-Sleep.
 AppliesTo: Server
 Scope: Computer
-Category: Configuration Hygiene & Best Practices.
-Impact: Medium(Time).
+Category: Configuration Hygiene & Best Practices
+Impact: Medium(Time)
+Uses: Get-WindowsFeature, Get-Website, Get-WebBinding.
+FalsePositives: None.
 #>
-
     # Skip test on workstations
     # 1 = Workstation 2 = Domain Controller 3 = Windows Server
     $host_type = (Get-CimInstance Win32_OperatingSystem).ProductType
@@ -438,16 +439,16 @@ Impact: Medium(Time).
 function HealthTest-RamPressure {
 <#
 .SYNOPSIS
-Checks Ram Pressure and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+Checks Ram Pressure and flags unhealthy or non-baseline states
 
 .DESCRIPTION
-Uses: Get-ADRootDSE, Get-ADObject, Get-SmbShare, Get-SmbShareAccess, Get-Acl, Get-SmbServerConfiguration, Set-SmbServerConfiguration.
 AppliesTo: All
 Scope: Computer
-Category: Configuration Hygiene & Best Practices.
-Impact: Medium(Time).
+Category: Configuration Hygiene & Best Practices
+Impact: Medium(Time)
+Uses: Get-Counter.
+FalsePositives: None.
 #>
-
   [CmdletBinding()]
   [OutputType([bool])]
   param(
@@ -502,16 +503,16 @@ Impact: Medium(Time).
 function HealthTest-ShareReasonableness {
 <#
 .SYNOPSIS
-Checks Share Reasonableness and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+Checks Share Reasonableness and flags unhealthy or non-baseline states
 
 .DESCRIPTION
-Uses: Get-ADRootDSE, Get-ADObject.
 AppliesTo: All
 Scope: Computer
-Category: Configuration Hygiene & Best Practices.
-Impact: Medium(Time).
+Category: Configuration Hygiene & Best Practices
+Impact: Medium(Time)
+Uses: Set-SmbServerConfiguration, Get-SmbShare, Get-SmbShareAccess.
+FalsePositives: None.
 #>
-
   [CmdletBinding()]param(
     [string[]]$BroadPrincipals = @(
       'Everyone',
@@ -694,16 +695,16 @@ Impact: Medium(Time).
 function HealthTest-DisksHaveFreeSpace {
 <#
 .SYNOPSIS
-Checks Disks Have Free Space and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+Checks Disks Have Free Space and flags unhealthy or non-baseline states
 
 .DESCRIPTION
-Uses: Get-ADOptionalFeature, Get-ADRootDSE, Get-ADObject.
 AppliesTo: All
 Scope: Computer
-Category: Configuration Hygiene & Best Practices.
-Impact: Medium(Time).
+Category: Configuration Hygiene & Best Practices
+Impact: Medium(Time)
+Uses: None.
+FalsePositives: None.
 #>
-
     foreach ($d in [System.IO.DriveInfo]::GetDrives()) {
         if (-not $d.IsReady) { continue }
         $t = $d.DriveType.ToString()
@@ -725,16 +726,16 @@ Impact: Medium(Time).
 function HealthTest-NtdsPathsLocation{
 <#
 .SYNOPSIS
-Checks Ntds Paths Location and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+Checks Ntds Paths Location and flags unhealthy or non-baseline states
 
 .DESCRIPTION
-Uses: Get-ADRootDSE, Get-ADReplicationPartnerMetadata, Get-ADOptionalFeature, Get-ADObject.
 AppliesTo: All
 Scope: Computer
-Category: Security & Stability Risks.
-Impact: Medium(Time).
+Category: Security & Stability Risks
+Impact: Medium(Time)
+Uses: Get-ItemProperty.
+FalsePositives: None.
 #>
-
   [CmdletBinding()]
   param(
     [string[]]$ExpectedDbRoots,
@@ -763,16 +764,16 @@ Impact: Medium(Time).
 function HealthTest-RequiredSrvRecords{
 <#
 .SYNOPSIS
-Checks Required Srv Records and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+Checks Required Srv Records and flags unhealthy or non-baseline states
 
 .DESCRIPTION
-Uses: Get-ADObject.
 AppliesTo: All
 Scope: Computer
-Category: Configuration Hygiene & Best Practices.
-Impact: Medium(Time).
+Category: Configuration Hygiene & Best Practices
+Impact: Medium(Time)
+Uses: Resolve-DnsName.
+FalsePositives: None.
 #>
-
   $dom=(Get-CimInstance Win32_ComputerSystem).Domain
   $labels=@("_ldap._tcp.dc._msdcs.$dom","_kerberos._tcp.$dom","_kerberos._udp.$dom")
   $missing=$false
@@ -786,16 +787,16 @@ Impact: Medium(Time).
 function HealthTest-LdapSigningChannelBinding {
 <#
 .SYNOPSIS
-Checks Ldap Signing Channel Binding and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+Checks Ldap Signing Channel Binding and flags unhealthy or non-baseline states
 
 .DESCRIPTION
-Uses: Get-ADObject.
 AppliesTo: DC
 Scope: Domain
-Category: Configuration Hygiene & Best Practices.
-Impact: Medium(Time).
+Category: Configuration Hygiene & Best Practices
+Impact: Medium(Time)
+Uses: Get-ItemProperty.
+FalsePositives: None.
 #>
-
     $p = 'HKLM:\SYSTEM\CurrentControlSet\Services\NTDS\Parameters'
 
     # Read all registry values in one shot (avoids repeated calls)
@@ -826,16 +827,16 @@ Impact: Medium(Time).
 function HealthTest-UnconstrainedDelegationAccounts{
 <#
 .SYNOPSIS
-Checks Unconstrained Delegation Accounts and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+Checks Unconstrained Delegation Accounts and flags unhealthy or non-baseline states
 
 .DESCRIPTION
-Uses: Get-ADObject.
 AppliesTo: All
 Scope: Computer
-Category: Security & Stability Risks.
-Impact: Medium(Time).
+Category: Security & Stability Risks
+Impact: Medium(Time)
+Uses: Get-ADObject.
+FalsePositives: None.
 #>
-
   [CmdletBinding()] param([switch]$IncludeDomainControllers)
 
   $bitTrusted  = 524288    # 0x80000 TRUSTED_FOR_DELEGATION
@@ -888,16 +889,16 @@ Impact: Medium(Time).
 function HealthTest-DuplicateSpn{
 <#
 .SYNOPSIS
-Checks Duplicate Spn and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+Checks Duplicate Spn and flags unhealthy or non-baseline states
 
 .DESCRIPTION
-Uses: Get-ADDomainController.
 AppliesTo: DC
 Scope: Domain
-Category: Configuration Hygiene & Best Practices.
-Impact: Medium(Time).
+Category: Configuration Hygiene & Best Practices
+Impact: Medium(Time)
+Uses: Get-ADObject.
+FalsePositives: None.
 #>
-
   $objs = Get-ADObject -LDAPFilter "(servicePrincipalName=*)" -Properties servicePrincipalName,sAMAccountName,distinguishedName -ErrorAction Stop
   if(-not $objs){ Write-Warning "[pass] No objects with SPN found"; return }
 
@@ -925,16 +926,16 @@ Impact: Medium(Time).
 function HealthTest-GcPlacement{
 <#
 .SYNOPSIS
-Checks Gc Placement and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+Checks Gc Placement and flags unhealthy or non-baseline states
 
 .DESCRIPTION
-Uses: Get-Tpm, w32tm.exe.
 AppliesTo: DC
 Scope: Domain
-Category: Configuration Hygiene & Best Practices.
-Impact: Medium(Time).
+Category: Configuration Hygiene & Best Practices
+Impact: Medium(Time)
+Uses: Get-ADDomainController.
+FalsePositives: None.
 #>
-
   [CmdletBinding()] param([switch]$AtLeastOnePerSite=$true)
   $dcs=Get-ADDomainController -Filter *
   if(-not $AtLeastOnePerSite){
@@ -1017,16 +1018,16 @@ and returns friendly licensing status fields for reporting.
 function HealthTest-SoftwareLicensing{
 <#
 .SYNOPSIS
-Checks Software Licensing and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+Checks Software Licensing and flags unhealthy or non-baseline states
 
 .DESCRIPTION
-Uses: Get-Tpm, chkdsk.exe.
 AppliesTo: All
 Scope: Computer
-Category: Audit / Compliance / Informational.
-Impact: Medium(Time).
+Category: Audit / Compliance / Informational
+Impact: Medium(Time)
+Uses: Write-BasedOnTestResult.
+FalsePositives: None.
 #>
-
     Get-SoftwareLicensing | %{
         # ($_ | Format-List * -Force | Out-String).Trim()|write-host -f green
         Write-BasedOnTestResult "Is $($_.ProductName) Licensed?" -Test $_.IsLicensed -comment "$_"
@@ -1036,16 +1037,16 @@ Impact: Medium(Time).
 function HealthTest-IsTPMActivated {
 <#
 .SYNOPSIS
-Checks Is TPM Activated and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+Checks Is TPM Activated and flags unhealthy or non-baseline states
 
 .DESCRIPTION
-Uses: chkdsk.exe.
 AppliesTo: Mobile
 Scope: Computer
-Category: Configuration Hygiene & Best Practices.
-Impact: Medium(Time).
+Category: Configuration Hygiene & Best Practices
+Impact: Medium(Time)
+Uses: Write-BasedOnTestResult, Get-Tpm.
+FalsePositives: None.
 #>
-
   Write-BasedOnTestResult "Is TPM Activated?" -Test (Get-Tpm).TpmActivated
 }
 
@@ -1057,16 +1058,16 @@ Impact: Medium(Time).
 function HealthTest-TimeSyncAccuracy {
 <#
 .SYNOPSIS
-Checks Time Sync Accuracy and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+Checks Time Sync Accuracy and flags unhealthy or non-baseline states
 
 .DESCRIPTION
-Uses: Get-WinEvent, Get-PhysicalDisk, Get-StorageReliabilityCounter, chkdsk.exe.
 AppliesTo: All
 Scope: Computer
-Category: Configuration Hygiene & Best Practices.
-Impact: Medium(Time).
+Category: Configuration Hygiene & Best Practices
+Impact: Medium(Time)
+Uses: None.
+FalsePositives: None.
 #>
-
   param(
     [int]$WarnOffsetSeconds=15,
     [int]$FailOffsetSeconds=30,
@@ -1141,14 +1142,15 @@ Impact: Medium(Time).
 function HealthTest-PagefileSanity{
 <#
 .SYNOPSIS
-Checks Pagefile Sanity and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+Checks Pagefile Sanity and flags unhealthy or non-baseline states
 
 .DESCRIPTION
-Uses: Get-WinEvent, Get-PhysicalDisk, Get-StorageReliabilityCounter, chkdsk.exe.
 AppliesTo: All
 Scope: Computer
-Category: Configuration Hygiene & Best Practices.
-Impact: Medium(Time).
+Category: Configuration Hygiene & Best Practices
+Impact: Medium(Time)
+Uses: Get-CimInstance.
+FalsePositives: None.
 #>
   [CmdletBinding()] param([int]$MinMB=1024,[switch]$RequireOnSystemDrive)
   $cs   = Get-CimInstance Win32_ComputerSystem -ErrorAction Stop
@@ -1195,14 +1197,15 @@ Impact: Medium(Time).
 function HealthTest-Storage {
 <#
 .SYNOPSIS
-Checks Storage and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+Checks Storage and flags unhealthy or non-baseline states
 
 .DESCRIPTION
-Uses: Get-WinEvent, wevtutil.exe.
 AppliesTo: All
 Scope: Computer
-Category: Configuration Hygiene & Best Practices.
-Impact: High(Time).
+Category: Configuration Hygiene & Best Practices
+Impact: High(Time)
+Uses: Get-PhysicalDisk, Get-StorageReliabilityCounter.
+FalsePositives: None.
 #>
     [CmdletBinding()]
     param([int]$MaxTemperatureC = 70,[int]$MaxPercentUsed = 95)
@@ -1275,14 +1278,15 @@ Impact: High(Time).
 function HealthTest-NtfsDirtyBit {
 <#
 .SYNOPSIS
-Checks Ntfs Dirty Bit and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+Checks Ntfs Dirty Bit and flags unhealthy or non-baseline states
 
 .DESCRIPTION
-Uses: Get-WinEvent, wevtutil.exe.
 AppliesTo: All
 Scope: Computer
-Category: Configuration Hygiene & Best Practices.
-Impact: Medium(Time).
+Category: Configuration Hygiene & Best Practices
+Impact: Medium(Time)
+Uses: Get-Volume.
+FalsePositives: None.
 #>
     $dirty = @()
     $drives = Get-Volume -FileSystem NTFS -ErrorAction SilentlyContinue
@@ -1297,14 +1301,15 @@ Impact: Medium(Time).
 function HealthTest-RecentDiskErrors {
 <#
 .SYNOPSIS
-Checks Recent Disk Errors and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+Checks Recent Disk Errors and flags unhealthy or non-baseline states
 
 .DESCRIPTION
-Uses: Get-WinEvent, wevtutil.exe.
 AppliesTo: All
 Scope: Computer
-Category: Configuration Hygiene & Best Practices.
-Impact: High(Time).
+Category: Configuration Hygiene & Best Practices
+Impact: High(Time)
+Uses: Get-WinEvent.
+FalsePositives: None.
 #>
     param([int]$Hours = 48)
 
@@ -1419,14 +1424,15 @@ function Test-DiskHasFreeSpace {
 function HealthTest-EventLogMaxSizes{
 <#
 .SYNOPSIS
-Checks Event Log Max Sizes and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+Checks Event Log Max Sizes and flags unhealthy or non-baseline states
 
 .DESCRIPTION
-Uses: Get-WinEvent, wevtutil.exe.
 AppliesTo: All
 Scope: Computer
-Category: Configuration Hygiene & Best Practices, Audit / Compliance / Informational.
-Impact: Medium(Network).
+Category: Configuration Hygiene & Best Practices
+Impact: Medium(Network)
+Uses: Select-String.
+FalsePositives: None.
 #>
   [CmdletBinding()]
   param([hashtable]$OverrideMinSizesMB)

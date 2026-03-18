@@ -3,17 +3,17 @@ Network & Connectivity
 #>
 
 function HealthTest-ConnectivityToDCs {
-
 <#
 .SYNOPSIS
-Checks Connectivity To D Cs and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+Checks Connectivity To D Cs and flags unhealthy or non-baseline states
 
 .DESCRIPTION
-Uses: Get-NetIPConfiguration, Get-NetIPInterface, Get-NetConnectionProfile.
 AppliesTo: DC
 Scope: Domain
-Category: Availability / Server Down Signals.
-Impact: Medium(Network).
+Category: Availability / Server Down Signals
+Impact: Medium(Network)
+Uses: Resolve-DnsName, Get-ADForest.
+FalsePositives: None.
 #>
   $dcs  = Get-DomainControllers
 
@@ -65,14 +65,15 @@ Impact: Medium(Network).
 function HealthTest-NetworkConnectionProfiles {
 <#
 .SYNOPSIS
-Checks Network Connection Profiles and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+Checks Network Connection Profiles and flags unhealthy or non-baseline states
 
 .DESCRIPTION
-Uses: Get-NetIPConfiguration, Get-NetIPInterface.
 AppliesTo: All
 Scope: Computer
-Category: Availability / Server Down Signals.
-Impact: Medium(Time).
+Category: Availability / Server Down Signals
+Impact: Medium(Time)
+Uses: Get-NetConnectionProfile, Test-NetConnectivityToNetwork.
+FalsePositives: None.
 #>
   [CmdletBinding()]
   param()
@@ -122,14 +123,15 @@ Impact: Medium(Time).
 function HealthTest-SingleDefaultGateway{
 <#
 .SYNOPSIS
-Checks Single Default Gateway and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+Checks Single Default Gateway and flags unhealthy or non-baseline states
 
 .DESCRIPTION
-Uses: Get-NetIPConfiguration, Get-NetIPInterface.
 AppliesTo: All
 Scope: Computer
-Category: Availability / Server Down Signals.
-Impact: Medium(Time).
+Category: Availability / Server Down Signals
+Impact: Medium(Time)
+Uses: Get-NetIPConfiguration.
+FalsePositives: None.
 #>
   [CmdletBinding()] param([switch]$AllowOnePerFamily)
   $cfg = Get-NetIPConfiguration
@@ -169,14 +171,15 @@ Impact: Medium(Time).
 function HealthTest-NetworkInterfaceMetrics{
 <#
 .SYNOPSIS
-Checks Network Interface Metrics and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+Checks Network Interface Metrics and flags unhealthy or non-baseline states
 
 .DESCRIPTION
-Uses: Get-NetIPConfiguration, Resolve-DnsName.
 AppliesTo: All
 Scope: Computer
-Category: Configuration Hygiene & Best Practices.
-Impact: Medium(Time).
+Category: Configuration Hygiene & Best Practices
+Impact: Medium(Time)
+Uses: Get-NetIPInterface.
+FalsePositives: None.
 #>
   [CmdletBinding()] param([int]$MaxPreferredMetric=25)
   $ifs=Get-NetIPInterface -AddressFamily IPv4 | Where-Object {$_.ConnectionState -eq 'Connected'}
@@ -356,14 +359,15 @@ function Test-MultipleGatewayConfiguration {
 function HealthTest-IPv6Binding{
 <#
 .SYNOPSIS
-Checks I Pv 6 Binding and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+Checks I Pv 6 Binding and flags unhealthy or non-baseline states
 
 .DESCRIPTION
-Uses: Test-WSMan, Get-NetAdapterStatistics.
 AppliesTo: All
 Scope: Computer
-Category: Configuration Hygiene & Best Practices.
-Impact: Medium(Time).
+Category: Configuration Hygiene & Best Practices
+Impact: Medium(Time)
+Uses: Get-NetAdapterBinding.
+FalsePositives: None.
 #>
   [CmdletBinding()] param([switch]$RequireEnabled)
   $rows = Get-NetAdapterBinding -ComponentID ms_tcpip6 | Select-Object Name,Enabled
@@ -382,14 +386,15 @@ Impact: Medium(Time).
 function HealthTest-Nic {
 <#
 .SYNOPSIS
-Checks Nic and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+Checks Nic and flags unhealthy or non-baseline states
 
 .DESCRIPTION
-Uses: Test-WSMan.
 AppliesTo: All
 Scope: Computer
-Category: Configuration Hygiene & Best Practices.
-Impact: Medium(Time).
+Category: Configuration Hygiene & Best Practices
+Impact: Medium(Time)
+Uses: Get-NetAdapterStatistics.
+FalsePositives: None.
 #>
     $nics = Get-NetAdapter -Physical -ErrorAction SilentlyContinue | Where-Object { $_.Status -eq 'Up' }
     if (-not $nics) {
@@ -465,14 +470,15 @@ Impact: Medium(Time).
 function HealthTest-WinRMListening{
 <#
 .SYNOPSIS
-Checks Win RM Listening and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+Checks Win RM Listening and flags unhealthy or non-baseline states
 
 .DESCRIPTION
-Uses: Test-WSMan.
 AppliesTo: All
 Scope: Computer
-Category: Availability / Server Down Signals.
-Impact: Medium(Network).
+Category: Availability / Server Down Signals
+Impact: Medium(Network)
+Uses: Test-WSMan.
+FalsePositives: None.
 #>
   $svc=Get-Service WinRM -ErrorAction Stop
   if($svc.Status -ne 'Running'){ Write-Warning "[failure] WinRM service is not running`nStatus=$($svc.Status)"; return }

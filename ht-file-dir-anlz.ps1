@@ -19,14 +19,15 @@ function Normalize-DirectoryPath {
 function HealthTest-LargeDirectories {
 <#
 .SYNOPSIS
-Checks Large Directories and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+Checks Large Directories and flags unhealthy or non-baseline states
 
 .DESCRIPTION
-Uses: None.
 AppliesTo: All
 Scope: Computer
-Category: Configuration Hygiene & Best Practices.
-Impact: High(Time).
+Category: Configuration Hygiene & Best Practices
+Impact: High(Time)
+Uses: None.
+FalsePositives: None.
 #>
     $foundLargeDirectory = $false
 

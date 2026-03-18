@@ -137,14 +137,15 @@ function Get-DaysSinceLastVirusScan {
 function HealthTest-RecentWindowsScan {
 <#
 .SYNOPSIS
-Checks Recent Windows Scan and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+Checks Recent Windows Scan and flags unhealthy or non-baseline states
 
 .DESCRIPTION
-Uses: Get-WindowsOptionalFeature, Get-NetFirewallProfile, Get-MpComputerStatus, Get-EffState.
 AppliesTo: All
 Scope: Computer
-Category: Configuration Hygiene & Best Practices.
-Impact: Medium(Time).
+Category: Configuration Hygiene & Best Practices
+Impact: Medium(Time)
+Uses: None.
+FalsePositives: None.
 #>
     $MAX_WARN_DAYS = 4
     $MAX_FAILURE_DAYS = 8
@@ -180,14 +181,15 @@ Impact: Medium(Time).
 function HealthTest-SchanelBaseline{
 <#
 .SYNOPSIS
-Checks Schanel Baseline and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+Checks Schanel Baseline and flags unhealthy or non-baseline states
 
 .DESCRIPTION
-Uses: Get-WindowsOptionalFeature, Get-NetFirewallProfile, Get-MpComputerStatus.
 AppliesTo: All
 Scope: Computer
-Category: Audit / Compliance / Informational.
-Impact: Medium(Time).
+Category: Audit / Compliance / Informational
+Impact: Medium(Time)
+Uses: Get-ItemProperty.
+FalsePositives: None.
 #>
   $base='HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols'
   function Get-EffState($proto,$role){
@@ -246,14 +248,15 @@ Impact: Medium(Time).
 function HealthTest-DefenderStatus {
 <#
 .SYNOPSIS
-Checks Defender Status and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+Checks Defender Status and flags unhealthy or non-baseline states
 
 .DESCRIPTION
-Uses: Get-WindowsOptionalFeature, Get-NetFirewallProfile, vssadmin.exe.
 AppliesTo: All
 Scope: Computer
-Category: Security & Stability Risks.
-Impact: Medium(Time).
+Category: Security & Stability Risks
+Impact: Medium(Time)
+Uses: Get-MpComputerStatus.
+FalsePositives: None.
 #>
     param([int]$WarnSigAgeDays=2,[int]$FailSigAgeDays=7)
     $s = Get-MpComputerStatus
@@ -274,14 +277,15 @@ Impact: Medium(Time).
 function HealthTest-FirewallEnabled {
 <#
 .SYNOPSIS
-Checks Firewall Enabled and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+Checks Firewall Enabled and flags unhealthy or non-baseline states
 
 .DESCRIPTION
-Uses: Get-PnpDevice, Get-PnpDeviceProperty, Get-AuthenticodeSignature, Split-Path, Get-WindowsOptionalFeature.
 AppliesTo: All
 Scope: Computer
-Category: Security & Stability Risks.
-Impact: Medium(Time).
+Category: Security & Stability Risks
+Impact: Medium(Time)
+Uses: Write-BasedOnTestResult, Get-NetFirewallProfile.
+FalsePositives: None.
 #>
     Write-BasedOnTestResult "Is mpssvc (the firewall service) enabled?" -Test ((Get-Service -name mpssvc).status -eq 'Running')
     Get-NetFirewallProfile | ForEach-Object {
@@ -293,14 +297,15 @@ Impact: Medium(Time).
 function HealthTest-Smb1Disabled{
 <#
 .SYNOPSIS
-Checks Smb 1 Disabled and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+Checks Smb 1 Disabled and flags unhealthy or non-baseline states
 
 .DESCRIPTION
-Uses: Get-PnpDevice, Get-PnpDeviceProperty, Get-AuthenticodeSignature, Split-Path.
 AppliesTo: All
 Scope: Computer
-Category: Security & Stability Risks.
-Impact: Medium(Time).
+Category: Security & Stability Risks
+Impact: Medium(Time)
+Uses: Get-WindowsOptionalFeature.
+FalsePositives: None.
 #>
   $f=Get-WindowsOptionalFeature -Online -FeatureName SMB1Protocol -ErrorAction SilentlyContinue
   $state=$f.State
@@ -311,14 +316,15 @@ Impact: Medium(Time).
 function HealthTest-WmiRepository{
 <#
 .SYNOPSIS
-Checks Wmi Repository and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+Checks Wmi Repository and flags unhealthy or non-baseline states
 
 .DESCRIPTION
-Uses: Get-PnpDevice, Get-PnpDeviceProperty, Get-AuthenticodeSignature, Split-Path.
 AppliesTo: All
 Scope: Computer
-Category: Configuration Hygiene & Best Practices.
-Impact: Medium(Time).
+Category: Configuration Hygiene & Best Practices
+Impact: Medium(Time)
+Uses: None.
+FalsePositives: None.
 #>
   $out=& winmgmt /verifyrepository 2>&1
   $ok=($out -match 'consistent')
@@ -329,14 +335,15 @@ Impact: Medium(Time).
 function HealthTest-VssWriters{
 <#
 .SYNOPSIS
-Checks Vss Writers and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+Checks Vss Writers and flags unhealthy or non-baseline states
 
 .DESCRIPTION
-Uses: Get-PnpDevice, Get-PnpDeviceProperty, Get-AuthenticodeSignature, Split-Path.
 AppliesTo: All
 Scope: Computer
-Category: Configuration Hygiene & Best Practices.
-Impact: Medium(Time).
+Category: Configuration Hygiene & Best Practices
+Impact: Medium(Time)
+Uses: Select-String.
+FalsePositives: None.
 #>
   $out=& vssadmin list writers 2>&1
   $bad=($out | Select-String -Pattern 'State: \d+ \((?i:Retryable error|Waiting for completion|Failed)\)')
@@ -349,14 +356,15 @@ Impact: Medium(Time).
 function HealthTest-UnsignedDrivers {
 <#
 .SYNOPSIS
-Checks Unsigned Drivers and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+Checks Unsigned Drivers and flags unhealthy or non-baseline states
 
 .DESCRIPTION
-Uses: nltest.exe.
 AppliesTo: All
 Scope: Computer
-Category: Security & Stability Risks.
-Impact: Medium(Time).
+Category: Security & Stability Risks
+Impact: Medium(Time)
+Uses: Get-PnpDeviceProperty, Get-AuthenticodeSignature, Get-PnpDevice.
+FalsePositives: None.
 #>
   [CmdletBinding()]
   param([string[]]$WhitelistDeviceIdRegex = @('^BTHENUM\\'))
@@ -459,16 +467,16 @@ Impact: Medium(Time).
 function HealthTest-NtdsLogVolumeFree{
 <#
 .SYNOPSIS
-Checks Ntds Log Volume Free and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+Checks Ntds Log Volume Free and flags unhealthy or non-baseline states
 
 .DESCRIPTION
-Uses: nltest.exe.
 AppliesTo: All
 Scope: Computer
-Category: Configuration Hygiene & Best Practices.
-Impact: Medium(Time).
+Category: Configuration Hygiene & Best Practices
+Impact: Medium(Time)
+Uses: Get-ItemProperty.
+FalsePositives: None.
 #>
-
   [CmdletBinding()] param([int]$MinFreeGB=5)
   $p='HKLM:\SYSTEM\CurrentControlSet\Services\NTDS\Parameters'
   $logPath=(Get-ItemProperty $p -Name 'Database log files path').'Database log files path'
@@ -491,16 +499,16 @@ Impact: Medium(Time).
 function HealthTest-GpWmiFiltersNamespaces{
 <#
 .SYNOPSIS
-Checks Gp Wmi Filters Namespaces and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+Checks Gp Wmi Filters Namespaces and flags unhealthy or non-baseline states
 
 .DESCRIPTION
-Uses: Test-ComputerSecureChannel.
 AppliesTo: All
 Scope: Computer
-Category: Configuration Hygiene & Best Practices.
-Impact: Medium(Time).
+Category: Configuration Hygiene & Best Practices
+Impact: Medium(Time)
+Uses: New-Object.
+FalsePositives: None.
 #>
-
   $bad=$false
   $items=@()
 
@@ -596,16 +604,16 @@ Impact: Medium(Time).
 function HealthTest-CrashDumpSignals {
 <#
 .SYNOPSIS
-Checks Crash Dump Signals and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+Checks Crash Dump Signals and flags unhealthy or non-baseline states
 
 .DESCRIPTION
-Uses: Get-BitLockerVolume, Get-HotFix, Get-FirstLine, Get-WinEvent, certutil.exe.
 AppliesTo: All
 Scope: Computer
-Category: Configuration Hygiene & Best Practices.
-Impact: Medium(Time).
+Category: Configuration Hygiene & Best Practices
+Impact: Medium(Time)
+Uses: None.
+FalsePositives: None.
 #>
-
     param([int]$Hours = 48)
 
     $pass = $true
@@ -625,16 +633,16 @@ Impact: Medium(Time).
 function HealthTest-SeriousRecentEventLogs {
 <#
 .SYNOPSIS
-Checks Serious Recent Event Logs and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+Checks Serious Recent Event Logs and flags unhealthy or non-baseline states
 
 .DESCRIPTION
-Uses: Get-BitLockerVolume, Get-HotFix, certutil.exe.
 AppliesTo: All
 Scope: Computer
-Category: Configuration Hygiene & Best Practices.
-Impact: Medium(Network).
+Category: Configuration Hygiene & Best Practices
+Impact: Medium(Network)
+Uses: Get-WinEvent.
+FalsePositives: None.
 #>
-
     [CmdletBinding()]
     param([int]$Hours = 24)
 
@@ -705,16 +713,16 @@ Impact: Medium(Network).
 function HealthTest-HotfixBaseline{
 <#
 .SYNOPSIS
-Checks Hotfix Baseline and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+Checks Hotfix Baseline and flags unhealthy or non-baseline states
 
 .DESCRIPTION
-Uses: Get-BitLockerVolume.
 AppliesTo: All
 Scope: Computer
-Category: Audit / Compliance / Informational.
-Impact: Medium(Network).
+Category: Audit / Compliance / Informational
+Impact: Medium(Network)
+Uses: Get-HotFix.
+FalsePositives: None.
 #>
-
   [CmdletBinding()] param([string[]]$RequiredKBs)
   if(-not $RequiredKBs -or $RequiredKBs.Count -eq 0){ Write-Warning "[pass] No hotfix baseline provided"; return }
   $have=(Get-HotFix | Select-Object -ExpandProperty HotFixID)
@@ -728,14 +736,15 @@ Impact: Medium(Network).
 function HealthTest-BitLockerStatus {
 <#
 .SYNOPSIS
-Checks Bit Locker Status and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+Checks Bit Locker Status and flags unhealthy or non-baseline states
 
 .DESCRIPTION
-Uses: None.
 AppliesTo: All
 Scope: Computer
-Category: Configuration Hygiene & Best Practices.
-Impact: Medium(Time).
+Category: Configuration Hygiene & Best Practices
+Impact: Medium(Time)
+Uses: Get-BitLockerVolume.
+FalsePositives: None.
 #>
     if (-not (Get-Command Get-BitLockerVolume -ErrorAction SilentlyContinue)) {
         Write-Warning "[warning] BitLocker PowerShell cmdlets not available; skipping BitLocker status check"; return
@@ -758,14 +767,15 @@ Impact: Medium(Time).
 function HealthTest-EfsRecoveryAgents{
 <#
 .SYNOPSIS
-Checks Efs Recovery Agents and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+Checks Efs Recovery Agents and flags unhealthy or non-baseline states
 
 .DESCRIPTION
-Uses: None.
 AppliesTo: All
 Scope: Computer
-Category: Configuration Hygiene & Best Practices.
-Impact: Medium(Time).
+Category: Configuration Hygiene & Best Practices
+Impact: Medium(Time)
+Uses: Select-String.
+FalsePositives: None.
 #>
   $out=& certutil -recoveryagent 2>&1
   $has=($out | Select-String -Pattern 'Recovery Agent' -SimpleMatch)
@@ -776,14 +786,15 @@ Impact: Medium(Time).
 function HealthTest-NtlmHardening {
 <#
 .SYNOPSIS
-Checks Ntlm Hardening and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+Checks Ntlm Hardening and flags unhealthy or non-baseline states
 
 .DESCRIPTION
-Uses: None.
 AppliesTo: All
 Scope: Computer
-Category: Security & Stability Risks.
-Impact: Medium(Time).
+Category: Security & Stability Risks
+Impact: Medium(Time)
+Uses: Get-ItemProperty.
+FalsePositives: None.
 #>
   $lsa = 'HKLM:\SYSTEM\CurrentControlSet\Control\Lsa'
 
@@ -809,14 +820,15 @@ Impact: Medium(Time).
 function HealthTest-RdpHardening {
 <#
 .SYNOPSIS
-Checks Rdp Hardening and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+Checks Rdp Hardening and flags unhealthy or non-baseline states
 
 .DESCRIPTION
-Uses: None.
 AppliesTo: All
 Scope: Computer
-Category: Security & Stability Risks.
-Impact: Medium(Time).
+Category: Security & Stability Risks
+Impact: Medium(Time)
+Uses: Get-ItemProperty.
+FalsePositives: None.
 #>
   $k = 'HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp'
 
@@ -845,14 +857,15 @@ Impact: Medium(Time).
 function HealthTest-NonDefaultShares {
 <#
 .SYNOPSIS
-Checks Non Default Shares and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+Checks Non Default Shares and flags unhealthy or non-baseline states
 
 .DESCRIPTION
-Uses: Get-CimInstance.
 AppliesTo: All
 Scope: Computer
-Category: Configuration Hygiene & Best Practices.
-Impact: Medium(Time).
+Category: Configuration Hygiene & Best Practices
+Impact: Medium(Time)
+Uses: Set-Service, Stop-Service.
+FalsePositives: None.
 #>
   # 0(Workstation standalone),  1(Workstation domain joined), 2(Server standalone), 3(Server joined), 4(DC non-FSMO), 5(DC with FSMO role)
   $domainRole = (Get-CimInstance Win32_ComputerSystem).DomainRole
@@ -880,14 +893,15 @@ Impact: Medium(Time).
 function HealthTest-LocalAcntRequirePass {
 <#
 .SYNOPSIS
-Checks Local Acnt Require Pass and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+Checks Local Acnt Require Pass and flags unhealthy or non-baseline states
 
 .DESCRIPTION
-Uses: Get-SmbServerConfiguration.
 AppliesTo: All
 Scope: Computer
-Category: Configuration Hygiene & Best Practices.
-Impact: Medium(Time).
+Category: Configuration Hygiene & Best Practices
+Impact: Medium(Time)
+Uses: Get-CimInstance.
+FalsePositives: None.
 #>
     $ok = $true
     $no_req_pass_accounts=Get-CimInstance -Class Win32_UserAccount -Filter `
@@ -907,14 +921,15 @@ Impact: Medium(Time).
 function HealthTest-RestrictAnonymous {
 <#
 .SYNOPSIS
-Checks Restrict Anonymous and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+Checks Restrict Anonymous and flags unhealthy or non-baseline states
 
 .DESCRIPTION
-Uses: Get-SmbServerConfiguration.
 AppliesTo: All
 Scope: Computer
-Category: Security & Stability Risks.
-Impact: Medium(Time).
+Category: Security & Stability Risks
+Impact: Medium(Time)
+Uses: Get-ItemProperty.
+FalsePositives: None.
 #>
   $p  = 'HKLM:\SYSTEM\CurrentControlSet\Control\Lsa'
   $ra = (Get-ItemProperty $p -Name restrictanonymous      -ErrorAction SilentlyContinue).restrictanonymous
@@ -934,14 +949,15 @@ Impact: Medium(Time).
 function HealthTest-DefaultLocale {
 <#
 .SYNOPSIS
-Checks Default Locale and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+Checks Default Locale and flags unhealthy or non-baseline states
 
 .DESCRIPTION
-Uses: Get-SmbServerConfiguration.
 AppliesTo: All
 Scope: Computer
-Category: Audit / Compliance / Informational.
-Impact: Medium(Time).
+Category: Audit / Compliance / Informational
+Impact: Medium(Time)
+Uses: Get-ItemProperty.
+FalsePositives: None.
 #>
     # see https://newbedev.com/how-can-i-manually-determine-the-codepage-and-locale-of-the-current-os
     $loc = Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Nls\CodePage' | Select-Object ACP,OEMCP
@@ -958,14 +974,15 @@ Impact: Medium(Time).
 function HealthTest-PendingReboot {
 <#
 .SYNOPSIS
-Checks Pending Reboot and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+Checks Pending Reboot and flags unhealthy or non-baseline states
 
 .DESCRIPTION
-Uses: Get-SmbServerConfiguration.
 AppliesTo: All
 Scope: Computer
-Category: Configuration Hygiene & Best Practices.
-Impact: Medium(Time).
+Category: Configuration Hygiene & Best Practices
+Impact: Medium(Time)
+Uses: Write-Debug.
+FalsePositives: None.
 #>
     $pending = $false
     if (Test-Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending') { $pending = $true }
@@ -979,14 +996,15 @@ Impact: Medium(Time).
 function HealthTest-SmbSigningRequired{
 <#
 .SYNOPSIS
-Checks Smb Signing Required and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+Checks Smb Signing Required and flags unhealthy or non-baseline states
 
 .DESCRIPTION
-Uses: Get-SmbServerConfiguration.
 AppliesTo: All
 Scope: Computer
-Category: Security & Stability Risks.
-Impact: Medium(Time).
+Category: Security & Stability Risks
+Impact: Medium(Time)
+Uses: Get-SmbServerConfiguration.
+FalsePositives: None.
 #>
   if ((Get-PropValue -obj (Get-Service -Name LanmanServer) -name Status) -ne 'running') {
       Write-Warning "[pass] Skipping HealthTest-SmbSigningRequired; LanmanServer service not running."

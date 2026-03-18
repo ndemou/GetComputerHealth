@@ -5,14 +5,15 @@ Special
 function HealthTest-Dummy {
 <#
 .SYNOPSIS
-Checks Dummy and flags unhealthy or non-baseline states by evaluating key signals from local/domain data sources and reporting pass/warn/fail outcomes.
+Checks Dummy and flags unhealthy or non-baseline states
 
 .DESCRIPTION
-Uses: Write-Output.
 AppliesTo: All
 Scope: Computer
-Category: Audit / Compliance / Informational.
-Impact: Medium(Time).
+Category: Audit / Compliance / Informational
+Impact: Medium(Time)
+Uses: None.
+FalsePositives: None.
 #>
     Write-Output "Dummy debug message"
     Write-Warning "[info] Dummy info message"
