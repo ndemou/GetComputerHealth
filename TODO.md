@@ -1,5 +1,10 @@
 # TODO
 
+## Add a test that verifies the help-block of HealthTest- functions follows our standards
+
+Also get more explicit about our standards. Both on formatting and meaning. I've seen GPT make a lot of mistakes. 
+Considering one function at a time helped it a lot.
+
 ## Review the hundrends of warnings from Invoke-ScriptAnalyzer (and 3 errors)
 
 See also : .\tests\script-analysis.ps1
