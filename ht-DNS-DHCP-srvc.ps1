@@ -240,8 +240,8 @@ function HealthTest-DnsSuffixMatchesDomain {
 Checks Dns Suffix Matches Domain
 
 .DESCRIPTION
-AppliesTo: DC
-Scope: Domain
+AppliesTo: DomainJoined
+Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Network)
 Uses: Select-String.
@@ -507,8 +507,8 @@ function HealthTest-InterfaceDnsServersUseDcs {
 Checks Interface Dns Servers Use Dcs
 
 .DESCRIPTION
-AppliesTo: DC
-Scope: Domain
+AppliesTo: DomainJoined
+Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Network)
 Uses: Get-CimInstance.

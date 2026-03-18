@@ -1589,8 +1589,8 @@ function HealthTest-DomainARecordPointsToDcIp {
 Checks Domain A Record Points To Dc Ip
 
 .DESCRIPTION
-AppliesTo: DC
-Scope: Domain
+AppliesTo: DomainJoined
+Scope: Computer
 Category: Security & Stability Risks
 Impact: Medium(Time)
 Uses: Resolve-DnsName.
