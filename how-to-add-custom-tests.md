@@ -117,13 +117,13 @@ Uses: Get-FooType
   
 For the `.DESCRIPTION` use plain text with one field per line in this exact order, so it is easy to lint with regex:
 
-1. `AppliesTo:` Type of computer (One of: `All`, `VM`, `Mobile`, `DomainJoined`, `Server`, `Workstation`, `DC`, `PDC` )
-2. `Scope:` `Computer`, `Domain`, `Forest`
-3. `Category:` Primary + optional Secondary (see below for list)
-4. `Impact:` `Medium` or `High`, and include resource dimension only if not low (`CPU`, `Disk`, `Network`, `Time`)
-5. `Uses:` List of up to three essential for the test external cmdlets/executables. E.g. Get-Services, Get-ADComputer,...
+1. `AppliesTo:` Type of computer (One of: `All`, `VM`, `Mobile`, `DomainJoined`, `Server`, `Workstation`, `DC`, `PDC` ). The test will only run if it applies.
+2. `Scope:` `Computer`, `Domain`, `Forest`. The scope that is being tested/verified. i.e. if Scope=Domain you only need to run the test from one computer of the domain.
+3. `Category:` Primary + optional Secondary (see below for list). Informational.
+4. `Impact:` `Medium` or `High`, and include resource dimension only if not low (`CPU`, `Disk`, `Network`, `Time`).
+5. `Uses:` List of up to three essential for the test external cmdlets/executables. E.g. Get-Services, Get-ADComputer,.... Informational.
   > This field is intended for essential dependency metadata, not implementation details. Include only essential external commands (e.g., `ipconfig.exe`, `Get-DnsServerZone`) that are both required to execute the test and return the core information that determines if the test passes. Do not list a) a function defined within this repository b) helper calls c) broad commands like `Get-Service`, or `Get-ADUser` unless they represent the **sole** essential dependency of the test. Avoid descriptive sentences. Use `Uses: None.` for empty dependencies.
-6. `FalsePositives:` short note (optional)
+6. `FalsePositives:` short note. Optional. Informational.
 
 Allowed values for `Category`:
 - `Availability / Server Down Signals`
