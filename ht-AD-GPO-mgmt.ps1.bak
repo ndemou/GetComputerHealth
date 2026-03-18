@@ -5,7 +5,7 @@ Active Directory & GPO Management
 function HealthTest-ADViewConsistency {
 <#
 .SYNOPSIS
-Checks AD View Consistency
+Checks AD View Consistency and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: DC
@@ -117,7 +117,7 @@ FalsePositives: None.
 function HealthTest-Dcdiag {
 <#
 .SYNOPSIS
-Checks Dcdiag
+Checks Dcdiag and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: DC
@@ -154,7 +154,7 @@ FalsePositives: None.
 function HealthTest-RidManager{
 <#
 .SYNOPSIS
-Checks Rid Manager
+Checks Rid Manager and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: DC
@@ -172,7 +172,7 @@ FalsePositives: None.
 function HealthTest-DfsrBacklogSysvol{
 <#
 .SYNOPSIS
-Checks Dfsr Backlog Sysvol
+Checks Dfsr Backlog Sysvol and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: DC
@@ -203,7 +203,7 @@ FalsePositives: None.
 function HealthTest-DfsReplicationState {
 <#
 .SYNOPSIS
-Checks Dfs Replication State
+Checks Dfs Replication State and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: DC
@@ -244,7 +244,7 @@ FalsePositives: None.
 function HealthTest-DfsrBacklog {
 <#
 .SYNOPSIS
-Checks Dfsr Backlog
+Checks Dfsr Backlog and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: DC
@@ -278,7 +278,7 @@ FalsePositives: None.
 function HealthTest-GpoVersionConsistency{
 <#
 .SYNOPSIS
-Checks Gpo Version Consistency
+Checks Gpo Version Consistency and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: DC
@@ -308,7 +308,7 @@ FalsePositives: None.
 function HealthTest-KccConnectivity{
 <#
 .SYNOPSIS
-Checks Kcc Connectivity
+Checks Kcc Connectivity and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: DC
@@ -360,7 +360,7 @@ FalsePositives: None.
 function HealthTest-KerberosEncryptionTypes{
 <#
 .SYNOPSIS
-Checks Kerberos Encryption Types
+Checks Kerberos Encryption Types and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: All
@@ -389,7 +389,7 @@ FalsePositives: None.
 function HealthTest-RodcPrp{
 <#
 .SYNOPSIS
-Checks Rodc Prp
+Checks Rodc Prp and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: DC
@@ -411,7 +411,7 @@ FalsePositives: None.
 function HealthTest-SysvolAclHygiene{
 <#
 .SYNOPSIS
-Checks Sysvol Acl Hygiene
+Checks Sysvol Acl Hygiene and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: DC
@@ -435,7 +435,7 @@ FalsePositives: None.
 function HealthTest-DfsDiagTestDCs {
 <#
 .SYNOPSIS
-Checks Dfs Diag Test D Cs
+Checks Dfs Diag Test D Cs and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: DC
@@ -457,7 +457,7 @@ FalsePositives: None.
 function HealthTest-DfsNamespaceEnumerate{
 <#
 .SYNOPSIS
-Checks Dfs Namespace Enumerate
+Checks Dfs Namespace Enumerate and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: All
@@ -478,7 +478,7 @@ FalsePositives: None.
 function HealthTest-PreWin2000Group{
 <#
 .SYNOPSIS
-Checks Pre Win 2000 Group
+Checks Pre Win 2000 Group and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: All
@@ -498,7 +498,7 @@ FalsePositives: None.
 function HealthTest-TrustsVerify{
 <#
 .SYNOPSIS
-Checks Trusts Verify
+Checks Trusts Verify and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: DC
@@ -581,7 +581,7 @@ function Get-DcDiagFailures {
 function HealthTest-AdminSDHolderCoverage{
 <#
 .SYNOPSIS
-Checks Admin SD Holder Coverage
+Checks Admin SD Holder Coverage and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: DC
@@ -598,7 +598,7 @@ FalsePositives: None.
 function HealthTest-ADReplicationDomainRepadmin {
 <#
 .SYNOPSIS
-Checks AD Replication Domain Repadmin
+Checks AD Replication Domain Repadmin and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: DC
@@ -833,7 +833,7 @@ FalsePositives: None.
 function HealthTest-ADReplicationLocalRSAT {
 <#
 .SYNOPSIS
-Checks AD Replication Local RSAT
+Checks AD Replication Local RSAT and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: DC
@@ -910,7 +910,7 @@ FalsePositives: None.
 function HealthTest-DhcpInAd{
 <#
 .SYNOPSIS
-Checks Dhcp In Ad
+Checks Dhcp In Ad and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: DC
@@ -931,7 +931,7 @@ FalsePositives: None.
 function HealthTest-DisabledGpoLinksAtDomainRoot{
 <#
 .SYNOPSIS
-Checks Disabled Gpo Links At Domain Root
+Checks Disabled Gpo Links At Domain Root and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: DC
@@ -1001,7 +1001,7 @@ FalsePositives: None.
 function HealthTest-KrbtgtAge{
 <#
 .SYNOPSIS
-Checks Krbtgt Age
+Checks Krbtgt Age and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: DC
@@ -1024,7 +1024,7 @@ FalsePositives: None.
 function HealthTest-LocalAdminsBaseline {
 <#
 .SYNOPSIS
-Checks Local Admins Baseline
+Checks Local Admins Baseline and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: DC
@@ -1098,7 +1098,7 @@ FalsePositives: None.
 function HealthTest-ShadowStorage{
 <#
 .SYNOPSIS
-Checks Shadow Storage
+Checks Shadow Storage and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: DC
@@ -1156,7 +1156,7 @@ FalsePositives: None.
 function HealthTest-SysvolContentConsistency{
 <#
 .SYNOPSIS
-Checks Sysvol Content Consistency
+Checks Sysvol Content Consistency and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: DC
@@ -1207,7 +1207,7 @@ FalsePositives: None.
 function HealthTest-SysvolNetlogonAccessible{
 <#
 .SYNOPSIS
-Checks Sysvol Netlogon Accessible
+Checks Sysvol Netlogon Accessible and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: DC
@@ -1233,7 +1233,7 @@ FalsePositives: None.
 function HealthTest-UnexpectedListeningPorts {
 <#
 .SYNOPSIS
-Checks Unexpected Listening Ports
+Checks Unexpected Listening Ports and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: DC
@@ -1335,7 +1335,7 @@ FalsePositives: None.
 function HealthTest-UnusedEnabledAdapters{
 <#
 .SYNOPSIS
-Checks Unused Enabled Adapters
+Checks Unused Enabled Adapters and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: DC
@@ -1356,7 +1356,7 @@ FalsePositives: None.
 function HealthTest-SchemaVersionConsistency{
 <#
 .SYNOPSIS
-Checks Schema Version Consistency
+Checks Schema Version Consistency and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: DC
@@ -1411,7 +1411,7 @@ FalsePositives: None.
 function HealthTest-TombstoneLifetime{
 <#
 .SYNOPSIS
-Checks Tombstone Lifetime
+Checks Tombstone Lifetime and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: DC
@@ -1432,7 +1432,7 @@ FalsePositives: None.
 function HealthTest-RecycleBinEnabled{
 <#
 .SYNOPSIS
-Checks Recycle Bin Enabled
+Checks Recycle Bin Enabled and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: DC
@@ -1450,7 +1450,7 @@ FalsePositives: None.
 function HealthTest-ReplicationLatency{
 <#
 .SYNOPSIS
-Checks Replication Latency
+Checks Replication Latency and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: DC
@@ -1478,7 +1478,7 @@ FalsePositives: None.
 function HealthTest-DomainARecordPointsToDcIp {
 <#
 .SYNOPSIS
-Checks Domain A Record Points To Dc Ip
+Checks Domain A Record Points To Dc Ip and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: DC
@@ -1518,7 +1518,7 @@ FalsePositives: None.
 function HealthTest-NltestSiteDiscovery {
 <#
 .SYNOPSIS
-Checks Nltest Site Discovery
+Checks Nltest Site Discovery and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: All
@@ -1559,7 +1559,7 @@ FalsePositives: None.
 function HealthTest-GpupdatePolicyApply {
 <#
 .SYNOPSIS
-Checks Gpupdate Policy Apply
+Checks Gpupdate Policy Apply and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: All

@@ -5,7 +5,7 @@ DNS & DHCP Services
 function HealthTest-DnsScavenging{
 <#
 .SYNOPSIS
-Checks Dns Scavenging
+Checks Dns Scavenging and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: All
@@ -37,7 +37,7 @@ FalsePositives: None.
 function HealthTest-DnsZoneReplicationScope{
 <#
 .SYNOPSIS
-Checks Dns Zone Replication Scope
+Checks Dns Zone Replication Scope and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: DC
@@ -57,7 +57,7 @@ FalsePositives: None.
 function HealthTest-DnsZoneTransfers{
 <#
 .SYNOPSIS
-Checks Dns Zone Transfers
+Checks Dns Zone Transfers and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: DC
@@ -79,7 +79,7 @@ FalsePositives: None.
 function HealthTest-ReverseZonesPresent{
 <#
 .SYNOPSIS
-Checks Reverse Zones Present
+Checks Reverse Zones Present and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: All
@@ -103,7 +103,7 @@ FalsePositives: None.
 function HealthTest-DcDnsServerForwarder {
 <#
 .SYNOPSIS
-Checks Dc Dns Server Forwarder
+Checks Dc Dns Server Forwarder and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: DC
@@ -146,7 +146,7 @@ FalsePositives: None.
 function HealthTest-DnsForwarders{
 <#
 .SYNOPSIS
-Checks Dns Forwarders
+Checks Dns Forwarders and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: All
@@ -172,7 +172,7 @@ FalsePositives: None.
 function HealthTest-DnsRecursionConfig {
 <#
 .SYNOPSIS
-Checks Dns Recursion Config
+Checks Dns Recursion Config and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: All
@@ -237,7 +237,7 @@ FalsePositives: None.
 function HealthTest-DnsSuffixMatchesDomain {
 <#
 .SYNOPSIS
-Checks Dns Suffix Matches Domain
+Checks Dns Suffix Matches Domain and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: DC
@@ -267,7 +267,7 @@ FalsePositives: None.
 function HealthTest-DnsClientService{
 <#
 .SYNOPSIS
-Checks Dns Client Service
+Checks Dns Client Service and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: All
@@ -284,7 +284,7 @@ FalsePositives: None.
 function HealthTest-DcDnsARecords{
 <#
 .SYNOPSIS
-Checks Dc Dns A Records
+Checks Dc Dns A Records and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: DC
@@ -308,7 +308,7 @@ FalsePositives: None.
 function HealthTest-DcDnsRegistration {
 <#
 .SYNOPSIS
-Checks Dc Dns Registration
+Checks Dc Dns Registration and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: DC
@@ -405,7 +405,7 @@ FalsePositives: None.
 function HealthTest-DhcpDnsCredential{
 <#
 .SYNOPSIS
-Checks Dhcp Dns Credential
+Checks Dhcp Dns Credential and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: DC
@@ -429,7 +429,7 @@ FalsePositives: None.
 function HealthTest-DhcpScopeUtilization {
 <#
 .SYNOPSIS
-Checks Dhcp Scope Utilization
+Checks Dhcp Scope Utilization and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: DC
@@ -473,7 +473,7 @@ FalsePositives: None.
 function HealthTest-DnsSuffixBaseline {
 <#
 .SYNOPSIS
-Checks Dns Suffix Baseline
+Checks Dns Suffix Baseline and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: All
@@ -548,7 +548,7 @@ FalsePositives: None.
 function HealthTest-InterfaceDnsServersUseDcs {
 <#
 .SYNOPSIS
-Checks Interface Dns Servers Use Dcs
+Checks Interface Dns Servers Use Dcs and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: DC

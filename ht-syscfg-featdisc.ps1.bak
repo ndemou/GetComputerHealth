@@ -5,7 +5,7 @@ System Configuration & Feature Discovery
 function HealthTest-InstalledRolesFeatures {
 <#
 .SYNOPSIS
-Checks Installed Roles Features
+Checks Installed Roles Features and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: All
@@ -38,7 +38,7 @@ FalsePositives: None.
 function HealthTest-MalwareProtectionFeatures {
 <#
 .SYNOPSIS
-Checks Malware Protection Features
+Checks Malware Protection Features and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: All
@@ -70,7 +70,7 @@ FalsePositives: None.
 function HealthTest-ExploitProtectionBaseline {
 <#
 .SYNOPSIS
-Checks Exploit Protection Baseline
+Checks Exploit Protection Baseline and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: All
@@ -93,7 +93,7 @@ FalsePositives: None.
 function HealthTest-StartupItems{
 <#
 .SYNOPSIS
-Checks Startup Items
+Checks Startup Items and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: All

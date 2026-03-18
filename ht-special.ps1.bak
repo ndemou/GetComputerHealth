@@ -5,7 +5,7 @@ Special
 function HealthTest-Dummy {
 <#
 .SYNOPSIS
-Checks Dummy
+Checks Dummy and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: All

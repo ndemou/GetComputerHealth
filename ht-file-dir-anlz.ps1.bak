@@ -19,7 +19,7 @@ function Normalize-DirectoryPath {
 function HealthTest-LargeDirectories {
 <#
 .SYNOPSIS
-Checks Large Directories
+Checks Large Directories and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: All

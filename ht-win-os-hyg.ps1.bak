@@ -137,7 +137,7 @@ function Get-DaysSinceLastVirusScan {
 function HealthTest-RecentWindowsScan {
 <#
 .SYNOPSIS
-Checks Recent Windows Scan
+Checks Recent Windows Scan and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: All
@@ -181,7 +181,7 @@ FalsePositives: None.
 function HealthTest-SchanelBaseline{
 <#
 .SYNOPSIS
-Checks Schanel Baseline
+Checks Schanel Baseline and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: All
@@ -248,7 +248,7 @@ FalsePositives: None.
 function HealthTest-DefenderStatus {
 <#
 .SYNOPSIS
-Checks Defender Status
+Checks Defender Status and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: All
@@ -277,7 +277,7 @@ FalsePositives: None.
 function HealthTest-FirewallEnabled {
 <#
 .SYNOPSIS
-Checks Firewall Enabled
+Checks Firewall Enabled and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: All
@@ -297,7 +297,7 @@ FalsePositives: None.
 function HealthTest-Smb1Disabled{
 <#
 .SYNOPSIS
-Checks Smb 1 Disabled
+Checks Smb 1 Disabled and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: All
@@ -316,7 +316,7 @@ FalsePositives: None.
 function HealthTest-WmiRepository{
 <#
 .SYNOPSIS
-Checks Wmi Repository
+Checks Wmi Repository and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: All
@@ -335,7 +335,7 @@ FalsePositives: None.
 function HealthTest-VssWriters{
 <#
 .SYNOPSIS
-Checks Vss Writers
+Checks Vss Writers and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: All
@@ -356,7 +356,7 @@ FalsePositives: None.
 function HealthTest-UnsignedDrivers {
 <#
 .SYNOPSIS
-Checks Unsigned Drivers
+Checks Unsigned Drivers and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: All
@@ -467,7 +467,7 @@ FalsePositives: None.
 function HealthTest-NtdsLogVolumeFree{
 <#
 .SYNOPSIS
-Checks Ntds Log Volume Free
+Checks Ntds Log Volume Free and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: All
@@ -499,7 +499,7 @@ FalsePositives: None.
 function HealthTest-GpWmiFiltersNamespaces{
 <#
 .SYNOPSIS
-Checks Gp Wmi Filters Namespaces
+Checks Gp Wmi Filters Namespaces and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: All
@@ -604,7 +604,7 @@ FalsePositives: None.
 function HealthTest-CrashDumpSignals {
 <#
 .SYNOPSIS
-Checks Crash Dump Signals
+Checks Crash Dump Signals and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: All
@@ -633,7 +633,7 @@ FalsePositives: None.
 function HealthTest-SeriousRecentEventLogs {
 <#
 .SYNOPSIS
-Checks Serious Recent Event Logs
+Checks Serious Recent Event Logs and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: All
@@ -713,7 +713,7 @@ FalsePositives: None.
 function HealthTest-HotfixBaseline{
 <#
 .SYNOPSIS
-Checks Hotfix Baseline
+Checks Hotfix Baseline and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: All
@@ -736,7 +736,7 @@ FalsePositives: None.
 function HealthTest-BitLockerStatus {
 <#
 .SYNOPSIS
-Checks Bit Locker Status
+Checks Bit Locker Status and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: All
@@ -767,7 +767,7 @@ FalsePositives: None.
 function HealthTest-EfsRecoveryAgents{
 <#
 .SYNOPSIS
-Checks Efs Recovery Agents
+Checks Efs Recovery Agents and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: All
@@ -786,7 +786,7 @@ FalsePositives: None.
 function HealthTest-NtlmHardening {
 <#
 .SYNOPSIS
-Checks Ntlm Hardening
+Checks Ntlm Hardening and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: All
@@ -820,7 +820,7 @@ FalsePositives: None.
 function HealthTest-RdpHardening {
 <#
 .SYNOPSIS
-Checks Rdp Hardening
+Checks Rdp Hardening and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: All
@@ -857,7 +857,7 @@ FalsePositives: None.
 function HealthTest-NonDefaultShares {
 <#
 .SYNOPSIS
-Checks Non Default Shares
+Checks Non Default Shares and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: All
@@ -893,7 +893,7 @@ FalsePositives: None.
 function HealthTest-LocalAcntRequirePass {
 <#
 .SYNOPSIS
-Checks Local Acnt Require Pass
+Checks Local Acnt Require Pass and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: All
@@ -921,7 +921,7 @@ FalsePositives: None.
 function HealthTest-RestrictAnonymous {
 <#
 .SYNOPSIS
-Checks Restrict Anonymous
+Checks Restrict Anonymous and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: All
@@ -949,7 +949,7 @@ FalsePositives: None.
 function HealthTest-DefaultLocale {
 <#
 .SYNOPSIS
-Checks Default Locale
+Checks Default Locale and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: All
@@ -974,7 +974,7 @@ FalsePositives: None.
 function HealthTest-PendingReboot {
 <#
 .SYNOPSIS
-Checks Pending Reboot
+Checks Pending Reboot and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: All
@@ -996,7 +996,7 @@ FalsePositives: None.
 function HealthTest-SmbSigningRequired{
 <#
 .SYNOPSIS
-Checks Smb Signing Required
+Checks Smb Signing Required and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: All

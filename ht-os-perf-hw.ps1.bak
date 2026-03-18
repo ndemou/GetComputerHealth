@@ -49,7 +49,7 @@ Filters out ports listening only on the loopback addresses (127.0.0.1 and ::1) b
 function HealthTest-TimeSyncPolicy {
 <#
 .SYNOPSIS
-Checks Time Sync Policy
+Checks Time Sync Policy and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: All
@@ -327,7 +327,7 @@ FalsePositives: None.
 function HealthTest-UpdateAge {
 <#
 .SYNOPSIS
-Checks Update Age
+Checks Update Age and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: All
@@ -356,7 +356,7 @@ FalsePositives: None.
 function HealthTest-CertExpiry {
 <#
 .SYNOPSIS
-Checks Cert Expiry
+Checks Cert Expiry and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: All
@@ -391,7 +391,7 @@ FalsePositives: None.
 function HealthTest-IisBindings {
 <#
 .SYNOPSIS
-Checks Iis Bindings
+Checks Iis Bindings and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: Server
@@ -439,7 +439,7 @@ FalsePositives: None.
 function HealthTest-RamPressure {
 <#
 .SYNOPSIS
-Checks Ram Pressure
+Checks Ram Pressure and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: All
@@ -503,7 +503,7 @@ FalsePositives: None.
 function HealthTest-ShareReasonableness {
 <#
 .SYNOPSIS
-Checks Share Reasonableness
+Checks Share Reasonableness and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: All
@@ -695,7 +695,7 @@ FalsePositives: None.
 function HealthTest-DisksHaveFreeSpace {
 <#
 .SYNOPSIS
-Checks Disks Have Free Space
+Checks Disks Have Free Space and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: All
@@ -726,7 +726,7 @@ FalsePositives: None.
 function HealthTest-NtdsPathsLocation{
 <#
 .SYNOPSIS
-Checks Ntds Paths Location
+Checks Ntds Paths Location and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: All
@@ -764,7 +764,7 @@ FalsePositives: None.
 function HealthTest-RequiredSrvRecords{
 <#
 .SYNOPSIS
-Checks Required Srv Records
+Checks Required Srv Records and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: All
@@ -787,7 +787,7 @@ FalsePositives: None.
 function HealthTest-LdapSigningChannelBinding {
 <#
 .SYNOPSIS
-Checks Ldap Signing Channel Binding
+Checks Ldap Signing Channel Binding and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: DC
@@ -827,7 +827,7 @@ FalsePositives: None.
 function HealthTest-UnconstrainedDelegationAccounts{
 <#
 .SYNOPSIS
-Checks Unconstrained Delegation Accounts
+Checks Unconstrained Delegation Accounts and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: All
@@ -889,7 +889,7 @@ FalsePositives: None.
 function HealthTest-DuplicateSpn{
 <#
 .SYNOPSIS
-Checks Duplicate Spn
+Checks Duplicate Spn and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: DC
@@ -926,7 +926,7 @@ FalsePositives: None.
 function HealthTest-GcPlacement{
 <#
 .SYNOPSIS
-Checks Gc Placement
+Checks Gc Placement and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: DC
@@ -1018,7 +1018,7 @@ and returns friendly licensing status fields for reporting.
 function HealthTest-SoftwareLicensing{
 <#
 .SYNOPSIS
-Checks Software Licensing
+Checks Software Licensing and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: All
@@ -1037,7 +1037,7 @@ FalsePositives: None.
 function HealthTest-IsTPMActivated {
 <#
 .SYNOPSIS
-Checks Is TPM Activated
+Checks Is TPM Activated and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: Mobile
@@ -1058,7 +1058,7 @@ FalsePositives: None.
 function HealthTest-TimeSyncAccuracy {
 <#
 .SYNOPSIS
-Checks Time Sync Accuracy
+Checks Time Sync Accuracy and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: All
@@ -1142,7 +1142,7 @@ FalsePositives: None.
 function HealthTest-PagefileSanity{
 <#
 .SYNOPSIS
-Checks Pagefile Sanity
+Checks Pagefile Sanity and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: All
@@ -1197,7 +1197,7 @@ FalsePositives: None.
 function HealthTest-Storage {
 <#
 .SYNOPSIS
-Checks Storage
+Checks Storage and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: All
@@ -1278,7 +1278,7 @@ FalsePositives: None.
 function HealthTest-NtfsDirtyBit {
 <#
 .SYNOPSIS
-Checks Ntfs Dirty Bit
+Checks Ntfs Dirty Bit and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: All
@@ -1301,7 +1301,7 @@ FalsePositives: None.
 function HealthTest-RecentDiskErrors {
 <#
 .SYNOPSIS
-Checks Recent Disk Errors
+Checks Recent Disk Errors and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: All
@@ -1424,7 +1424,7 @@ function Test-DiskHasFreeSpace {
 function HealthTest-EventLogMaxSizes{
 <#
 .SYNOPSIS
-Checks Event Log Max Sizes
+Checks Event Log Max Sizes and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: All

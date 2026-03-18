@@ -5,7 +5,7 @@ Network & Connectivity
 function HealthTest-ConnectivityToDCs {
 <#
 .SYNOPSIS
-Checks Connectivity To D Cs
+Checks Connectivity To D Cs and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: DC
@@ -65,7 +65,7 @@ FalsePositives: None.
 function HealthTest-NetworkConnectionProfiles {
 <#
 .SYNOPSIS
-Checks Network Connection Profiles
+Checks Network Connection Profiles and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: All
@@ -123,7 +123,7 @@ FalsePositives: None.
 function HealthTest-SingleDefaultGateway{
 <#
 .SYNOPSIS
-Checks Single Default Gateway
+Checks Single Default Gateway and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: All
@@ -171,7 +171,7 @@ FalsePositives: None.
 function HealthTest-NetworkInterfaceMetrics{
 <#
 .SYNOPSIS
-Checks Network Interface Metrics
+Checks Network Interface Metrics and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: All
@@ -359,7 +359,7 @@ function Test-MultipleGatewayConfiguration {
 function HealthTest-IPv6Binding{
 <#
 .SYNOPSIS
-Checks I Pv 6 Binding
+Checks I Pv 6 Binding and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: All
@@ -386,7 +386,7 @@ FalsePositives: None.
 function HealthTest-Nic {
 <#
 .SYNOPSIS
-Checks Nic
+Checks Nic and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: All
@@ -470,7 +470,7 @@ FalsePositives: None.
 function HealthTest-WinRMListening{
 <#
 .SYNOPSIS
-Checks Win RM Listening
+Checks Win RM Listening and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: All

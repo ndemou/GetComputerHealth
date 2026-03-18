@@ -5,7 +5,7 @@ Scheduled Task Master Cluster
 function HealthTest-ScheduledTasks {
 <#
 .SYNOPSIS
-Checks Scheduled Tasks
+Checks Scheduled Tasks and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: All
@@ -91,7 +91,7 @@ FalsePositives: None.
 function HealthTest-SystemScheduledTasks{
 <#
 .SYNOPSIS
-Checks System Scheduled Tasks
+Checks System Scheduled Tasks and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: All
@@ -317,7 +317,7 @@ function Get-ScheduledTaskDeepInfo{
 function HealthTest-ScheduledTasksLastResult {
 <#
 .SYNOPSIS
-Checks Scheduled Tasks Last Result
+Checks Scheduled Tasks Last Result and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: All

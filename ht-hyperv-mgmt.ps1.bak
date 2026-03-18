@@ -5,7 +5,7 @@ Hyper-V Management
 function HealthTest-HyperVVMProperties {
 <#
 .SYNOPSIS
-Checks Hyper VVM Properties
+Checks Hyper VVM Properties and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: Server
@@ -54,7 +54,7 @@ FalsePositives: None.
 function HealthTest-HyperVRunningVMs {
 <#
 .SYNOPSIS
-Checks Hyper V Running V Ms
+Checks Hyper V Running V Ms and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: Server

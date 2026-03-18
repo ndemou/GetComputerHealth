@@ -744,7 +744,7 @@ function Test-LooksLikePath {
 function HealthTest-AutoStartServicesRunning {
 <#
 .SYNOPSIS
-Checks Auto Start Services Running
+Checks Auto Start Services Running and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: All
@@ -838,7 +838,7 @@ FalsePositives: None.
 function HealthTest-NonMicrosoftServices {
 <#
 .SYNOPSIS
-Checks Non Microsoft Services
+Checks Non Microsoft Services and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: All
@@ -875,7 +875,7 @@ FalsePositives: None.
 function HealthTest-ServiceAccountsPwdNeverExpires{
 <#
 .SYNOPSIS
-Checks Service Accounts Pwd Never Expires
+Checks Service Accounts Pwd Never Expires and flags unhealthy or non-baseline states
 
 .DESCRIPTION
 AppliesTo: All
