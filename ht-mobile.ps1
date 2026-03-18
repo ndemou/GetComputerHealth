@@ -1,10 +1,6 @@
 <#
-OS Performance & Hardware
+Only for laptop/Mobile device
 #>
-
-# This function(s) will only be defined if the Computer
-# is a laptop/Mobile device
-if ($Global:GetComputerHealthDataQMTA.isHostMobile){
 
 function HealthTest-IsTPMActivated {
 <#
@@ -20,6 +16,4 @@ Uses: Write-BasedOnTestResult, Get-Tpm.
 FalsePositives: None.
 #>
   Write-BasedOnTestResult "Is TPM Activated?" -Test (Get-Tpm).TpmActivated
-}
-
 }

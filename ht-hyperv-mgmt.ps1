@@ -1,10 +1,6 @@
 <#
-Hyper-V Management
+Only for Hyper-V servers
 #>
-
-# Functions in this file are only going to be defined if the
-# Microsoft-Hyper-V feature is enabled in this computer
-if ((Get-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V).State -eq 'Enabled') {
 
 function HealthTest-HyperVVMProperties {
 <#
@@ -79,6 +75,4 @@ FalsePositives: None.
     } else {
         Write-Warning "[info] No VM is set to always auto-start"
     }
-}
-
 }

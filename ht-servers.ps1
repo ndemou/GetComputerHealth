@@ -2,10 +2,6 @@
 Tests that are only applicable to Windows Server O.S.
 #>
 
-# Functions in this file are only going to be defined if
-# this computer runs Windows Server O.S.
-if ((Get-CimInstance Win32_ComputerSystem).DomainRole  -in 3,4,5) {
-
 function HealthTest-DhcpInAd{
 <#
 .SYNOPSIS
@@ -101,5 +97,3 @@ FalsePositives: None.
     Write-Warning "[pass] No unintended roles/features installed"
   }
 }
-
-} # is this computer running Windows Server

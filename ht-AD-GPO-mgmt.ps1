@@ -2,9 +2,6 @@
 Active Directory & GPO Management
 #>
 
-# The functions below are only defined if computer is a DC/PDC
-if ((Get-CimInstance Win32_ComputerSystem).DomainRole -in 4,5) {
-
 function HealthTest-ADViewConsistency {
 <#
 .SYNOPSIS
@@ -1398,5 +1395,3 @@ FalsePositives: None.
   }
   if(-not $anyFail){ Write-Warning "[pass] AD replication latency acceptable (<= $MaxMinutes min on schema/config)" }
 }
-
-} # computer is a DC/PDC

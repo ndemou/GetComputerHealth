@@ -2,10 +2,6 @@
 Tests only for domain joined servers (including DC/PDC)
 #>
 
-# The functions below are only defined if computer is domain joined
-if ((Get-CimInstance Win32_ComputerSystem).DomainRole -in 1,3,4,5) {
-
-
 function HealthTest-InterfaceDnsServersUseDcs {
 <#
 .SYNOPSIS
@@ -175,8 +171,3 @@ TODO: maybe part of these tests are for non-domain joined Computers also
         }
     }
 }
-
-
-
-
-} # Computer is domain joined

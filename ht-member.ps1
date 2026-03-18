@@ -2,10 +2,6 @@
 Tests only for domain joined servers except DC/PDC
 #>
 
-# The functions below are only defined if computer is 
-# 1(Member Workstation) or 3(Member Server) i.e. domain joined but not DC/PDC
-if ((Get-CimInstance Win32_ComputerSystem).DomainRole -in 1,3) {
-
 function HealthTest-DomainARecordPointsToDcIp {
 <#
 .SYNOPSIS
@@ -131,5 +127,3 @@ FalsePositives: None.
     Write-Warning "[pass] User policy update completed successfully (gpupdate)."
   }
 }
-
-} # is 1(Member Workstation) or 3(Member Server) i.e. domain joined but not DC/PDC

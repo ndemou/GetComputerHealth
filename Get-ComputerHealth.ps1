@@ -195,17 +195,7 @@ $script:Config = [pscustomobject]@{
 #
 . (Join-Path -Path $PSScriptRoot -ChildPath "lib-write-log-objects.ps1")
 . (Join-Path -Path $PSScriptRoot -ChildPath "helpers-networking.ps1")
-. (Join-Path -Path $PSScriptRoot -ChildPath "ht-AD-GPO-mgmt.ps1")
-. (Join-Path -Path $PSScriptRoot -ChildPath "ht-DNS-DHCP-srvc.ps1")
-. (Join-Path -Path $PSScriptRoot -ChildPath "ht-syscfg-featdisc.ps1")
-. (Join-Path -Path $PSScriptRoot -ChildPath "ht-srvc-exe-resolve.ps1")
-. (Join-Path -Path $PSScriptRoot -ChildPath "ht-file-dir-anlz.ps1")
-. (Join-Path -Path $PSScriptRoot -ChildPath "ht-schtasks-master.ps1")
-. (Join-Path -Path $PSScriptRoot -ChildPath "ht-net-conn.ps1")
-. (Join-Path -Path $PSScriptRoot -ChildPath "ht-os-perf-hw.ps1")
-. (Join-Path -Path $PSScriptRoot -ChildPath "ht-win-os-hyg.ps1")
-. (Join-Path -Path $PSScriptRoot -ChildPath "ht-hyperv-mgmt.ps1")
-. (Join-Path -Path $PSScriptRoot -ChildPath "ht-special.ps1")
+
 
 #------------------------------------------
 # Helper functions specific to this script except tests
@@ -603,41 +593,6 @@ function Write-UsageHelp {
 #
 #=============================================================================
 
-if ($ListAllBuiltInTests) {Get-HealthTest; return}
-
-# Fail if not run as Administrator (elevated)
-# None of the functionality that follows is available to non-admins
-if (-not ([Security.Principal.WindowsPrincipal] `
-    [Security.Principal.WindowsIdentity]::GetCurrent() `
-).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-    Write-Error "This script must be run as Administrator (elevated)."
-    exit 1
-}
-
-if ($AddWhitelisting ){
-    if (-not $Signature) {throw "You must supply a -Signature"}
-    if (-not $ComputerName) {throw "You must supply a -ComputerName"}
-    if ($Signature -notmatch '^[0-9A-Fa-f]{8}$') {
-        throw "Invalid -Signature: $Signature"
-    }
-    if ($ComputerName -ne $env:COMPUTERNAME) {
-        throw "Running on $($env:COMPUTERNAME) but suppression is for $ComputerName"
-    }
-    if ($Until) {
-        $culture = [System.Globalization.CultureInfo]::InvariantCulture
-        $dt=[datetime]::MinValue
-        $ok=[DateTime]::TryParseExact($Until,'yyyy-MM-dd',$culture,[System.Globalization.DateTimeStyles]::None,[ref]$dt)
-        if(-not $ok){$ok=[DateTime]::TryParse($Until,[System.IFormatProvider]$culture,[System.Globalization.DateTimeStyles]::None,[ref]$dt)}
-        if(-not $ok){throw "Invalid date: `$Until"}
-        $line='{0} UNTIL {1:yyyy-MM-dd} # {2:yyyy-MM-dd HH:mm} # {3}' -f $Signature,$dt,(Get-Date),$Comment
-        Add-AsciiLine -Line $line -Path $script:Config.SuppressSignaturesPath
-    } else {
-        $line = "$Signature # $(Get-Date -format yyyy-MM-dd` HH:mm) # $Comment"
-        Add-AsciiLine -Line $line -Path $script:Config.SuppressSignaturesPath
-    }
-    return
-}
-
 #+-----------------------------------------------------------
 #| Collect system information
 #|
@@ -728,6 +683,68 @@ $Global:GetComputerHealthDataQMTA = [pscustomobject]@{
 #|
 #| Collect system information
 #+-----------------------------------------------------------
+
+#+-----------------------------------------------------------
+#| Dot source health tests
+#|
+
+. (Join-Path -Path $PSScriptRoot -ChildPath "ht-syscfg-featdisc.ps1")
+. (Join-Path -Path $PSScriptRoot -ChildPath "ht-srvc-exe-resolve.ps1")
+. (Join-Path -Path $PSScriptRoot -ChildPath "ht-file-dir-anlz.ps1")
+. (Join-Path -Path $PSScriptRoot -ChildPath "ht-schtasks-master.ps1")
+. (Join-Path -Path $PSScriptRoot -ChildPath "ht-net-conn.ps1")
+. (Join-Path -Path $PSScriptRoot -ChildPath "ht-os-perf-hw.ps1")
+. (Join-Path -Path $PSScriptRoot -ChildPath "ht-win-os-hyg.ps1")
+. (Join-Path -Path $PSScriptRoot -ChildPath "ht-special.ps1")
+
+$isHyperVRoleEnabled = (Get-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V).State -eq 'Enabled'
+$isDomJoinedButNotDC = (Get-CimInstance Win32_ComputerSystem).DomainRole -in 1,3
+if ($isHostDC -or $isHostPDC) {. (Join-Path -Path $PSScriptRoot -ChildPath "ht-AD-GPO-mgmt.ps1")}
+if ($isHostDC -or $isHostPDC) {. (Join-Path -Path $PSScriptRoot -ChildPath "ht-DNS-DHCP-srvc.ps1")}
+if ($isHostDomainJoined) {. (Join-Path -Path $PSScriptRoot -ChildPath "ht-domjoined.ps1")}
+if ($isDomJoinedButNotDC) {. (Join-Path -Path $PSScriptRoot -ChildPath "ht-member.ps1")}
+if ($isHostMobile) {. (Join-Path -Path $PSScriptRoot -ChildPath "ht-mobile.ps1")}
+if ($isHyperVRoleEnabled) {. (Join-Path -Path $PSScriptRoot -ChildPath "ht-hyperv-mgmt.ps1")}
+if ($isHostServer) {. (Join-Path -Path $PSScriptRoot -ChildPath "ht-servers.ps1")}
+#|
+#| Dot source health tests
+#+-----------------------------------------------------------
+
+if ($ListAllBuiltInTests) {Get-HealthTest; return}
+
+# Fail if not run as Administrator (elevated)
+# None of the functionality that follows is available to non-admins
+if (-not ([Security.Principal.WindowsPrincipal] `
+    [Security.Principal.WindowsIdentity]::GetCurrent() `
+).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+    Write-Error "This script must be run as Administrator (elevated)."
+    exit 1
+}
+
+if ($AddWhitelisting ){
+    if (-not $Signature) {throw "You must supply a -Signature"}
+    if (-not $ComputerName) {throw "You must supply a -ComputerName"}
+    if ($Signature -notmatch '^[0-9A-Fa-f]{8}$') {
+        throw "Invalid -Signature: $Signature"
+    }
+    if ($ComputerName -ne $env:COMPUTERNAME) {
+        throw "Running on $($env:COMPUTERNAME) but suppression is for $ComputerName"
+    }
+    if ($Until) {
+        $culture = [System.Globalization.CultureInfo]::InvariantCulture
+        $dt=[datetime]::MinValue
+        $ok=[DateTime]::TryParseExact($Until,'yyyy-MM-dd',$culture,[System.Globalization.DateTimeStyles]::None,[ref]$dt)
+        if(-not $ok){$ok=[DateTime]::TryParse($Until,[System.IFormatProvider]$culture,[System.Globalization.DateTimeStyles]::None,[ref]$dt)}
+        if(-not $ok){throw "Invalid date: `$Until"}
+        $line='{0} UNTIL {1:yyyy-MM-dd} # {2:yyyy-MM-dd HH:mm} # {3}' -f $Signature,$dt,(Get-Date),$Comment
+        Add-AsciiLine -Line $line -Path $script:Config.SuppressSignaturesPath
+    } else {
+        $line = "$Signature # $(Get-Date -format yyyy-MM-dd` HH:mm) # $Comment"
+        Add-AsciiLine -Line $line -Path $script:Config.SuppressSignaturesPath
+    }
+    return
+}
+
 
 if ($DoNothing){return}
 
