@@ -184,7 +184,7 @@ function HealthTest-SchanelBaseline{
 Checks Schanel Baseline
 
 .DESCRIPTION
-AppliesTo: All
+AppliesTo: DC
 Scope: Computer
 Category: Audit / Compliance / Informational
 Impact: Medium(Time)
@@ -470,7 +470,7 @@ function HealthTest-NtdsLogVolumeFree{
 Checks Ntds Log Volume Free
 
 .DESCRIPTION
-AppliesTo: All
+AppliesTo: DC
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time)
@@ -502,7 +502,7 @@ function HealthTest-GpWmiFiltersNamespaces{
 Checks Gp Wmi Filters Namespaces
 
 .DESCRIPTION
-AppliesTo: All
+AppliesTo: DC
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time)
@@ -770,7 +770,7 @@ function HealthTest-EfsRecoveryAgents{
 Checks Efs Recovery Agents
 
 .DESCRIPTION
-AppliesTo: All
+AppliesTo: DC
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time)
@@ -1017,4 +1017,208 @@ FalsePositives: None.
   } else {
     Write-Warning "[warning] SMB signing is not required`nRequireSecuritySignature=$($c.RequireSecuritySignature); EnableSecuritySignature=$($c.EnableSecuritySignature)"
   }
+}
+
+function HealthTest-ShadowStorage {
+<#
+.SYNOPSIS
+Checks if Shadow Storage is enabled on internal drives (for servers) or on C: (for workstations)
+
+.DESCRIPTION
+AppliesTo: All
+Scope: Computer
+Category: Configuration Hygiene & Best Practices
+Impact: Low
+Uses: Get-CimInstance.
+FalsePositives: None.
+#>
+  [CmdletBinding()]
+  param(
+    [string[]]$RequireOnVolumes = @(),
+    [Nullable[double]]$MinRecommendedGB = $null,
+    [Nullable[double]]$MaxRecommendedGB = $null
+  )
+
+  $domainRole = (Get-CimInstance -ClassName Win32_ComputerSystem).DomainRole
+  $isWorkstation = ($domainRole -in 0,1)
+  $isServer = -not $isWorkstation
+
+  $allVolumes = @(Get-CimInstance -ClassName Win32_Volume | Select-Object DeviceID, DriveLetter, DriveType)
+
+  if ($isWorkstation) {
+    if ($RequireOnVolumes.Count -eq 0) { $RequireOnVolumes = @('C:') }
+    if (-not $MinRecommendedGB.HasValue) { $MinRecommendedGB = 5 }
+    if (-not $MaxRecommendedGB.HasValue) { $MaxRecommendedGB = 25 }
+  } elseif ($isServer) {
+    if ($RequireOnVolumes.Count -eq 0) {
+      $RequireOnVolumes = @(
+        $allVolumes |
+          Where-Object { $_.DriveType -eq 3 -and $_.DriveLetter } |
+          ForEach-Object { $_.DriveLetter.TrimEnd('\') } |
+          Sort-Object -Unique
+      )
+    }
+  }
+
+  $assoc = @(Get-CimInstance -ClassName Win32_ShadowStorage 2>$null)
+  $vols = @($allVolumes)
+
+  $present = @{}
+  $statsByDrive = @{}
+
+  foreach ($a in $assoc) {
+    $drive = $null
+    $devId = $null
+
+    try {
+      $volObj = $null
+
+      if ($a.Volume -is [Microsoft.Management.Infrastructure.CimInstance]) {
+        $volObj = $a.Volume
+      } elseif ($a.Volume) {
+        $volObj = Get-CimInstance -InputObject $a.Volume -ErrorAction Stop
+      }
+
+      if ($volObj) {
+        $devId = [string]$volObj.DeviceID
+        if ($volObj.DriveLetter) {
+          $drive = [string]$volObj.DriveLetter
+        }
+      }
+    } catch {
+    }
+
+    if (-not $devId -and $a.Volume) {
+      $volRef = [string]$a.Volume
+      if ($volRef -match 'DeviceID\s*=\s*"((?:[^"\\]|\\.)*)"') {
+        $devId = $Matches[1] -replace '\\\\','\'
+      }
+    }
+
+    if (-not $drive -and $devId) {
+      $m = @($vols | Where-Object { $_.DeviceID -eq $devId } | Select-Object -First 1)
+      if ($m.Count -gt 0 -and $m[0].DriveLetter) {
+        $drive = [string]$m[0].DriveLetter
+      }
+    }
+
+    if (-not $drive -and $devId -match '^[A-Z]:\\?$') {
+      $drive = $devId.TrimEnd('\')
+    }
+
+    if (-not $drive -and $devId) {
+      $drive = $devId.TrimEnd('\')
+    }
+
+    if (-not $drive) { continue }
+
+    $k = $drive.TrimEnd('\')
+    $present[$k] = $true
+
+    if (-not $statsByDrive.ContainsKey($k)) {
+      $statsByDrive[$k] = [pscustomobject]@{
+        MaxSpaceBytes = [uint64]0
+        AllocatedSpaceBytes = [uint64]0
+        UsedSpaceBytes = [uint64]0
+      }
+    }
+
+    if ($null -ne $a.MaxSpace -and [uint64]$a.MaxSpace -gt 0) {
+      $statsByDrive[$k].MaxSpaceBytes += [uint64]$a.MaxSpace
+    }
+    if ($null -ne $a.AllocatedSpace -and [uint64]$a.AllocatedSpace -gt 0) {
+      $statsByDrive[$k].AllocatedSpaceBytes += [uint64]$a.AllocatedSpace
+    }
+    if ($null -ne $a.UsedSpace -and [uint64]$a.UsedSpace -gt 0) {
+      $statsByDrive[$k].UsedSpaceBytes += [uint64]$a.UsedSpace
+    }
+  }
+
+  $missingLevel = if ($isWorkstation) { 'notice' } else { 'failure' }
+
+  $rangeOutOfBounds = New-Object System.Collections.Generic.List[string]
+  $rangeUnknown = New-Object System.Collections.Generic.List[string]
+  $outOfRange = $false
+
+  if ($MinRecommendedGB.HasValue -or $MaxRecommendedGB.HasValue) {
+    $targets = if ($RequireOnVolumes.Count -gt 0) {
+      @($RequireOnVolumes | ForEach-Object { $_.TrimEnd('\') } | Sort-Object -Unique)
+    } else {
+      @($present.Keys | Sort-Object)
+    }
+
+    foreach ($k in $targets) {
+      if (-not $statsByDrive.ContainsKey($k)) { continue }
+
+      $s = $statsByDrive[$k]
+      [uint64]$maxBytes = $s.MaxSpaceBytes
+      if ($maxBytes -le 0 -and $s.AllocatedSpaceBytes -gt 0) {
+        $maxBytes = $s.AllocatedSpaceBytes
+      }
+
+      if ($maxBytes -le 0) {
+        $rangeUnknown.Add("$k size not available")
+        continue
+      }
+
+      $sizeGB = [math]::Round(($maxBytes / 1GB), 2)
+
+      if ($MinRecommendedGB.HasValue -and $sizeGB -lt $MinRecommendedGB.Value) {
+        $outOfRange = $true
+        $rangeOutOfBounds.Add("$k=$sizeGB GB below min $($MinRecommendedGB.Value) GB")
+      }
+
+      if ($MaxRecommendedGB.HasValue -and $sizeGB -gt $MaxRecommendedGB.Value) {
+        $outOfRange = $true
+        $rangeOutOfBounds.Add("$k=$sizeGB GB above max $($MaxRecommendedGB.Value) GB")
+      }
+    }
+  }
+
+  if ($RequireOnVolumes.Count -gt 0) {
+    $missing = @()
+
+    foreach ($v in $RequireOnVolumes) {
+      $k = $v.TrimEnd('\')
+      if (-not $present.ContainsKey($k)) {
+        $missing += $k
+        Write-Warning "[$missingLevel] Shadow storage not configured on required volume $k"
+      }
+    }
+
+    if ($missing.Count -eq 0) {
+      Write-Warning ("[pass] Shadow storage on required volumes`nConfigured on: " + ((@($present.Keys) | Sort-Object) -join ', '))
+    }
+  } else {
+    if ($present.Count -gt 0) {
+      Write-Warning ("[pass] Shadow storage configured`nOn: " + ((@($present.Keys) | Sort-Object) -join ', '))
+    } else {
+      Write-Warning "[notice] Shadow storage (Volume Shadow Copies) is not enabled`nUsers won't see Previous Version for files/folders. (Note that this issue is UNRELATED to the VSS service that backup software use.)"
+    }
+  }
+
+  if ($outOfRange -and $rangeOutOfBounds.Count -gt 0) {
+    Write-Warning ("[notice] Shadow storage size outside recommended range`n" + ($rangeOutOfBounds -join '; '))
+  }
+
+  if ($rangeUnknown.Count -gt 0) {
+    Write-Warning ("[info] Shadow storage size could not be determined`n" + ($rangeUnknown -join '; '))
+  }
+}
+
+function HealthTest-DnsClientService{
+<#
+.SYNOPSIS
+Checks Dns Client Service
+
+.DESCRIPTION
+AppliesTo: All
+Scope: Computer
+Category: Configuration Hygiene & Best Practices
+Impact: Low
+Uses: Get-Service.
+FalsePositives: None.
+#>
+  $s=Get-Service Dnscache -ErrorAction Stop
+  if($s.Status -eq 'Running'){ Write-Warning "[pass] DNS Client service running" } else { Write-Warning "[failure] DNS Client service is not running`nStatus=$($s.Status)" }
 }

@@ -878,7 +878,7 @@ function HealthTest-ServiceAccountsPwdNeverExpires{
 Checks Service Accounts Pwd Never Expires
 
 .DESCRIPTION
-AppliesTo: All
+AppliesTo: DC
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time)

@@ -720,7 +720,7 @@ function HealthTest-NtdsPathsLocation{
 Checks Ntds Paths Location
 
 .DESCRIPTION
-AppliesTo: All
+AppliesTo: DC
 Scope: Computer
 Category: Security & Stability Risks
 Impact: Medium(Time)
@@ -737,12 +737,12 @@ FalsePositives: None.
   $lg = (Get-ItemProperty -Path $regPath -Name 'Database log files path' -ErrorAction Stop).'Database log files path'
 
   $dbOk = if($ExpectedDbRoots -and $ExpectedDbRoots.Count){
-    ($ExpectedDbRoots | Where-Object { $db -like "$_*" -or ([IO.Path]::GetPathRoot($db) -eq $_) }).Count -gt 0
+    ($ExpectedDbRoots | Where-Object { $db -like "$($_)*" -or ([IO.Path]::GetPathRoot($db) -eq $_) }).Count -gt 0
   } else { $true }
   if(-not $dbOk){ Write-Warning "[failure] NTDS database path not on an expected volume`nDB=$db; Expected roots: $($ExpectedDbRoots -join ', ')" }
 
   $lgOk = if($ExpectedLogRoots -and $ExpectedLogRoots.Count){
-    ($ExpectedLogRoots | Where-Object { $lg -like "$_*" -or ([IO.Path]::GetPathRoot($lg) -eq $_) }).Count -gt 0
+    ($ExpectedLogRoots | Where-Object { $lg -like "$($_)*" -or ([IO.Path]::GetPathRoot($lg) -eq $_) }).Count -gt 0
   } else { $true }
   if(-not $lgOk){ Write-Warning "[failure] NTDS log path not on an expected volume`nLOGS=$lg; Expected roots: $($ExpectedLogRoots -join ', ')" }
 
@@ -821,7 +821,7 @@ function HealthTest-UnconstrainedDelegationAccounts{
 Checks Unconstrained Delegation Accounts
 
 .DESCRIPTION
-AppliesTo: All
+AppliesTo: DC
 Scope: Computer
 Category: Security & Stability Risks
 Impact: Medium(Time)

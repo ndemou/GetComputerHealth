@@ -908,7 +908,6 @@ if ($isHostDC) {
     Invoke-HealthTest "HealthTest-NtdsPathsLocation"
     Invoke-HealthTest "HealthTest-LdapSigningChannelBinding"
     Invoke-HealthTest "HealthTest-UnusedEnabledAdapters"
-    Invoke-HealthTest "HealthTest-NetworkInterfaceMetrics"
     if (!$DebugSkipSlowTests) { Invoke-HealthTest "HealthTest-DisabledGpoLinksAtDomainRoot" }
 
     # TODO: some of these below are maybe for all member servers

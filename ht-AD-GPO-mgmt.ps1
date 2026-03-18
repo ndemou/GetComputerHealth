@@ -2,6 +2,9 @@
 Active Directory & GPO Management
 #>
 
+# The functions below are only defined if computer is a DC/PDC
+if ((Get-CimInstance Win32_ComputerSystem).DomainRole -in 4,5) {
+
 function HealthTest-ADViewConsistency {
 <#
 .SYNOPSIS
@@ -363,7 +366,7 @@ function HealthTest-KerberosEncryptionTypes{
 Checks Kerberos Encryption Types
 
 .DESCRIPTION
-AppliesTo: All
+AppliesTo: DC
 Scope: Computer
 Category: Security & Stability Risks
 Impact: Medium(Time)
@@ -460,7 +463,7 @@ function HealthTest-DfsNamespaceEnumerate{
 Checks Dfs Namespace Enumerate
 
 .DESCRIPTION
-AppliesTo: All
+AppliesTo: DC
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time)
@@ -481,7 +484,7 @@ function HealthTest-PreWin2000Group{
 Checks Pre Win 2000 Group
 
 .DESCRIPTION
-AppliesTo: All
+AppliesTo: DC
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time)
@@ -1074,193 +1077,6 @@ FalsePositives: None.
         Write-Warning "[pass] No unexpected accounts in Local Administrators"}
 }
 
-function HealthTest-ShadowStorage {
-<#
-.SYNOPSIS
-Checks if Shadow Storage is enabled on internal drives (for servers) or on C: (for workstations)
-
-.DESCRIPTION
-AppliesTo: All
-Scope: Computer
-Category: Configuration Hygiene & Best Practices
-Impact: Low
-Uses: Get-CimInstance.
-FalsePositives: None.
-#>
-  [CmdletBinding()]
-  param(
-    [string[]]$RequireOnVolumes = @(),
-    [Nullable[double]]$MinRecommendedGB = $null,
-    [Nullable[double]]$MaxRecommendedGB = $null
-  )
-
-  $domainRole = (Get-CimInstance -ClassName Win32_ComputerSystem).DomainRole
-  $isWorkstation = ($domainRole -in 0,1)
-  $isServer = -not $isWorkstation
-
-  $allVolumes = @(Get-CimInstance -ClassName Win32_Volume | Select-Object DeviceID, DriveLetter, DriveType)
-
-  if ($isWorkstation) {
-    if ($RequireOnVolumes.Count -eq 0) { $RequireOnVolumes = @('C:') }
-    if (-not $MinRecommendedGB.HasValue) { $MinRecommendedGB = 5 }
-    if (-not $MaxRecommendedGB.HasValue) { $MaxRecommendedGB = 25 }
-  } elseif ($isServer) {
-    if ($RequireOnVolumes.Count -eq 0) {
-      $RequireOnVolumes = @(
-        $allVolumes |
-          Where-Object { $_.DriveType -eq 3 -and $_.DriveLetter } |
-          ForEach-Object { $_.DriveLetter.TrimEnd('\') } |
-          Sort-Object -Unique
-      )
-    }
-  }
-
-  $assoc = @(Get-CimInstance -ClassName Win32_ShadowStorage 2>$null)
-  $vols = @($allVolumes)
-
-  $present = @{}
-  $statsByDrive = @{}
-
-  foreach ($a in $assoc) {
-    $drive = $null
-    $devId = $null
-
-    try {
-      $volObj = $null
-
-      if ($a.Volume -is [Microsoft.Management.Infrastructure.CimInstance]) {
-        $volObj = $a.Volume
-      } elseif ($a.Volume) {
-        $volObj = Get-CimInstance -InputObject $a.Volume -ErrorAction Stop
-      }
-
-      if ($volObj) {
-        $devId = [string]$volObj.DeviceID
-        if ($volObj.DriveLetter) {
-          $drive = [string]$volObj.DriveLetter
-        }
-      }
-    } catch {
-    }
-
-    if (-not $devId -and $a.Volume) {
-      $volRef = [string]$a.Volume
-      if ($volRef -match 'DeviceID\s*=\s*"((?:[^"\\]|\\.)*)"') {
-        $devId = $Matches[1] -replace '\\\\','\'
-      }
-    }
-
-    if (-not $drive -and $devId) {
-      $m = @($vols | Where-Object { $_.DeviceID -eq $devId } | Select-Object -First 1)
-      if ($m.Count -gt 0 -and $m[0].DriveLetter) {
-        $drive = [string]$m[0].DriveLetter
-      }
-    }
-
-    if (-not $drive -and $devId -match '^[A-Z]:\\?$') {
-      $drive = $devId.TrimEnd('\')
-    }
-
-    if (-not $drive -and $devId) {
-      $drive = $devId.TrimEnd('\')
-    }
-
-    if (-not $drive) { continue }
-
-    $k = $drive.TrimEnd('\')
-    $present[$k] = $true
-
-    if (-not $statsByDrive.ContainsKey($k)) {
-      $statsByDrive[$k] = [pscustomobject]@{
-        MaxSpaceBytes = [uint64]0
-        AllocatedSpaceBytes = [uint64]0
-        UsedSpaceBytes = [uint64]0
-      }
-    }
-
-    if ($null -ne $a.MaxSpace -and [uint64]$a.MaxSpace -gt 0) {
-      $statsByDrive[$k].MaxSpaceBytes += [uint64]$a.MaxSpace
-    }
-    if ($null -ne $a.AllocatedSpace -and [uint64]$a.AllocatedSpace -gt 0) {
-      $statsByDrive[$k].AllocatedSpaceBytes += [uint64]$a.AllocatedSpace
-    }
-    if ($null -ne $a.UsedSpace -and [uint64]$a.UsedSpace -gt 0) {
-      $statsByDrive[$k].UsedSpaceBytes += [uint64]$a.UsedSpace
-    }
-  }
-
-  $missingLevel = if ($isWorkstation) { 'notice' } else { 'failure' }
-
-  $rangeOutOfBounds = New-Object System.Collections.Generic.List[string]
-  $rangeUnknown = New-Object System.Collections.Generic.List[string]
-  $outOfRange = $false
-
-  if ($MinRecommendedGB.HasValue -or $MaxRecommendedGB.HasValue) {
-    $targets = if ($RequireOnVolumes.Count -gt 0) {
-      @($RequireOnVolumes | ForEach-Object { $_.TrimEnd('\') } | Sort-Object -Unique)
-    } else {
-      @($present.Keys | Sort-Object)
-    }
-
-    foreach ($k in $targets) {
-      if (-not $statsByDrive.ContainsKey($k)) { continue }
-
-      $s = $statsByDrive[$k]
-      [uint64]$maxBytes = $s.MaxSpaceBytes
-      if ($maxBytes -le 0 -and $s.AllocatedSpaceBytes -gt 0) {
-        $maxBytes = $s.AllocatedSpaceBytes
-      }
-
-      if ($maxBytes -le 0) {
-        $rangeUnknown.Add("$k size not available")
-        continue
-      }
-
-      $sizeGB = [math]::Round(($maxBytes / 1GB), 2)
-
-      if ($MinRecommendedGB.HasValue -and $sizeGB -lt $MinRecommendedGB.Value) {
-        $outOfRange = $true
-        $rangeOutOfBounds.Add("$k=$sizeGB GB below min $($MinRecommendedGB.Value) GB")
-      }
-
-      if ($MaxRecommendedGB.HasValue -and $sizeGB -gt $MaxRecommendedGB.Value) {
-        $outOfRange = $true
-        $rangeOutOfBounds.Add("$k=$sizeGB GB above max $($MaxRecommendedGB.Value) GB")
-      }
-    }
-  }
-
-  if ($RequireOnVolumes.Count -gt 0) {
-    $missing = @()
-
-    foreach ($v in $RequireOnVolumes) {
-      $k = $v.TrimEnd('\')
-      if (-not $present.ContainsKey($k)) {
-        $missing += $k
-        Write-Warning "[$missingLevel] Shadow storage not configured on required volume $k"
-      }
-    }
-
-    if ($missing.Count -eq 0) {
-      Write-Warning ("[pass] Shadow storage on required volumes`nConfigured on: " + ((@($present.Keys) | Sort-Object) -join ', '))
-    }
-  } else {
-    if ($present.Count -gt 0) {
-      Write-Warning ("[pass] Shadow storage configured`nOn: " + ((@($present.Keys) | Sort-Object) -join ', '))
-    } else {
-      Write-Warning "[notice] Shadow storage (Volume Shadow Copies) is not enabled`nUsers won't see Previous Version for files/folders. (Note that this issue is UNRELATED to the VSS service that backup software use.)"
-    }
-  }
-
-  if ($outOfRange -and $rangeOutOfBounds.Count -gt 0) {
-    Write-Warning ("[notice] Shadow storage size outside recommended range`n" + ($rangeOutOfBounds -join '; '))
-  }
-
-  if ($rangeUnknown.Count -gt 0) {
-    Write-Warning ("[info] Shadow storage size could not be determined`n" + ($rangeUnknown -join '; '))
-  }
-}
-
 function HealthTest-SysvolContentConsistency{
 <#
 .SYNOPSIS
@@ -1583,145 +1399,4 @@ FalsePositives: None.
   if(-not $anyFail){ Write-Warning "[pass] AD replication latency acceptable (<= $MaxMinutes min on schema/config)" }
 }
 
-function HealthTest-DomainARecordPointsToDcIp {
-<#
-.SYNOPSIS
-Checks Domain A Record Points To Dc Ip
-
-.DESCRIPTION
-AppliesTo: DomainJoined
-Scope: Computer
-Category: Security & Stability Risks
-Impact: Medium(Time)
-Uses: Resolve-DnsName.
-FalsePositives: None.
-#>
-  $cs = Get-CimInstance Win32_ComputerSystem
-  $role = $cs.DomainRole
-  $fn = $MyInvocation.MyCommand.Name
-  if ($role -in 0,2) { Write-Warning "[notice] This test ($fn) is not applicable to non-domain joined hosts"; return }
-  if ($role -in 4,5) { Write-Warning "[notice] This test ($fn) is not applicable to Domain Controllers"; return }
-  $dcIps = @($Global:GetComputerHealthDataQMTA.IpsOfAllDcs)
-
-  $domain = $cs.Domain
-  $ares = $null
-  try { $ares = Resolve-DnsName -Name $domain -Type A -ErrorAction Stop } catch {}
-  if (-not $ares) {
-    Write-Warning "[failure] No A records found for domain DNS name.`n$domain"
-    return
-  }
-
-  $aIps = @($ares | Where-Object { $_.IPAddress } | ForEach-Object { $_.IPAddress })
-  $intersection = @()
-  foreach ($ip in $aIps) { if ($dcIps -contains $ip) { $intersection += $ip } }
-
-  $comment = "Domain=$domain; DC IPs=" + ($dcIps -join ', ') + "; Domain A IPs=" + ($aIps -join ', ')
-  if ($intersection.Count -gt 0) {
-    Write-Warning ("[pass] Domain DNS name resolves to at least one DC IP.`n$comment")
-  } else {
-    Write-Warning ("[failure] Domain DNS name does not resolve to any known DC IPv4 address.`n$comment")
-  }
-}
-
-function HealthTest-NltestSiteDiscovery {
-<#
-.SYNOPSIS
-Checks Nltest Site Discovery
-
-.DESCRIPTION
-AppliesTo: All
-Scope: Computer
-Category: Configuration Hygiene & Best Practices
-Impact: Medium(Time)
-Uses: Get-CimInstance.
-FalsePositives: None.
-#>
-  [CmdletBinding()] param()
-  $cs = Get-CimInstance Win32_ComputerSystem
-  $role = $cs.DomainRole
-  $fn = $MyInvocation.MyCommand.Name
-  if ($role -in 0,2) { Write-Warning "[notice] This test ($fn) is not applicable to non-domain joined hosts"; return }
-  if ($role -in 4,5) { Write-Warning "[notice] This test ($fn) is not applicable to Domain Controllers"; return }
-
-  $out  = nltest /dsgetsite 2>&1
-  $exit = $LASTEXITCODE
-  $txt  = ($out | Out-String).Trim()
-
-  if ($exit -eq 0 -and $txt -match 'The command completed successfully') {
-    $lines = $txt -split "`r?`n"
-    $site  = $null
-    foreach ($l in $lines) {
-      if (-not $site -and $l -and $l -notmatch 'The command completed successfully') {
-        $site = $l.Trim()
-        break
-      }
-    }
-    if (-not $site) { $site = '(unknown)' }
-    Write-Warning "[pass] NLTEST /dsgetsite succeeded.`nSite: $site"
-  } else {
-    $hex = '0x{0:X}' -f ($exit -band 0xFFFFFFFF)
-    Write-Warning "[failure] NLTEST /dsgetsite failed.`nExitCode=$hex; Output=`n$txt"
-  }
-}
-
-function HealthTest-GpupdatePolicyApply {
-<#
-.SYNOPSIS
-Checks Gpupdate Policy Apply
-
-.DESCRIPTION
-AppliesTo: All
-Scope: Computer
-Category: Configuration Hygiene & Best Practices
-Impact: Medium(Time)
-Uses: Test-ComputerSecureChannel.
-FalsePositives: None.
-#>
-  [CmdletBinding()] param()
-  $cs   = Get-CimInstance Win32_ComputerSystem
-  $role = $cs.DomainRole
-  $fn   = $MyInvocation.MyCommand.Name
-  if ($role -in 0,2) { Write-Warning "[notice] This test ($fn) is not applicable to non-domain joined hosts"; return }
-  if ($role -in 4,5) { Write-Warning "[notice] This test ($fn) is not applicable to Domain Controllers"; return }
-
-
-  if (!(Test-ComputerSecureChannel)) {
-      Write-Warning "[warning] Can't connected to any Domain Controller. Can not run gpupdate.`nMake sure you are on the domain LAN or connected via VPN."
-    return
-  }
-
-  $id = [Security.Principal.WindowsIdentity]::GetCurrent()
-  $isSystem = $false
-  try {
-    if ($id -and $id.User -and $id.User.Value -eq 'S-1-5-18') { $isSystem = $true }
-  } catch {}
-
-  $out  = gpupdate 2>&1
-  $text = ($out | sls -notmatch '^ *$' | Out-String)
-
-  $compOk = ($text -like "*Computer Policy update has completed successfully*")
-  $userOk = ($text -like "*User Policy update has completed successfully*")
-
-  if ($compOk -and $userOk) {
-    Write-Warning "[pass] Computer and user policy updates completed successfully (gpupdate)."; return
-  }
-
-  if ($compOk) {
-    Write-Warning "[pass] Computer policy update completed successfully (gpupdate)."
-  } else {
-    Write-Warning ("[failure] Computer policy update did not report success.`ngpupdate output:`n" + $text)
-  }
-
-  if (-not $userOk) {
-    if ($isSystem) {
-      Write-Warning ("[notice] User policy update did not report success (gpupdate running under SYSTEM/non-interactive).`nThis can be expected when no interactive user is logged on.`nRaw gpupdate output:`n" + $text)
-    } else {
-      Write-Warning ("[failure] User policy update did not report success.`nExpected success for interactive user.`nRaw gpupdate output:`n" + $text)
-    }
-  } else {
-    Write-Warning "[pass] User policy update completed successfully (gpupdate)."
-  }
-}
-
-#--------------------------------------------------------
-# xxx new tests 20205-11-26
+} # computer is a DC/PDC

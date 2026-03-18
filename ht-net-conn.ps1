@@ -168,28 +168,6 @@ FalsePositives: None.
   }
 }
 
-function HealthTest-NetworkInterfaceMetrics{
-<#
-.SYNOPSIS
-Checks Network Interface Metrics
-
-.DESCRIPTION
-AppliesTo: All
-Scope: Computer
-Category: Configuration Hygiene & Best Practices
-Impact: Medium(Time)
-Uses: Get-NetIPInterface.
-FalsePositives: None.
-#>
-  [CmdletBinding()] param([int]$MaxPreferredMetric=25)
-  $ifs=Get-NetIPInterface -AddressFamily IPv4 | Where-Object {$_.ConnectionState -eq 'Connected'}
-  $bad=$false
-  foreach($i in $ifs){
-    if($i.InterfaceMetric -gt $MaxPreferredMetric -and !($i.InterfaceAlias -like "Loopback*")){ $bad=$true; Write-Warning "[warning] Interface metric too high: $($i.InterfaceAlias) Metric=$($i.InterfaceMetric) (Max=$MaxPreferredMetric)" }
-  }
-  if(-not $bad){ Write-Warning "[pass] All connected interfaces have acceptable metrics (<= $MaxPreferredMetric)" } else { Write-Warning "[failure] One or more interfaces have metrics above the preferred threshold" }
-}
-
 function Test-NetConnectionFast {
   [CmdletBinding()]
   param(
