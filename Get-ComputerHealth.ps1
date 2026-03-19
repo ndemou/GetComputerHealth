@@ -699,6 +699,7 @@ $Global:GCHDQMTA = [pscustomobject]@{
     DebugSkipSlowTests     = $DebugSkipSlowTests
     IpsOfAllDcs            = @($validIpsOfAllDcs)
 }
+Log-Debug "`$global:GCHDQMTA" -Comment "$(($global:GCHDQMTA|fl|Out-String).trim())"
 
 #|
 #| Collect system information
