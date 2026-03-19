@@ -89,9 +89,18 @@ Available properties include these self-documenting booleans:
 
 And `.GetCurrentDomain = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain()`
 
-## Required help-block format for every `HealthTest-*` function
 
-Every `HealthTest-*` function must include an **in-function** comment-based help block immediately after the opening `{`.
+## Optional niceties
+
+If your function takes a lot of time (e.g. more than 5sec) and you want it to be skipped when the user includes the `-DebugSkipSlowTests` switch on invocation, add this at the top of your function:
+```
+if ($Global:GCHDQMTA.DebugSkipSlowTests) {Write-Warning "[info] Skipping slow test $($MyInvocation.MyCommand.Name) because of -DebugSkipSlowTests switch"; return}
+```
+
+## Required help-block format for every *internal* `HealthTest-*` function
+
+This is not mandatory for custom health tests but every `HealthTest-*` function must include an **in-function** comment-based help block immediately after the opening `{`.
+
 
 ### Example
 
