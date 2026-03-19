@@ -712,7 +712,7 @@ $Global:GCHDQMTA = [pscustomobject]@{
 $isHostDnsServer = $null -ne (Get-Service -Name DNS -ErrorAction SilentlyContinue)
 $isHostHyperisor = (Get-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V).State -eq 'Enabled'
 $isHostInDomainButNotDC = (Get-CimInstance Win32_ComputerSystem).DomainRole -in 1,3
-if ($isHostDC -or $isHostPDC){. (Join-Path -Path $PSScriptRoot -ChildPath "ht-AD-GPO-mgmt.ps1")}
+if ($isHostDC -or $isHostPDC){. (Join-Path -Path $PSScriptRoot -ChildPath "ht-DC-PDC.ps1")}
 if ($isHostDC -or $isHostPDC){. (Join-Path -Path $PSScriptRoot -ChildPath "ht-DNS-DHCP-srvc.ps1")}
 if ($isHostDomainJoined)     {. (Join-Path -Path $PSScriptRoot -ChildPath "ht-domjoined.ps1")}
 if ($isHostInDomainButNotDC) {. (Join-Path -Path $PSScriptRoot -ChildPath "ht-member.ps1")}

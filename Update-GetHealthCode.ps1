@@ -736,7 +736,7 @@ if ($updated) {
 }
 
 $_ = Replace-FileFromSource -FileName 'lib-write-log-objects.ps1'      -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
-$_ = Replace-FileFromSource -FileName 'ht-AD-GPO-mgmt.ps1'             -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+$_ = Replace-FileFromSource -FileName 'ht-DC-PDC.ps1'             -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
 $_ = Replace-FileFromSource -FileName 'ht-DNS-DHCP-srvc.ps1'           -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
 $_ = Replace-FileFromSource -FileName 'ht-syscfg-featdisc.ps1'         -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
 $_ = Replace-FileFromSource -FileName 'ht-srvc-exe-resolve.ps1'        -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
