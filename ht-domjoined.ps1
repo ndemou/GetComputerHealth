@@ -2,99 +2,6 @@
 Tests only for domain joined servers (including DC/PDC)
 #>
 
-function HealthTest-InterfaceDnsServersUseDcs {
-<#
-.SYNOPSIS
-Checks Interface Dns Servers Use Dcs
-
-.DESCRIPTION
-AppliesTo: DomainJoined
-Scope: Computer
-Category: Configuration Hygiene & Best Practices
-Impact: Medium(Network)
-Uses: Get-CimInstance.
-FalsePositives: None.
-#>
-  $cs = Get-CimInstance Win32_ComputerSystem
-  $role = $cs.DomainRole
-  $fn = $MyInvocation.MyCommand.Name
-  if ($role -in 0,2) { Write-Warning "[notice] This test ($fn) is not applicable to non-domain joined hosts"; return }
-  if ($role -in 4,5) { Write-Warning "[notice] This test ($fn) is not applicable to Domain Controllers"; return }
-  $dcIps = @($Global:GCHDQMTA.IpsOfAllDcs)
-
-  $nets = Get-CimInstance Win32_NetworkAdapterConfiguration -Filter "IPEnabled=TRUE"
-  if (-not $nets) {
-    Write-Warning "[failure] No IP-enabled network adapters found."; return
-  }
-
-  $anyClean = $false
-  $anyBad   = $false
-
-  foreach ($net in $nets) {
-    $dns  = $net.DNSServerSearchOrder
-    $desc = $net.Description
-    if (-not $dns -or $dns.Count -eq 0) {
-      Write-Warning "[notice] Interface has no DNS servers configured.`n$desc"
-      continue
-    }
-
-    $dnsList = $dns -join ', '
-    $allDomain = $true
-    $allNonDomain = $true
-    foreach ($s in $dns) {
-      if ($dcIps -notcontains $s) { $allDomain = $false; break }
-    }
-    foreach ($s in $dns) {
-      if ($dcIps -contains $s) { $allNonDomain = $false; break }
-    }
-
-    if ($allDomain) {
-      $anyClean = $true
-      Write-Warning "[pass] Interface has only DCs as DNS servers.`nInterface: $desc; DNS=$dnsList"
-    } elseif ($allNonDomain) {
-      # Ignoring this interface that only has non-domain DNS servers
-    } else {
-      $anyBad = $true
-      Write-Warning "[failure] Interface DNS servers include non-DC addresses.`nInterface: $desc; DNS=$dnsList; DC IPs=$($dcIps -join ', ')"
-    }
-  }
-
-  if (-not $anyClean) {
-    Write-Warning "[failure] No interface found where all DNS servers are DC IPs."} elseif (-not $anyBad) {
-    Write-Warning "[pass] All interfaces with DNS configured use only DC IPs."}
-}
-
-
-function HealthTest-DnsSuffixMatchesDomain {
-<#
-.SYNOPSIS
-Checks Dns Suffix Matches Domain
-
-.DESCRIPTION
-AppliesTo: DomainJoined
-Scope: Computer
-Category: Configuration Hygiene & Best Practices
-Impact: Medium(Network)
-Uses: Select-String.
-FalsePositives: None.
-#>
-  [CmdletBinding()] param()
-  $cs = Get-CimInstance Win32_ComputerSystem
-  $role = $cs.DomainRole
-  $fn = $MyInvocation.MyCommand.Name
-  if ($role -in 0,2) { Write-Warning "[notice] This test ($fn) is not applicable to non-domain joined hosts"; return }
-  if ($role -in 4,5) { Write-Warning "[notice] This test ($fn) is not applicable to Domain Controllers"; return }
-
-  $domain = $cs.Domain
-  $out = ipconfig /all 2>&1
-  $pattern = "DNS Suffix.* $domain`$"
-  if ($out | Select-String -Pattern $pattern) {
-    Write-Warning "[pass] Domain name appears in DNS suffix`nDomain: $domain"
-  } else {
-    Write-Warning "[failure] Domain name does not appear in DNS suffix`nExpected suffix: $domain"
-  }
-}
-
 function HealthTest-DnsSuffixBaseline {
 <#
 .SYNOPSIS
@@ -351,5 +258,3 @@ FalsePositives: None.
   if(-not $bad){ Write-Warning "[pass] All WMI namespaces referenced by GPO WMI filters exist on this host"}
   else{ Write-Warning "[warning] One or more GPO WMI filter namespaces are missing on this host"}
 }
-
-
