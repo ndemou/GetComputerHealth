@@ -67,7 +67,7 @@ These instrunction are also valid for contributing health tests in the core libr
    ```
 3. Test your function:
    ```powershell
-   . C:\IT\bin\Get-ComputerHealth.ps1 -DoNothing # only needed if your function reads `$Global:GetComputerHealthDataQMTA`
+   . C:\IT\bin\Get-ComputerHealth.ps1 -DoNothing # only needed if your function reads `$Global:GCHDQMTA`
    . "C:\IT\config\Custom-HealthTests\tests-for-$env:COMPUTERNAME.ps1" # <-- the name of your ps1 file here
    HealthTest-LargeDirectories # <-- the name of your function here
    ```
@@ -76,7 +76,7 @@ If you wish you can have more than one .ps1 files in `C:\IT\config\Custom-Health
 
 ## Runtime context available to custom health tests
 
-When `Get-ComputerHealth.ps1` runs, it populates a global variable named `$Global:GetComputerHealthDataQMTA` so all health tests can reuse these host facts without re-computing.
+When `Get-ComputerHealth.ps1` runs, it populates a global variable named `$Global:GCHDQMTA` so all health tests can reuse these host facts without re-computing.
 
 Available properties include these self-documenting booleans:
 - `.isHostVM` (based on heuristics)

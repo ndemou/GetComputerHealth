@@ -15,7 +15,7 @@ Impact: Medium(Time)
 Uses: Resolve-DnsName.
 FalsePositives: None.
 #>
-  $dcIps = @($Global:GetComputerHealthDataQMTA.IpsOfAllDcs)
+  $dcIps = @($Global:GCHDQMTA.IpsOfAllDcs)
 
   $domain = (Get-CimInstance Win32_ComputerSystem).Domain
   $ares = $null
@@ -51,7 +51,7 @@ Uses: Get-CimInstance.
 FalsePositives: None.
 #>
   [CmdletBinding()] param()
-  $dcIps = @($Global:GetComputerHealthDataQMTA.IpsOfAllDcs)
+  $dcIps = @($Global:GCHDQMTA.IpsOfAllDcs)
 
   $out  = nltest /dsgetsite 2>&1
   $exit = $LASTEXITCODE
@@ -83,12 +83,13 @@ Checks Gpupdate Policy Apply
 AppliesTo: DomainJoined
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
-Impact: Medium(Time), High(Time)
+Impact: Medium(Time)
 Uses: Test-ComputerSecureChannel.
 FalsePositives: None.
 #>
   [CmdletBinding()] param()
-  $dcIps = @($Global:GetComputerHealthDataQMTA.IpsOfAllDcs)
+if ($Global:GCHDQMTA.DebugSkipSlowTests) {Write-Warning "[info] Skipping slow test $($MyInvocation.MyCommand.Name) because of -DebugSkipSlowTests switch"; return}
+  $dcIps = @($Global:GCHDQMTA.IpsOfAllDcs)
 
   if (!(Test-ComputerSecureChannel)) {
       Write-Warning "[warning] Can't connected to any Domain Controller. Can not run gpupdate.`nMake sure you are on the domain LAN or connected via VPN."

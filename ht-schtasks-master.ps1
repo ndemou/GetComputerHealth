@@ -327,6 +327,7 @@ Impact: High(Time)
 Uses: None.
 FalsePositives: None.
 #>
+    if ($Global:GCHDQMTA.DebugSkipSlowTests) {Write-Warning "[info] Skipping slow test $($MyInvocation.MyCommand.Name) because of -DebugSkipSlowTests switch"; return}
   $mapHresult = @{
     0x40010004=@{d='Process terminated externally'}
     0x80070001=@{d='Incorrect function'}

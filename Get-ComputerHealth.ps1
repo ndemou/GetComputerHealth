@@ -56,7 +56,7 @@ Default: empty (show all). Typical value: `DIP`
 (Parameter set: Run) Skips a predefined subset of "slow" built-in tests (those gated by the script's `$DebugSkipSlowTests` check).
 
 .PARAMETER IpsOfAllDcs
-(Parameter set: Run) Optional list of Domain Controller IP addresses passed in by the orchestrator. Stored in `$Global:GetComputerHealthDataQMTA.IpsOfAllDcs` for health tests that need it.
+(Parameter set: Run) Optional list of Domain Controller IP addresses passed in by the orchestrator. Stored in `$Global:GCHDQMTA.IpsOfAllDcs` for health tests that need it.
 
 .PARAMETER DoNothing
 (Parameter set: Run) Immediate no-op return (useful for smoke-testing invocation/parameter binding).
@@ -681,7 +681,7 @@ $validIpsOfAllDcs = @($validIpsList)
 
 # Explicitly created so host-fact values are publicly accessible to all health tests,
 # including custom health tests loaded at runtime.
-$Global:GetComputerHealthDataQMTA = [pscustomobject]@{
+$Global:GCHDQMTA = [pscustomobject]@{
     isHostVM           = $isHostVM
     isHostMobile       = $isHostMobile
     isHostDomainJoined = $isHostDomainJoined
@@ -867,43 +867,18 @@ Invoke-HealthTest "HealthTest-HotfixBaseline"
 Invoke-HealthTest "HealthTest-RdpHardening"
 Invoke-HealthTest "HealthTest-RequiredSrvRecords"
 Invoke-HealthTest "HealthTest-BitLockerStatus"
-
-# Tests that take >1sec (Not including ones for DCs):
-#   1.2s  HealthTest-IisBindings
-#   1.3s  HealthTest-Smb1Disabled
-#   1.7s  HealthTest-MalwareProtectionFeatures
-#   1.8s  HealthTest-SingleDefaultGateway
-#   2.1s  HealthTest-TimeSyncAccuracy
-#   2.3s  HealthTest-SystemScheduledTasks
-#   2.5s  HealthTest-VssWriters
-#   2.6s  HealthTest-UnsignedDrivers
-#   2.7s  HealthTest-RamPressure
-
-# Tests that take >3sec (Not including ones for DCs):
-# (These are skiped by -DebugSkipSlowTests)
-#   3.5s  HealthTest-ShareReasonableness
-#   3.7s  HealthTest-FirewallEnabled
-#   3.9s  HealthTest-IPv6Binding
-#   4.0s  HealthTest-UnexpectedListeningPorts
-#   5.0s  HealthTest-Storage
-#   5.9s  HealthTest-NonMicrosoftServices
-#   6.0s  HealthTest-SeriousRecentEventLogs
-#  26.3s  HealthTest-GpupdatePolicyApply
-
-if (!$DebugSkipSlowTests) {
-	Invoke-HealthTest "HealthTest-SingleDefaultGateway" 
-	Invoke-HealthTest "HealthTest-VssWriters" 
-    Invoke-HealthTest "HealthTest-SoftwareLicensing"
-    Invoke-HealthTest "HealthTest-ScheduledTasksLastResult"
-    Invoke-HealthTest "HealthTest-FirewallEnabled"
-    Invoke-HealthTest "HealthTest-Storage"
-    Invoke-HealthTest "HealthTest-ShareReasonableness"
-    Invoke-HealthTest "HealthTest-UnexpectedListeningPorts"
-    Invoke-HealthTest "HealthTest-IPv6Binding"
-    Invoke-HealthTest "HealthTest-NonMicrosoftServices"
-    Invoke-HealthTest "HealthTest-SeriousRecentEventLogs"
-    Invoke-HealthTest "HealthTest-LargeDirectories"
-}
+Invoke-HealthTest "HealthTest-SingleDefaultGateway" 
+Invoke-HealthTest "HealthTest-VssWriters" 
+Invoke-HealthTest "HealthTest-SoftwareLicensing"
+Invoke-HealthTest "HealthTest-ScheduledTasksLastResult"
+Invoke-HealthTest "HealthTest-FirewallEnabled"
+Invoke-HealthTest "HealthTest-Storage"
+Invoke-HealthTest "HealthTest-ShareReasonableness"
+Invoke-HealthTest "HealthTest-UnexpectedListeningPorts"
+Invoke-HealthTest "HealthTest-IPv6Binding"
+Invoke-HealthTest "HealthTest-NonMicrosoftServices"
+Invoke-HealthTest "HealthTest-SeriousRecentEventLogs"
+Invoke-HealthTest "HealthTest-LargeDirectories"
 
 if ($isHostMobile) {
     Invoke-HealthTest "HealthTest-IsTPMActivated"
@@ -928,9 +903,7 @@ if ($isHostDomainJoined -and -not $isHostDC) {
     Invoke-HealthTest "HealthTest-InterfaceDnsServersUseDcs"
     Invoke-HealthTest "HealthTest-DnsSuffixMatchesDomain"
     Invoke-HealthTest "HealthTest-NltestSiteDiscovery"
-    if (!$DebugSkipSlowTests) {
-		Invoke-HealthTest "HealthTest-GpupdatePolicyApply"
-	}
+	Invoke-HealthTest "HealthTest-GpupdatePolicyApply"
 }
 
 if ($isHostDnsServer) {
@@ -984,12 +957,10 @@ if ($isHostDC) {
     Invoke-HealthTest "HealthTest-ServiceAccountsPwdNeverExpires"
     #---END TODO------------------------------------------------------
 
-    if (!$DebugSkipSlowTests) {
-        Invoke-HealthTest "HealthTest-DfsDiagTestDCs"
-        Invoke-HealthTest "HealthTest-Dcdiag"
-		Invoke-HealthTest "HealthTest-DisabledGpoLinksAtDomainRoot"
-		Invoke-HealthTest "HealthTest-SysvolContentConsistency"
-    }
+	Invoke-HealthTest "HealthTest-DfsDiagTestDCs"
+	Invoke-HealthTest "HealthTest-Dcdiag"
+	Invoke-HealthTest "HealthTest-DisabledGpoLinksAtDomainRoot"
+	Invoke-HealthTest "HealthTest-SysvolContentConsistency"
 }
 
 if ($isHostHyperisor) {

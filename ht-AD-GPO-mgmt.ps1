@@ -127,6 +127,7 @@ Impact: High(Time)
 Uses: Write-Progress.
 FalsePositives: None.
 #>
+    if ($Global:GCHDQMTA.DebugSkipSlowTests) {Write-Warning "[info] Skipping slow test $($MyInvocation.MyCommand.Name) because of -DebugSkipSlowTests switch"; return}
     write-progress "Runing DCDIAG /c /v"
     $AllTestResults = Get-DcDiagFailures -Comprehensive
     if($AllTestResults){
@@ -415,6 +416,7 @@ Impact: Medium(Time), High(Time)
 Uses: Write-Progress.
 FalsePositives: None.
 #>
+    if ($Global:GCHDQMTA.DebugSkipSlowTests) {Write-Warning "[info] Skipping slow test $($MyInvocation.MyCommand.Name) because of -DebugSkipSlowTests switch"; return}
     write-progress "Runing 'DFSDIAG /TestDCs'"
     $out=(DFSDIAG /TestDCs | sls -NotMatch '^$|^(Information|[A-Za-z]+ing|Success)[ :]|^Finished TestDcs[.] *$')
     if ($out) {
@@ -890,6 +892,7 @@ Impact: Medium(Time), High(Time)
 Uses: Get-GPO, Get-ADDomain, Get-GPOReport.
 FalsePositives: None.
 #>
+    if ($Global:GCHDQMTA.DebugSkipSlowTests) {Write-Warning "[info] Skipping slow test $($MyInvocation.MyCommand.Name) because of -DebugSkipSlowTests switch"; return}
   if(-not (Get-Command Get-GPO -ErrorAction SilentlyContinue)){
     Write-Warning "[warning] GroupPolicy cmdlets not available; install RSAT/GPMC (GroupPolicy module)."; return
   }
@@ -983,6 +986,7 @@ Impact: High(Time)
 Uses: Get-ADDomainController.
 FalsePositives: None.
 #>
+    if ($Global:GCHDQMTA.DebugSkipSlowTests) {Write-Warning "[info] Skipping slow test $($MyInvocation.MyCommand.Name) because of -DebugSkipSlowTests switch"; return}
     $dom=(Get-CimInstance Win32_ComputerSystem).Domain
     $dcs=Get-ADDomainController -Filter * | Select-Object -ExpandProperty HostName
 

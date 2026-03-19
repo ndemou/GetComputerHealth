@@ -19,7 +19,7 @@ FalsePositives: None.
   param()
   
   $POPULAR_HOSTS = @('8.8.8.8','8.8.4.4','1.1.1.1','1.1.1.2')
-  $hostFacts = $Global:GetComputerHealthDataQMTA
+  $hostFacts = $Global:GCHDQMTA
 
   # Phase 1, Collect Data
   $profiles = @(Get-NetConnectionProfile) # We'll let an unexpected exception bubble up -- the caller catches and displays exceptions nicely
@@ -69,11 +69,12 @@ Checks Single Default Gateway
 AppliesTo: All
 Scope: Computer
 Category: Availability / Server Down Signals
-Impact: Medium(Time), High(Time)
+Impact: Medium(Time)
 Uses: Get-NetIPConfiguration.
 FalsePositives: None.
 #>
   [CmdletBinding()] param([switch]$AllowOnePerFamily)
+if ($Global:GCHDQMTA.DebugSkipSlowTests) {Write-Warning "[info] Skipping slow test $($MyInvocation.MyCommand.Name) because of -DebugSkipSlowTests switch"; return}
   $cfg = Get-NetIPConfiguration
   $gws = @(
     $cfg | ForEach-Object {
@@ -283,11 +284,12 @@ Checks I Pv 6 Binding
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
-Impact: Medium(Time), High(Time)
+Impact: Medium(Time)
 Uses: Get-NetAdapterBinding.
 FalsePositives: None.
 #>
   [CmdletBinding()] param([switch]$RequireEnabled)
+if ($Global:GCHDQMTA.DebugSkipSlowTests) {Write-Warning "[info] Skipping slow test $($MyInvocation.MyCommand.Name) because of -DebugSkipSlowTests switch"; return}
   $rows = Get-NetAdapterBinding -ComponentID ms_tcpip6 | Select-Object Name,Enabled
   if(-not $rows){ Write-Warning "[failure] No adapters returned for IPv6 binding (ms_tcpip6)"; return }
   $bad=$false

@@ -20,7 +20,7 @@ FalsePositives: None.
   $fn = $MyInvocation.MyCommand.Name
   if ($role -in 0,2) { Write-Warning "[notice] This test ($fn) is not applicable to non-domain joined hosts"; return }
   if ($role -in 4,5) { Write-Warning "[notice] This test ($fn) is not applicable to Domain Controllers"; return }
-  $dcIps = @($Global:GetComputerHealthDataQMTA.IpsOfAllDcs)
+  $dcIps = @($Global:GCHDQMTA.IpsOfAllDcs)
 
   $nets = Get-CimInstance Win32_NetworkAdapterConfiguration -Filter "IPEnabled=TRUE"
   if (-not $nets) {

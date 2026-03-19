@@ -520,6 +520,7 @@ FalsePositives: None.
     ),
     [switch]$IncludeAdminShares
   )
+if ($Global:GCHDQMTA.DebugSkipSlowTests) {Write-Warning "[info] Skipping slow test $($MyInvocation.MyCommand.Name) because of -DebugSkipSlowTests switch"; return}
   # Regarding BUILTIN\Power Users:
   # I have included it in the list allthough it's not a Broad group (in fact it's usually empty).
   # It is a legacy local group from pre-Vista/XP era. On modern Windows, it exists but is empty by default.
@@ -1016,9 +1017,10 @@ AppliesTo: All
 Scope: Computer
 Category: Audit / Compliance / Informational
 Impact: Medium(Time), High(Time)
-Uses: Write-BasedOnTestResult.
+Uses: Unknown.
 FalsePositives: None.
 #>
+    if ($Global:GCHDQMTA.DebugSkipSlowTests) {Write-Warning "[info] Skipping slow test $($MyInvocation.MyCommand.Name) because of -DebugSkipSlowTests switch"; return}
     Get-SoftwareLicensing | %{
         # ($_ | Format-List * -Force | Out-String).Trim()|write-host -f green
         Write-BasedOnTestResult "Is $($_.ProductName) Licensed?" -Test $_.IsLicensed -comment "$_"
@@ -1180,6 +1182,7 @@ FalsePositives: None.
 #>
     [CmdletBinding()]
     param([int]$MaxTemperatureC = 70,[int]$MaxPercentUsed = 95)
+if ($Global:GCHDQMTA.DebugSkipSlowTests) {Write-Warning "[info] Skipping slow test $($MyInvocation.MyCommand.Name) because of -DebugSkipSlowTests switch"; return}
 
     $allHealthy = $true
     $disks = Get-PhysicalDisk -ErrorAction SilentlyContinue

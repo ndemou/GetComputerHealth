@@ -29,6 +29,7 @@ Impact: High(Time)
 Uses: None.
 FalsePositives: None.
 #>
+    if ($Global:GCHDQMTA.DebugSkipSlowTests) {Write-Warning "[info] Skipping slow test $($MyInvocation.MyCommand.Name) because of -DebugSkipSlowTests switch"; return}
     $foundLargeDirectory = $false
 
     foreach ($dir in Find-LargeDirectory -Path 'C:\' -Threshold 10000 -SkipPaths @("C:\windows\servicing","C:\windows\WinSxS")) {
