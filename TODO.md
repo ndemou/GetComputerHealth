@@ -1,35 +1,22 @@
 # TODO
 
-## Add option to hide "SUPPRESSED" lines from console output (maybe -Hide S)
+## Policy Tests - How to introduce new tests (with new findings) without new alerts also
 
-## Add a test that verifies the help-block of HealthTest- functions follows our standards
+Policy tests emit warnings (or notices) for every finding and the user is responsible to suppress findings that *are* accepted, thus establishing a baseline.
+Examples of policy tests:
+      - HealthTest-UnexpectedListeningPorts
+      - HealthTest-NonMicrosoftServices
+      - HealthTest-InstalledRolesFeatures
+      - HealthTest-InstalledSW (TODO)
+      - HealthTest-EnabledScheduledTasks 
 
-Also get more explicit about our standards. Both on formatting and meaning. I've seen GPT make a lot of mistakes. 
-Considering one function at a time helped it a lot.
+The first time a specific policy test is run it automatically supresses all findings (except if -DontAutosetPolicy is passed) and appends a line to Get-ComputerHealth.sigs-to-suppress.txt to note that the first-time supression was performed. E.g.:
+   `AUTOMATIC_SUPPRESSIONS_PERFORMED, HealthTest-CheckSomething`
 
-I see plenty of `Scope: Domain` that is plainly wrong
+This automatic suppression allows developers of get computer health to add policy tests without anoying users with new warnings. Code is also emmiting a Notice:
+  `Automatically suppressed finding from new test 'HealthTest-OpenPorts': Found unexpected open port TCP:3389`
 
-## Get-ComputerHealth should auto-detect and invoke HealthTests -- not literally call them one by one
-
-It should discover them and run them.
-I have done most work. `ht-....ps1` files only define functions if they are applicable. But I must be formal about the way I do it. 
-So I can use the method I use for custom health tests.
-
-## Relative Tests
-relative tests don't produce absolute pass/fail results.
-Rather, they warn for every funding as if it's a failure 
-and the user is responsible to suppress findings that *are* accepted, thus establishing a baseline.
-Examples of relative tests are those that list open ports or installed SW.
-The first time a specific relative test is run it automatically 
-supresses all findings (except if -DontRecordBaseline is passed)
-and appends a line to Get-ComputerHealth.sigs-to-suppress.txt to
-note that the first-time supression was performed.
-E.g. for a function named HealthTest-CheckSomething__s_D-V__t_S
-   `BASELINE_RECORDED_FOR: HealthTest-CheckSomething`
-
-This automatic suppression allows developers of get computer health to add Relative tests without
-anoying their users with new warnings. Code is also emmiting a Notice:
-  `Automatically suppressed this finding from new test 'HealthTest-OpenPorts': Found unexpected open port TCP:3389`
+Maybe I should have an option to exclude policy tests (-SkipPolicyTests)
 
 ## Review the hundrends of warnings from Invoke-ScriptAnalyzer (and 3 errors)
 
@@ -39,6 +26,50 @@ See also : .\tests\script-analysis.ps1
 
 ChatGPT said: GitHub Actions can run Windows PowerShell 5.1 by using the powershell shell (which invokes powershell.exe on Windows runners).
 See also: https://docs.github.com/actions/automating-builds-and-tests/building-and-testing-powershell
+
+## Other
+
+  - Failure should not be used for Policy test findings, only for unambigouous failures.
+  - In general re-evaluate notice/warning/failure levels.
+
+  - Implement -RemoveWhitelisting -ComputerName -Signature
+
+  - HealthTest-EnabledScheduledTasks: I should include a hash of the action and the file(s) it runs
+
+  - I could be monitoring the CPU and memory pressure *while* running all/most 
+    other tests. This has pros and cons so I can make it a separate check 
+    (e.g. some tests *do* streess the CPU (maybe RAM also). I wonder if I could
+    tag them so that they do not run while measuring CPU or RAM)
+
+  - Also measure CPU, board temperature.
+
+  - -AddWhitelisting should be deleting any existing line for the signature.
+    Note that even without this fix, everything works as it should 
+    (because the last config line wins), but it's confusing to have
+    conflicting lines.
+
+  - Use [string[]]$Arg1 everywhere for arguments that expect string arrays
+    This style works like this:
+         -Arg1 test,foo,bar             --> @("test","foo","bar")
+         -Arg1 test -Arg1 foo -Arg1 bar --> @("test","foo","bar")
+         -Arg1 @("test","foo","bar")    --> @("test","foo","bar")
+         -Arg1 "test,foo,bar"           --> "test,foo,bar" 
+         -Arg1 "test foo bar"           --> "test foo bar" 
+    If I don't expect the values to have spaces or commas I could fix the last 2 cases manually
+
+  - `Start-HealthTestVeeamRecentBackupsExist` expects to read a text in clear text from a file. Maybe use credentials manager (note that the credentials manager stores passwords per user which complicates stuff -- you run it from your account and works, run from SYSTEM and doesn't)
+
+## Finalize HealthTest help-block standards and add code tests to verify we follow them
+
+Finalize both formatting and meaning. 
+
+I've seen GPT make a lot of mistakes. I see plenty of `Scope: Domain` that is plainly wrong. Considering one function at a time helped GPT a lot.## Some tests that have Scope: Domain should ideally be executed on one DC
+
+- "HealthTest-ADReplicationDomainRepadmin"
+- "HealthTest-SysvolNetlogonAccessible"
+- "HealthTest-SchemaVersionConsistency"
+- "HealthTest-TombstoneLifetime"
+- "HealthTest-RecycleBinEnabled"
 
 ## Health test candidates
 ```
@@ -748,58 +779,7 @@ function HealthTest-SchannelCompliance {
 ```
 
 
-## Other
 
-  - Re-evaluate notice/warning/failure levels (e.g. some failures should be warnings)
-  - Allow users to install somewhere besides C:\IT
-    Also, maybe config files should be in ProgramData instead of c:\IT\config
-    (but not readable by anyone except Admins)
-
-  - Implement -RemoveWhitelisting -ComputerName -Signature
-
-  - Some health tests like these:
-      - HealthTest-UnexpectedListeningPorts
-      - HealthTest-NonMicrosoftServices
-      - HealthTest-InstalledRolesFeatures
-      - HealthTest-InstalledSW (TODO)
-      - HealthTest-EnabledScheduledTasks (TODO)(I should include a hash of the action and the file(s) it runs)
-    are only meaningful if you have first established a baseline by
-    running them on an known good state. I should have an option
-    to exclude them from running (maybe -ExcludeTestsThatNeedBaseline)
-
-  - I could be monitoring the CPU and memory pressure *while* running all/most 
-    other tests. This has pros and cons so I can make it a separate check 
-    (e.g. some tests *do* streess the CPU (maybe RAM also). I wonder if I could
-    tag them so that they do not run while measuring CPU or RAM)
-
-  - Also measure CPU, board temperature.
-
-  - -AddWhitelisting should be deleting any existing line for the signature.
-    Note that even without this fix, everything works as it should 
-    (because the last config line wins), but it's confusing to have
-    conflicting lines.
-
-  - Use [string[]]$Arg1 everywhere for arguments that expect string arrays
-    This style works like this:
-         -Arg1 test,foo,bar             --> @("test","foo","bar")
-         -Arg1 test -Arg1 foo -Arg1 bar --> @("test","foo","bar")
-         -Arg1 @("test","foo","bar")    --> @("test","foo","bar")
-         -Arg1 "test,foo,bar"           --> "test,foo,bar" 
-         -Arg1 "test foo bar"           --> "test foo bar" 
-    If I don't expect the values to have spaces or commas I could fix the last 2 cases manually
-
-  - `Start-HealthTestVeeamRecentBackupsExist` expects to read a text 
-    in clear text from a file. Maybe use credentials manager (note that
-	the credentials manager stores passwords per user which complicates
-	stuff -- you run it from your account and works but not from SYSTEM)
-
-## Some tests that have Scope: Domain should ideally be executed on one DC
-
-- "HealthTest-ADReplicationDomainRepadmin"
-- "HealthTest-SysvolNetlogonAccessible"
-- "HealthTest-SchemaVersionConsistency"
-- "HealthTest-TombstoneLifetime"
-- "HealthTest-RecycleBinEnabled"
 - "HealthTest-TrustsVerify"
 - "HealthTest-ReplicationLatency"
 - "HealthTest-UnconstrainedDelegationAccounts"
