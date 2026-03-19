@@ -40,7 +40,130 @@ See also : .\tests\script-analysis.ps1
 ChatGPT said: GitHub Actions can run Windows PowerShell 5.1 by using the powershell shell (which invokes powershell.exe on Windows runners).
 See also: https://docs.github.com/actions/automating-builds-and-tests/building-and-testing-powershell
 
+## Health test candidates
+```
+function HealthTest-ExploitProtectionBaseline {
+<#
+.SYNOPSIS
+Checks Exploit Protection Baseline
 
+.DESCRIPTION
+AppliesTo: All
+Scope: Computer
+Category: Audit / Compliance / Informational
+Impact: Medium(Time)
+Uses: Get-ProcessMitigation.
+FalsePositives: None.
+
+TODO: Check all protections not just the 3 below. Get-ProcessMitigation -System 
+TODO: What are the popular defaults?
+#>
+    if (-not (Get-Command Get-ProcessMitigation -ErrorAction SilentlyContinue)) { Write-Warning "[notice] Exploit Protection cmdlets unavailable"; return }
+    $sys = Get-ProcessMitigation -System -ErrorAction SilentlyContinue
+    if (-not $sys) { Write-Warning "[warning] Could not read system process mitigations"; return }
+    $ok = $true
+    if (-not $sys.Dep.Enable) { Write-Warning "[notice] Exploit Protection; DEP not enforced system-wide"; $ok = $false }
+    if (-not $sys.ASLR.EnableForceRelocateImages) { Write-Warning "[notice] Exploit Protection; ASLR not enforcing force-relocate"; $ok = $false }
+    if (-not $sys.SEHOP.Enable) { Write-Warning "[notice] Exploit Protection; SEHOP not enabled"; $ok = $false }
+    if ($ok) { Write-Warning "[pass] Exploit Protection key mitigations enabled"; return } else { return }
+}
+
+
+function HealthTest-HyperVVMProperties {
+<#
+.SYNOPSIS
+Checks Hyper VVM Properties
+
+.DESCRIPTION
+AppliesTo: Hypervisors
+Scope: Computer
+Category: Configuration Hygiene & Best Practices
+Impact: Medium(Time)
+Uses: Get-VM.
+FalsePositives: None.
+#>
+    # For Hyper-V hosts put here the expected values for these VM properties
+    $EXPECTED_VALUES_FOR_VM_PROPERTIES = @{
+        ReplicationHealth        = 'Normal'
+        Status                   = 'Operating normally'
+        PrimaryOperationalStatus = 'Ok'
+        Heartbeat                = 'Ok*'
+        AutomaticStartAction     = 'Start*'
+        AutomaticStopAction      = 'Save'
+        VMIntegrationService     = 'Guest Service Interface,Heartbeat,Key-Value Pair Exchange,Shutdown,Time Synchronization,VSS'
+        Generation               = '2'
+        Version                  = '9.0'
+    }
+
+    $vms = Get-VM | Where-Object { $_.State -eq 'Running' }
+    foreach ($vm in $vms) {
+        $EXPECTED_VALUES_FOR_VM_PROPERTIES.Keys | ForEach-Object {
+            $prop_name = $_
+            $expected_value = $EXPECTED_VALUES_FOR_VM_PROPERTIES[$prop_name]
+            # write-host "Checking if $prop_name = $expected_value"
+
+            if ($prop_name -eq 'VMIntegrationService') {
+                # for VMIntegrationService we need to canonicalize the values
+                $expected_value = ($expected_value -split ',' | % { $_.Trim() } | Sort-Object -Unique)  -join ','
+                $actual_value   = ($vm.VMIntegrationService.Name | Sort-Object -Unique) -join ','
+            } else {
+                # for all other properties we have a simple value we expect them to have
+                $actual_value = $vm.$prop_name
+            }
+            if ($actual_value -notlike $expected_value) {
+                Write-Warning "[warning] VM $($vm.Name) has $prop_name='$actual_value' instead of '$expected_value'."
+            }
+        }
+    }
+}
+
+
+function HealthTest-RecentDiskErrors {
+<#
+.SYNOPSIS
+Checks Recent Disk Errors
+
+.DESCRIPTION
+AppliesTo: All
+Scope: Computer
+Category: Configuration Hygiene & Best Practices
+Impact: High(Time)
+Uses: Get-WinEvent.
+FalsePositives: None.
+#>
+    param([int]$Hours = 48)
+
+    $pass = $true
+    if ($Hours -lt 1) { $Hours = 1 }
+
+    $start     = (Get-Date).AddHours(-$Hours)
+    $providers = @('disk','ntfs','stornvme')
+    $events    = @()
+
+    foreach ($p in $providers) {
+        try {
+            Get-WinEvent -FilterHashtable @{
+                    LogName      = 'System'
+                    ProviderName = $p
+                    Level        = 2     # Error
+                    StartTime    = $start
+            } -ErrorAction SilentlyContinue | %{
+                Write-Warning "[failure] Storage($p) error in last N hours`nN=$Hours hours; Event: $($_.TimeCreated), $($_.LevelDisplayName), $($_.Message)"
+                $pass = $false
+            }
+        } catch {
+            if ($_.Exception.Message -notlike '*There is not an event provider*') {
+                Write-Warning "[warning] Failed reading System log for provider '$p': $($_.Exception.Message)"
+            }
+        }
+    }
+
+    if ($pass) {
+        Write-Warning "[pass] No disk/NTFS/storage errors in last $Hours h"
+    }
+
+}
+```
 
 ## HealthTest-SysvolContentConsistency
 The function HealthTest-SysvolContentConsistency calculates the size and file count of the entire `\\SYSVOL\...\Policies` tree across **all** Domain Controllers over the network. In a production environment with branch offices or many GPOs, this is dangerous. It generates massive WAN traffic. Since Health Tests are already running on every single DC you could in theory compute the hashes localy on each DC (and compute real hashes instead of the pseudo sigs that this function computes) and then exchange and compare them. This will be super fast even over WAN.
