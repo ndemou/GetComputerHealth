@@ -746,8 +746,13 @@ Impact: Medium(Time)
 Uses: Get-BitLockerVolume.
 FalsePositives: None.
 #>
+    if ($isHostVM) {
+        Write-Warning "[info] Computer is a VM; skipping HealthTest-BitLockerStatus"
+		return
+	}
     if (-not (Get-Command Get-BitLockerVolume -ErrorAction SilentlyContinue)) {
-        Write-Warning "[warning] BitLocker PowerShell cmdlets not available; skipping BitLocker status check"; return
+        Write-Warning "[warning] BitLocker PowerShell cmdlets not available; skipping BitLocker status check"
+		return
     }
 
     $pass = $true

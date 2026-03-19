@@ -697,15 +697,16 @@ $Global:GetComputerHealthDataQMTA = [pscustomobject]@{
 . (Join-Path -Path $PSScriptRoot -ChildPath "ht-win-os-hyg.ps1")
 . (Join-Path -Path $PSScriptRoot -ChildPath "ht-special.ps1")
 
-$isHyperVRoleEnabled = (Get-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V).State -eq 'Enabled'
-$isDomJoinedButNotDC = (Get-CimInstance Win32_ComputerSystem).DomainRole -in 1,3
-if ($isHostDC -or $isHostPDC) {. (Join-Path -Path $PSScriptRoot -ChildPath "ht-AD-GPO-mgmt.ps1")}
-if ($isHostDC -or $isHostPDC) {. (Join-Path -Path $PSScriptRoot -ChildPath "ht-DNS-DHCP-srvc.ps1")}
-if ($isHostDomainJoined) {. (Join-Path -Path $PSScriptRoot -ChildPath "ht-domjoined.ps1")}
-if ($isDomJoinedButNotDC) {. (Join-Path -Path $PSScriptRoot -ChildPath "ht-member.ps1")}
-if ($isHostMobile) {. (Join-Path -Path $PSScriptRoot -ChildPath "ht-mobile.ps1")}
-if ($isHyperVRoleEnabled) {. (Join-Path -Path $PSScriptRoot -ChildPath "ht-hyperv-mgmt.ps1")}
-if ($isHostServer) {. (Join-Path -Path $PSScriptRoot -ChildPath "ht-servers.ps1")}
+$isHostDnsServer = $null -ne (Get-Service -Name DNS -ErrorAction SilentlyContinue)
+$isHostHyperisor = (Get-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V).State -eq 'Enabled'
+$isHostInDomainButNotDC = (Get-CimInstance Win32_ComputerSystem).DomainRole -in 1,3
+if ($isHostDC -or $isHostPDC){. (Join-Path -Path $PSScriptRoot -ChildPath "ht-AD-GPO-mgmt.ps1")}
+if ($isHostDC -or $isHostPDC){. (Join-Path -Path $PSScriptRoot -ChildPath "ht-DNS-DHCP-srvc.ps1")}
+if ($isHostDomainJoined)     {. (Join-Path -Path $PSScriptRoot -ChildPath "ht-domjoined.ps1")}
+if ($isHostInDomainButNotDC) {. (Join-Path -Path $PSScriptRoot -ChildPath "ht-member.ps1")}
+if ($isHostMobile)           {. (Join-Path -Path $PSScriptRoot -ChildPath "ht-mobile.ps1")}
+if ($isHostHyperisor)        {. (Join-Path -Path $PSScriptRoot -ChildPath "ht-hyperv-mgmt.ps1")}
+if ($isHostServer)           {. (Join-Path -Path $PSScriptRoot -ChildPath "ht-servers.ps1")}
 #|
 #| Dot source health tests
 #+-----------------------------------------------------------
@@ -814,10 +815,6 @@ if ($OnlyTheseTests) {
 #
 #=============================================================================
 
-if ($isHostMobile) {
-    Invoke-HealthTest "HealthTest-IsTPMActivated"
-}
-
 #--------------------------------------------------------
 # For any computer (Generic)
 Invoke-HealthTest "HealthTest-PendingReboot"
@@ -844,11 +841,9 @@ Invoke-HealthTest "HealthTest-WmiRepository"
 Invoke-HealthTest "HealthTest-StartupItems"
 Invoke-HealthTest "HealthTest-RamPressure"
 Invoke-HealthTest "HealthTest-UpdateAge"
-if (!$DebugSkipSlowTests) { Invoke-HealthTest "HealthTest-SingleDefaultGateway" }
 Invoke-HealthTest "HealthTest-NetworkConnectionProfiles"
 Invoke-HealthTest "HealthTest-ScheduledTasks"
 Invoke-HealthTest "HealthTest-SystemScheduledTasks"
-if (!$DebugSkipSlowTests) { Invoke-HealthTest "HealthTest-VssWriters" }
 Invoke-HealthTest "HealthTest-TimeSyncAccuracy"
 Invoke-HealthTest "HealthTest-TimeSyncPolicy"
 Invoke-HealthTest "HealthTest-UnsignedDrivers"
@@ -859,11 +854,8 @@ Invoke-HealthTest "HealthTest-EventLogMaxSizes"
 Invoke-HealthTest "HealthTest-HotfixBaseline"
 Invoke-HealthTest "HealthTest-RdpHardening"
 Invoke-HealthTest "HealthTest-RequiredSrvRecords"
+Invoke-HealthTest "HealthTest-BitLockerStatus"
 # Invoke-HealthTest "HealthTest-ExploitProtectionBaseline"
-
-if (-not $isHostVM) {
-    Invoke-HealthTest "HealthTest-BitLockerStatus"
-}
 
 # Tests that take >1sec (Not including ones for DCs):
 #   1.2s  HealthTest-IisBindings
@@ -888,6 +880,8 @@ if (-not $isHostVM) {
 #  26.3s  HealthTest-GpupdatePolicyApply
 
 if (!$DebugSkipSlowTests) {
+	Invoke-HealthTest "HealthTest-SingleDefaultGateway" 
+	Invoke-HealthTest "HealthTest-VssWriters" 
     Invoke-HealthTest "HealthTest-SoftwareLicensing"
     Invoke-HealthTest "HealthTest-ScheduledTasksLastResult"
     Invoke-HealthTest "HealthTest-FirewallEnabled"
@@ -900,6 +894,10 @@ if (!$DebugSkipSlowTests) {
     Invoke-HealthTest "HealthTest-LargeDirectories"
 }
 
+if ($isHostMobile) {
+    Invoke-HealthTest "HealthTest-IsTPMActivated"
+}
+
 if ($isHostServer) {
     Invoke-HealthTest "HealthTest-InstalledRolesFeatures"
     Invoke-HealthTest "HealthTest-DhcpInAd"
@@ -910,12 +908,23 @@ if ($isHostDomainJoined) {
     Invoke-HealthTest "HealthTest-ConnectivityToDCs"
     Invoke-HealthTest "HealthTest-DnsSuffixBaseline"
 }
+if ($isHostDomainJoined -and -not $isHostDC) {
+    Invoke-HealthTest "HealthTest-DomainARecordPointsToDcIp"
+    Invoke-HealthTest "HealthTest-InterfaceDnsServersUseDcs"
+    Invoke-HealthTest "HealthTest-DnsSuffixMatchesDomain"
+    Invoke-HealthTest "HealthTest-NltestSiteDiscovery"
+    if (!$DebugSkipSlowTests) {
+		Invoke-HealthTest "HealthTest-GpupdatePolicyApply"
+	}
+}
+
+if ($isHostDnsServer) {
+    Invoke-HealthTest "HealthTest-DnsZoneReplicationScope"
+    Invoke-HealthTest "HealthTest-DnsScavenging"
+    Invoke-HealthTest "HealthTest-DnsForwarders"
+}
 
 if ($isHostDC) {
-    if (!$DebugSkipSlowTests) {
-        Invoke-HealthTest "HealthTest-DfsDiagTestDCs"
-        Invoke-HealthTest "HealthTest-Dcdiag"
-    }
     Invoke-HealthTest "HealthTest-DcDnsRegistration"
     Invoke-HealthTest "HealthTest-ADViewConsistency"
     Invoke-HealthTest "HealthTest-DfsReplicationState"
@@ -924,7 +933,6 @@ if ($isHostDC) {
     Invoke-HealthTest "HealthTest-NtdsPathsLocation"
     Invoke-HealthTest "HealthTest-LdapSigningChannelBinding"
     Invoke-HealthTest "HealthTest-UnusedEnabledAdapters"
-    if (!$DebugSkipSlowTests) { Invoke-HealthTest "HealthTest-DisabledGpoLinksAtDomainRoot" }
 
     # TODO: some of these below are maybe for all member servers
     Invoke-HealthTest "HealthTest-SchanelBaseline"
@@ -932,7 +940,8 @@ if ($isHostDC) {
     Invoke-HealthTest "HealthTest-GpWmiFiltersNamespaces"
     #---END TODO---------------------
 
-    # TODO: These tests are domain-wide and there's no need to execute them from all DCs -- if they get executed by one DC we are OK
+    # TODO: These tests are domain-wide and there's no need to execute
+    # them on all DCs; if they get executed by one DC we are OK
     Invoke-HealthTest "HealthTest-ADReplicationDomainRepadmin"
     Invoke-HealthTest "HealthTest-SysvolNetlogonAccessible"
     Invoke-HealthTest "HealthTest-SchemaVersionConsistency"
@@ -945,12 +954,6 @@ if ($isHostDC) {
     Invoke-HealthTest "HealthTest-ServiceAccountsPwdNeverExpires"
     #---END TODO---------------------
 
-    # TODO: only run these tests if DNS role is enabled
-    Invoke-HealthTest "HealthTest-DnsZoneReplicationScope"
-    Invoke-HealthTest "HealthTest-DnsScavenging"
-    Invoke-HealthTest "HealthTest-DnsForwarders"
-    #---END TODO---------------------
-
     # GPT5 inspired tests
     Invoke-HealthTest "HealthTest-DcDnsARecords"
     Invoke-HealthTest "HealthTest-DnsRecursionConfig"
@@ -961,7 +964,6 @@ if ($isHostDC) {
     Invoke-HealthTest "HealthTest-RidManager"
     Invoke-HealthTest "HealthTest-DnsZoneTransfers"
     Invoke-HealthTest "HealthTest-NtdsLogVolumeFree"
-    if (!$DebugSkipSlowTests) { Invoke-HealthTest "HealthTest-SysvolContentConsistency" }
     Invoke-HealthTest "HealthTest-DfsrBacklog"
     Invoke-HealthTest "HealthTest-GpoVersionConsistency"
     Invoke-HealthTest "HealthTest-AdminSDHolderCoverage"
@@ -971,21 +973,20 @@ if ($isHostDC) {
     Invoke-HealthTest "HealthTest-PreWin2000Group"
     Invoke-HealthTest "HealthTest-KrbtgtAge"
     Invoke-HealthTest "HealthTest-DhcpDnsCredential"
+
+    if (!$DebugSkipSlowTests) {
+        Invoke-HealthTest "HealthTest-DfsDiagTestDCs"
+        Invoke-HealthTest "HealthTest-Dcdiag"
+		Invoke-HealthTest "HealthTest-DisabledGpoLinksAtDomainRoot"
+		Invoke-HealthTest "HealthTest-SysvolContentConsistency"
+    }
 }
 
-if ($isHostDomainJoined -and -not $isHostDC) {
-    Invoke-HealthTest "HealthTest-DomainARecordPointsToDcIp"
-    Invoke-HealthTest "HealthTest-InterfaceDnsServersUseDcs"
-    Invoke-HealthTest "HealthTest-DnsSuffixMatchesDomain"
-    Invoke-HealthTest "HealthTest-NltestSiteDiscovery"
-    if (!$DebugSkipSlowTests) {Invoke-HealthTest "HealthTest-GpupdatePolicyApply"}
-}
-
-if (Get-Command -Name Get-VM -ErrorAction SilentlyContinue) {
-    # Only for Hyper-v Hypervisors
+if ($isHostHyperisor) {
     Invoke-HealthTest "HealthTest-HyperVRunningVMs"
 }
 
+# Custom HealthTest-*
 if ($IncludeTestsFromFolder) {
     Invoke-HealthTestsFromFolder $IncludeTestsFromFolder
 }

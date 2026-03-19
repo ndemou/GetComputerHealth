@@ -101,7 +101,7 @@ function HealthTest-DnsSuffixBaseline {
 Checks Dns Suffix Baseline
 
 .DESCRIPTION
-AppliesTo: All
+AppliesTo: DomainJoined
 Scope: Computer
 Category: Audit / Compliance / Informational
 Impact: Medium(Network)
@@ -171,3 +171,64 @@ TODO: maybe part of these tests are for non-domain joined Computers also
         }
     }
 }
+
+function HealthTest-ConnectivityToDCs {
+<#
+.SYNOPSIS
+Checks Connectivity To D Cs
+
+.DESCRIPTION
+AppliesTo: DomainJoined
+Scope: Computer
+Category: Availability / Server Down Signals
+Impact: Medium(Network)
+Uses: Resolve-DnsName, Get-ADForest.
+FalsePositives: None.
+#>
+  $dcs  = Get-DomainControllers
+
+  foreach ($s in $dcs) {
+    $fqdn = $s.ToLower()
+    # 1) DNS resolution
+    try {
+      [System.Net.Dns]::GetHostAddresses($fqdn) | Out-Null
+      Write-Warning "[pass] DNS resolved for $fqdn"
+    } catch {
+      Write-Warning "[failure] DNS resolution failed for $fqdn`nCheck forward/reverse lookup zones and _msdcs records. Command: nslookup $fqdn"
+      continue
+    }
+
+    # 2) Core ports
+    $ports =  @(
+      @{Port=53;  Proto='TCP'; Name='DNS'},
+      @{Port=389; Proto='TCP'; Name='LDAP'},
+      @{Port=636; Proto='TCP'; Name='LDAPS'},
+      @{Port=88;  Proto='TCP'; Name='Kerberos'},
+      @{Port=135; Proto='TCP'; Name='RPC endpoint mapper'},
+      @{Port=9389;Proto='TCP'; Name='AD Web Services'}
+    )
+    foreach ($p in $ports) {
+      $res = Test-NetConnectionFast -ComputerName $fqdn -Port $p.Port -WarningAction SilentlyContinue
+      if ($res.TcpTestSucceeded) {
+        Write-Warning "[pass] $($p.Name) port open on $fqdn"
+      } else {
+        Write-Warning "[failure] TCP port $($p.Port)($($p.Name)) unreachable on $fqdn`nPort $($p.Port)/$($p.Proto) blocked or service down. Check firewall and service status."
+      }
+    }
+
+    # 3) SRV records check for LDAP
+    $domainName=(Get-CimInstance Win32_ComputerSystem).Domain
+    try {
+      $srv = Resolve-DnsName -Type SRV "_ldap._tcp.dc._msdcs.$domainName" -ErrorAction Stop
+      if ($srv.Name -contains $fqdn) {
+        Write-Warning "[pass] SRV record present for $fqdn"
+      } else {
+        Write-Warning "[failure] Missing SRV record for $fqdn`nDC not registered in _ldap._tcp.dc._msdcs. Run ipconfig /registerdns on $fqdn."
+      }
+    } catch {
+      Write-Warning "[failure] Could not query SRV records.`nCheck DNS service and replication for zone _msdcs.$((Get-ADForest).RootDomain)."
+    }
+  }
+}
+
+
