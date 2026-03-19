@@ -730,6 +730,7 @@ if ($isHostServer)           {. (Join-Path -Path $PSScriptRoot -ChildPath "ht-se
 #+-----------------------------------------------------------
 
 $allHealthTests = Get-Command -CommandType Function -Name 'HealthTest-*' -ErrorAction SilentlyContinue
+Log-Debug '$allHealthTests' -comment "$(($allHealthTests).name -join ', ')"
 
 if ($ListAllBuiltInTests) {Get-HealthTest $allHealthTests; return}
 
