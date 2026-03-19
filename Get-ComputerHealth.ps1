@@ -603,6 +603,14 @@ function Write-DummyHealthTest {
 #
 #=============================================================================
 
+# This is only helpful during debuging
+# (Built-in test files are dot-sourced into the current session, and then tests
+# are discovered with a broad Get-Command -Name 'HealthTest-*' . That allows 
+# previously loaded functions in the same shell to be picked up. 
+# With this command we remove all HealthTest-* functions)
+Get-ChildItem Function:\HealthTest-*, Function:\Global:HealthTest-* -ErrorAction SilentlyContinue |
+  Remove-Item -Force -ErrorAction SilentlyContinue
+
 #+-----------------------------------------------------------
 #| Collect system information
 #|
