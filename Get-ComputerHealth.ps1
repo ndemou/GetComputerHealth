@@ -689,6 +689,7 @@ $Global:GetComputerHealthDataQMTA = [pscustomobject]@{
     isHostDC           = $isHostDC
     isHostPDC          = $isHostPDC
     GetCurrentDomain   = $currentDomain
+    DebugSkipSlowTests = $DebugSkipSlowTests
     IpsOfAllDcs        = @($validIpsOfAllDcs)
 }
 #|
