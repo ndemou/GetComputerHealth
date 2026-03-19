@@ -448,7 +448,7 @@ FunctionName, Time, ElapsedMilliseconds, Output, Success, Error, Category, Reaso
       }
 
     Log-Failure "(Program Error) Exception while running '$FunctionName'" `
-      -Comment "details: $baseMsg`nThis often means that the test failed but it may also be a bug in this code."
+      -Comment "details: $baseMsg`nA Program Error during a test means either that the test failed or that its code has a bug."
   } finally {
     $sw.Stop()
     $ErrorActionPreference = $oldEap
