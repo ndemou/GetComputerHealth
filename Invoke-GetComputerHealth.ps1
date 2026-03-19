@@ -345,26 +345,69 @@ foreach ($target in $targets) {
       $configDir = Join-Path $RootDir 'config'
       $updateScriptPath = Join-Path $binDir 'Update-GetHealthCode.ps1'
       $getHealthScriptPath = Join-Path $binDir 'Get-ComputerHealth.ps1'
+      $logLibPath = Join-Path $binDir 'lib-write-log-objects.ps1'
       $customTestsDir = Join-Path $configDir 'Custom-HealthTests'
+      $records = New-Object System.Collections.Generic.List[object]
+
+      if (-not (Test-Path -LiteralPath $logLibPath)) {
+        throw "Logging helper file not found: $logLibPath"
+      }
+      . $logLibPath
 
       if (-not $NoUpdate) {
-          if ($PushUpdate -and $UpdateZipPath) {
-              & $updateScriptPath -UpdateFromZip $UpdateZipPath
-          } else {
-              & $updateScriptPath
+          try {
+              $updateOutput = if ($PushUpdate -and $UpdateZipPath) {
+                  & $updateScriptPath -UpdateFromZip $UpdateZipPath 2>&1
+              } else {
+                  & $updateScriptPath 2>&1
+              }
+
+              foreach ($item in @($updateOutput)) {
+                  if ($item -is [System.Management.Automation.ErrorRecord]) {
+                      $comment = ($item | Out-String).Trim()
+                      $records.Add((Log-Failure "PowerShell error while running Update-GetHealthCode.ps1" -Comment $comment)) | Out-Null
+                  }
+              }
+          } catch {
+              $records.Add((Log-Failure "Terminating error while running Update-GetHealthCode.ps1" -Comment (($_ | Out-String).Trim()))) | Out-Null
+              return $records
           }
       }
 
-      & $getHealthScriptPath `
-          -OutputObjects -OutputConsoleMessages `
-          -Hide $Hide `
-          -OnlyTheseTests $OnlyTheseTests `
-          -ExcludeTests $ExcludeTests `
-          -IncludeTestsFromFolder $customTestsDir `
-          -SuppressSigs $WhitelistSigs `
-          -DebugSkipSlowTests:$DebugSkipSlowTests `
-          -IpsOfAllDcs $IpsOfAllDcs |
-          Select-Object -Property Computer,Level,Hash,Suppressed,Message,Comment,Emitter
+      try {
+          $healthOutput = & $getHealthScriptPath `
+              -OutputObjects -OutputConsoleMessages `
+              -Hide $Hide `
+              -OnlyTheseTests $OnlyTheseTests `
+              -ExcludeTests $ExcludeTests `
+              -IncludeTestsFromFolder $customTestsDir `
+              -SuppressSigs $WhitelistSigs `
+              -DebugSkipSlowTests:$DebugSkipSlowTests `
+              -IpsOfAllDcs $IpsOfAllDcs 2>&1
+
+          foreach ($item in @($healthOutput)) {
+              if ($item -is [System.Management.Automation.ErrorRecord]) {
+                  $records.Add((Log-Failure "PowerShell error while running Get-ComputerHealth.ps1" -Comment (($item | Out-String).Trim()))) | Out-Null
+                  continue
+              }
+
+              if ($item -and $item.PSObject.Properties['Level'] -and $item.PSObject.Properties['Message']) {
+                  $records.Add([pscustomobject]@{
+                      Computer   = if ($item.PSObject.Properties['Computer']) { [string]$item.Computer } else { $env:COMPUTERNAME }
+                      Level      = [string]$item.Level
+                      Hash       = if ($item.PSObject.Properties['Hash']) { [string]$item.Hash } else { '00000000' }
+                      Suppressed = if ($item.PSObject.Properties['Suppressed']) { [bool]$item.Suppressed } else { $false }
+                      Message    = [string]$item.Message
+                      Comment    = if ($item.PSObject.Properties['Comment']) { [string]$item.Comment } else { '' }
+                      Emitter    = if ($item.PSObject.Properties['Emitter']) { $item.Emitter } else { $null }
+                  }) | Out-Null
+              }
+          }
+      } catch {
+          $records.Add((Log-Failure "Terminating error while running Get-ComputerHealth.ps1" -Comment (($_ | Out-String).Trim()))) | Out-Null
+      }
+
+      return $records
   }
 
   if ($target -eq $env:COMPUTERNAME) {
@@ -402,6 +445,18 @@ foreach ($target in $targets) {
           }
 
           $output = Invoke-Command -Session $session -ScriptBlock $healthCheckBlock -ArgumentList $ROOT_DIR, $Hide, $OnlyTheseTests, $ExcludeTests, $WhitelistSigs, $DebugSkipSlowTests, $NoUpdate, $IpsOfAllDcs, $PushUpdate, $remoteZipPath
+        } catch {
+          $_ = Log-failure "Failed running update/health scripts on target $target"
+          $all_messages += [pscustomobject]@{
+              Computer   = $target
+              Level      = 'failure'
+              Hash       = '00000000'
+              Suppressed = $false
+              Message    = "Failed running update/health scripts"
+              Comment    = (($_ | Out-String).Trim())
+              Emitter    = $null
+          }
+          continue
         }
         finally {
           if ($session) { Remove-PSSession $session }
