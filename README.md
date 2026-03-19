@@ -100,7 +100,7 @@ These are the scripts you actually execute.
   3. Runs the health checks remotely.
   4. Collects output, saves it in Excel format (`C:\IT\temp\`), and emails “Notable” (non-success) messages.
 
-* **Key Parameters:** `-Computers` (list of targets), `-ExcludeServers`, `-Hide` (filters output levels).
+* **Key Parameters:** `-Computers` (list of targets), `-ExcludeServers`, `-Hide` (filters output levels, including suppressed-message lines via `S`).
 
 ## B. The Worker (Runs on Targets)
 
@@ -261,7 +261,7 @@ To debug a specific server locally:
 C:\IT\bin\Get-ComputerHealth.ps1 -OutputConsoleMessages -OutputObjects -Hide DIP
 ```
 
-* **Tip:** `-Hide DIP` hides **D**ebug, **I**nfo, and **P**ass messages, showing only Notices, Warnings, and Failures.
+* **Tip:** `-Hide DIP` hides **D**ebug, **I**nfo, and **P**ass messages, showing only Notices, Warnings, and Failures. Add **S** to hide suppressed lines (`SUPRSD :`).
 
 ## How to Add Custom Tests
 

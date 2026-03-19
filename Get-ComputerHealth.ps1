@@ -30,7 +30,7 @@ Dependencies & execution context:
 (Parameter set: Run) If set, outputs structured objects produced by the health tests to the pipeline.
 
 .PARAMETER Hide
-(Parameter set: Run) Message visibility filter. String containing only letters from `DIPNWFC`.
+(Parameter set: Run) Message visibility filter. String containing only letters from `DIPNWFSC`.
 Default: empty (show all). Typical value: `DIP`
   D = hide Debug messages
   I = hide Info messages
@@ -118,7 +118,7 @@ param(
   [switch]$OutputObjects,
 
   [Parameter(ParameterSetName='Run')]
-  [ValidatePattern('^[DIPNWFC]*$')]
+  [ValidatePattern('^[DIPNWFSC]*$')]
   [string]$Hide = '',
 
   [Parameter(ParameterSetName='Run')]
@@ -581,7 +581,7 @@ function Write-UsageHelp {
     Write-Host -ForegroundColor Gray  "Most often you want to use me like this:"
     Write-Host -ForegroundColor White "    `$out = $PSCommandPath -OutputConsoleMessages -Hide " -NoNewline
     Write-Host -ForegroundColor DarkCyan "DIP"
-    Write-Host -ForegroundColor Gray  "          # (-Hide DIP means: hide Debug, Informationcal and Pass messages)"
+    Write-Host -ForegroundColor Gray  "          # (-Hide DIP means: hide Debug, Informational and Pass messages)"
     Write-Host -ForegroundColor White "    `$out | ogv # or similar"
     Write-Host -ForegroundColor Gray  ""
     return

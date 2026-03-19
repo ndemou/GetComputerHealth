@@ -64,6 +64,7 @@ Valid letters for HideStr are these:
 	N : Notice
 	W : Warning
 	F : Failure
+	S : Suppressed findings (console lines with SUPRSD : prefix)
 	C : Comment (messages are printed but without their comments)
 
 ------------------------------------------------------------------------------
@@ -218,7 +219,7 @@ suppression entries for the current run.
 Controls whether messages are printed to the console.
 
 .PARAMETER HideStr
-Console visibility filter (letters from DIPNWFC).
+Console visibility filter (letters from DIPNWFSC).
 
 .PARAMETER SuppressionFilePath
 Path to a suppression configuration file to load.
@@ -308,7 +309,7 @@ Complete list of 8-hex signatures to treat as suppressed.
 Controls whether messages are written to the console.
 
 .PARAMETER HideStr
-Console visibility filter (letters from DIPNWFC).
+Console visibility filter (letters from DIPNWFSC).
 #>
 function Set-LogConfig {
   [CmdletBinding()]
@@ -421,6 +422,7 @@ function Log-Msg {
   if ((-not $script:cfgOutputConsoleMessages) -or $Hide) { return }
 
   if ($must_suppress_sig) {
+    if ($script:cfgHideStr -like '*S*') { return }
     Write-Host -ForegroundColor DarkGreen -NoNewline '  SUPRSD :'
     Write-Host -ForegroundColor DarkGray -NoNewline (" [{0}] " -f $sig)
     Write-Host -ForegroundColor DarkGray $Msg
