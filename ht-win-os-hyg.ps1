@@ -242,7 +242,7 @@ Checks the effective Schannel server-side protocol baseline for SSL 3.0, TLS 1.0
   } else {
     $why="Inbound services that rely on Schannel may negotiate legacy TLS/SSL protocols if they remain enabled. E.g. LDAP over TLS, WinRM, ADWS..."
     $comment = ("Detected mismatches:`n"+($bad | ForEach-Object { "  - {0}: Current={1}, Recommended={2}" -f $_.Protocol,$_.CurrentState,$should[$_.Protocol] } | Out-String) + "`nRegistry snapshot:`n"+$det+$why)
-    Write-Warning "[failure] Schannel baseline not hardened`n$comment"
+    Write-Warning "[warning] Schannel baseline not hardened`n$comment"
   }
 }
 
@@ -626,9 +626,9 @@ FalsePositives: None.
 
     $vols = Get-BitLockerVolume -ErrorAction SilentlyContinue
     if (-not $vols) {
-        Write-Warning "[notice] No BitLocker-capable volumes found"}
+        Write-Warning "[warning] No BitLocker-capable volumes found"}
     $vols | Where-Object { $_.ProtectionStatus -ne 'On' } | %{
-        Write-Warning "[failure] Volume not protected by BitLocker: $($_.MountPoint)"
+        Write-Warning "[warning] Volume not protected by BitLocker: $($_.MountPoint)"
         $pass = $false
     }
     if ($pass) {
