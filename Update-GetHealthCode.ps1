@@ -274,7 +274,8 @@ Writes the installed-release marker into the shared metadata cache file.
   [CmdletBinding()]
   param(
     [Parameter(Mandatory)][string]$CachePath,
-    [Parameter(Mandatory)][string]$Marker
+    [Parameter(Mandatory)][string]$Marker,
+    [string]$FetchedAt
   )
 
   try {
@@ -295,12 +296,69 @@ Writes the installed-release marker into the shared metadata cache file.
       }
     }
 
+    if (-not [string]::IsNullOrWhiteSpace($FetchedAt)) {
+      $cachePayload['fetchedAt'] = $FetchedAt
+    }
     $cachePayload['installedReleaseMarker'] = $Marker
 
     $cachePayload | ConvertTo-Json -Depth 20 | Out-File -LiteralPath $CachePath -Encoding UTF8 -Force
     Write-Verbose "Updated installed release marker in metadata cache '$CachePath'"
   } catch {
     Write-Warning ("Failed writing installed release marker to {0}: {1}" -f $CachePath, $_.Exception.Message)
+  }
+}
+
+function Prepare-ManualUpdateZip {
+<#
+.SYNOPSIS
+Prepares metadata for a manually provided update zip and copies it to temp cache.
+.OUTPUTS
+Hashtable with keys: SourceFullPath, ZipLastWriteTimeIso, CachedZipPath.
+#>
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)][string]$ZipPath,
+    [Parameter(Mandatory)][string]$CacheDir
+  )
+
+  if (-not (Test-Path -LiteralPath $ZipPath -PathType Leaf)) {
+    throw "Zip file not found: $ZipPath"
+  }
+
+  if (-not (Test-Path -LiteralPath $CacheDir -PathType Container)) {
+    $null = New-Item -ItemType Directory -Path $CacheDir -Force
+  }
+
+  $zipItem = Get-Item -LiteralPath $ZipPath -ErrorAction Stop
+  $sourceFullPath = $zipItem.FullName
+  $zipLastWrite = [datetime]$zipItem.LastWriteTime
+  $zipLastWriteIso = $zipLastWrite.ToString('o')
+  $zipLastWriteToken = $zipLastWrite.ToString('yyyyMMdd-HHmmss')
+  $cachedZipPath = Join-Path $CacheDir ("GetComputerHealth-MANUAL-UPDATE-{0}.zip" -f $zipLastWriteToken)
+
+  $samePath = $false
+  if (Test-Path -LiteralPath $cachedZipPath -PathType Leaf) {
+    try {
+      $existingFullPath = (Get-Item -LiteralPath $cachedZipPath -ErrorAction Stop).FullName
+      $samePath = ($existingFullPath.TrimEnd('\') -ieq $sourceFullPath.TrimEnd('\'))
+    } catch {
+      $samePath = ($cachedZipPath.TrimEnd('\') -ieq $sourceFullPath.TrimEnd('\'))
+    }
+  } else {
+    $samePath = ($cachedZipPath.TrimEnd('\') -ieq $sourceFullPath.TrimEnd('\'))
+  }
+
+  if ($samePath) {
+    Write-Verbose "Manual update zip already in cache path '$cachedZipPath'; skipping copy"
+  } else {
+    Write-Verbose "Copying manual update zip to cache '$cachedZipPath'"
+    Copy-Item -LiteralPath $sourceFullPath -Destination $cachedZipPath -Force -ErrorAction Stop
+  }
+
+  return @{
+    SourceFullPath    = $sourceFullPath
+    ZipLastWriteTimeIso = $zipLastWriteIso
+    CachedZipPath     = $cachedZipPath
   }
 }
 
@@ -649,6 +707,8 @@ if (-not (Test-Path $p)) {
 
 $latestRelease = $null
 $latestReleaseMarker = $null
+$manualUpdateMarkerPath = $null
+$manualUpdateFetchedAt = $null
 if (-not $UpdateFromZip) {
   Write-Verbose "$passLabel Resolving latest release metadata (cache TTL $RELEASE_METADATA_CACHE_TTL_MINUTES minutes)"
   try {
@@ -660,6 +720,11 @@ if (-not $UpdateFromZip) {
   }
 } else {
   Write-Verbose "-UpdateFromZip specified; skipping latest release marker query"
+  $manualUpdateZip = Prepare-ManualUpdateZip -ZipPath $UpdateFromZip -CacheDir $BAK_DIR
+  $manualUpdateMarkerPath = [string]$manualUpdateZip.SourceFullPath
+  $manualUpdateFetchedAt = [string]$manualUpdateZip.ZipLastWriteTimeIso
+  Write-Verbose "Manual update marker path is '$manualUpdateMarkerPath'"
+  Write-Verbose "Manual update fetchedAt is '$manualUpdateFetchedAt'"
 }
 
 if ($latestReleaseMarker) {
@@ -716,6 +781,9 @@ if ($updated) {
   if ($latestReleaseMarker) {
     Write-Verbose "$passLabel Persisting installed release marker before self-rerun"
     Set-GetComputerHealthInstalledReleaseMarker -CachePath $LATEST_RELEASE_METADATA_CACHE_PATH -Marker $latestReleaseMarker
+  } elseif ($manualUpdateMarkerPath) {
+    Write-Verbose "$passLabel Persisting manual update marker before self-rerun"
+    Set-GetComputerHealthInstalledReleaseMarker -CachePath $LATEST_RELEASE_METADATA_CACHE_PATH -Marker $manualUpdateMarkerPath -FetchedAt $manualUpdateFetchedAt
   }
 
   if ($SelfRerunCount -ge 1) {
@@ -760,6 +828,8 @@ $_ = Replace-FileFromSource -FileName 'ht-servers.ps1'               -SourcePath
 
 if ($latestReleaseMarker) {
   Set-GetComputerHealthInstalledReleaseMarker -CachePath $LATEST_RELEASE_METADATA_CACHE_PATH -Marker $latestReleaseMarker
+} elseif ($manualUpdateMarkerPath) {
+  Set-GetComputerHealthInstalledReleaseMarker -CachePath $LATEST_RELEASE_METADATA_CACHE_PATH -Marker $manualUpdateMarkerPath -FetchedAt $manualUpdateFetchedAt
 }
 
 if ((Get-Date) -le [datetime]'2026-04-30') {
