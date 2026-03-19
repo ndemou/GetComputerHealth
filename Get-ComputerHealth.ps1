@@ -587,6 +587,17 @@ function Write-UsageHelp {
     Write-Host -ForegroundColor Gray  ""
     return
 }
+
+function Write-DummyHealthTest {
+# Useful only for code testing.
+    Write-Output "Dummy debug message"
+    Write-Warning "[info] Dummy info message"
+    Write-Warning "[pass] Dummy pass message"
+    Write-Warning "[notice] Dummy notice message"
+    Write-Warning "[warning] Dummy warning message" + "`n" + "This one has a comment(details) also"
+    Write-Warning "[failure] Dummy failure message" + "`n" + "This one has a comment(details) also`nWith 2 lines of text!"
+}
+
 #=============================================================================
 #
 # MAIN CODE
@@ -855,7 +866,6 @@ Invoke-HealthTest "HealthTest-HotfixBaseline"
 Invoke-HealthTest "HealthTest-RdpHardening"
 Invoke-HealthTest "HealthTest-RequiredSrvRecords"
 Invoke-HealthTest "HealthTest-BitLockerStatus"
-# Invoke-HealthTest "HealthTest-ExploitProtectionBaseline"
 
 # Tests that take >1sec (Not including ones for DCs):
 #   1.2s  HealthTest-IisBindings
@@ -938,20 +948,6 @@ if ($isHostDC) {
     Invoke-HealthTest "HealthTest-LdapSigningChannelBinding"
     Invoke-HealthTest "HealthTest-UnusedEnabledAdapters"
 
-    # TODO: These tests are domain-wide and there's no need to execute
-    # them on all DCs; if they get executed by one DC we are OK
-    Invoke-HealthTest "HealthTest-ADReplicationDomainRepadmin"
-    Invoke-HealthTest "HealthTest-SysvolNetlogonAccessible"
-    Invoke-HealthTest "HealthTest-SchemaVersionConsistency"
-    Invoke-HealthTest "HealthTest-TombstoneLifetime"
-    Invoke-HealthTest "HealthTest-RecycleBinEnabled"
-    Invoke-HealthTest "HealthTest-TrustsVerify"
-    Invoke-HealthTest "HealthTest-ReplicationLatency"
-    Invoke-HealthTest "HealthTest-UnconstrainedDelegationAccounts"
-    Invoke-HealthTest "HealthTest-DuplicateSpn"
-    Invoke-HealthTest "HealthTest-ServiceAccountsPwdNeverExpires"
-    #---END TODO---------------------
-
     # GPT5 inspired tests
     Invoke-HealthTest "HealthTest-DcDnsARecords"
     Invoke-HealthTest "HealthTest-DnsRecursionConfig"
@@ -971,6 +967,21 @@ if ($isHostDC) {
     Invoke-HealthTest "HealthTest-PreWin2000Group"
     Invoke-HealthTest "HealthTest-KrbtgtAge"
     Invoke-HealthTest "HealthTest-DhcpDnsCredential"
+
+    #-----------------------------------------------------------------
+    # TODO: These tests are domain-wide and there's no need to execute
+    # them on all DCs; if they get executed by one DC we are OK
+    Invoke-HealthTest "HealthTest-ADReplicationDomainRepadmin"
+    Invoke-HealthTest "HealthTest-SysvolNetlogonAccessible"
+    Invoke-HealthTest "HealthTest-SchemaVersionConsistency"
+    Invoke-HealthTest "HealthTest-TombstoneLifetime"
+    Invoke-HealthTest "HealthTest-RecycleBinEnabled"
+    Invoke-HealthTest "HealthTest-TrustsVerify"
+    Invoke-HealthTest "HealthTest-ReplicationLatency"
+    Invoke-HealthTest "HealthTest-UnconstrainedDelegationAccounts"
+    Invoke-HealthTest "HealthTest-DuplicateSpn"
+    Invoke-HealthTest "HealthTest-ServiceAccountsPwdNeverExpires"
+    #---END TODO------------------------------------------------------
 
     if (!$DebugSkipSlowTests) {
         Invoke-HealthTest "HealthTest-DfsDiagTestDCs"

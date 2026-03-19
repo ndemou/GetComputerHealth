@@ -1269,52 +1269,6 @@ FalsePositives: None.
     Write-Warning "[pass] No NTFS dirty volumes"
 }
 
-function HealthTest-RecentDiskErrors {
-<#
-.SYNOPSIS
-Checks Recent Disk Errors
-
-.DESCRIPTION
-AppliesTo: All
-Scope: Computer
-Category: Configuration Hygiene & Best Practices
-Impact: High(Time)
-Uses: Get-WinEvent.
-FalsePositives: None.
-#>
-    param([int]$Hours = 48)
-
-    $pass = $true
-    if ($Hours -lt 1) { $Hours = 1 }
-
-    $start     = (Get-Date).AddHours(-$Hours)
-    $providers = @('disk','ntfs','stornvme')
-    $events    = @()
-
-    foreach ($p in $providers) {
-        try {
-            Get-WinEvent -FilterHashtable @{
-                    LogName      = 'System'
-                    ProviderName = $p
-                    Level        = 2     # Error
-                    StartTime    = $start
-            } -ErrorAction SilentlyContinue | %{
-                Write-Warning "[failure] Storage($p) error in last N hours`nN=$Hours hours; Event: $($_.TimeCreated), $($_.LevelDisplayName), $($_.Message)"
-                $pass = $false
-            }
-        } catch {
-            if ($_.Exception.Message -notlike '*There is not an event provider*') {
-                Write-Warning "[warning] Failed reading System log for provider '$p': $($_.Exception.Message)"
-            }
-        }
-    }
-
-    if ($pass) {
-        Write-Warning "[pass] No disk/NTFS/storage errors in last $Hours h"
-    }
-
-}
-
 function Get-FreeGB {
     param([Parameter(Mandatory)][string]$PathOrDrive)
 

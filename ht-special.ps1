@@ -2,27 +2,6 @@
 Special
 #>
 
-function HealthTest-Dummy {
-<#
-.SYNOPSIS
-Checks Dummy
-
-.DESCRIPTION
-AppliesTo: All
-Scope: Computer
-Category: Audit / Compliance / Informational
-Impact: Medium(Time)
-Uses: None.
-FalsePositives: None.
-#>
-    Write-Output "Dummy debug message"
-    Write-Warning "[info] Dummy info message"
-    Write-Warning "[pass] Dummy pass message"
-    Write-Warning "[notice] Dummy notice message"
-    Write-Warning "[warning] Dummy warning message"
-    Write-Warning "[failure] Dummy failure message"
-}
-
 function Start-HealthTestVeeamRecentBackupsExist{
 <#
 .SYNOPSIS

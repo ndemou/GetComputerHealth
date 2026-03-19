@@ -34,29 +34,6 @@ FalsePositives: None.
 
 
 
-function HealthTest-ExploitProtectionBaseline {
-<#
-.SYNOPSIS
-Checks Exploit Protection Baseline
-
-.DESCRIPTION
-AppliesTo: All
-Scope: Computer
-Category: Audit / Compliance / Informational
-Impact: Medium(Time)
-Uses: Get-ProcessMitigation.
-FalsePositives: None.
-#>
-    if (-not (Get-Command Get-ProcessMitigation -ErrorAction SilentlyContinue)) { Write-Warning "[notice] Exploit Protection cmdlets unavailable"; return }
-    $sys = Get-ProcessMitigation -System -ErrorAction SilentlyContinue
-    if (-not $sys) { Write-Warning "[warning] Could not read system process mitigations"; return }
-    $ok = $true
-    if (-not $sys.Dep.Enable) { Write-Warning "[notice] Exploit Protection; DEP not enforced system-wide"; $ok = $false }
-    if (-not $sys.ASLR.EnableForceRelocateImages) { Write-Warning "[notice] Exploit Protection; ASLR not enforcing force-relocate"; $ok = $false }
-    if (-not $sys.SEHOP.Enable) { Write-Warning "[notice] Exploit Protection; SEHOP not enabled"; $ok = $false }
-    if ($ok) { Write-Warning "[pass] Exploit Protection key mitigations enabled"; return } else { return }
-}
-
 function HealthTest-StartupItems{
 <#
 .SYNOPSIS
