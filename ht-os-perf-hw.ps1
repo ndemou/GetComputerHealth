@@ -400,9 +400,20 @@ Impact: Medium(Time)
 Uses: Get-WindowsFeature, Get-Website, Get-WebBinding.
 FalsePositives: None.
 #>
-    $role = Get-WindowsFeature Web-Server -ErrorAction SilentlyContinue
+    $iisInstalled = $false
 
-    if (-not($role -and $role.Installed)) {
+    if (Get-Command Get-WindowsFeature -ErrorAction SilentlyContinue) {
+        $role = Get-WindowsFeature Web-Server -ErrorAction SilentlyContinue
+        $iisInstalled = [bool]($role -and $role.Installed)
+    }
+    else {
+        # Get-WindowsFeature is ServerManager-only (not available on many workstation SKUs).
+        # Fall back to checking for an IIS core service that exists when IIS is installed.
+        $w3svc = Get-Service W3SVC -ErrorAction SilentlyContinue
+        $iisInstalled = [bool]$w3svc
+    }
+
+    if (-not $iisInstalled) {
         Write-Warning "[info] No IIS installed; skiping HealthTest-IisBindings"
         return
     }
