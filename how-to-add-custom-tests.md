@@ -85,6 +85,10 @@ Available properties include these self-documenting booleans:
 - `.isHostServer`
 - `.isHostDC`
 - `.isHostPDC`
+- `.isHostDnsServer`
+- `.isHostDHCPServer`
+- `.isHostHyperisor`
+- `.isHostInDomainButNotDC`
 - `.DebugSkipSlowTests` ($True if the `-DebugSkipSlowTests` switch was used on invocation)
 
 And `.GetCurrentDomain = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain()`
