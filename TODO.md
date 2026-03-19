@@ -791,3 +791,17 @@ function HealthTest-SchannelCompliance {
     in clear text from a file. Maybe use credentials manager (note that
 	the credentials manager stores passwords per user which complicates
 	stuff -- you run it from your account and works but not from SYSTEM)
+
+## Some tests that have Scope: Domain should ideally be executed on one DC
+
+- "HealthTest-ADReplicationDomainRepadmin"
+- "HealthTest-SysvolNetlogonAccessible"
+- "HealthTest-SchemaVersionConsistency"
+- "HealthTest-TombstoneLifetime"
+- "HealthTest-RecycleBinEnabled"
+- "HealthTest-TrustsVerify"
+- "HealthTest-ReplicationLatency"
+- "HealthTest-UnconstrainedDelegationAccounts"
+- "HealthTest-DuplicateSpn"
+- "HealthTest-ServiceAccountsPwdNeverExpires"
+

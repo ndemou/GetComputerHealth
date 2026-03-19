@@ -458,7 +458,7 @@ FunctionName, Time, ElapsedMilliseconds, Output, Success, Error, Category, Reaso
   Log-debug "Done with test $FunctionName in $([int]$sw.ElapsedMilliseconds) ms"
 }
 
-function Get-HealthTest {
+function Get-HealthTest($allHealthTests) {
 <#
 .SYNOPSIS
 Lists all loaded HealthTest-* functions with their synopsis text.
@@ -467,7 +467,7 @@ Lists all loaded HealthTest-* functions with their synopsis text.
     [OutputType([pscustomobject])]
     param()
 
-    Get-Command -CommandType Function -Name 'HealthTest-*' | ForEach-Object {
+    $allHealthTests | ForEach-Object {
         $help = Get-Help $_.Name -ErrorAction SilentlyContinue
         [pscustomobject]@{
             Name     = $_.Name
@@ -692,10 +692,10 @@ $Global:GCHDQMTA = [pscustomobject]@{
     isHostServer           = $isHostServer
     isHostDC               = $isHostDC
     isHostPDC              = $isHostPDC
-	isHostDnsServer        = $isHostDnsServer
-	isHostDHCPServer       = $isHostDHCPServer
-	isHostHyperisor        = $isHostHyperisor
-	isHostInDomainButNotDC = $isHostInDomainButNotDC
+    isHostDnsServer        = $isHostDnsServer
+    isHostDHCPServer       = $isHostDHCPServer
+    isHostHyperisor        = $isHostHyperisor
+    isHostInDomainButNotDC = $isHostInDomainButNotDC
     GetCurrentDomain       = $currentDomain
     DebugSkipSlowTests     = $DebugSkipSlowTests
     IpsOfAllDcs            = @($validIpsOfAllDcs)
@@ -729,7 +729,9 @@ if ($isHostServer)           {. (Join-Path -Path $PSScriptRoot -ChildPath "ht-se
 #| Dot source health tests
 #+-----------------------------------------------------------
 
-if ($ListAllBuiltInTests) {Get-HealthTest; return}
+$allHealthTests = Get-Command -CommandType Function -Name 'HealthTest-*' -ErrorAction SilentlyContinue
+
+if ($ListAllBuiltInTests) {Get-HealthTest $allHealthTests; return}
 
 # Fail if not run as Administrator (elevated)
 # None of the functionality that follows is available to non-admins
@@ -813,8 +815,14 @@ Log-Debug "-WhitelistSigs '$WhitelistSigs'"
 $cfg = Get-LogConfig
 Log-debug "Final list of suppressed signatures: $((@($cfg.SuppressedSignatures) | Sort-Object -Unique) -join ', ')"
 
+#=============================================================================
+#
+# START OF TESTS
+#
+#=============================================================================
 
 if ($OnlyTheseTests) {
+# -OnlyTheseTests
     $valid_cmdlet_name_regex = '^ *[A-Za-z][A-Za-z0-9_-]*[A-Za-z0-9]+ *$'
 
     foreach ($item in $OnlyTheseTests) {
@@ -825,155 +833,14 @@ if ($OnlyTheseTests) {
         }
     }
     return
+} else {
+# All tests
+    foreach($fn in $allHealthTests){
+      Invoke-HealthTest $fn.Name
+    }
 }
 
-#=============================================================================
-#
-# START OF TESTS
-#
-#=============================================================================
-
-#--------------------------------------------------------
-# For any computer (Generic)
-Invoke-HealthTest "HealthTest-PendingReboot"
-Invoke-HealthTest "HealthTest-MalwareProtectionFeatures"
-Invoke-HealthTest "HealthTest-DefaultLocale"
-Invoke-HealthTest "HealthTest-DefenderStatus"
-Invoke-HealthTest "HealthTest-RecentWindowsScan"
-Invoke-HealthTest "HealthTest-DisksHaveFreeSpace"
-Invoke-HealthTest "HealthTest-LocalAcntRequirePass"
-Invoke-HealthTest "HealthTest-NonDefaultShares"
-Invoke-HealthTest "HealthTest-CertExpiry"
-Invoke-HealthTest "HealthTest-NtfsDirtyBit"
-Invoke-HealthTest "HealthTest-ShadowStorage"
-Invoke-HealthTest "HealthTest-IisBindings"
-Invoke-HealthTest "HealthTest-AutoStartServicesRunning"
-Invoke-HealthTest "HealthTest-NtlmHardening"
-Invoke-HealthTest "HealthTest-SmbSigningRequired"
-Invoke-HealthTest "HealthTest-Smb1Disabled"
-Invoke-HealthTest "HealthTest-RestrictAnonymous"
-Invoke-HealthTest "HealthTest-PagefileSanity"
-Invoke-HealthTest "HealthTest-WinRMListening"
-Invoke-HealthTest "HealthTest-DnsClientService"
-Invoke-HealthTest "HealthTest-WmiRepository"
-Invoke-HealthTest "HealthTest-StartupItems"
-Invoke-HealthTest "HealthTest-RamPressure"
-Invoke-HealthTest "HealthTest-UpdateAge"
-Invoke-HealthTest "HealthTest-NetworkConnectionProfiles"
-Invoke-HealthTest "HealthTest-ScheduledTasks"
-Invoke-HealthTest "HealthTest-SystemScheduledTasks"
-Invoke-HealthTest "HealthTest-TimeSyncAccuracy"
-Invoke-HealthTest "HealthTest-TimeSyncPolicy"
-Invoke-HealthTest "HealthTest-UnsignedDrivers"
-Invoke-HealthTest "HealthTest-CrashDumpSignals"
-Invoke-HealthTest "HealthTest-LocalAdminsBaseline"
-Invoke-HealthTest "HealthTest-Nic"
-Invoke-HealthTest "HealthTest-EventLogMaxSizes"
-Invoke-HealthTest "HealthTest-HotfixBaseline"
-Invoke-HealthTest "HealthTest-RdpHardening"
-Invoke-HealthTest "HealthTest-RequiredSrvRecords"
-Invoke-HealthTest "HealthTest-BitLockerStatus"
-Invoke-HealthTest "HealthTest-SingleDefaultGateway"
-Invoke-HealthTest "HealthTest-VssWriters"
-Invoke-HealthTest "HealthTest-SoftwareLicensing"
-Invoke-HealthTest "HealthTest-ScheduledTasksLastResult"
-Invoke-HealthTest "HealthTest-FirewallEnabled"
-Invoke-HealthTest "HealthTest-Storage"
-Invoke-HealthTest "HealthTest-ShareReasonableness"
-Invoke-HealthTest "HealthTest-UnexpectedListeningPorts"
-Invoke-HealthTest "HealthTest-IPv6Binding"
-Invoke-HealthTest "HealthTest-NonMicrosoftServices"
-Invoke-HealthTest "HealthTest-SeriousRecentEventLogs"
-Invoke-HealthTest "HealthTest-LargeDirectories"
-
-if ($isHostMobile) {
-    Invoke-HealthTest "HealthTest-IsTPMActivated"
-}
-
-if ($isHostServer) {
-    Invoke-HealthTest "HealthTest-InstalledRolesFeatures"
-    Invoke-HealthTest "HealthTest-DhcpInAd"
-    Invoke-HealthTest "HealthTest-DhcpScopeUtilization"
-    Invoke-HealthTest "HealthTest-SchanelBaseline"
-}
-
-if ($isHostDomainJoined) {
-    Invoke-HealthTest "HealthTest-ConnectivityToDCs"
-    Invoke-HealthTest "HealthTest-DnsSuffixBaseline"
-    Invoke-HealthTest "HealthTest-EfsRecoveryAgents"
-    Invoke-HealthTest "HealthTest-GpWmiFilterNamespacesOnLocalHost"
-}
-
-if ($isHostDomainJoined -and -not $isHostDC) {
-    Invoke-HealthTest "HealthTest-DomainARecordPointsToDcIp"
-    Invoke-HealthTest "HealthTest-InterfaceDnsServersUseDcs"
-    Invoke-HealthTest "HealthTest-DnsSuffixMatchesDomain"
-    Invoke-HealthTest "HealthTest-NltestSiteDiscovery"
-	Invoke-HealthTest "HealthTest-GpupdatePolicyApply"
-}
-
-if ($isHostDnsServer) {
-    Invoke-HealthTest "HealthTest-DnsZoneReplicationScope"
-    Invoke-HealthTest "HealthTest-DnsScavenging"
-    Invoke-HealthTest "HealthTest-DnsForwarders"
-}
-
-if ($isHostDC) {
-    Invoke-HealthTest "HealthTest-DcDnsRegistration"
-    Invoke-HealthTest "HealthTest-ADViewConsistency"
-    Invoke-HealthTest "HealthTest-DfsReplicationState"
-    Invoke-HealthTest "HealthTest-ADReplicationLocalRSAT"
-    Invoke-HealthTest "HealthTest-DcDnsServerForwarder"
-    Invoke-HealthTest "HealthTest-NtdsPathsLocation"
-    Invoke-HealthTest "HealthTest-LdapSigningChannelBinding"
-    Invoke-HealthTest "HealthTest-UnusedEnabledAdapters"
-
-    # GPT5 inspired tests
-    Invoke-HealthTest "HealthTest-DcDnsARecords"
-    Invoke-HealthTest "HealthTest-DnsRecursionConfig"
-    Invoke-HealthTest "HealthTest-ReverseZonesPresent"
-    Invoke-HealthTest "HealthTest-GcPlacement"
-    Invoke-HealthTest "HealthTest-KccConnectivity"
-    Invoke-HealthTest "HealthTest-SysvolAclHygiene"
-    Invoke-HealthTest "HealthTest-RidManager"
-    Invoke-HealthTest "HealthTest-DnsZoneTransfers"
-    Invoke-HealthTest "HealthTest-NtdsLogVolumeFree"
-    Invoke-HealthTest "HealthTest-DfsrBacklog"
-    Invoke-HealthTest "HealthTest-GpoVersionConsistency"
-    Invoke-HealthTest "HealthTest-AdminSDHolderCoverage"
-    Invoke-HealthTest "HealthTest-DfsNamespaceEnumerate"
-    Invoke-HealthTest "HealthTest-KerberosEncryptionTypes"
-    Invoke-HealthTest "HealthTest-RodcPrp"
-    Invoke-HealthTest "HealthTest-PreWin2000Group"
-    Invoke-HealthTest "HealthTest-KrbtgtAge"
-    Invoke-HealthTest "HealthTest-DhcpDnsCredential"
-
-    #-----------------------------------------------------------------
-    # TODO: These tests are domain-wide and there's no need to execute
-    # them on all DCs; if they get executed by one DC we are OK
-    Invoke-HealthTest "HealthTest-ADReplicationDomainRepadmin"
-    Invoke-HealthTest "HealthTest-SysvolNetlogonAccessible"
-    Invoke-HealthTest "HealthTest-SchemaVersionConsistency"
-    Invoke-HealthTest "HealthTest-TombstoneLifetime"
-    Invoke-HealthTest "HealthTest-RecycleBinEnabled"
-    Invoke-HealthTest "HealthTest-TrustsVerify"
-    Invoke-HealthTest "HealthTest-ReplicationLatency"
-    Invoke-HealthTest "HealthTest-UnconstrainedDelegationAccounts"
-    Invoke-HealthTest "HealthTest-DuplicateSpn"
-    Invoke-HealthTest "HealthTest-ServiceAccountsPwdNeverExpires"
-    #---END TODO------------------------------------------------------
-
-	Invoke-HealthTest "HealthTest-DfsDiagTestDCs"
-	Invoke-HealthTest "HealthTest-Dcdiag"
-	Invoke-HealthTest "HealthTest-DisabledGpoLinksAtDomainRoot"
-	Invoke-HealthTest "HealthTest-SysvolContentConsistency"
-}
-
-if ($isHostHyperisor) {
-    Invoke-HealthTest "HealthTest-HyperVRunningVMs"
-}
-
-# Custom HealthTest-*
 if ($IncludeTestsFromFolder) {
+# Also Custom HealthTest-*
     Invoke-HealthTestsFromFolder $IncludeTestsFromFolder
 }
