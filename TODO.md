@@ -750,6 +750,7 @@ function HealthTest-SchannelCompliance {
 
 ## Other
 
+  - Re-evaluate notice/warning/failure levels (e.g. some failures should be warnings)
   - Allow users to install somewhere besides C:\IT
     Also, maybe config files should be in ProgramData instead of c:\IT\config
     (but not readable by anyone except Admins)
