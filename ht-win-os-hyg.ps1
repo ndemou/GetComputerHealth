@@ -1134,8 +1134,6 @@ FalsePositives: None.
     }
   }
 
-  $missingLevel = if ($isWorkstation) { 'notice' } else { 'failure' }
-
   $rangeOutOfBounds = New-Object System.Collections.Generic.List[string]
   $rangeUnknown = New-Object System.Collections.Generic.List[string]
   $outOfRange = $false
@@ -1182,7 +1180,7 @@ FalsePositives: None.
       $k = $v.TrimEnd('\')
       if (-not $present.ContainsKey($k)) {
         $missing += $k
-        Write-Warning "[$missingLevel] Shadow storage not configured on required volume $k"
+        Write-Warning "[notice] Shadow storage not configured on $k"
       }
     }
 
@@ -1222,3 +1220,181 @@ FalsePositives: None.
   $s=Get-Service Dnscache -ErrorAction Stop
   if($s.Status -eq 'Running'){ Write-Warning "[pass] DNS Client service running" } else { Write-Warning "[failure] DNS Client service is not running`nStatus=$($s.Status)" }
 }
+
+
+function HealthTest-LocalAdminsBaseline {
+<#
+.SYNOPSIS
+Checks Local Admins Baseline
+
+.DESCRIPTION
+AppliesTo: All
+Scope: Computer
+Category: Audit / Compliance / Informational
+Impact: Medium(Time)
+Uses: None.
+FalsePositives: None.
+#>
+    param(
+        [string[]]$Allowed = @(
+            'BUILTIN\Administrators',
+            'NT AUTHORITY\SYSTEM',
+            'Domain Admins',
+            'Enterprise Admins'
+        )
+    )
+
+    $pass = $true
+
+    $grp = [ADSI]"WinNT://$env:COMPUTERNAME/Administrators,group"
+    $members = @(@($grp.psbase.Invoke('Members')) | ForEach-Object { [ADSI]$_ })
+    $unexpected = @()
+
+    foreach ($m in $members) {
+        $name = $m.InvokeGet('Name')
+        $path = [string]$m.Path
+
+        $dom  = ''
+        $acct = $name
+
+        if ($path -match '^WinNT://([^/]+)/([^/,]+)(?:,.*)?$') {
+            $dom  = $Matches[1]
+            $acct = $Matches[2]
+        }
+
+        $full = if ($dom) { "$dom\$acct" } else { $acct }
+
+        $isAllowed = $false
+        # 1) Built-in Administrator: SID ends with -500
+        try {
+            $sidBytes = $m.InvokeGet('ObjectSid')
+            if ($sidBytes) {
+                $sid = New-Object System.Security.Principal.SecurityIdentifier($sidBytes, 0)
+                if ($sid.Value -match '-500$') {
+                    $isAllowed = $true
+                }
+            }
+        } catch {
+            # If SID lookup fails we just fall back to name-based checks
+        }
+        # 2) Name-based allow list (if not already allowed by SID)
+        if (-not $isAllowed) {
+            foreach ($a in $Allowed) {
+                if ($full -ieq $a -or $full -like "*\$a") {
+                    $isAllowed = $true
+                    break
+                }
+            }
+        }
+
+        if (-not $isAllowed) {
+            Write-Warning "[warning] Unexpected Local Administrator: $full"
+            $pass = $false
+        }
+    }
+    if ($pass) {
+        Write-Warning "[pass] No unexpected accounts in Local Administrators"}
+}
+
+function HealthTest-UnexpectedListeningPorts {
+<#
+.SYNOPSIS
+Checks Unexpected Listening Ports
+
+.DESCRIPTION
+AppliesTo: All
+Scope: Computer
+Category: Security & Stability Risks
+Impact: Medium(Time)
+Uses: Get-NetTCPConnection.
+FalsePositives: None.
+#>
+    [CmdletBinding()] param(
+        [int[]]$AllowedPorts = @(53, 88, 123, 135, 139, 389, 445, 464, 636, 3268, 3269, 5722, 5985, 5986, 9389),
+        [int[]]$OptionalNoticePorts = @(3389, 47001, 593),
+        [int]$DynamicStart = 49152,
+        [int]$DynamicEnd = 65535
+    )
+# From a brand new Lenovo:
+#    FAILURE:[01d04124] Unexpected listening port: 7680 (Process: svchost)
+#    FAILURE:[3d641d0f] Unexpected listening port: 5040 (Process: svchost)
+#
+#   From Intel ATM:
+#       FAILURE:[5fbea54a] Unexpected listening port: 623 (Process: LMS)
+#       FAILURE:[58582cc2] Unexpected listening port: 16992 (Process: LMS)
+
+    $domainRole = (Get-CimInstance Win32_ComputerSystem).DomainRole
+    $isHostServer = ($domainRole  -in 3,4,5)
+
+    # 1. Get all listening connections
+    $AllListening = Get-NetTCPConnection -State Listen
+
+    # 2. Filter out connections where the LocalAddress is *only* the localhost loopback (127.0.0.1 or ::1)
+    $ExternalListening = $AllListening | Where-Object {
+        $_.LocalAddress -ne '127.0.0.1' -and $_.LocalAddress -ne '::1'
+    }
+
+    # 3. Group the connections by port number. This ensures each port is checked only once.
+    # This replaces the old method of selecting only the port number, so we retain the process ID.
+    $listeningPortGroups = $ExternalListening | Group-Object -Property LocalPort
+
+    $bad = $false
+    # 4. Loop through each group of connections (one group per unique port).
+    foreach ($portGroup in $listeningPortGroups) {
+        $comment = ""
+        $p = [int]$portGroup.Name # The port number is the 'Name' of the group
+
+        if ($p -ge $DynamicStart -and $p -le $DynamicEnd) { continue } # ignore ephemeral
+        if ($AllowedPorts -contains $p) { continue }
+
+        # For optional and unexpected ports, we'll find the process name.
+        # Get the Process ID from the first connection object in the group.
+        $procID = $portGroup.Group[0].OwningProcess
+        # Use the ID to get the process name. ErrorAction handles cases where the process might have just ended.
+        $vendor="(failed to find)"
+        if ($procID -eq 4) {
+            $procDescr="Process=SYSTEM(PID=4)"
+            $vendor="Microsoft Windows" # PID 4 is Microsoft Windows system process
+        } else {
+            $proc = (Get-Process -Id $procID -ErrorAction SilentlyContinue)
+            if (-not $proc) {
+                $procDescr = "PID $procID not found"
+                $comment = "The process that was listening terminated before we had the chance to query it. That's unusual."
+            } else {
+                if ($proc.path) {$procPath=Resolve-ExecutablePath $proc.path} else {$procPath=Resolve-ExecutablePath $proc.ProcessName}
+                try {$vendor=Get-ExeVendor $procPath} catch {}
+                $procDescr="$($proc.ProcessName)"
+                $comment = "Vendor: '$vendor'; Process Path: '$procPath'"
+            }
+        }
+
+        if ($OptionalNoticePorts -contains $p) {
+            # Added process name to the notice message for extra context.
+            Write-Warning "[notice] Optional baseline port is listening: $p ($procDescr)"
+            continue
+        }
+
+        $bad = $true
+
+        if ($vendor.PSObject.Properties.Name -contains 'Vendor') {
+            $vendorDescr=$vendor.Vendor
+        } else {
+            $vendorDescr=$vendor
+        }
+
+        # Display the unexpected port along with the listening process name.
+        # If vendor is like "Microsoft Windows*" then level becomes "WARNING" for servers and "NOTICE" for workstations
+        if ($vendorDescr -like "Microsoft Windows*") {
+            if($isHostServer){
+                Write-Warning ("[warning] Unexpected listening port: $p (Process: $procDescr, Vendor: $vendor)`n$comment")
+            } else {
+                Write-Warning ("[notice] Unexpected listening port: $p (Process: $procDescr, Vendor: $vendor)`n$comment")
+            }
+        } else {
+            Write-Warning ("[failure] Unexpected listening port: $p (Process: $procDescr, Vendor: $vendor)`n$comment")
+        }
+    }
+
+    if (-not $bad) { Write-Warning "[pass] Listening ports are within baseline"}
+}
+
