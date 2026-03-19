@@ -30,7 +30,7 @@ Dependencies & execution context:
 (Parameter set: Run) If set, outputs structured objects produced by the health tests to the pipeline.
 
 .PARAMETER Hide
-(Parameter set: Run) Message visibility filter. String containing only letters from `DIPNWFC`.
+(Parameter set: Run) Message visibility filter. String containing only letters from `DIPNWFSC`.
 Default: empty (show all). Typical value: `DIP`
   D = hide Debug messages
   I = hide Info messages
@@ -118,7 +118,7 @@ param(
   [switch]$OutputObjects,
 
   [Parameter(ParameterSetName='Run')]
-  [ValidatePattern('^[DIPNWFC]*$')]
+  [ValidatePattern('^[DIPNWFSC]*$')]
   [string]$Hide = '',
 
   [Parameter(ParameterSetName='Run')]
@@ -448,7 +448,7 @@ FunctionName, Time, ElapsedMilliseconds, Output, Success, Error, Category, Reaso
       }
 
     Log-Failure "(Program Error) Exception while running '$FunctionName'" `
-      -Comment "details: $baseMsg`nThis often means that the test failed but it may also be a bug in this code."
+      -Comment "details: $baseMsg`nA Program Error during a test means either that the test failed or that its code has a bug."
   } finally {
     $sw.Stop()
     $ErrorActionPreference = $oldEap
@@ -581,7 +581,7 @@ function Write-UsageHelp {
     Write-Host -ForegroundColor Gray  "Most often you want to use me like this:"
     Write-Host -ForegroundColor White "    `$out = $PSCommandPath -OutputConsoleMessages -Hide " -NoNewline
     Write-Host -ForegroundColor DarkCyan "DIP"
-    Write-Host -ForegroundColor Gray  "          # (-Hide DIP means: hide Debug, Informationcal and Pass messages)"
+    Write-Host -ForegroundColor Gray  "          # (-Hide DIP means: hide Debug, Informational and Pass messages)"
     Write-Host -ForegroundColor White "    `$out | ogv # or similar"
     Write-Host -ForegroundColor Gray  ""
     return
