@@ -232,3 +232,20 @@ FalsePositives: None.
 }
 
 
+function HealthTest-EfsRecoveryAgents{
+<#
+.SYNOPSIS
+Checks Efs Recovery Agents
+
+.DESCRIPTION
+AppliesTo: DomainJoined
+Scope: Computer
+Category: Configuration Hygiene & Best Practices
+Impact: Medium(Time)
+Uses: Select-String.
+FalsePositives: None.
+#>
+  $out=& certutil -recoveryagent 2>&1
+  $has=($out | Select-String -Pattern 'Recovery Agent' -SimpleMatch)
+  if($has){ Write-Warning "[pass] EFS Data Recovery Agents are configured"} else { Write-Warning "[notice] No EFS Data Recovery Agents configured.`n*IF* EFS (NTFS file encryption) is used, there's no domain recovery agent to decrypt data if the user's key is lost." }
+}

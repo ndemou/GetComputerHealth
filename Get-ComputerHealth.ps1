@@ -902,12 +902,16 @@ if ($isHostServer) {
     Invoke-HealthTest "HealthTest-InstalledRolesFeatures"
     Invoke-HealthTest "HealthTest-DhcpInAd"
     Invoke-HealthTest "HealthTest-DhcpScopeUtilization"
+    Invoke-HealthTest "HealthTest-SchanelBaseline"
 }
 
 if ($isHostDomainJoined) {
     Invoke-HealthTest "HealthTest-ConnectivityToDCs"
     Invoke-HealthTest "HealthTest-DnsSuffixBaseline"
+    Invoke-HealthTest "HealthTest-EfsRecoveryAgents"
+    Invoke-HealthTest "HealthTest-GpWmiFilterNamespacesOnLocalHost"
 }
+
 if ($isHostDomainJoined -and -not $isHostDC) {
     Invoke-HealthTest "HealthTest-DomainARecordPointsToDcIp"
     Invoke-HealthTest "HealthTest-InterfaceDnsServersUseDcs"
@@ -933,12 +937,6 @@ if ($isHostDC) {
     Invoke-HealthTest "HealthTest-NtdsPathsLocation"
     Invoke-HealthTest "HealthTest-LdapSigningChannelBinding"
     Invoke-HealthTest "HealthTest-UnusedEnabledAdapters"
-
-    # TODO: some of these below are maybe for all member servers
-    Invoke-HealthTest "HealthTest-SchanelBaseline"
-    Invoke-HealthTest "HealthTest-EfsRecoveryAgents"
-    Invoke-HealthTest "HealthTest-GpWmiFiltersNamespaces"
-    #---END TODO---------------------
 
     # TODO: These tests are domain-wide and there's no need to execute
     # them on all DCs; if they get executed by one DC we are OK
