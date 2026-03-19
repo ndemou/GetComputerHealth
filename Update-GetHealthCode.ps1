@@ -33,6 +33,8 @@ $ROOT_DIR = Split-Path -Parent $SCRIPT_BIN_DIR
 $DEST_DIR = $SCRIPT_BIN_DIR
 $BAK_DIR  = Join-Path $ROOT_DIR 'temp'
 $CFG_DIR  = Join-Path $ROOT_DIR 'config'
+$LOG_DIR  = Join-Path $ROOT_DIR 'log'
+$script:UPDATE_LOG_PATH = Join-Path $LOG_DIR 'Update-GetHealthCode.log'
 $REPO_URL = 'https://github.com/ndemou/GetComputerHealth'
 $REPO_REF = 'main'
 $LATEST_RELEASE_METADATA_CACHE_PATH = Join-Path $CFG_DIR 'Get-ComputerHealth-latest-release-meta.json'
@@ -49,6 +51,22 @@ $repoSlug = (($REPO_URL -replace '^https?://github\.com/','') -replace '\.git$',
 #
 #  HELPER FUNCTIONS START
 #
+function Write-UpdateEvent {
+  [CmdletBinding()]
+  param([Parameter(Mandatory)][string]$Message)
+
+  if ([string]::IsNullOrWhiteSpace($Message)) { return }
+  Write-Host $Message
+  try {
+    if (-not (Test-Path -LiteralPath $LOG_DIR -PathType Container)) {
+      $null = New-Item -ItemType Directory -Path $LOG_DIR -Force
+    }
+    Add-Content -LiteralPath $script:UPDATE_LOG_PATH -Value ("{0} {1}" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $Message)
+  } catch {
+    Write-Verbose ("Failed writing update event log to {0}: {1}" -f $script:UPDATE_LOG_PATH, $_.Exception.Message)
+  }
+}
+
 function Ensure-PSModuleInstalled {
 <#
 .SYNOPSIS
@@ -416,6 +434,7 @@ System.Collections.Hashtable with keys RootPath and ZipPath.
     }
 
     Write-Verbose "Downloading release zip from GitHub"
+    Write-UpdateEvent "Downloading release zip from GitHub"
     Invoke-WebRequest -Uri $Uri -OutFile $OutFile -Headers $Headers -UseBasicParsing -ErrorAction Stop
   }
 
@@ -433,6 +452,7 @@ System.Collections.Hashtable with keys RootPath and ZipPath.
     }
 
     Write-Verbose "Expanding release zip '$LiteralZipPath'"
+    Write-UpdateEvent "Expanding release zip '$LiteralZipPath'"
     Expand-Archive -LiteralPath $LiteralZipPath -DestinationPath $DestinationPath -Force -ErrorAction Stop
   }
 
@@ -505,6 +525,7 @@ Extracts a provided release zip into a temporary folder and returns extracted ro
   }
 
   Write-Verbose "Expanding provided zip '$ZipPath'"
+  Write-UpdateEvent "Expanding release zip '$ZipPath'"
   Expand-Archive -LiteralPath $ZipPath -DestinationPath $extractPath -Force
 
   $root = Get-ChildItem -LiteralPath $extractPath -Directory | Select-Object -First 1
@@ -663,6 +684,7 @@ $passLabel = "[pass $passNumber/2]"
 
 Write-Verbose "$passLabel Starting Update-GetHealthCode"
 Write-Verbose "$passLabel Parameters: Reinstall=$Reinstall UpdateFromZip='$UpdateFromZip' ForceRefreshReleaseMetadata=$ForceRefreshReleaseMetadata SelfRerunCount=$SelfRerunCount"
+Write-UpdateEvent "$passLabel Parameters: Reinstall=$Reinstall UpdateFromZip='$UpdateFromZip' ForceRefreshReleaseMetadata=$ForceRefreshReleaseMetadata SelfRerunCount=$SelfRerunCount"
 Write-Verbose "Configuration:"
 Write-Verbose "  DEST_DIR                    : $DEST_DIR"
 Write-Verbose "  BAK_DIR                     : $BAK_DIR"
@@ -717,6 +739,7 @@ if (-not $UpdateFromZip) {
     $latestRelease = Get-GetComputerHealthLatestRelease -RepositoryUrl $REPO_URL -CachePath $LATEST_RELEASE_METADATA_CACHE_PATH -CacheTtlMinutes $RELEASE_METADATA_CACHE_TTL_MINUTES -ForceRefresh:$ForceRefreshReleaseMetadata
     $latestReleaseMarker = Convert-GetComputerHealthReleaseToMarker -RepositoryUrl $REPO_URL -Release $latestRelease
     Write-Verbose "$passLabel Latest release marker is '$latestReleaseMarker'"
+    Write-UpdateEvent "$passLabel Latest release marker is '$latestReleaseMarker'"
   } catch {
     Write-Warning ("Could not query latest release metadata from {0}: {1}" -f $REPO_URL, $_.Exception.Message)
   }
@@ -734,6 +757,7 @@ if ($latestReleaseMarker) {
 
   if ($storedReleaseMarker) {
     Write-Verbose "Stored installed release marker is '$storedReleaseMarker'"
+    Write-UpdateEvent "Stored installed release marker is '$storedReleaseMarker'"
   } else {
     Write-Verbose "No stored installed release marker is available yet"
   }
@@ -758,10 +782,12 @@ $preparedZipPath = $null
 try {
   if ($UpdateFromZip) {
     Write-Verbose "$passLabel Updating from provided zip '$UpdateFromZip'"
+    Write-UpdateEvent "$passLabel Updating from provided zip '$UpdateFromZip'"
     $preparedRelease = Expand-ReleaseFromZipFile -ZipPath $UpdateFromZip -TempPath $tmdDir
     Keep-OnlyLatestReleaseZips -CacheDir $BAK_DIR -Pattern $MANUAL_ZIP_CACHE_PATTERN -KeepCount 4
   } else {
     Write-Verbose "$passLabel Updating from latest GitHub release"
+    Write-UpdateEvent "$passLabel Updating from latest GitHub release"
     if (-not $latestRelease) {
       $latestRelease = Get-GetComputerHealthLatestRelease -RepositoryUrl $REPO_URL -CachePath $LATEST_RELEASE_METADATA_CACHE_PATH -CacheTtlMinutes $RELEASE_METADATA_CACHE_TTL_MINUTES -ForceRefresh:$ForceRefreshReleaseMetadata
     }
@@ -783,7 +809,7 @@ if ($updated) { $appliedUpdate = $true }
 if ($updated) {
   Write-Verbose "$passLabel This script updated itself"
   $zipName = if ($preparedZipPath) { Split-Path -Path $preparedZipPath -Leaf } else { '<unknown zip>' }
-  Write-Host "Applied GetComputerHealth update from zip '$zipName'"
+  Write-UpdateEvent "Applied GetComputerHealth update from zip '$zipName'"
 
   if ($latestReleaseMarker) {
     Write-Verbose "$passLabel Persisting installed release marker before self-rerun"
@@ -835,7 +861,7 @@ if (Replace-FileFromSource -FileName 'ht-servers.ps1'               -SourcePath 
 
 if ($appliedUpdate) {
   $zipName = if ($preparedZipPath) { Split-Path -Path $preparedZipPath -Leaf } else { '<unknown zip>' }
-  Write-Host "Applied GetComputerHealth update from zip '$zipName'"
+  Write-UpdateEvent "Applied GetComputerHealth update from zip '$zipName'"
 }
 
 if ($latestReleaseMarker) {
