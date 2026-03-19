@@ -195,7 +195,7 @@ $script:Config = [pscustomobject]@{
 #
 . (Join-Path -Path $PSScriptRoot -ChildPath "lib-write-log-objects.ps1")
 . (Join-Path -Path $PSScriptRoot -ChildPath "helpers-networking.ps1")
-
+. (Join-Path -Path $PSScriptRoot -ChildPath "helpers-for-custom-ht.ps1")
 
 #------------------------------------------
 # Helper functions specific to this script except tests
@@ -716,7 +716,6 @@ $Global:GCHDQMTA = [pscustomobject]@{
 . (Join-Path -Path $PSScriptRoot -ChildPath "ht-net-conn.ps1")
 . (Join-Path -Path $PSScriptRoot -ChildPath "ht-os-perf-hw.ps1")
 . (Join-Path -Path $PSScriptRoot -ChildPath "ht-win-os-hyg.ps1")
-. (Join-Path -Path $PSScriptRoot -ChildPath "ht-special.ps1")
 
 if ($isHostDC -or $isHostPDC){. (Join-Path -Path $PSScriptRoot -ChildPath "ht-DC-PDC.ps1")}
 if ($isHostDnsServer)        {. (Join-Path -Path $PSScriptRoot -ChildPath "ht-DNS.ps1")}
