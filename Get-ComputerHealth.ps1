@@ -623,14 +623,18 @@ $domainRole = (Get-CimInstance Win32_ComputerSystem).DomainRole
 #------------------------------------------
 # What type of system are we running on
 #------------------------------------------
-$isHostVM = Test-IsVirtualMachine                # V   (based on heuristics)
-$isHostMobile = Test-IsLaptopOrMobile            # L   (based on heuristics)
-$isHostDomainJoined = ($domainRole  -in 1,3,4,5) # J (N = Not domain joines)
-$isHostServer = ($domainRole  -in 3,4,5)         # S (W = not a server (Workstation))
-$isHostDC = ($domainRole -in 4,5)                # C   (by definition also JS)
+$isHostVM = Test-IsVirtualMachine
+$isHostMobile = Test-IsLaptopOrMobile
+$isHostDomainJoined = ($domainRole  -in 1,3,4,5)
+$isHostServer = ($domainRole  -in 3,4,5)
+$isHostDC = ($domainRole -in 4,5)
+$isHostDnsServer = $null -ne (Get-Service -Name DNS -ErrorAction SilentlyContinue)
+$isHostDHCPServer = (Get-WindowsFeature DHCP -ErrorAction SilentlyContinue).InstallState -eq 'Installed'
+$isHostHyperisor = (Get-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V).State -eq 'Enabled'
+$isHostInDomainButNotDC = (Get-CimInstance Win32_ComputerSystem).DomainRole -in 1,3
 $isHostPDC = $false
 $currentDomain = $null
-if($isHostDC){$isHostPDC=$false                  # P   (by definition also CJS)
+if($isHostDC){$isHostPDC=$false
     $domainInfo=$null
     try{
         $domainInfo=[System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain()
@@ -682,16 +686,21 @@ $validIpsOfAllDcs = @($validIpsList)
 # Explicitly created so host-fact values are publicly accessible to all health tests,
 # including custom health tests loaded at runtime.
 $Global:GCHDQMTA = [pscustomobject]@{
-    isHostVM           = $isHostVM
-    isHostMobile       = $isHostMobile
-    isHostDomainJoined = $isHostDomainJoined
-    isHostServer       = $isHostServer
-    isHostDC           = $isHostDC
-    isHostPDC          = $isHostPDC
-    GetCurrentDomain   = $currentDomain
-    DebugSkipSlowTests = $DebugSkipSlowTests
-    IpsOfAllDcs        = @($validIpsOfAllDcs)
+    isHostVM               = $isHostVM
+    isHostMobile           = $isHostMobile
+    isHostDomainJoined     = $isHostDomainJoined
+    isHostServer           = $isHostServer
+    isHostDC               = $isHostDC
+    isHostPDC              = $isHostPDC
+	isHostDnsServer        = $isHostDnsServer
+	isHostDHCPServer       = $isHostDHCPServer
+	isHostHyperisor        = $isHostHyperisor
+	isHostInDomainButNotDC = $isHostInDomainButNotDC
+    GetCurrentDomain       = $currentDomain
+    DebugSkipSlowTests     = $DebugSkipSlowTests
+    IpsOfAllDcs            = @($validIpsOfAllDcs)
 }
+
 #|
 #| Collect system information
 #+-----------------------------------------------------------
@@ -709,15 +718,13 @@ $Global:GCHDQMTA = [pscustomobject]@{
 . (Join-Path -Path $PSScriptRoot -ChildPath "ht-win-os-hyg.ps1")
 . (Join-Path -Path $PSScriptRoot -ChildPath "ht-special.ps1")
 
-$isHostDnsServer = $null -ne (Get-Service -Name DNS -ErrorAction SilentlyContinue)
-$isHostHyperisor = (Get-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V).State -eq 'Enabled'
-$isHostInDomainButNotDC = (Get-CimInstance Win32_ComputerSystem).DomainRole -in 1,3
 if ($isHostDC -or $isHostPDC){. (Join-Path -Path $PSScriptRoot -ChildPath "ht-DC-PDC.ps1")}
-if ($isHostDC -or $isHostPDC){. (Join-Path -Path $PSScriptRoot -ChildPath "ht-DNS-DHCP-srvc.ps1")}
-if ($isHostDomainJoined)     {. (Join-Path -Path $PSScriptRoot -ChildPath "ht-domjoined.ps1")}
+if ($isHostDnsServer)        {. (Join-Path -Path $PSScriptRoot -ChildPath "ht-DNS.ps1")}
+if ($isHostDHCPServer)       {. (Join-Path -Path $PSScriptRoot -ChildPath "ht-DHCP.ps1")}
+if ($isHostDomainJoined)     {. (Join-Path -Path $PSScriptRoot -ChildPath "ht-DomJoined.ps1")}
 if ($isHostInDomainButNotDC) {. (Join-Path -Path $PSScriptRoot -ChildPath "ht-member.ps1")}
 if ($isHostMobile)           {. (Join-Path -Path $PSScriptRoot -ChildPath "ht-mobile.ps1")}
-if ($isHostHyperisor)        {. (Join-Path -Path $PSScriptRoot -ChildPath "ht-hyperv-mgmt.ps1")}
+if ($isHostHyperisor)        {. (Join-Path -Path $PSScriptRoot -ChildPath "ht-hypervisor.ps1")}
 if ($isHostServer)           {. (Join-Path -Path $PSScriptRoot -ChildPath "ht-servers.ps1")}
 #|
 #| Dot source health tests
@@ -867,8 +874,8 @@ Invoke-HealthTest "HealthTest-HotfixBaseline"
 Invoke-HealthTest "HealthTest-RdpHardening"
 Invoke-HealthTest "HealthTest-RequiredSrvRecords"
 Invoke-HealthTest "HealthTest-BitLockerStatus"
-Invoke-HealthTest "HealthTest-SingleDefaultGateway" 
-Invoke-HealthTest "HealthTest-VssWriters" 
+Invoke-HealthTest "HealthTest-SingleDefaultGateway"
+Invoke-HealthTest "HealthTest-VssWriters"
 Invoke-HealthTest "HealthTest-SoftwareLicensing"
 Invoke-HealthTest "HealthTest-ScheduledTasksLastResult"
 Invoke-HealthTest "HealthTest-FirewallEnabled"

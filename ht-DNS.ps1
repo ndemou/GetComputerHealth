@@ -354,27 +354,3 @@ FalsePositives: None.
         Write-Warning ("[pass] " + $synopsis + $details)
     }
 }
-
-function HealthTest-DhcpDnsCredential{
-<#
-.SYNOPSIS
-Checks Dhcp Dns Credential
-
-.DESCRIPTION
-AppliesTo: DC
-Scope: Computer
-Category: Configuration Hygiene & Best Practices
-Impact: Medium(Network)
-Uses: Get-WindowsFeature, Get-DhcpServerDnsCredential.
-FalsePositives: None.
-#>
-  [CmdletBinding()] param([int]$MaxPwdAgeDays=365)
-  $dhcp=Get-WindowsFeature -Name DHCP -ErrorAction SilentlyContinue
-  if(-not $dhcp -or -not $dhcp.Installed){ Write-Warning "[pass] DHCP role not installed on this server"; return }
-  $cred=Get-DhcpServerDnsCredential -ErrorAction SilentlyContinue
-  if(-not $cred -or -not $cred.UserName){ Write-Warning "[failure] No DHCP DNS update credentials configured"; return }
-  $u=Get-ADUser -Identity $cred.UserName -Properties Enabled,pwdLastSet
-  $age=[int]((Get-Date) - [DateTime]::FromFileTime($u.pwdLastSet)).TotalDays
-  if(-not $u.Enabled){ Write-Warning "[failure] DHCP DNS credential account is disabled: $($cred.UserName)"; return }
-  if($age -gt $MaxPwdAgeDays){ Write-Warning "[failure] DHCP DNS credential password age too high ($age days > $MaxPwdAgeDays): $($cred.UserName)" } else { Write-Warning "[pass] DHCP DNS credential healthy (Enabled, pwd age $age days <= $MaxPwdAgeDays)" }
-}
