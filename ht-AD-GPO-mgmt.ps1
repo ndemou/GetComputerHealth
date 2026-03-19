@@ -411,7 +411,7 @@ Checks Dfs Diag Test D Cs
 AppliesTo: DC
 Scope: Domain
 Category: Configuration Hygiene & Best Practices
-Impact: Medium(Time)
+Impact: Medium(Time), High(Time)
 Uses: Write-Progress.
 FalsePositives: None.
 #>
@@ -886,7 +886,7 @@ Checks Disabled Gpo Links At Domain Root
 AppliesTo: DC
 Scope: Domain
 Category: Configuration Hygiene & Best Practices
-Impact: Medium(Time)
+Impact: Medium(Time), High(Time)
 Uses: Get-GPO, Get-ADDomain, Get-GPOReport.
 FalsePositives: None.
 #>

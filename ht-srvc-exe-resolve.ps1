@@ -844,7 +844,7 @@ Checks Non Microsoft Services
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
-Impact: Medium(Time)
+Impact: Medium(Time), High(Time)
 Uses: Get-CimInstance.
 FalsePositives: None.
 #>

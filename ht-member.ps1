@@ -83,7 +83,7 @@ Checks Gpupdate Policy Apply
 AppliesTo: DomainJoined
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
-Impact: Medium(Time)
+Impact: Medium(Time), High(Time)
 Uses: Test-ComputerSecureChannel.
 FalsePositives: None.
 #>

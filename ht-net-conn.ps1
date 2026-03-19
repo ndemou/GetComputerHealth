@@ -69,7 +69,7 @@ Checks Single Default Gateway
 AppliesTo: All
 Scope: Computer
 Category: Availability / Server Down Signals
-Impact: Medium(Time)
+Impact: Medium(Time), High(Time)
 Uses: Get-NetIPConfiguration.
 FalsePositives: None.
 #>
@@ -283,7 +283,7 @@ Checks I Pv 6 Binding
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
-Impact: Medium(Time)
+Impact: Medium(Time), High(Time)
 Uses: Get-NetAdapterBinding.
 FalsePositives: None.
 #>

@@ -500,7 +500,7 @@ Checks Share Reasonableness
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
-Impact: Medium(Time)
+Impact: Medium(Time), High(Time)
 Uses: Set-SmbServerConfiguration, Get-SmbShare, Get-SmbShareAccess.
 FalsePositives: None.
 #>
@@ -1015,7 +1015,7 @@ Checks Software Licensing
 AppliesTo: All
 Scope: Computer
 Category: Audit / Compliance / Informational
-Impact: Medium(Time)
+Impact: Medium(Time), High(Time)
 Uses: Write-BasedOnTestResult.
 FalsePositives: None.
 #>
