@@ -219,8 +219,9 @@ Uses a local metadata cache to avoid querying GitHub too frequently.
           Write-Verbose "Reading installedReleaseMarker from $CachePath"
           $existingRaw = Get-Content -LiteralPath $CachePath -Raw -ErrorAction Stop
           $existingCache = $existingRaw | ConvertFrom-Json -ErrorAction Stop
-          if ($existingCache.installedReleaseMarker) {
-            $cachePayload['installedReleaseMarker'] = [string]$existingCache.installedReleaseMarker
+          $existingMarkerProp = $existingCache.PSObject.Properties['installedReleaseMarker']
+          if ($existingMarkerProp -and $existingMarkerProp.Value) {
+            $cachePayload['installedReleaseMarker'] = [string]$existingMarkerProp.Value
           }
         } catch {
           Write-Warning ("Failed to preserve installed release marker from {0}: {1}" -f $CachePath, $_.Exception.Message)
@@ -254,7 +255,12 @@ Reads the installed-release marker from the shared metadata cache file.
     Write-Verbose "Reading release marker from $CachePath"
     $cachedRaw = Get-Content -LiteralPath $CachePath -Raw -ErrorAction Stop
     $cached = $cachedRaw | ConvertFrom-Json -ErrorAction Stop
-    $marker = [string]$cached.installedReleaseMarker
+    $markerProp = $cached.PSObject.Properties['installedReleaseMarker']
+    if (-not $markerProp) {
+      return $null
+    }
+
+    $marker = [string]$markerProp.Value
     if ([string]::IsNullOrWhiteSpace($marker)) {
       return $null
     }
@@ -473,12 +479,13 @@ Keeps only the latest N cached release zips.
 
   try {
     Write-Verbose "Pruning cached release zips in '$CacheDir' using pattern '$Pattern'; keeping newest $KeepCount"
-    $cachedZips = Get-ChildItem -LiteralPath $CacheDir -File -Filter $Pattern -ErrorAction Stop |
+    $cachedZips = @(Get-ChildItem -LiteralPath $CacheDir -File -Filter $Pattern -ErrorAction Stop |
       Sort-Object -Property LastWriteTime -Descending
+    )
 
     Write-Verbose ("Found {0} cached release zip(s)" -f @($cachedZips).Count)
 
-    if ($cachedZips.Count -gt $KeepCount) {
+    if (@($cachedZips).Count -gt $KeepCount) {
       $toDelete = $cachedZips | Select-Object -Skip $KeepCount
       foreach ($item in $toDelete) {
         Write-Verbose "Deleting old cached release zip '$($item.FullName)'"
