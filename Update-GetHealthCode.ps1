@@ -735,23 +735,28 @@ if ($updated) {
   return
 }
 
-$_ = Replace-FileFromSource -FileName 'lib-write-log-objects.ps1'      -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
-$_ = Replace-FileFromSource -FileName 'ht-DC-PDC.ps1'             -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
-$_ = Replace-FileFromSource -FileName 'ht-DNS-DHCP-srvc.ps1'           -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
-$_ = Replace-FileFromSource -FileName 'ht-syscfg-featdisc.ps1'         -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
-$_ = Replace-FileFromSource -FileName 'ht-srvc-exe-resolve.ps1'        -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
-$_ = Replace-FileFromSource -FileName 'ht-file-dir-anlz.ps1'           -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
-$_ = Replace-FileFromSource -FileName 'ht-schtasks-master.ps1'         -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
-$_ = Replace-FileFromSource -FileName 'ht-net-conn.ps1'                -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
-$_ = Replace-FileFromSource -FileName 'ht-os-perf-hw.ps1'              -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
-$_ = Replace-FileFromSource -FileName 'ht-win-os-hyg.ps1'              -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
-$_ = Replace-FileFromSource -FileName 'ht-hypervisor.ps1'             -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
-$_ = Replace-FileFromSource -FileName 'ht-special.ps1'                 -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
-$_ = Replace-FileFromSource -FileName 'Get-ComputerHealth.ps1'         -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
-$_ = Replace-FileFromSource -FileName 'Invoke-GetComputerHealth.ps1'   -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
-$_ = Replace-FileFromSource -FileName 'Send-Message.ps1'               -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
-$_ = Replace-FileFromSource -FileName 'helpers-processes.ps1'          -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
-$_ = Replace-FileFromSource -FileName 'helpers-networking.ps1'         -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+$_ = Replace-FileFromSource -FileName 'lib-write-log-objects.ps1'    -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+$_ = Replace-FileFromSource -FileName 'ht-DC-PDC.ps1'                -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+$_ = Replace-FileFromSource -FileName 'ht-DNS.ps1'                   -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+$_ = Replace-FileFromSource -FileName 'ht-DHCP.ps1'                  -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+$_ = Replace-FileFromSource -FileName 'ht-syscfg-featdisc.ps1'       -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+$_ = Replace-FileFromSource -FileName 'ht-srvc-exe-resolve.ps1'      -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+$_ = Replace-FileFromSource -FileName 'ht-file-dir-anlz.ps1'         -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+$_ = Replace-FileFromSource -FileName 'ht-schtasks-master.ps1'       -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+$_ = Replace-FileFromSource -FileName 'ht-net-conn.ps1'              -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+$_ = Replace-FileFromSource -FileName 'ht-os-perf-hw.ps1'            -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+$_ = Replace-FileFromSource -FileName 'ht-win-os-hyg.ps1'            -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+$_ = Replace-FileFromSource -FileName 'ht-hypervisor.ps1'            -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+$_ = Replace-FileFromSource -FileName 'Get-ComputerHealth.ps1'       -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+$_ = Replace-FileFromSource -FileName 'Invoke-GetComputerHealth.ps1' -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+$_ = Replace-FileFromSource -FileName 'Send-Message.ps1'             -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+$_ = Replace-FileFromSource -FileName 'helpers-processes.ps1'        -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+$_ = Replace-FileFromSource -FileName 'helpers-networking.ps1'       -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+$_ = Replace-FileFromSource -FileName 'helpers-for-custom-ht.ps1'    -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+$_ = Replace-FileFromSource -FileName 'ht-DomJoined.ps1'             -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+$_ = Replace-FileFromSource -FileName 'ht-member.ps1'                -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+$_ = Replace-FileFromSource -FileName 'ht-mobile.ps1'                -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+$_ = Replace-FileFromSource -FileName 'ht-servers.ps1'               -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
 
 if ($latestReleaseMarker) {
   Set-GetComputerHealthInstalledReleaseMarker -CachePath $LATEST_RELEASE_METADATA_CACHE_PATH -Marker $latestReleaseMarker
