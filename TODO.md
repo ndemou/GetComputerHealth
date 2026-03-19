@@ -1,9 +1,13 @@
 # TODO
 
+## Add option to hide "SUPPRESSED" lines from console output (maybe -Hide S)
+
 ## Add a test that verifies the help-block of HealthTest- functions follows our standards
 
 Also get more explicit about our standards. Both on formatting and meaning. I've seen GPT make a lot of mistakes. 
 Considering one function at a time helped it a lot.
+
+I see plenty of `Scope: Domain` that is plainly wrong
 
 ## Get-ComputerHealth should auto-detect and invoke HealthTests -- not literally call them one by one
 
