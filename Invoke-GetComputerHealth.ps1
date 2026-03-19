@@ -238,11 +238,34 @@ function Get-LatestLocalReleaseZip {
   [CmdletBinding()]
   param(
     [string]$CacheDir = $TEMP_DIR,
-    [string]$Pattern = 'GetComputerHealth-release-*.zip'
+    [string]$ConfigDir = $CONFIG_DIR,
+    [string[]]$Patterns = @('GetComputerHealth-release-*.zip','GetComputerHealth-MANUAL-UPDATE-*.zip')
   )
 
   try {
-    return (Get-ChildItem -LiteralPath $CacheDir -File -Filter $Pattern -ErrorAction Stop |
+    $metadataPath = Join-Path $ConfigDir 'Get-ComputerHealth-latest-release-meta.json'
+    if (Test-Path -LiteralPath $metadataPath -PathType Leaf) {
+      try {
+        $metaRaw = Get-Content -LiteralPath $metadataPath -Raw -ErrorAction Stop
+        $meta = $metaRaw | ConvertFrom-Json -ErrorAction Stop
+        $markerPath = [string]$meta.installedReleaseMarker
+        if (
+          -not [string]::IsNullOrWhiteSpace($markerPath) -and
+          ($markerPath -match '(?i)\.zip$') -and
+          (Test-Path -LiteralPath $markerPath -PathType Leaf)
+        ) {
+          return (Resolve-Path -LiteralPath $markerPath -ErrorAction Stop).Path
+        }
+      } catch {
+        # Fall through to cache-based selection.
+      }
+    }
+
+    $candidates = @()
+    foreach ($pattern in $Patterns) {
+      $candidates += @(Get-ChildItem -LiteralPath $CacheDir -File -Filter $pattern -ErrorAction SilentlyContinue)
+    }
+    return ($candidates |
       Sort-Object -Property LastWriteTime -Descending |
       Select-Object -First 1 -ExpandProperty FullName)
   } catch {
@@ -288,7 +311,7 @@ $localReleaseZip = $null
 if ($PushUpdate) {
     $localReleaseZip = Get-LatestLocalReleaseZip
     if (-not $localReleaseZip) {
-        Write-Warning "-PushUpdate was requested but no local release zip cache was found in ${TEMP_DIR}. Falling back to normal update behavior."
+        Write-Warning "-PushUpdate was requested but no local update zip was found (metadata marker or cached zip in ${TEMP_DIR}). Falling back to normal update behavior."
     }
 }
 

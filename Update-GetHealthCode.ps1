@@ -38,6 +38,7 @@ $REPO_REF = 'main'
 $LATEST_RELEASE_METADATA_CACHE_PATH = Join-Path $CFG_DIR 'Get-ComputerHealth-latest-release-meta.json'
 $RELEASE_METADATA_CACHE_TTL_MINUTES = 60
 $ZIP_CACHE_PATTERN = 'GetComputerHealth-release-*.zip'
+$MANUAL_ZIP_CACHE_PATTERN = 'GetComputerHealth-MANUAL-UPDATE-*.zip'
 $repoSlug = (($REPO_URL -replace '^https?://github\.com/','') -replace '\.git$','').Trim('/')
 #
 #  END OF CONFIG
@@ -671,6 +672,7 @@ Write-Verbose "  REPO_REF                    : $REPO_REF"
 Write-Verbose "  LATEST_RELEASE_METADATA_CACHE_PATH : $LATEST_RELEASE_METADATA_CACHE_PATH"
 Write-Verbose "  RELEASE_METADATA_CACHE_TTL_MINUTES : $RELEASE_METADATA_CACHE_TTL_MINUTES"
 Write-Verbose "  ZIP_CACHE_PATTERN           : $ZIP_CACHE_PATTERN"
+Write-Verbose "  MANUAL_ZIP_CACHE_PATTERN    : $MANUAL_ZIP_CACHE_PATTERN"
 Write-Verbose "  repoSlug                    : $repoSlug"
 
 if (-not (Test-Path $DEST_DIR)) {
@@ -757,13 +759,14 @@ try {
   if ($UpdateFromZip) {
     Write-Verbose "$passLabel Updating from provided zip '$UpdateFromZip'"
     $preparedRelease = Expand-ReleaseFromZipFile -ZipPath $UpdateFromZip -TempPath $tmdDir
+    Keep-OnlyLatestReleaseZips -CacheDir $BAK_DIR -Pattern $MANUAL_ZIP_CACHE_PATTERN -KeepCount 4
   } else {
     Write-Verbose "$passLabel Updating from latest GitHub release"
     if (-not $latestRelease) {
       $latestRelease = Get-GetComputerHealthLatestRelease -RepositoryUrl $REPO_URL -CachePath $LATEST_RELEASE_METADATA_CACHE_PATH -CacheTtlMinutes $RELEASE_METADATA_CACHE_TTL_MINUTES -ForceRefresh:$ForceRefreshReleaseMetadata
     }
     $preparedRelease = Expand-GetComputerHealthLatestRelease -RepositoryUrl $REPO_URL -TempPath $tmdDir -ZipCacheDir $BAK_DIR -Release $latestRelease -ForceDownload:$Reinstall
-    Keep-OnlyLatestReleaseZips -CacheDir $BAK_DIR -Pattern $ZIP_CACHE_PATTERN -KeepCount 2
+    Keep-OnlyLatestReleaseZips -CacheDir $BAK_DIR -Pattern $ZIP_CACHE_PATTERN -KeepCount 4
   }
   $releaseRoot = $preparedRelease.RootPath
   $preparedZipPath = $preparedRelease.ZipPath
