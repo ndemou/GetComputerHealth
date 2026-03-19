@@ -9,7 +9,7 @@ Checks AD View Consistency
 
 .DESCRIPTION
 AppliesTo: DC
-Scope: Domain
+Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time)
 Uses: Get-ADDomain, Get-ADDomainController, Get-ADForest.
@@ -121,7 +121,7 @@ Checks Dcdiag
 
 .DESCRIPTION
 AppliesTo: DC
-Scope: Domain
+Scope: Computer
 Category: Availability / Server Down Signals
 Impact: High(Time)
 Uses: Write-Progress.
@@ -158,7 +158,7 @@ Checks Rid Manager
 
 .DESCRIPTION
 AppliesTo: DC
-Scope: Domain
+Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time)
 Uses: Select-String.
@@ -177,7 +177,7 @@ Checks Dfs Replication State
 
 .DESCRIPTION
 AppliesTo: DC
-Scope: Domain
+Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: High(Time)
 Uses: Get-CimInstance.
@@ -218,7 +218,7 @@ Checks Dfsr Backlog
 
 .DESCRIPTION
 AppliesTo: DC
-Scope: Domain
+Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: High(Time)
 Uses: Get-DfsrBacklog, Install-WindowsFeature, Get-DfsrConnection.
@@ -252,7 +252,7 @@ Checks Gpo Version Consistency
 
 .DESCRIPTION
 AppliesTo: DC
-Scope: Domain
+Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time)
 Uses: Get-GPO.
@@ -282,7 +282,7 @@ Checks Kcc Connectivity
 
 .DESCRIPTION
 AppliesTo: DC
-Scope: Domain
+Scope: Computer
 Category: Availability / Server Down Signals
 Impact: Medium(Network)
 Uses: Get-ADDomainController, Get-ADReplicationPartnerMetadata, Get-ADObject.
@@ -363,7 +363,7 @@ Checks Rodc Prp
 
 .DESCRIPTION
 AppliesTo: DC
-Scope: Domain
+Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time)
 Uses: Get-ADDomainController, Get-ADObject.
@@ -385,7 +385,7 @@ Checks Sysvol Acl Hygiene
 
 .DESCRIPTION
 AppliesTo: DC
-Scope: Domain
+Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time)
 Uses: Get-Acl.
@@ -409,7 +409,7 @@ Checks Dfs Diag Test D Cs
 
 .DESCRIPTION
 AppliesTo: DC
-Scope: Domain
+Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time), High(Time)
 Uses: Write-Progress.
@@ -555,7 +555,7 @@ Checks Admin SD Holder Coverage
 
 .DESCRIPTION
 AppliesTo: DC
-Scope: Domain
+Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time)
 Uses: Get-ADUser.
@@ -807,7 +807,7 @@ Checks AD Replication Local RSAT
 
 .DESCRIPTION
 AppliesTo: DC
-Scope: Domain
+Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: High(Time)
 Uses: Get-ADReplicationPartnerMetadata, Get-Module, Get-ADDomainController.
@@ -884,7 +884,7 @@ Checks Disabled Gpo Links At Domain Root
 
 .DESCRIPTION
 AppliesTo: DC
-Scope: Domain
+Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time), High(Time)
 Uses: Get-GPO, Get-ADDomain, Get-GPOReport.
@@ -954,7 +954,7 @@ Checks Krbtgt Age
 
 .DESCRIPTION
 AppliesTo: DC
-Scope: Domain
+Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time)
 Uses: Get-ADUser.
@@ -977,7 +977,7 @@ Checks Sysvol Content Consistency
 
 .DESCRIPTION
 AppliesTo: DC
-Scope: Domain
+Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: High(Time)
 Uses: Get-ADDomainController.
@@ -1054,7 +1054,7 @@ Checks Unused Enabled Adapters
 
 .DESCRIPTION
 AppliesTo: DC
-Scope: Domain
+Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time)
 Uses: Get-NetAdapter.
@@ -1075,7 +1075,7 @@ Checks Schema Version Consistency
 
 .DESCRIPTION
 AppliesTo: DC
-Scope: Forest
+Scope: Domain
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time)
 Uses: Get-ADRootDSE, Get-ADDomainController, Get-ADObject.

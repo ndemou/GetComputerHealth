@@ -9,7 +9,7 @@ Checks Dhcp In Ad
 
 .DESCRIPTION
 AppliesTo: DC
-Scope: Domain
+Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time)
 Uses: Get-WindowsFeature, Get-DhcpServerInDC.
@@ -30,7 +30,7 @@ Checks Dhcp Scope Utilization
 
 .DESCRIPTION
 AppliesTo: DC
-Scope: Domain
+Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time)
 Uses: Get-DhcpServerv4ScopeStatistics.

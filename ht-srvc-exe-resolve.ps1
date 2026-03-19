@@ -879,7 +879,7 @@ Checks Service Accounts Pwd Never Expires
 
 .DESCRIPTION
 AppliesTo: DC
-Scope: Computer
+Scope: Domain
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time)
 Uses: Get-ADUser.

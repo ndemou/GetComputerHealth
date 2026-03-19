@@ -41,7 +41,7 @@ Checks Dns Zone Replication Scope
 
 .DESCRIPTION
 AppliesTo: DC
-Scope: Domain
+Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: High(Time)
 Uses: Get-DnsServerZone.
@@ -61,7 +61,7 @@ Checks Dns Zone Transfers
 
 .DESCRIPTION
 AppliesTo: DC
-Scope: Domain
+Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Network)
 Uses: Get-DnsServerZone.
@@ -107,7 +107,7 @@ Checks Dc Dns Server Forwarder
 
 .DESCRIPTION
 AppliesTo: DC
-Scope: Domain
+Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Network)
 Uses: Get-DnsServerForwarder.
@@ -241,7 +241,7 @@ Checks Dc Dns A Records
 
 .DESCRIPTION
 AppliesTo: DC
-Scope: Domain
+Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Network)
 Uses: Get-ADDomainController, Resolve-DnsName.
@@ -265,7 +265,7 @@ Checks Dc Dns Registration
 
 .DESCRIPTION
 AppliesTo: DC
-Scope: Domain
+Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Network)
 Uses: Resolve-DnsName.
@@ -362,7 +362,7 @@ Checks Dhcp Dns Credential
 
 .DESCRIPTION
 AppliesTo: DC
-Scope: Domain
+Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Network)
 Uses: Get-WindowsFeature, Get-DhcpServerDnsCredential.

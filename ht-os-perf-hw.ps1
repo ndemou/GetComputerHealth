@@ -782,7 +782,7 @@ Checks Ldap Signing Channel Binding
 
 .DESCRIPTION
 AppliesTo: DC
-Scope: Domain
+Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time)
 Uses: Get-ItemProperty.
@@ -822,7 +822,7 @@ Checks Unconstrained Delegation Accounts
 
 .DESCRIPTION
 AppliesTo: DC
-Scope: Computer
+Scope: Domain
 Category: Security & Stability Risks
 Impact: Medium(Time)
 Uses: Get-ADObject.
@@ -921,7 +921,7 @@ Checks Gc Placement
 
 .DESCRIPTION
 AppliesTo: DC
-Scope: Domain
+Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time)
 Uses: Get-ADDomainController.
