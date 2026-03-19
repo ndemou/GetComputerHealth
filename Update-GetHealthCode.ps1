@@ -760,14 +760,22 @@ if ($latestReleaseMarker) {
 if ((Get-Date) -le [datetime]'2026-04-30') {
   Write-Verbose "Executing temporary cleanup for obsolete files"
 
-  $fpath = "$CFG_DIR\Get-ComputerHealth-latest-release.dat"
-  if (Test-Path $fpath) {Write-Verbose "Removing obsolete file '$fpath'"; Remove-Item $fpath}
-  
-  $fpath = "$DEST_DIR\lib-helpers-for-health-tests.ps1"
-  if (Test-Path $fpath) {Write-Verbose "Removing obsolete file '$fpath'"; Remove-Item $fpath}
+  $obsoleteFiles = @(
+    (Join-Path $CFG_DIR  'Get-ComputerHealth-latest-release.dat')
+    (Join-Path $DEST_DIR 'lib-helpers-for-health-tests.ps1')
+    (Join-Path $DEST_DIR 'lib-health-tests.ps1')
+    (Join-Path $DEST_DIR 'ht-AD-GPO-mgmt.ps1')
+    (Join-Path $DEST_DIR 'ht-DNS-DHCP-srvc.ps1')
+    (Join-Path $DEST_DIR 'ht-hyperv-mgmt.ps1')
+    (Join-Path $DEST_DIR 'ht-special.ps1')
+  )
 
-  $fpath = "$DEST_DIR\lib-health-tests.ps1"
-  if (Test-Path $fpath) {Write-Verbose "Removing obsolete file '$fpath'"; Remove-Item $fpath}
+  foreach ($fpath in $obsoleteFiles) {
+    if (Test-Path -LiteralPath $fpath) {
+      Write-Verbose "Removing obsolete file '$fpath'"
+      Remove-Item -LiteralPath $fpath
+    }
+  }
 }
 
 try {
