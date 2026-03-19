@@ -1193,3 +1193,227 @@ FalsePositives: None.
   }
   if(-not $anyFail){ Write-Warning "[pass] AD replication latency acceptable (<= $MaxMinutes min on schema/config)" }
 }
+
+
+function HealthTest-NtdsLogVolumeFree{
+<#
+.SYNOPSIS
+Checks Ntds Log Volume Free
+
+.DESCRIPTION
+AppliesTo: DC
+Scope: Computer
+Category: Configuration Hygiene & Best Practices
+Impact: Medium(Time)
+Uses: Get-ItemProperty.
+FalsePositives: None.
+#>
+  [CmdletBinding()] param([int]$MinFreeGB=5)
+  $p='HKLM:\SYSTEM\CurrentControlSet\Services\NTDS\Parameters'
+  $logPath=(Get-ItemProperty $p -Name 'Database log files path').'Database log files path'
+  $drive=(Get-Item $logPath).PSDrive.Name+':'
+  $d=Get-CimInstance Win32_LogicalDisk -Filter "DeviceID='$drive'"
+  $freeGB=[math]::Round($d.FreeSpace/1GB,2)
+  if($freeGB -ge $MinFreeGB){
+    Write-Warning "[pass] NTDS log volume free space OK ($freeGB GB >= $MinFreeGB GB)"
+  } else {
+    Write-Warning (
+      "[failure] " +
+      "NTDS log volume low free space ($freeGB GB < $MinFreeGB GB)" +
+      "`n" +
+      "Log path: $logPath"
+    )
+  }
+}
+
+
+function HealthTest-NtdsPathsLocation{
+<#
+.SYNOPSIS
+Checks Ntds Paths Location
+
+.DESCRIPTION
+AppliesTo: DC
+Scope: Computer
+Category: Security & Stability Risks
+Impact: Medium(Time)
+Uses: Get-ItemProperty.
+FalsePositives: None.
+#>
+  [CmdletBinding()]
+  param(
+    [string[]]$ExpectedDbRoots,
+    [string[]]$ExpectedLogRoots
+  )
+  $regPath = 'HKLM:\SYSTEM\CurrentControlSet\Services\NTDS\Parameters'
+  $db = (Get-ItemProperty -Path $regPath -Name 'DSA Database file' -ErrorAction Stop).'DSA Database file'
+  $lg = (Get-ItemProperty -Path $regPath -Name 'Database log files path' -ErrorAction Stop).'Database log files path'
+
+  $dbOk = if($ExpectedDbRoots -and $ExpectedDbRoots.Count){
+    ($ExpectedDbRoots | Where-Object { $db -like "$($_)*" -or ([IO.Path]::GetPathRoot($db) -eq $_) }).Count -gt 0
+  } else { $true }
+  if(-not $dbOk){ Write-Warning "[failure] NTDS database path not on an expected volume`nDB=$db; Expected roots: $($ExpectedDbRoots -join ', ')" }
+
+  $lgOk = if($ExpectedLogRoots -and $ExpectedLogRoots.Count){
+    ($ExpectedLogRoots | Where-Object { $lg -like "$($_)*" -or ([IO.Path]::GetPathRoot($lg) -eq $_) }).Count -gt 0
+  } else { $true }
+  if(-not $lgOk){ Write-Warning "[failure] NTDS log path not on an expected volume`nLOGS=$lg; Expected roots: $($ExpectedLogRoots -join ', ')" }
+
+  if($dbOk -and $lgOk){ Write-Warning "[pass] NTDS database/log paths sane (DB=$db; LOGS=$lg)" }
+}
+
+
+function HealthTest-ServiceAccountsPwdNeverExpires{
+<#
+.SYNOPSIS
+Checks Service Accounts Pwd Never Expires
+
+.DESCRIPTION
+AppliesTo: DC
+Scope: Domain # SCOPE VERIFIED BY HUMAN
+Category: Configuration Hygiene & Best Practices
+Impact: Medium(Time)
+Uses: Get-ADUser.
+FalsePositives: None.
+#>
+  $filter='(servicePrincipalName=*)'
+  $objs=Get-ADUser -LDAPFilter $filter -Properties PasswordNeverExpires,PasswordLastSet
+  $bad=@($objs | Where-Object {$_.PasswordNeverExpires -eq $true})
+  if($bad.Count -gt 0){
+    foreach($u in $bad){ Write-Warning "[failure] $("Service account password set to never expire")`n$($u.SamAccountName)" }
+  } else {
+    Write-Warning "[pass] Service accounts have expiring passwords"
+  }
+}
+
+
+# TODO this test is repeated in HealthTest-ShareReasonableness
+
+function HealthTest-UnconstrainedDelegationAccounts{
+<#
+.SYNOPSIS
+Checks Unconstrained Delegation Accounts
+
+.DESCRIPTION
+AppliesTo: DC
+Scope: Domain # SCOPE VERIFIED BY HUMAN
+Category: Security & Stability Risks
+Impact: Medium(Time)
+Uses: Get-ADObject.
+FalsePositives: None.
+#>
+  [CmdletBinding()] param([switch]$IncludeDomainControllers)
+
+  $bitTrusted  = 524288    # 0x80000 TRUSTED_FOR_DELEGATION
+  $bitDC       = 8192      # 0x2000  SERVER_TRUST_ACCOUNT
+
+  if ($IncludeDomainControllers) {
+    $ldap = "(&(|(objectClass=user)(objectClass=computer))(userAccountControl:1.2.840.113556.1.4.803:=$bitTrusted))"
+  } else {
+    $ldap = "(&(|(objectClass=user)(objectClass=computer))(userAccountControl:1.2.840.113556.1.4.803:=$bitTrusted)(!(userAccountControl:1.2.840.113556.1.4.803:=$bitDC)))"
+  }
+
+  $objs = @(
+    Get-ADObject -LDAPFilter $ldap -Properties sAMAccountName,objectClass,dnsHostName |
+      Select-Object sAMAccountName,objectClass,dnsHostName
+  )
+
+  if ($objs.Count -gt 0) {
+
+    foreach($o in $objs){
+
+      # Determine if computer object (objectClass may be array or string)
+      $isComputer = $false
+      if ($o.objectClass -is [array]) {
+        if ($o.objectClass -contains 'computer') { $isComputer = $true }
+      } elseif ($o.objectClass -eq 'computer') {
+        $isComputer = $true
+      }
+
+      # Build a friendly name
+      if ($isComputer) {
+        $name = $o.sAMAccountName.TrimEnd('$')
+        if ($o.dnsHostName) {
+          $name += " ($($o.dnsHostName))"
+        }
+        $cls = 'computer'
+      } else {
+        $name = $o.sAMAccountName
+        $cls  = 'user'
+      }
+
+      Write-Warning "[failure] Unconstrained delegation account found`n$($cls): $name"
+    }
+
+  } else {
+    Write-Warning "[pass] No unconstrained delegation accounts"
+  }
+}
+
+
+function HealthTest-GcPlacement{
+<#
+.SYNOPSIS
+Checks Gc Placement
+
+.DESCRIPTION
+AppliesTo: DC
+Scope: Domain # SCOPE VERIFIED BY HUMAN
+Category: Configuration Hygiene & Best Practices
+Impact: Medium(Time)
+Uses: Get-ADDomainController.
+FalsePositives: None.
+#>
+  [CmdletBinding()] param([switch]$AtLeastOnePerSite=$true)
+  $dcs=Get-ADDomainController -Filter *
+  if(-not $AtLeastOnePerSite){
+    $has=($dcs | Where-Object {$_.IsGlobalCatalog}).Count -gt 0
+    if($has){ Write-Warning "[pass] At least one Global Catalog exists in the domain" } else { Write-Warning "[failure] No Global Catalog server detected in the domain" }
+    return
+  }
+  $sites=$dcs | Group-Object Site
+  $bad=@()
+  foreach($s in $sites){
+    if(($s.Group | Where-Object {$_.IsGlobalCatalog}).Count -eq 0){ $bad+=$s.Name; Write-Warning "[failure] No Global Catalog in site '$($s.Name)'" }
+  }
+  if($bad.Count -eq 0){ Write-Warning "[pass] Each AD site has at least one Global Catalog" }
+}
+
+
+function HealthTest-DuplicateSpn{
+<#
+.SYNOPSIS
+Checks Duplicate Spn
+
+.DESCRIPTION
+AppliesTo: DC
+Scope: Domain # SCOPE VERIFIED BY HUMAN
+Category: Configuration Hygiene & Best Practices
+Impact: Medium(Time)
+Uses: Get-ADObject.
+FalsePositives: None.
+#>
+  $objs = Get-ADObject -LDAPFilter "(servicePrincipalName=*)" -Properties servicePrincipalName,sAMAccountName,distinguishedName -ErrorAction Stop
+  if(-not $objs){ Write-Warning "[pass] No objects with SPN found"; return }
+
+  $map = @{}
+  foreach($o in $objs){
+    $acct = if($o.sAMAccountName){ $o.sAMAccountName } else { $o.distinguishedName }
+    foreach($spn in @($o.servicePrincipalName)){
+      if([string]::IsNullOrEmpty($spn)){ continue }
+      if($map.ContainsKey($spn)){ $map[$spn] += $acct } else { $map[$spn] = @($acct) }
+    }
+  }
+
+  $dupsFound=$false
+  foreach($spn in $map.Keys){
+    $owners = @($map[$spn] | Sort-Object -Unique)
+    if($owners.Count -gt 1){
+      $dupsFound=$true
+      Write-Warning "[failure] $("Duplicate SPN detected")`n$(("$spn -> " + ($owners -join ', ')))"
+    }
+  }
+  if(-not $dupsFound){ Write-Warning "[pass] No duplicate SPNs detected" }
+}
+
+

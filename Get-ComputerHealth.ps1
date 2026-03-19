@@ -465,7 +465,6 @@ Lists all loaded HealthTest-* functions with their synopsis text.
 #>
     [CmdletBinding()]
     [OutputType([pscustomobject])]
-    param()
 
     $allHealthTests | ForEach-Object {
         $help = Get-Help $_.Name -ErrorAction SilentlyContinue
@@ -824,10 +823,19 @@ Log-debug "Final list of suppressed signatures: $((@($cfg.SuppressedSignatures) 
 if ($OnlyTheseTests) {
 # -OnlyTheseTests
     $valid_cmdlet_name_regex = '^ *[A-Za-z][A-Za-z0-9_-]*[A-Za-z0-9]+ *$'
+    $loadedTestsByName = @{}
+    $allHealthTests | ForEach-Object {
+        $loadedTestsByName[$_.Name] = $true
+    }
 
     foreach ($item in $OnlyTheseTests) {
         if ($item -match $valid_cmdlet_name_regex) {
-            Invoke-HealthTest $item
+            $testName = $item.Trim()
+            if ($loadedTestsByName.ContainsKey($testName)) {
+                Invoke-HealthTest $testName
+            } else {
+                Log-Notice "Skipping unavailable test '$testName' (not loaded/applicable on this host)."
+            }
         } else {
             Log-Warning "Input '$item' is not a valid cmdlet name."
         }

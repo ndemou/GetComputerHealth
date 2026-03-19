@@ -873,25 +873,3 @@ FalsePositives: None.
     if ($ok) {Write-Warning "[pass] Found no service except Microsoft ones"}
 }
 
-function HealthTest-ServiceAccountsPwdNeverExpires{
-<#
-.SYNOPSIS
-Checks Service Accounts Pwd Never Expires
-
-.DESCRIPTION
-AppliesTo: DC
-Scope: Domain
-Category: Configuration Hygiene & Best Practices
-Impact: Medium(Time)
-Uses: Get-ADUser.
-FalsePositives: None.
-#>
-  $filter='(servicePrincipalName=*)'
-  $objs=Get-ADUser -LDAPFilter $filter -Properties PasswordNeverExpires,PasswordLastSet
-  $bad=@($objs | Where-Object {$_.PasswordNeverExpires -eq $true})
-  if($bad.Count -gt 0){
-    foreach($u in $bad){ Write-Warning "[failure] $("Service account password set to never expire")`n$($u.SamAccountName)" }
-  } else {
-    Write-Warning "[pass] Service accounts have expiring passwords"
-  }
-}
