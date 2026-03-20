@@ -1,8 +1,10 @@
 # Introduction
 
-**Get-ComputerHealth** is a lightweight, extendable PowerShell framework. It is ideal for a single workstation or server, and it also works well in domains with a few dozen servers managed through PowerShell remoting with `Enter-PSSession` and `Invoke-Command`. It produces clean terminal output, concise Excel reports, and actionable email alerts that highlight risks before they become disasters.
+**Get-ComputerHealth** is a lightweight, extendable PowerShell framework. It is suitable both for a single workstation or server, and for a domain with a few dozen servers. It produces clean terminal output, concise Excel reports, and email alerts.
 
-It is a native, agentless alternative to heavy monitoring suites. Installation is simple, and routine use usually takes no more than two minutes per server once you are familiar with it. If you have basic PowerShell skills, you can easily add your own custom health tests.
+It is a native, agentless alternative to heavy monitoring suites. Installation is simple, usually taking no more than two minutes per server once you are familiar with it. If you have basic PowerShell skills, you can easily add your own custom health tests.
+
+For domains the only requirement is to enable PowerShell remoting to the servers or workstations you want to monitor. Once you can manage them through with `Enter-PSSession`/`Invoke-Command` everything works.
 
 <img width="1086" height="251" alt="Example of the report you receive via email" src="https://github.com/user-attachments/assets/9da7e7f7-c1ef-4f3e-9d47-d164a96b2d4f" />
 
@@ -10,15 +12,15 @@ It is a native, agentless alternative to heavy monitoring suites. Installation i
 
 This code is actively used in production across several domains and multiple servers, but as far as I know, I am its only user.
 
-It appears to work well, but the project is still at an early stage. Significant refactoring and additional tests should be expected.
+It appears to work well, but the project is still at a rather early stage. Some (annoying) changes should be expected.
 
-I am happy to help when I can, but my availability is limited. If you decide to use it, **assume you are on your own**. You should be comfortable with PowerShell and prepared to invest time and LLM tokens. On the plus side, the codebase is surprisingly small and straightforward: **the core is about 1,500 lines, including comments**. The tests total well over ten thousand lines, but each one is small and the vast majority are self-contained.
+I am happy to help when I can, but my availability is limited. If you decide to use it, **assume you are on your own**. You should be comfortable with PowerShell and prepared to invest time and LLM tokens. On the plus side, the codebase is surprisingly small and straightforward: **the core is about 1,000 lines, including comments**. The tests total well over ten thousand lines, but each one is small and the vast majority are self-contained.
 
 # Security
 
-The installer(`Update-GetHealthCode.ps1`), downloads and updates files from this GitHub. It does so *every* time you call `Invoke-GetComputerHealth.ps1`. It's strongly recomended that you clone this repo, audit it and then change the `$URI=` line of `Update-GetHealthCode.ps1` to point to your copy. Besides installation this code should not change the state of the system it runs on in any way. So autiting with a modern LLM is in fact quite easy. 
+The installer(`Update-GetHealthCode.ps1`), downloads and updates files from this GitHub. It may do so *every* time you call `Invoke-GetComputerHealth.ps1`. It's strongly recomended that you clone this repo, audit it and then change the `$URI=` line of `Update-GetHealthCode.ps1` to point to your copy. Besides installation this code should not change the state of the system it runs on in any way. So autiting with a modern LLM is in fact quite easy. 
 
-The installer also registers and sets PSGallery as Trusted, and installs PS module `ImportExcel`.
+The installer registers and sets PSGallery as Trusted, and installs PS module `ImportExcel`.
 
 # 0. Prerequisites
 
