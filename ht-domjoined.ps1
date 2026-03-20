@@ -48,12 +48,20 @@ TODO: maybe part of these tests are for non-domain joined Computers also
     # 3) Per-NIC checks (only PASS/FAIL; no discovery warning if none found)
     $nics = @()
     try {
-        $nics = Get-DnsClient -ErrorAction Stop |
+        $allNics = Get-DnsClient -ErrorAction Stop
+    } catch {
+        $err = $_
+        $comment = "$($err.Exception.Message)"
+        Write-Warning "[warning] Unable to test if DNS registration is OK (RegisterThisConnectionsAddress=True and UseSuffixWhenRegistering=True)`nGet-DnsClient exception:`n$comment"
+        $allNics = @()
+    }
+    try {
+        $nics = $allNics |
                 Where-Object { $_.InterfaceOperationalStatus -eq "Up" -and $_.ConnectionSpecificSuffix -ne "localdomain" }
     } catch {
         $err = $_
-        $comment = "Unable to query DNS client interfaces: $($err.Exception.Message)`nConfirm OS supports Get-DnsClient and you have sufficient privileges."
-        Write-Warning "[failure] NIC DNS settings`n$comment"
+        $comment = "$($err.Exception.Message)"
+        Write-Warning "[warning] Unable to test if DNS registration is OK (RegisterThisConnectionsAddress=True and UseSuffixWhenRegistering=True)`nUnable to filter DNS client interfaces based on InterfaceOperationalStatus & ConnectionSpecificSuffix`n$comment"
         $nics = @()
     }
 

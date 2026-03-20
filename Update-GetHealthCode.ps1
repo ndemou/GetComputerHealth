@@ -570,7 +570,7 @@ Keeps only the latest N cached release zips.
     $cachedZipCount = @($cachedZips).Length
     Write-Verbose ("Found {0} cached release zip(s)" -f $cachedZipCount)
 
-    if ($cachedZipCount -gt $KeepCount) {
+    if (@($cachedZips).Count -gt $KeepCount) {
       $toDelete = @($cachedZips | Select-Object -Skip $KeepCount)
       foreach ($item in $toDelete) {
         Write-Verbose "Deleting old cached release zip '$($item.FullName)'"

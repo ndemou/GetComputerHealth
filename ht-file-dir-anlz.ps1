@@ -30,9 +30,11 @@ Uses: None.
 FalsePositives: None.
 #>
     if ($Global:GCHDQMTA.DebugSkipSlowTests) {Write-Warning "[info] Skipping slow test $($MyInvocation.MyCommand.Name) because of -DebugSkipSlowTests switch"; return}
+	$PATHS_TO_SKIP=@("C:\windows\servicing","C:\windows\WinSxS","C:\Windows\SoftwareDistribution\Download")
+	# TODO: Verify that Find-LargeDirectory does not scan these -SkipPaths (I'm only sure it does not report them)
     $foundLargeDirectory = $false
 
-    foreach ($dir in Find-LargeDirectory -Path 'C:\' -Threshold 10000 -SkipPaths @("C:\windows\servicing","C:\windows\WinSxS")) {
+    foreach ($dir in Find-LargeDirectory -Path 'C:\' -Threshold 10000 -SkipPaths $PATHS_TO_SKIP) {
         $foundLargeDirectory = $true
         $comment = "$($dir.ItemsCount) items found"
         try {

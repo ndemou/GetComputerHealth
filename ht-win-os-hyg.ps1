@@ -900,8 +900,8 @@ FalsePositives: None.
 
   if ($isWorkstation) {
     if ($RequireOnVolumes.Count -eq 0) { $RequireOnVolumes = @('C:') }
-    if (-not $MinRecommendedGB.HasValue) { $MinRecommendedGB = 5 }
-    if (-not $MaxRecommendedGB.HasValue) { $MaxRecommendedGB = 25 }
+    if ($null -eq $MinRecommendedGB) { $MinRecommendedGB = 5 }
+    if ($null -eq $MaxRecommendedGB) { $MaxRecommendedGB = 25 }
   } elseif ($isServer) {
     if ($RequireOnVolumes.Count -eq 0) {
       $RequireOnVolumes = @(
@@ -991,7 +991,7 @@ FalsePositives: None.
   $rangeUnknown = New-Object System.Collections.Generic.List[string]
   $outOfRange = $false
 
-  if ($MinRecommendedGB.HasValue -or $MaxRecommendedGB.HasValue) {
+  if ($null -eq $MinRecommendedGB -or $null -eq $MaxRecommendedGB) {
     $targets = if ($RequireOnVolumes.Count -gt 0) {
       @($RequireOnVolumes | ForEach-Object { $_.TrimEnd('\') } | Sort-Object -Unique)
     } else {
@@ -1014,12 +1014,12 @@ FalsePositives: None.
 
       $sizeGB = [math]::Round(($maxBytes / 1GB), 2)
 
-      if ($MinRecommendedGB.HasValue -and $sizeGB -lt $MinRecommendedGB.Value) {
+      if ($null -eq $MinRecommendedGB -and $sizeGB -lt $MinRecommendedGB.Value) {
         $outOfRange = $true
         $rangeOutOfBounds.Add("$k=$sizeGB GB below min $($MinRecommendedGB.Value) GB")
       }
 
-      if ($MaxRecommendedGB.HasValue -and $sizeGB -gt $MaxRecommendedGB.Value) {
+      if ($null -eq $MaxRecommendedGB -and $sizeGB -gt $MaxRecommendedGB.Value) {
         $outOfRange = $true
         $rangeOutOfBounds.Add("$k=$sizeGB GB above max $($MaxRecommendedGB.Value) GB")
       }
@@ -1056,6 +1056,7 @@ FalsePositives: None.
     Write-Warning ("[info] Shadow storage size could not be determined`n" + ($rangeUnknown -join '; '))
   }
 }
+
 
 function HealthTest-DnsClientService{
 <#

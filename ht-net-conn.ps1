@@ -2,6 +2,17 @@
 Network & Connectivity
 #>
 
+function Get-PropValue {
+# returns a default value if object does not have a property with that name.
+# The default value for the default value returned is $null but you can Set
+# $default to anything else.
+    param($obj, [string]$name, $default=$null)
+    if ($obj -and $obj.PSObject -and $obj.PSObject.Properties[$name]) {
+        return $obj.PSObject.Properties[$name].Value
+    }
+    return $default
+}
+
 function HealthTest-NetworkConnectionProfiles {
 <#
 .SYNOPSIS
@@ -209,7 +220,7 @@ function Test-MultipleGatewayConfiguration {
   $routes = Get-NetRoute -DestinationPrefix "0.0.0.0/0" -AddressFamily IPv4 -ErrorAction SilentlyContinue |
             Where-Object { $_.NextHop -and ($_.State -eq 'Active' -or -not $_.State) }
 
-  if (-not $routes -or $routes.Count -lt 2) {
+  if (-not $routes -or @($routes).Count -lt 2) {
     Write-Verbose "[Test-MultipleGatewayConfiguration] Fewer than 2 default routes; nothing to validate."
     return
   }
@@ -325,7 +336,7 @@ FalsePositives: None.
     $pass = $true
     $minPackets = 100000
 
-    foreach ($n in $nics) {
+   foreach ($n in $nics) {
         $stat = Get-NetAdapterStatistics -Name $n.Name -ErrorAction SilentlyContinue
         if (-not $stat) {
             Write-Output "Network interface skipped due to missing stats ($($n.Name))"
@@ -333,18 +344,18 @@ FalsePositives: None.
         }
 
         $errors =
-            $stat.ReceivedDiscardedPackets +
-            $stat.ReceivedPacketErrors +
-            $stat.OutboundDiscardedPackets +
-            $stat.OutboundPacketErrors
+            (Get-PropValue $stat 'ReceivedDiscardedPackets' 0) +
+            (Get-PropValue $stat 'ReceivedPacketErrors' 0) +
+            (Get-PropValue $stat 'OutboundDiscardedPackets' 0) +
+            (Get-PropValue $stat 'OutboundPacketErrors' 0)
 
         $totalPackets =
-            $stat.ReceivedUnicastPackets +
-            $stat.ReceivedBroadcastPackets +
-            $stat.ReceivedMulticastPackets +
-            $stat.OutboundUnicastPackets +
-            $stat.OutboundBroadcastPackets +
-            $stat.OutboundMulticastPackets
+            (Get-PropValue $stat 'ReceivedUnicastPackets' 0) +
+            (Get-PropValue $stat 'ReceivedBroadcastPackets' 0) +
+            (Get-PropValue $stat 'ReceivedMulticastPackets' 0) +
+            (Get-PropValue $stat 'OutboundUnicastPackets' 0) +
+            (Get-PropValue $stat 'OutboundBroadcastPackets' 0) +
+            (Get-PropValue $stat 'OutboundMulticastPackets' 0)
 
         if ($n.MediaConnectionState -ne 'Connected') {
             $warnList += "$($n.Name): mediaState=$($n.MediaConnectionState)"
