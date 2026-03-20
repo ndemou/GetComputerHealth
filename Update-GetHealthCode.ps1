@@ -17,7 +17,8 @@ param(
   [switch]$Reinstall,
   [string]$UpdateFromZip,
   [switch]$ForceRefreshReleaseMetadata,
-  [Parameter(DontShow=$true)][int]$SelfRerunCount = 0
+  [Parameter(DontShow=$true)][int]$SelfRerunCount = 0,
+  [Parameter(DontShow=$true)][string]$PersistReleaseMarker
 )
 
 ####################################################################
@@ -559,18 +560,24 @@ Keeps only the latest N cached release zips.
 
   try {
     Write-Verbose "Pruning cached release zips in '$CacheDir' using pattern '$Pattern'; keeping newest $KeepCount"
-    $cachedZips = @(Get-ChildItem -LiteralPath $CacheDir -File -Filter $Pattern -ErrorAction Stop |
+    $cachedZips = Get-ChildItem -LiteralPath $CacheDir -File -Filter $Pattern -ErrorAction Stop |
       Sort-Object -Property LastWriteTime -Descending
-    )
 
-    Write-Verbose ("Found {0} cached release zip(s)" -f @($cachedZips).Count)
+    if ($null -eq $cachedZips) {
+      $cachedZips = @()
+    }
 
-    if (@($cachedZips).Count -gt $KeepCount) {
-      $toDelete = $cachedZips | Select-Object -Skip $KeepCount
+    $cachedZipCount = @($cachedZips).Length
+    Write-Verbose ("Found {0} cached release zip(s)" -f $cachedZipCount)
+
+    if ($cachedZipCount -gt $KeepCount) {
+      $toDelete = @($cachedZips | Select-Object -Skip $KeepCount)
       foreach ($item in $toDelete) {
         Write-Verbose "Deleting old cached release zip '$($item.FullName)'"
       }
-      $toDelete | Remove-Item -Force -ErrorAction Stop
+      if (@($toDelete).Length -gt 0) {
+        $toDelete | Remove-Item -Force -ErrorAction Stop
+      }
     } else {
       Write-Verbose "No cached release zips need pruning"
     }
@@ -690,8 +697,8 @@ $passNumber = $SelfRerunCount + 1
 $passLabel = "[pass $passNumber/2]"
 
 Write-Verbose "$passLabel Starting Update-GetHealthCode"
-Write-Verbose "$passLabel Parameters: Reinstall=$Reinstall UpdateFromZip='$UpdateFromZip' ForceRefreshReleaseMetadata=$ForceRefreshReleaseMetadata SelfRerunCount=$SelfRerunCount"
-Write-UpdateEvent "$passLabel Parameters: Reinstall=$Reinstall UpdateFromZip='$UpdateFromZip' ForceRefreshReleaseMetadata=$ForceRefreshReleaseMetadata SelfRerunCount=$SelfRerunCount"
+Write-Verbose "$passLabel Parameters: Reinstall=$Reinstall UpdateFromZip='$UpdateFromZip' ForceRefreshReleaseMetadata=$ForceRefreshReleaseMetadata SelfRerunCount=$SelfRerunCount PersistReleaseMarker='$PersistReleaseMarker'"
+Write-UpdateEvent "$passLabel Parameters: Reinstall=$Reinstall UpdateFromZip='$UpdateFromZip' ForceRefreshReleaseMetadata=$ForceRefreshReleaseMetadata SelfRerunCount=$SelfRerunCount PersistReleaseMarker='$PersistReleaseMarker'"
 Write-Verbose "Configuration:"
 Write-Verbose "  DEST_DIR                    : $DEST_DIR"
 Write-Verbose "  BAK_DIR                     : $BAK_DIR"
@@ -837,6 +844,9 @@ if ($updated) {
   if ($preparedZipPath) {
     $rerunParameters['UpdateFromZip'] = $preparedZipPath
   }
+  if ($latestReleaseMarker) {
+    $rerunParameters['PersistReleaseMarker'] = $latestReleaseMarker
+  }
 
   Write-Verbose "$passLabel Rerunning updated copy '$rerunPath' with one-time self-rerun guard"
   & $rerunPath @rerunParameters
@@ -871,7 +881,9 @@ if ($appliedUpdate) {
   Write-UpdateEvent "Applied GetComputerHealth update from zip '$zipName'"
 }
 
-if ($latestReleaseMarker) {
+if ($PersistReleaseMarker) {
+  Set-GetComputerHealthInstalledReleaseMarker -CachePath $LATEST_RELEASE_METADATA_CACHE_PATH -Marker $PersistReleaseMarker
+} elseif ($latestReleaseMarker) {
   Set-GetComputerHealthInstalledReleaseMarker -CachePath $LATEST_RELEASE_METADATA_CACHE_PATH -Marker $latestReleaseMarker
 } elseif ($manualUpdateMarkerPath) {
   Set-GetComputerHealthInstalledReleaseMarker -CachePath $LATEST_RELEASE_METADATA_CACHE_PATH -Marker $manualUpdateMarkerPath -FetchedAt $manualUpdateFetchedAt
