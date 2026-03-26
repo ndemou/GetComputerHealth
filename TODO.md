@@ -2,15 +2,14 @@
 
 ## Policy Tests - How to introduce new tests, with new findings, without also causing new alerts
 
-Policy tests Write-Warning messages of levels [warning] or [notice] for every finding and the user is responsible to suppress findings that *are* accepted, thus establishing a baseline. An example of such a policy test which is on our todo list is `HealthTest-InstalledSW` 
+Policy tests are tests with function names starting with `HealthTest-Policy`. They use Write-Warning to emit messages of levels `[warning]` or `[notice]` for every policy deviation finding. Serious failures that are not a matter of policy can still use the `[failure]` level. The first time a policy test is run (and provided that `-DontAutosetPolicy` was not used) code emits and *then* automatically supresses every finding of `[warning]` or `[notice]` level (but not `[failure]`). 
+On first run code appends a line to `Get-ComputerHealth.sigs-to-suppress.txt` to note that the first-time supression was performed. The line has this format: `POLICY_TEST_WAS_RUN: HealthTest-PolicyOpenPorts` (which allows code to distinguish the first run from every other). After the first run no automatic suppression is performed again.
 
-The first time a specific policy test is run, and provided that `-DontAutosetPolicy` was not passed, code automatically supresses all findings of [warning] or [notice] levels and appends a line to `Get-ComputerHealth.sigs-to-suppress.txt` to note that the first-time supression was performed while also emmiting a Notice:  `Automatically suppressed finding from new test 'HealthTest-OpenPorts': Found unexpected open port TCP:3389`. The line appended has this format: `AUTOMATIC_SUPPRESSIONS_PERFORMED, HealthTest-CheckSomething`. Findings of [failure] level are **not** automatically suppressed. No more automatic suppression is performed on subsequent runs.
+This automatic suppression on first run only, allows developers of get-computerhealth to add policy tests without anoying users with new findings. The existing policy status of the system is automatically considered the accepted baseline. 
 
-This automatic suppression on first run only, allows developers of get-computerhealth to add policy tests without anoying users with new findings. 
+An example of such a policy test which is on our todo list is `HealthTest-PolicyInstalledSW`.
 
----
-
-Maybe I should have an option to exclude policy tests (`-SkipPolicyTests`)
+## Maybe I could have an option to exclude policy tests (`-SkipPolicyTests`)
 
 ## Review the hundrends of warnings from Invoke-ScriptAnalyzer (and 3 errors)
 
