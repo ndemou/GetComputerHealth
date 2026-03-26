@@ -1,22 +1,16 @@
 # TODO
 
-## Policy Tests - How to introduce new tests (with new findings) without new alerts also
+## Policy Tests - How to introduce new tests, with new findings, without also causing new alerts
 
-Policy tests emit warnings (or notices) for every finding and the user is responsible to suppress findings that *are* accepted, thus establishing a baseline.
-Examples of policy tests:
-      - HealthTest-UnexpectedListeningPorts
-      - HealthTest-NonMicrosoftServices
-      - HealthTest-InstalledRolesFeatures
-      - HealthTest-InstalledSW (TODO)
-      - HealthTest-EnabledScheduledTasks 
+Policy tests Write-Warning messages of levels [warning] or [notice] for every finding and the user is responsible to suppress findings that *are* accepted, thus establishing a baseline. An example of such a policy test which is on our todo list is `HealthTest-InstalledSW` 
 
-The first time a specific policy test is run it automatically supresses all findings (except if -DontAutosetPolicy is passed) and appends a line to Get-ComputerHealth.sigs-to-suppress.txt to note that the first-time supression was performed. E.g.:
-   `AUTOMATIC_SUPPRESSIONS_PERFORMED, HealthTest-CheckSomething`
+The first time a specific policy test is run, and provided that `-DontAutosetPolicy` was not passed, code automatically supresses all findings of [warning] or [notice] levels and appends a line to `Get-ComputerHealth.sigs-to-suppress.txt` to note that the first-time supression was performed while also emmiting a Notice:  `Automatically suppressed finding from new test 'HealthTest-OpenPorts': Found unexpected open port TCP:3389`. The line appended has this format: `AUTOMATIC_SUPPRESSIONS_PERFORMED, HealthTest-CheckSomething`. Findings of [failure] level are **not** automatically suppressed. No more automatic suppression is performed on subsequent runs.
 
-This automatic suppression allows developers of get computer health to add policy tests without anoying users with new warnings. Code is also emmiting a Notice:
-  `Automatically suppressed finding from new test 'HealthTest-OpenPorts': Found unexpected open port TCP:3389`
+This automatic suppression on first run only, allows developers of get-computerhealth to add policy tests without anoying users with new findings. 
 
-Maybe I should have an option to exclude policy tests (-SkipPolicyTests)
+---
+
+Maybe I should have an option to exclude policy tests (`-SkipPolicyTests`)
 
 ## Review the hundrends of warnings from Invoke-ScriptAnalyzer (and 3 errors)
 
