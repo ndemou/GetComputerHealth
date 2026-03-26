@@ -19,7 +19,7 @@ Forces fresh source resolution for internet-backed selectors.
 Reinstalls even if the resolved package hash matches installed state.
 
 .PARAMETER DevMode
-After extracting the zip to the stage folder, replaces staged `install.ps1`
+After extracting the zip to the stage folder, replaces staged `install-gch.ps1`
 with the currently running script before handoff. This allows in-progress installer
 changes to run through the full staged flow during development.
 
@@ -468,7 +468,7 @@ function Enter-InstallMutex {
     }
 
     if (-not $acquired) {
-      throw 'Another install.ps1 instance is already running for this bin folder.'
+      throw 'Another install-gch.ps1 instance is already running for this bin folder.'
     }
 
     $mutex
@@ -640,7 +640,7 @@ function Get-GitHubLatestZipAssetInfo {
 
   $uri = 'https://api.github.com/repos/{0}/releases/latest' -f $Repo
   $headers = @{
-    'User-Agent' = 'install.ps1'
+    'User-Agent' = 'install-gch.ps1'
     'Accept'     = 'application/vnd.github+json'
   }
 
@@ -1249,7 +1249,7 @@ function Resolve-SourcePlan {
 
     $downloadPath = Get-NewDownloadPath -TempDir $TempDir
     Write-Log -Message ('Downloading GitHub asset {0}.' -f $info.DownloadUri)
-    Download-File -Uri $info.DownloadUri -DestinationPath $downloadPath -Headers @{ 'User-Agent' = 'install.ps1' }
+    Download-File -Uri $info.DownloadUri -DestinationPath $downloadPath -Headers @{ 'User-Agent' = 'install-gch.ps1' }
 
     return ([ordered]@{
         ZipPath = $downloadPath
@@ -1517,9 +1517,9 @@ function Test-StagedPackage {
     throw 'Package must contain at least one .ps1 file.'
   }
 
-  $stagedInstaller = Join-Path $packageRoot 'install.ps1'
+  $stagedInstaller = Join-Path $packageRoot 'install-gch.ps1'
   if (-not (Test-Path -LiteralPath $stagedInstaller -PathType Leaf)) {
-    throw 'Package must contain install.ps1 at package root.'
+    throw 'Package must contain install-gch.ps1 at package root.'
   }
 
   $syntax = Test-PowerShellSyntaxFiles -PackageRoot $packageRoot
@@ -1772,7 +1772,7 @@ function Invoke-StagedDeployment {
 
   foreach ($file in $allFiles) {
     $relative = $file.FullName.Substring($validated.PackageRoot.Length).TrimStart('\')
-    if ($relative -ieq 'install.ps1') { continue }
+    if ($relative -ieq 'install-gch.ps1') { continue }
     if ($relative -ieq 'VERSION') { continue }
 
     $destPath = Join-Path $BinPath $relative
@@ -1800,11 +1800,11 @@ function Invoke-StagedDeployment {
 
   # Final committed file step: installer copy must remain last among payload writes.
   # Do not move earlier; this protects recovery behavior after mid-flight failures.
-  $installerSource = Join-Path $validated.PackageRoot 'install.ps1'
-  $installerDest = Join-Path $BinPath 'install.ps1'
+  $installerSource = Join-Path $validated.PackageRoot 'install-gch.ps1'
+  $installerDest = Join-Path $BinPath 'install-gch.ps1'
   if (Test-FilesDifferent -SourcePath $installerSource -DestinationPath $installerDest) {
     Copy-FileAtomic -SourcePath $installerSource -DestinationPath $installerDest
-    Write-Log -Message 'Copied installer as final committed step: install.ps1'
+    Write-Log -Message 'Copied installer as final committed step: install-gch.ps1'
     $filesCopied++
   }
   else {
@@ -1880,7 +1880,7 @@ try {
   Initialize-Paths -BinPath $targetBin
   Remove-StaleInstallerArtifacts -TempDir $script:TempDir -BinPath $targetBin
 
-  Write-Log -Message ('Starting install.ps1. InternalStageRun={0}; Bin={1}' -f $InternalStageRun, $targetBin)
+  Write-Log -Message ('Starting install-gch.ps1. InternalStageRun={0}; Bin={1}' -f $InternalStageRun, $targetBin)
 
   if (-not $SkipMutexAcquire) {
     if ($InternalStageRun) {

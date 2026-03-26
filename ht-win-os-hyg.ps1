@@ -402,9 +402,9 @@ FalsePositives: None.
     try{ $dev = Get-PnpDevice -InstanceId $deviceId -ErrorAction Stop }catch{}
     if($dev){
       $p = Get-PnpDeviceProperty -InstanceId $deviceId -ErrorAction SilentlyContinue
-      $inf = ($p|? KeyName -eq 'DEVPKEY_Device_DriverInfPath').Data
-      $prob= ($p|? KeyName -eq 'DEVPKEY_Device_ProblemCode').Data
-      $inst= ($p|? KeyName -eq 'DEVPKEY_Device_InstallState').Data
+      $inf = $null; try {$inf = ($p|? KeyName -eq 'DEVPKEY_Device_DriverInfPath').Data} catch {}
+      $prob= $null; try {$prob= ($p|? KeyName -eq 'DEVPKEY_Device_ProblemCode').Data} catch {}
+      $inst= $null; try {$inst= ($p|? KeyName -eq 'DEVPKEY_Device_InstallState').Data} catch {}
 
       # Suppress logical child: empty INF + OK state; verify parent's service is signed
       if([string]::IsNullOrWhiteSpace($inf) -and $dev.Status -eq 'OK' -and ($prob -eq 0 -or -not $prob) -and ($inst -eq 0 -or -not $inst)){

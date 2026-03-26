@@ -707,7 +707,6 @@ $Global:GCHDQMTA = [pscustomobject]@{
     DebugSkipSlowTests     = $DebugSkipSlowTests
     IpsOfAllDcs            = @($validIpsOfAllDcs)
 }
-Log-Debug "`$global:GCHDQMTA" -Comment "$(($global:GCHDQMTA|fl|Out-String).trim())"
 
 #|
 #| Collect system information
@@ -738,7 +737,6 @@ if ($isHostServer)           {. (Join-Path -Path $PSScriptRoot -ChildPath "ht-se
 #+-----------------------------------------------------------
 
 $allHealthTests = Get-Command -CommandType Function -Name 'HealthTest-*' -ErrorAction SilentlyContinue
-Log-Debug '$allHealthTests' -comment "$(($allHealthTests).name -join ', ')"
 
 if ($ListAllBuiltInTests) {Get-HealthTest $allHealthTests; return}
 
@@ -805,6 +803,8 @@ Initialize-LogSystem `
 #|
 #|
 #+-----------------------------------------------------------
+Log-Debug "`$global:GCHDQMTA" -Comment "$(($global:GCHDQMTA|fl|Out-String).trim())"
+Log-Debug '$allHealthTests' -comment "$(($allHealthTests).name -join ', ')"
 
 Log-info "$((Split-Path $PSCommandPath -Leaf) -replace '.ps1'), ver.$VERSION, Nick Demou, enLogic"
 Log-info "$(Get-Date -format yyyy-MM-dd` HH:mm:ss), Computer: $($env:COMPUTERNAME), S/N: $((Get-CimInstance win32_bios).serialnumber)"

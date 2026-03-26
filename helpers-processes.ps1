@@ -304,15 +304,15 @@ boundaries).
     'Hourly' {
       $start   = (Get-Date).AddMinutes(1)
       $Trigger = New-ScheduledTaskTrigger -Once -At $start -RepetitionInterval (New-TimeSpan -Hours 1)
-      $Trigger.Repetition.Duration = [TimeSpan]::Zero
     }
     'EveryMinute' {
       $start   = (Get-Date).AddMinutes(1)
       $Trigger = New-ScheduledTaskTrigger -Once -At $start -RepetitionInterval (New-TimeSpan -Minutes 1)
-      $Trigger.Repetition.Duration = [TimeSpan]::Zero
     }
     'Manual' { $Trigger = $null }
   }
+  # Note that in all repeating cases above we don't define $Trigger.Repetition.Duration 
+  # so that the task repeats forever
 
   $Principal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
 
