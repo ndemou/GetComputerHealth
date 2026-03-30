@@ -85,6 +85,52 @@ function Send-MailMessageWithRetry {
     return (($parts | Select-Object -Unique) -join ' | ')
   }
 
+  function Test-IsRetryableNetworkFailure {
+    param(
+      [Parameter(Mandatory)]
+      [System.Exception]$Exception
+    )
+
+    for ($cur = $Exception; $null -ne $cur; $cur = $cur.InnerException) {
+      if ($cur -is [System.Net.Sockets.SocketException]) { return $true }
+      if ($cur -is [System.TimeoutException]) { return $true }
+      if ($cur -is [System.IO.IOException] -and $cur.Message -match 'forcibly closed|transport connection|connection.*closed') { return $true }
+
+      if ($cur -is [System.Net.WebException]) {
+        switch ($cur.Status) {
+          ([System.Net.WebExceptionStatus]::NameResolutionFailure) { return $true }
+          ([System.Net.WebExceptionStatus]::ConnectFailure) { return $true }
+          ([System.Net.WebExceptionStatus]::ConnectionClosed) { return $true }
+          ([System.Net.WebExceptionStatus]::Timeout) { return $true }
+          ([System.Net.WebExceptionStatus]::ProxyNameResolutionFailure) { return $true }
+          ([System.Net.WebExceptionStatus]::UnknownError) { return $true }
+          ([System.Net.WebExceptionStatus]::SendFailure) { return $true }
+          ([System.Net.WebExceptionStatus]::ReceiveFailure) { return $true }
+          ([System.Net.WebExceptionStatus]::KeepAliveFailure) { return $true }
+          ([System.Net.WebExceptionStatus]::PipelineFailure) { return $true }
+        }
+      }
+
+      if ($cur -is [System.Net.Mail.SmtpException]) {
+        switch ($cur.StatusCode) {
+          ([System.Net.Mail.SmtpStatusCode]::GeneralFailure) { return $true }
+          ([System.Net.Mail.SmtpStatusCode]::MailboxBusy) { return $true }
+          ([System.Net.Mail.SmtpStatusCode]::ServiceNotAvailable) { return $true }
+          ([System.Net.Mail.SmtpStatusCode]::TransactionFailed) { return $true }
+          ([System.Net.Mail.SmtpStatusCode]::ClientNotPermitted) { return $true }
+          ([System.Net.Mail.SmtpStatusCode]::InsufficientStorage) { return $true }
+          ([System.Net.Mail.SmtpStatusCode]::LocalErrorInProcessing) { return $true }
+        }
+      }
+
+      if ($cur.Message -match 'timeout|timed out|closing transmission channel|remote name could not be resolved|name could not be resolved|no such host is known|name resolution|connection|reset|refused|unreachable|network path|host is down|temporar') {
+        return $true
+      }
+    }
+
+    return $false
+  }
+
   $attempt = 0
   $lastErr = $null
 
@@ -108,12 +154,7 @@ function Send-MailMessageWithRetry {
 
       if ($msg -match '^\s*4\.\d\.\d') { $isTransient = $true }               # 4.x.x SMTP temp
       elseif ($msg -match '4\d{2}\s') { $isTransient = $true }                # "4xx " (some servers)
-      elseif ($msg -match 'timeout|timed out|closing transmission channel') { $isTransient = $true }
-      elseif ($msg -match 'remote name could not be resolved|name could not be resolved|no such host is known|name resolution') { $isTransient = $true }
-      elseif ($inner -match 'timeout|timed out|temporar|connection|reset|refused|unreachable') { $isTransient = $true }
-      elseif ($ex -is [System.Net.Mail.SmtpException] -and $ex.StatusCode -ne [System.Net.Mail.SmtpStatusCode]::GeneralFailure) {
-        if ($ex.StatusCode.ToString() -match 'MailboxBusy|ServiceNotAvailable|TransactionFailed|ClientNotPermitted') { $isTransient = $true }
-      }
+      elseif (Test-IsRetryableNetworkFailure -Exception $ex) { $isTransient = $true }
 
       $retryText = if ($isTransient -and $attempt -lt $MaxAttempts) { 'retrying' } else { 'giving up' }
       Write-Warning ("Send-MailMessage FAILED (attempt $attempt/$MaxAttempts, {0} ms, $retryText): {1}" -f ([int]$sw.Elapsed.TotalMilliseconds), $msg)
