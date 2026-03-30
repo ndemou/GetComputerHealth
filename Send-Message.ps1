@@ -1,28 +1,36 @@
 <#
 .SYNOPSIS
-  Sends an email alert using SMTP settings stored in a JSON config file.
+Sends an email alert using SMTP settings stored in a JSON config file.
 
 .DESCRIPTION
-  Required parameters:
-    -Subject
-    -ConfigFile
 
-  Optional parameters:
-    -Body
-    -Attachments
-    -BodyAsHtml
-    -GenerateConfig <Path> : Interactively creates a new JSON config file at the specified path.
+# Normal Operation
 
-  Config file (JSON) required keys:
-    Server, From, To
+Required parameters:
+  - Subject
+  - ConfigFile
 
-  Optional config keys:
-    Port   (default: 25)
-    UseSsl (default: false)
+Optional parameters:
+  - Body
+  - Attachments
+  - BodyAsHtml
 
-  Behavior:
+Behavior:
   - Supports -WhatIf / -Confirm (ShouldProcess).
   - Validates config and attachment paths before sending.
+
+# First time run/configuration
+
+To configure it run it like this: 
+```
+& C:\it\bin\Send-Message.ps1 -GenerateConfig c:\it\config\Send-Message.conf 
+```
+It will interactively create a new JSON config file at the specified path.
+
+Config file keys:
+    Server, From, To (required)
+    Port   (default: 25)
+    UseSsl (default: false)
 
 .NOTES
   - Send-MailMessage is obsolete (shows a warning), but still works in many environments.
