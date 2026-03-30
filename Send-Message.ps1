@@ -62,6 +62,29 @@ function Send-MailMessageWithRetry {
     [int]$BaseDelaySeconds = 2
   )
 
+  function Get-CleanExceptionMessage {
+    param(
+      [Parameter(Mandatory)]
+      [System.Exception]$Exception
+    )
+
+    $base = $Exception.GetBaseException()
+    $parts = @()
+
+    if ($base -and -not [string]::IsNullOrWhiteSpace($base.Message)) {
+      $parts += $base.Message.Trim()
+    }
+
+    if ($Exception -ne $base -and -not [string]::IsNullOrWhiteSpace($Exception.Message)) {
+      $outer = $Exception.Message.Trim()
+      if ($outer -notlike "*$($parts[0])*") {
+        $parts += $outer
+      }
+    }
+
+    return (($parts | Select-Object -Unique) -join ' | ')
+  }
+
   $attempt = 0
   $lastErr = $null
 
@@ -78,7 +101,7 @@ function Send-MailMessageWithRetry {
       $ex = $_.Exception
       $lastErr = $_
 
-      $msg = $ex.Message
+      $msg = Get-CleanExceptionMessage -Exception $ex
       $inner = if ($ex.InnerException) { $ex.InnerException.Message } else { $null }
 
       $isTransient = $false
@@ -86,15 +109,21 @@ function Send-MailMessageWithRetry {
       if ($msg -match '^\s*4\.\d\.\d') { $isTransient = $true }               # 4.x.x SMTP temp
       elseif ($msg -match '4\d{2}\s') { $isTransient = $true }                # "4xx " (some servers)
       elseif ($msg -match 'timeout|timed out|closing transmission channel') { $isTransient = $true }
+      elseif ($msg -match 'remote name could not be resolved|name could not be resolved|no such host is known|name resolution') { $isTransient = $true }
       elseif ($inner -match 'timeout|timed out|temporar|connection|reset|refused|unreachable') { $isTransient = $true }
       elseif ($ex -is [System.Net.Mail.SmtpException] -and $ex.StatusCode -ne [System.Net.Mail.SmtpStatusCode]::GeneralFailure) {
         if ($ex.StatusCode.ToString() -match 'MailboxBusy|ServiceNotAvailable|TransactionFailed|ClientNotPermitted') { $isTransient = $true }
       }
 
-      Write-Warning ("Send-MailMessage FAILED (attempt $attempt/$MaxAttempts, {0} ms): {1}" -f ([int]$sw.Elapsed.TotalMilliseconds), $msg)
+      $retryText = if ($isTransient -and $attempt -lt $MaxAttempts) { 'retrying' } else { 'giving up' }
+      Write-Warning ("Send-MailMessage FAILED (attempt $attempt/$MaxAttempts, {0} ms, $retryText): {1}" -f ([int]$sw.Elapsed.TotalMilliseconds), $msg)
       if ($inner) { Write-Verbose ("InnerException: " + $inner) }
 
-      if (-not $isTransient -or $attempt -ge $MaxAttempts) { throw }
+      if (-not $isTransient -or $attempt -ge $MaxAttempts) {
+        $base = $ex.GetBaseException()
+        $finalMessage = "Send-MailMessage failed after $attempt attempt(s): $msg"
+        throw [System.Exception]::new($finalMessage, $base)
+      }
 
       $delay = [Math]::Min(60, [Math]::Pow(2, ($attempt-1)) * $BaseDelaySeconds)
       $jitter = Get-Random -Minimum 0 -Maximum 1000
@@ -294,10 +323,6 @@ $target = "$($cfg.Server):$($cfg.Port) -> $($cfg.To -join ', ')"
 $action = "Send email '$subjectWithTrace'"
 
 if ($PSCmdlet.ShouldProcess($target, $action)) {
-  try {
-    Send-MailMessageWithRetry -MailParams $mailParams -MaxAttempts 5 -BaseDelaySeconds 2
-    Write-Verbose "Mail send completed."
-  } catch {
-    throw
-  }
+  Send-MailMessageWithRetry -MailParams $mailParams -MaxAttempts 5 -BaseDelaySeconds 2
+  Write-Verbose "Mail send completed."
 }
