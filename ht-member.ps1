@@ -164,7 +164,7 @@ FalsePositives: None.
   }
 }
 
-function HealthTest-GpupdatePolicyApply {
+function HealthTest-GpupdatePolicyApply__S {
 <#
 .SYNOPSIS
 Checks Gpupdate Policy Apply
@@ -178,7 +178,7 @@ Uses: Test-ComputerSecureChannel.
 FalsePositives: None.
 #>
   [CmdletBinding()] param()
-if ($Global:GCHDQMTA.DebugSkipSlowTests) {Write-Warning "[info] Skipping slow test $($MyInvocation.MyCommand.Name) because of -DebugSkipSlowTests switch"; return}
+
   $dcIps = @($Global:GCHDQMTA.IpsOfAllDcs)
 
   if (!(Test-ComputerSecureChannel)) {

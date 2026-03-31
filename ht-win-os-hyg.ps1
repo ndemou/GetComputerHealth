@@ -275,7 +275,7 @@ FalsePositives: None.
     }
 }
 
-function HealthTest-FirewallEnabled {
+function HealthTest-FirewallEnabled__S {
 <#
 .SYNOPSIS
 Checks Firewall Enabled
@@ -288,7 +288,7 @@ Impact: Medium(Time), High(Time)
 Uses: Write-BasedOnTestResult, Get-NetFirewallProfile.
 FalsePositives: None.
 #>
-    if ($Global:GCHDQMTA.DebugSkipSlowTests) {Write-Warning "[info] Skipping slow test $($MyInvocation.MyCommand.Name) because of -DebugSkipSlowTests switch"; return}
+
     Write-BasedOnTestResult "Is mpssvc (the firewall service) enabled?" -Test ((Get-Service -name mpssvc).status -eq 'Running')
     Get-NetFirewallProfile | ForEach-Object {
         Write-BasedOnTestResult "Is firewall enabled for the $($_.Name) profile?" -Test ($_.Enabled -eq 1) -comment "To enable firewall for *ALL* profiles run this:`nSet-NetFirewallProfile -Profile Domain,Private,Public -Enabled True"
@@ -334,7 +334,7 @@ FalsePositives: None.
 }
 
 
-function HealthTest-VssWriters{
+function HealthTest-VssWriters__S{
 <#
 .SYNOPSIS
 Checks Vss Writers
@@ -347,7 +347,7 @@ Impact: Medium(Time), High(Time)
 Uses: Select-String.
 FalsePositives: None.
 #>
-    if ($Global:GCHDQMTA.DebugSkipSlowTests) {Write-Warning "[info] Skipping slow test $($MyInvocation.MyCommand.Name) because of -DebugSkipSlowTests switch"; return}
+
   $out=& vssadmin list writers 2>&1
   $bad=($out | Select-String -Pattern 'State: \d+ \((?i:Retryable error|Waiting for completion|Failed)\)')
   if($bad){
@@ -496,7 +496,7 @@ FalsePositives: None.
     }
 }
 
-function HealthTest-SeriousRecentEventLogs {
+function HealthTest-SeriousRecentEventLogs__S {
 <#
 .SYNOPSIS
 Checks Serious Recent Event Logs
@@ -511,7 +511,7 @@ FalsePositives: None.
 #>
     [CmdletBinding()]
     param([int]$Hours = 24)
-if ($Global:GCHDQMTA.DebugSkipSlowTests) {Write-Warning "[info] Skipping slow test $($MyInvocation.MyCommand.Name) because of -DebugSkipSlowTests switch"; return}
+
 
     if ($Hours -lt 1) { $Hours = 1 }
     $cutoff = (Get-Date).AddHours(-$Hours)
@@ -764,7 +764,7 @@ FalsePositives: None.
             try {$account_name = $_.name} catch {$account_name="(FAILED_TO_GET_NAME)"}
             $ok = $false
             $comment =  "Make sure the account password is set and then run this command:`n& cmd /c 'net user `"$($_.name)`" /passwordreq:yes'"
-            Write-Warning "[failure] This local account has the property PasswordRequired set to false: $account_name`n$comment" 
+            Write-Warning "[failure] This local account has the property PasswordRequired set to false: $account_name`n$comment"
         }
     }
     if ($ok) {Write-Warning "[pass] All local accounts have PasswordRequired True"}
@@ -1150,7 +1150,7 @@ FalsePositives: None.
         Write-Warning "[pass] No unexpected accounts in Local Administrators"}
 }
 
-function HealthTest-UnexpectedListeningPorts {
+function HealthTest-UnexpectedListeningPorts__S {
 <#
 .SYNOPSIS
 Checks Unexpected Listening Ports
@@ -1169,7 +1169,7 @@ FalsePositives: None.
         [int]$DynamicStart = 49152,
         [int]$DynamicEnd = 65535
     )
-if ($Global:GCHDQMTA.DebugSkipSlowTests) {Write-Warning "[info] Skipping slow test $($MyInvocation.MyCommand.Name) because of -DebugSkipSlowTests switch"; return}
+
 # From a brand new Lenovo:
 #    FAILURE:[01d04124] Unexpected listening port: 7680 (Process: svchost)
 #    FAILURE:[3d641d0f] Unexpected listening port: 5040 (Process: svchost)

@@ -502,7 +502,7 @@ FalsePositives: None.
 }
 
 
-function HealthTest-ShareReasonableness {
+function HealthTest-ShareReasonableness__S {
 <#
 .SYNOPSIS
 Checks Share Reasonableness
@@ -531,7 +531,7 @@ FalsePositives: None.
     ),
     [switch]$IncludeAdminShares
   )
-if ($Global:GCHDQMTA.DebugSkipSlowTests) {Write-Warning "[info] Skipping slow test $($MyInvocation.MyCommand.Name) because of -DebugSkipSlowTests switch"; return}
+
   # Regarding BUILTIN\Power Users:
   # I have included it in the list allthough it's not a Broad group (in fact it's usually empty).
   # It is a legacy local group from pre-Vista/XP era. On modern Windows, it exists but is empty by default.
@@ -849,7 +849,7 @@ and returns friendly licensing status fields for reporting.
     $objects | Sort-Object ProductName, LicenseStatus
 }
 
-function HealthTest-SoftwareLicensing{
+function HealthTest-SoftwareLicensing__S{
 <#
 .SYNOPSIS
 Checks Software Licensing
@@ -862,7 +862,7 @@ Impact: Medium(Time), High(Time)
 Uses: Unknown.
 FalsePositives: None.
 #>
-    if ($Global:GCHDQMTA.DebugSkipSlowTests) {Write-Warning "[info] Skipping slow test $($MyInvocation.MyCommand.Name) because of -DebugSkipSlowTests switch"; return}
+
     Get-SoftwareLicensing | %{
         # ($_ | Format-List * -Force | Out-String).Trim()|write-host -f green
         Write-BasedOnTestResult "Is $($_.ProductName) Licensed?" -Test $_.IsLicensed -comment "$_"
@@ -1009,7 +1009,7 @@ FalsePositives: None.
 }
 
 
-function HealthTest-Storage {
+function HealthTest-Storage__S {
 <#
 .SYNOPSIS
 Checks Storage
@@ -1024,7 +1024,7 @@ FalsePositives: None.
 #>
     [CmdletBinding()]
     param([int]$MaxTemperatureC = 70,[int]$MaxPercentUsed = 95)
-if ($Global:GCHDQMTA.DebugSkipSlowTests) {Write-Warning "[info] Skipping slow test $($MyInvocation.MyCommand.Name) because of -DebugSkipSlowTests switch"; return}
+
 
     $allHealthy = $true
     $disks = Get-PhysicalDisk -ErrorAction SilentlyContinue

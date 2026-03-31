@@ -229,7 +229,7 @@ function Get-PathExtList {
   $exts | ForEach-Object { $_.Trim() } | Where-Object { $_ } | ForEach-Object { if ($_.StartsWith('.')) { $_ } else { ".$_" } } | Select-Object -Unique
 }
 
-# --- Resolve-ServiceExecutable Helper: 
+# --- Resolve-ServiceExecutable Helper:
 # Split the first token from a command line (handles leading quotes); returns @($token,$rest) ---
 function Split-FirstToken {
   [CmdletBinding()]
@@ -251,7 +251,7 @@ function Split-FirstToken {
   ,@($c.Substring(0,$i), $c.Substring($i).Trim())
 }
 
-# --- Resolve-ServiceExecutable Helper: 
+# --- Resolve-ServiceExecutable Helper:
 # Progressive probing for unquoted path-with-spaces ambiguity (audit + best-effort resolution) ---
 function Probe-UnquotedServicePath {
   [CmdletBinding()]
@@ -278,7 +278,7 @@ function Probe-UnquotedServicePath {
   $null
 }
 
-# ---Resolve-ServiceExecutable  Helper: 
+# ---Resolve-ServiceExecutable  Helper:
 # Parse rundll32's "dll,EntryPoint" token safely (comma outside quotes) ---
 function Split-Rundll32DllToken {
   [CmdletBinding()]
@@ -349,17 +349,17 @@ function Resolve-ServiceExecutable {
     [Parameter(Mandatory)][AllowEmptyString()][string]$LaunchCommand,
     [Parameter(Mandatory)][string]$ServiceName
   )
-  
+
   function Get-BaseServiceName {
     param([Parameter(Mandatory)][string]$ServiceName)
-  
+
     $m=[regex]::Match($ServiceName,'^(?<base>.+?)_(?<hex>[0-9a-fA-F]{5,16})$')
     if(-not $m.Success){ return $ServiceName }
-  
+
     $base=$m.Groups['base'].Value
     $baseKey="Registry::HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\$base"
     if(Test-Path -LiteralPath $baseKey){ return $base }
-  
+
     $ServiceName
   }
 
@@ -467,12 +467,12 @@ function Resolve-ServiceExecutable {
       }
     } elseif ($launcherLeaf -ieq 'svchost.exe') {
       $payloadType='DllViaSvchost'
-    
+
       $svcDll=$null; $svcDllWhere=$null
-    
+
       $hit = Get-ServiceDllFromReg -SvcName $ServiceName
       if($hit){ $svcDll=$hit.Value; $svcDllWhere=$hit.Where }
-    
+
       if(-not $svcDll){
         $base = Get-BaseServiceName $ServiceName
         if($base -and $base -ne $ServiceName){
@@ -480,7 +480,7 @@ function Resolve-ServiceExecutable {
           if($hit2){ $svcDll=$hit2.Value; $svcDllWhere="$($hit2.Where) (base of $ServiceName)" }
         }
       }
-    
+
       if ($svcDll) {
         $svcDllNorm = Normalize-CommandText $svcDll -NoDequote
         $dllPath = Resolve-ExecutablePath -NameOrPath $svcDllNorm -ExtsIfMissing @('.DLL')
@@ -526,15 +526,15 @@ function Resolve-ExecutablePath {
 
   The function follows a strict, deterministic resolution strategy with literal semantics (no wildcard expansion),
   predictable behavior, and explicit PATHEXT probing.
-  If the input looks like a path (rooted, relative with \ or /, or \SystemRoot\... after normalization), 
-  the function does not search $env:PATH, System32, Windows, or the current directory to 
-  "find something else". It only checks whether the explicit path exists as given and, if the input has 
+  If the input looks like a path (rooted, relative with \ or /, or \SystemRoot\... after normalization),
+  the function does not search $env:PATH, System32, Windows, or the current directory to
+  "find something else". It only checks whether the explicit path exists as given and, if the input has
   no extension, it performs extension probing (PATHEXT or -ExtsIfMissing) against that same explicit path.
   If no match is found, it returns $null.
 
   Resolution proceeds through these stages:
 
-  - If the input appears to be a path but contains illegal filesystem characters it returns $null instead 
+  - If the input appears to be a path but contains illegal filesystem characters it returns $null instead
   of throwing.
   - If the input does not include an extension, the function probes all extensions in $env:PATHEXT
      (plus .EXE to guarantee coverage), exactly like CMD and CreateProcess.
@@ -835,7 +835,7 @@ FalsePositives: None.
         Write-Warning "[pass] All services that are set to automatically start are running"}
 }
 
-function HealthTest-NonMicrosoftServices {
+function HealthTest-NonMicrosoftServices__S {
 <#
 .SYNOPSIS
 Checks Non Microsoft Services
@@ -848,7 +848,7 @@ Impact: Medium(Time), High(Time)
 Uses: Get-CimInstance.
 FalsePositives: None.
 #>
-    if ($Global:GCHDQMTA.DebugSkipSlowTests) {Write-Warning "[info] Skipping slow test $($MyInvocation.MyCommand.Name) because of -DebugSkipSlowTests switch"; return}
+
     $ok = $true
     $CORE_MICROSOFT_VENDORS = @('Microsoft Windows','Microsoft Windows Publisher','Microsoft Corporation','Microsoft Windows Hardware Compatibility Publisher')
     $COMMON_VENDORS_FOR_WORKSTATIONS = @('Adobe Inc.', 'Cisco Systems, Inc.', 'Google LLC', 'Lenovo', 'Mozilla Corporation')
