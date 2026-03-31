@@ -991,7 +991,7 @@ FalsePositives: None.
   $rangeUnknown = New-Object System.Collections.Generic.List[string]
   $outOfRange = $false
 
-  if ($null -eq $MinRecommendedGB -or $null -eq $MaxRecommendedGB) {
+  if ($null -ne $MinRecommendedGB -or $null -ne $MaxRecommendedGB) {
     $targets = if ($RequireOnVolumes.Count -gt 0) {
       @($RequireOnVolumes | ForEach-Object { $_.TrimEnd('\') } | Sort-Object -Unique)
     } else {
@@ -1014,12 +1014,12 @@ FalsePositives: None.
 
       $sizeGB = [math]::Round(($maxBytes / 1GB), 2)
 
-      if ($null -eq $MinRecommendedGB -and $sizeGB -lt $MinRecommendedGB.Value) {
+      if ($null -ne $MinRecommendedGB -and $sizeGB -lt $MinRecommendedGB.Value) {
         $outOfRange = $true
         $rangeOutOfBounds.Add("$k=$sizeGB GB below min $($MinRecommendedGB.Value) GB")
       }
 
-      if ($null -eq $MaxRecommendedGB -and $sizeGB -gt $MaxRecommendedGB.Value) {
+      if ($null -ne $MaxRecommendedGB -and $sizeGB -gt $MaxRecommendedGB.Value) {
         $outOfRange = $true
         $rangeOutOfBounds.Add("$k=$sizeGB GB above max $($MaxRecommendedGB.Value) GB")
       }
