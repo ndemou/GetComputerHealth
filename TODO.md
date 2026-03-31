@@ -24,16 +24,18 @@ Expanding release zip 'C:\it\temp\GetComputerHealth-3.0.4.zip'
   - HealthTest-LocalAdminsBaseline
   - HealthTest-InstalledRolesFeatures
 
-Also all these tests should not emit [Failure] for findings of services/shares/admins/roles but only for unambigouous serious failures.
+Also all these tests should not emit [Failure] for finding services,shares,admins or roles respectively but only for other serious failures. E.g. "[failure] Unintended role/feature installed" should become "[warning] Unintended role/feature installed"
 
-Also in these tests: remove any exceptions for findings that are currently ignored as benign.
-E.g. all services are to be reported (including Microsoft ones), and all 
+Also in these tests: remove any exceptions for findings that are currently ignored as benign (e.g. Microsoft services, default shares, etc).
+So after this change all services are to be reported (including Microsoft ones), and all 
 shares(including default ones) and all administrators and all roles.
-So we need to adjust their names accordingly NonMicrosoftServices -> Services & NonDefaultShares -> Shares
+Thus we also need to adjust the function names accordingly: NonMicrosoftServices -> Services; NonDefaultShares -> Shares
 
 ## I don't have tests that verify a TCP port is indeed open, or a SW is indeed installed
 
-Both are sometimes very important indicators of "everything's good"
+At least for ports this is often a very important indicator of "everything's good".
+
+But I only have tests that check for any extra new open port.
 
 ## Review the hundrends of warnings from Invoke-ScriptAnalyzer (and 3 errors)
 
