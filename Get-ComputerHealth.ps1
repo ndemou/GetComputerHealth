@@ -55,6 +55,9 @@ Default: empty (show all). Typical value: `DIP`
 .PARAMETER DebugSkipSlowTests
 (Parameter set: Run) Skips a predefined subset of "slow" built-in tests (those gated by the script's `$DebugSkipSlowTests` check).
 
+.PARAMETER DontAutosetPolicy
+(Parameter set: Run) Disables first-run auto-baselining for policy tests (tests tagged with `P`, e.g. `HealthTest-InstalledSW__P`). By default, first run auto-suppresses emitted `[notice]`/`[warning]` findings for each policy test and records a marker in the suppression file.
+
 .PARAMETER IpsOfAllDcs
 (Parameter set: Run) Optional list of Domain Controller IP addresses passed in by the orchestrator. Stored in `$Global:GCHDQMTA.IpsOfAllDcs` for health tests that need it.
 
@@ -136,6 +139,9 @@ param(
 
   [Parameter(ParameterSetName='Run')]
   [switch]$DebugSkipSlowTests,
+
+  [Parameter(ParameterSetName='Run')]
+  [switch]$DontAutosetPolicy,
 
   [Parameter(ParameterSetName='Run')]
   [string[]]$IpsOfAllDcs = @(),
@@ -531,7 +537,7 @@ function Invoke-HealthTestsFromFolder {
         $existing = Get-Item -Path ("Function:\{0}" -f $fn.Name) -ErrorAction SilentlyContinue
         try {
           Set-Item -Path ("Function:\{0}" -f $fn.Name) -Value $fn.ScriptBlock -Force
-          Invoke-HealthTest $fn.Name
+          Invoke-HealthTestWithPolicyAutoset $fn.Name
         } finally {
           if ($existing) {
             Set-Item -Path ("Function:\{0}" -f $fn.Name) -Value $existing.ScriptBlock -Force
@@ -595,6 +601,89 @@ function Write-DummyHealthTest {
     Write-Warning "[notice] Dummy notice message"
     Write-Warning "[warning] Dummy warning message" + "`n" + "This one has a comment(details) also"
     Write-Warning "[failure] Dummy failure message" + "`n" + "This one has a comment(details) also`nWith 2 lines of text!"
+}
+
+function Get-HealthTestTagsMetadata {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)][string]$FunctionName
+  )
+
+  $normalizedTestName = $FunctionName -replace '^HealthTest-', ''
+  $tags = @()
+
+  if ($FunctionName -match '^HealthTest-(?<testName>.+?)(?:__(?<tags>[A-Za-z0-9]+))?$') {
+    $normalizedTestName = $matches['testName']
+    $rawTags = $matches['tags']
+    if ($rawTags) {
+      $tags = @(
+        $rawTags.ToCharArray() |
+          ForEach-Object { $_.ToString().ToUpperInvariant() } |
+          Where-Object { $_ -match '^[A-Z0-9]$' } |
+          Sort-Object -Unique
+      )
+    }
+  }
+
+  [pscustomobject]@{
+    FunctionName = $FunctionName
+    TestName     = $normalizedTestName
+    Tags         = @($tags)
+    IsPolicyTest = ('P' -in $tags)
+  }
+}
+
+function Test-PolicyAutosetAlreadyPerformed {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)][string]$PolicyTestName,
+    [Parameter(Mandatory)][string]$SuppressionFilePath
+  )
+
+  if (-not (Test-Path -LiteralPath $SuppressionFilePath)) { return $false }
+  $marker = "POLICY_TEST_WAS_RUN: $PolicyTestName"
+  foreach ($line in (Get-Content -LiteralPath $SuppressionFilePath -ErrorAction SilentlyContinue)) {
+    if ($line -and ($line.Trim() -eq $marker)) { return $true }
+  }
+  return $false
+}
+
+function Invoke-HealthTestWithPolicyAutoset {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)][string]$FunctionName
+  )
+
+  $meta = Get-HealthTestTagsMetadata -FunctionName $FunctionName
+  $isPolicyTest = $meta.IsPolicyTest
+  $policyTestName = $meta.TestName
+  $shouldAutoset = $isPolicyTest -and (-not $DontAutosetPolicy) -and `
+    (-not (Test-PolicyAutosetAlreadyPerformed -PolicyTestName $policyTestName -SuppressionFilePath $script:Config.SuppressSignaturesPath))
+
+  $records = @(Invoke-HealthTest $FunctionName)
+
+  if ($shouldAutoset) {
+    $newSuppressionSigs = @(
+      $records |
+        Where-Object { $_.Level -in @('notice','warning') -and (-not $_.Suppressed) -and ($_.Hash -match '^[0-9a-f]{8}$') } |
+        Select-Object -ExpandProperty Hash -Unique
+    )
+
+    foreach ($sig in $newSuppressionSigs) {
+      $line = "$sig # $(Get-Date -format yyyy-MM-dd` HH:mm) # policy auto-baseline from $($meta.TestName)"
+      Add-AsciiLine -Line $line -Path $script:Config.SuppressSignaturesPath
+    }
+    if ($newSuppressionSigs.Count -gt 0) {
+      Add-LogSuppressedSignatures -Signatures $newSuppressionSigs
+      Log-Info "Auto-suppressed $($newSuppressionSigs.Count) policy findings for first run of $($meta.FunctionName)."
+    } else {
+      Log-Info "No policy findings to auto-suppress during first run of $($meta.FunctionName)."
+    }
+
+    Add-AsciiLine -Line "POLICY_TEST_WAS_RUN: $policyTestName" -Path $script:Config.SuppressSignaturesPath
+  }
+
+  $records
 }
 
 #=============================================================================
@@ -842,7 +931,7 @@ if ($OnlyTheseTests) {
         if ($item -match $valid_cmdlet_name_regex) {
             $testName = $item.Trim()
             if ($loadedTestsByName.ContainsKey($testName)) {
-                Invoke-HealthTest $testName
+                Invoke-HealthTestWithPolicyAutoset $testName
             } else {
                 Log-Notice "Skipping unavailable test '$testName' (not loaded/applicable on this host)."
             }
@@ -854,7 +943,7 @@ if ($OnlyTheseTests) {
 } else {
 # All tests
     foreach($fn in $allHealthTests){
-      Invoke-HealthTest $fn.Name
+      Invoke-HealthTestWithPolicyAutoset $fn.Name
     }
 }
 
