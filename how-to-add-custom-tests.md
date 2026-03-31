@@ -94,7 +94,7 @@ Available properties include these self-documenting booleans:
 And `.GetCurrentDomain = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain()`
 
 
-## Optional niceties
+## Optional
 
 ### Tags in test names
 
@@ -104,11 +104,12 @@ Example:
 - `HealthTest-SomeName__SP` (a Slow & Policy test)
 
 Currently supported tags:
-- `S`: Slow test
-- `E`: Quick & Essential test (you can execute these tests only with the `-Quick` switch)
-- `P`: Policy Inventory test (tests that report a finding for every item of a particular aspect of the current system state that depending on policy might be either benign or not -- e.g. all open ports, all installed SW, all enabled services, etc)
+- `S`: Slow test (skiped when using `-SkipSlowTests`)
+- `E`: Quick & Essential test (the only tests to be executed when using `-Quick`)
+- `P`: Policy Inventory test 
 - `D`: Domain-wide test (reserved, not yet in use)
 
+### More about the S(Slow) Tag
 If your function takes a lot of time (e.g. more than 5sec) and you want it to be skipped when the user includes the `-SkipSlowTests` switch on invocation, tag it with `S`.
 
 Example:
@@ -116,7 +117,13 @@ Example:
 function HealthTest-LargeDirectories__S {}
 ```
 
-## Required help-block format for every *internal* `HealthTest-*` function
+### More about the P(Policy Inventory) Tag
+
+These are tests that report a finding for every item of a particular aspect of the current system state which, depending on policy, might be either benign or not. Examples: open ports, installed SW, enabled services.
+
+So these tests help you define a "Baseline Inventory" or "Expected Surface" and then detect drift/deviations.
+
+## Required help-block format for built-in `HealthTest-*` functions
 
 This is not mandatory for custom health tests but every built-in `HealthTest-*` function must include an **in-function** comment-based help block immediately after the opening `{`.
 

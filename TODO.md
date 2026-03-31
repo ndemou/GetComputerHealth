@@ -21,21 +21,16 @@ It seems that the zip is extracted even when it is the same as the one used duri
 This helps when one runs manually and wants to rerun only the tests that failed to check if a finding is transient.
 
 ## Add the "P" Tag to these functions:
-  - HealthTest-NonMicrosoftServices__S  *If I make it a policy test I can emit finding for ALL.
-  - HealthTest-NonDefaultShares *If I make it a policy test I can emit finding for ALL.
-  - HealthTest-LocalAdminsBaseline *If I make it a policy test I can emit finding for ALL.
-  - HealthTest-InstalledRolesFeatures  *If I make it a policy test I can emit finding for ALL.
+  - HealthTest-NonMicrosoftServices__S
+  - HealthTest-NonDefaultShares
+  - HealthTest-LocalAdminsBaseline
+  - HealthTest-InstalledRolesFeatures
 
 Also all these tests should not emit [Failure] for findings of services/shares/admins/roles but only for unambigouous serious failures.
 
 Also remove any exceptions for findings that are currently ignored as benign from these tests.
 E.g. all services are to be reported (including Microsoft ones), and all 
 shares(including default ones) and all administrators and all roles.
-
-Baseline Inventory/Baseline Drift
-Policy Inventory/Policy Exceptions
-Surface Audits/Expected Surface
-
 
 ## I don't have tests that verify a TCP port is indeed open, or a SW is indeed installed
 
