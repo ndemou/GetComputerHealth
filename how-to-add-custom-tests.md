@@ -74,19 +74,6 @@ These instrunction are also valid for contributing health tests in the core libr
 
 If you wish you can have more than one .ps1 files in `C:\IT\config\Custom-HealthTests\`
 
-## Tags in test names
-
-You can attach tags directly in the test function name by adding `__` and one or more letters or digits after the base name.
-
-Example:
-- `HealthTest-SomeName__SP` (a slow + policy test)
-
-Currently supported tags:
-- `S`: Slow test
-- `E`: Quick Essential test
-- `P`: Policy test
-- `D`: Domain-wide test (reserved, not yet in use)
-
 ## Runtime context available to custom health tests
 
 When `Get-ComputerHealth.ps1` runs, it populates a global variable named `$Global:GCHDQMTA` so all health tests can reuse these host facts without re-computing.
@@ -109,23 +96,29 @@ And `.GetCurrentDomain = [System.DirectoryServices.ActiveDirectory.Domain]::GetC
 
 ## Optional niceties
 
-If your function takes a lot of time (e.g. more than 5sec) and you want it to be skipped when the user includes the `-DebugSkipSlowTests` switch on invocation, tag the function name with `S`.
+### Tags in test names
+
+You can attach tags directly in the test function name by adding `__` and one or more letters or digits after the base name.
+
+Example:
+- `HealthTest-SomeName__SP` (a Slow & Policy test)
+
+Currently supported tags:
+- `S`: Slow test
+- `E`: Quick & Essential test (you can execute these tests only with the `-Quick` switch)
+- `P`: Policy Inventory test (tests that report a finding for every item of a particular aspect of the current system state that depending on policy might be either benign or not -- e.g. all open ports, all installed SW, all enabled services, etc)
+- `D`: Domain-wide test (reserved, not yet in use)
+
+If your function takes a lot of time (e.g. more than 5sec) and you want it to be skipped when the user includes the `-SkipSlowTests` switch on invocation, tag it with `S`.
 
 Example:
 ```powershell
-function HealthTest-LargeDirectories__S {
-  # test code
-}
+function HealthTest-LargeDirectories__S {}
 ```
-
-The runner detects the `S` tag and skips the test automatically when `-DebugSkipSlowTests` is used.
 
 ## Required help-block format for every *internal* `HealthTest-*` function
 
-This is not mandatory for custom health tests but every `HealthTest-*` function must include an **in-function** comment-based help block immediately after the opening `{`.
-
-
-### Example
+This is not mandatory for custom health tests but every built-in `HealthTest-*` function must include an **in-function** comment-based help block immediately after the opening `{`.
 
 ```powershell
 function HealthTest-Example {
