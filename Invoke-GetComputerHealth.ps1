@@ -85,11 +85,15 @@ param(
     [Alias('DebugSkipSlowTests')]
     [switch]$SkipSlowTests,
     [switch]$SkipPolicyTests,
+    [Alias('Quick')]
+    [switch]$SkipNonEssentialTests,
     [switch]$NoUpdate,
     [switch]$PushUpdate,
     [switch]$NoSendMessage,
     [string[]]$IpsOfAllDcs = @(),
-    [string[]]$Computers
+    [string[]]$Computers,
+    [Parameter(ValueFromRemainingArguments = $true)]
+    [object[]]$PassThruArgs = @()
 )
 
 #------------------------------------------------------------------------
@@ -343,10 +347,12 @@ foreach ($target in $targets) {
           $WhitelistSigs,
           $SkipSlowTests,
           $SkipPolicyTests,
+          $SkipNonEssentialTests,
           $NoUpdate,
           $IpsOfAllDcs,
           $PushUpdate,
-          $UpdateZipPath
+          $UpdateZipPath,
+          $PassThruArgs
       )
 
       $binDir = Join-Path $RootDir 'bin'
@@ -383,16 +389,20 @@ foreach ($target in $targets) {
       }
 
       try {
-          $healthOutput = & $getHealthScriptPath `
-              -OutputObjects -OutputConsoleMessages `
-              -Hide $Hide `
-              -OnlyTheseTests $OnlyTheseTests `
-              -ExcludeTests $ExcludeTests `
-              -IncludeTestsFromFolder $customTestsDir `
-              -SuppressSigs $WhitelistSigs `
-              -SkipSlowTests:$SkipSlowTests `
-              -SkipPolicyTests:$SkipPolicyTests `
-              -IpsOfAllDcs $IpsOfAllDcs 2>&1
+          $getHealthParams = @{
+              OutputObjects         = $true
+              OutputConsoleMessages = $true
+              Hide                  = $Hide
+              OnlyTheseTests        = $OnlyTheseTests
+              ExcludeTests          = $ExcludeTests
+              IncludeTestsFromFolder= $customTestsDir
+              SuppressSigs          = $WhitelistSigs
+              SkipSlowTests         = $SkipSlowTests
+              SkipPolicyTests       = $SkipPolicyTests
+              SkipNonEssentialTests = $SkipNonEssentialTests
+              IpsOfAllDcs           = $IpsOfAllDcs
+          }
+          $healthOutput = & $getHealthScriptPath @getHealthParams @PassThruArgs 2>&1
 
           foreach ($item in @($healthOutput)) {
               if ($item -is [System.Management.Automation.ErrorRecord]) {
@@ -420,7 +430,7 @@ foreach ($target in $targets) {
   }
 
   if ($target -eq $env:COMPUTERNAME) {
-      $output = & $healthCheckBlock $ROOT_DIR $Hide $OnlyTheseTests $ExcludeTests $WhitelistSigs $SkipSlowTests $SkipPolicyTests $NoUpdate $IpsOfAllDcs $PushUpdate $localReleaseZip
+      $output = & $healthCheckBlock $ROOT_DIR $Hide $OnlyTheseTests $ExcludeTests $WhitelistSigs $SkipSlowTests $SkipPolicyTests $SkipNonEssentialTests $NoUpdate $IpsOfAllDcs $PushUpdate $localReleaseZip $PassThruArgs
   }
   else {
       if (Get-TcpPortStateFast $target @(5985, 5986, 80, 443, 88, 135, 389, 636, 445, 3268, 3269) | Where-Object { $_.Open }) {
@@ -453,7 +463,7 @@ foreach ($target in $targets) {
             Copy-Item -Path $localReleaseZip -Destination $remoteZipPath -ToSession $session -Force
           }
 
-          $output = Invoke-Command -Session $session -ScriptBlock $healthCheckBlock -ArgumentList $ROOT_DIR, $Hide, $OnlyTheseTests, $ExcludeTests, $WhitelistSigs, $SkipSlowTests, $SkipPolicyTests, $NoUpdate, $IpsOfAllDcs, $PushUpdate, $remoteZipPath
+          $output = Invoke-Command -Session $session -ScriptBlock $healthCheckBlock -ArgumentList $ROOT_DIR, $Hide, $OnlyTheseTests, $ExcludeTests, $WhitelistSigs, $SkipSlowTests, $SkipPolicyTests, $SkipNonEssentialTests, $NoUpdate, $IpsOfAllDcs, $PushUpdate, $remoteZipPath, $PassThruArgs
         } catch {
           $_ = Log-failure "Failed running update/health scripts on target $target"
           $all_messages += [pscustomobject]@{

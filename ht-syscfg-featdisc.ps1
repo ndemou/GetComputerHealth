@@ -2,7 +2,7 @@
 System Configuration & Feature Discovery
 #>
 
-function HealthTest-MalwareProtectionFeatures {
+function HealthTest-MalwareProtectionFeatures__E {
 <#
 .SYNOPSIS
 Checks Malware Protection Features
@@ -34,7 +34,7 @@ FalsePositives: None.
 
 
 
-function HealthTest-StartupItems{
+function HealthTest-StartupItems__E{
 <#
 .SYNOPSIS
 Checks Startup Items

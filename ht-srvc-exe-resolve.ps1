@@ -741,7 +741,7 @@ function Test-LooksLikePath {
 }
 
 
-function HealthTest-AutoStartServicesRunning {
+function HealthTest-AutoStartServicesRunning__E {
 <#
 .SYNOPSIS
 Checks Auto Start Services Running

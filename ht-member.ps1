@@ -2,7 +2,7 @@
 Tests only for domain joined servers except DC/PDC
 #>
 
-function HealthTest-InterfaceDnsServersUseDcs {
+function HealthTest-InterfaceDnsServersUseDcs__E {
 <#
 .SYNOPSIS
 Checks Interface Dns Servers Use Dcs
@@ -63,7 +63,7 @@ FalsePositives: None.
     Write-Warning "[pass] All interfaces with DNS configured use only DC IPs."}
 }
 
-function HealthTest-DnsSuffixMatchesDomain {
+function HealthTest-DnsSuffixMatchesDomain__E {
 <#
 .SYNOPSIS
 Checks Dns Suffix Matches Domain
@@ -92,7 +92,7 @@ FalsePositives: None.
   }
 }
 
-function HealthTest-DomainARecordPointsToDcIp {
+function HealthTest-DomainARecordPointsToDcIp__E {
 <#
 .SYNOPSIS
 Checks Domain A Record Points To Dc Ip
