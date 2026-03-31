@@ -657,7 +657,7 @@ function Invoke-HealthTestWithPolicyAutoset {
 
   $meta = Get-HealthTestTagsMetadata -FunctionName $FunctionName
   if ($DebugSkipSlowTests -and $meta.IsSlowTest) {
-    Write-Warning "[info] Skipping slow test $FunctionName because of -DebugSkipSlowTests switch"
+    Log-Info "Skipping slow test $FunctionName because of -DebugSkipSlowTests switch"
     return
   }
   $isPolicyTest = $meta.IsPolicyTest
