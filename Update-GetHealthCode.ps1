@@ -339,7 +339,7 @@ function Prepare-ManualUpdateZip {
 .SYNOPSIS
 Prepares metadata for a manually provided update zip and copies it to temp cache.
 .OUTPUTS
-Hashtable with keys: SourceFullPath, ZipLastWriteTimeIso, CachedZipPath.
+Hashtable with keys: SourceFullPath, ZipLastWriteTimeIso, CachedZipPath, ZipSha256, ManualMarker.
 #>
   [CmdletBinding()]
   param(
@@ -359,8 +359,12 @@ Hashtable with keys: SourceFullPath, ZipLastWriteTimeIso, CachedZipPath.
   $sourceFullPath = $zipItem.FullName
   $zipLastWrite = [datetime]$zipItem.LastWriteTime
   $zipLastWriteIso = $zipLastWrite.ToString('o')
+  $zipHash = (Get-FileHash -LiteralPath $sourceFullPath -Algorithm SHA256 -ErrorAction Stop).Hash
   $zipLastWriteToken = $zipLastWrite.ToString('yyyyMMdd-HHmmss')
   $cachedZipPath = Join-Path $CacheDir ("GetComputerHealth-MANUAL-UPDATE-{0}.zip" -f $zipLastWriteToken)
+  $zipTag = [System.IO.Path]::GetFileNameWithoutExtension($zipItem.Name)
+  if ([string]::IsNullOrWhiteSpace($zipTag)) { $zipTag = 'manual' }
+  $manualMarker = ("manual-zip|{0}|{1}" -f $zipTag, $zipHash)
 
   $samePath = $false
   if (Test-Path -LiteralPath $cachedZipPath -PathType Leaf) {
@@ -382,9 +386,11 @@ Hashtable with keys: SourceFullPath, ZipLastWriteTimeIso, CachedZipPath.
   }
 
   return @{
-    SourceFullPath    = $sourceFullPath
+    SourceFullPath      = $sourceFullPath
     ZipLastWriteTimeIso = $zipLastWriteIso
-    CachedZipPath     = $cachedZipPath
+    CachedZipPath       = $cachedZipPath
+    ZipSha256           = $zipHash
+    ManualMarker        = $manualMarker
   }
 }
 
@@ -745,7 +751,7 @@ if (-not (Test-Path $p)) {
 
 $latestRelease = $null
 $latestReleaseMarker = $null
-$manualUpdateMarkerPath = $null
+$manualUpdateMarker = $null
 $manualUpdateFetchedAt = $null
 if (-not $UpdateFromZip) {
   Write-Verbose "$passLabel Resolving latest release metadata (cache TTL $RELEASE_METADATA_CACHE_TTL_MINUTES minutes)"
@@ -760,9 +766,9 @@ if (-not $UpdateFromZip) {
 } else {
   Write-Verbose "-UpdateFromZip specified; skipping latest release marker query"
   $manualUpdateZip = Prepare-ManualUpdateZip -ZipPath $UpdateFromZip -CacheDir $BAK_DIR
-  $manualUpdateMarkerPath = [string]$manualUpdateZip.SourceFullPath
+  $manualUpdateMarker = [string]$manualUpdateZip.ManualMarker
   $manualUpdateFetchedAt = [string]$manualUpdateZip.ZipLastWriteTimeIso
-  Write-Verbose "Manual update marker path is '$manualUpdateMarkerPath'"
+  Write-Verbose "Manual update marker is '$manualUpdateMarker'"
   Write-Verbose "Manual update fetchedAt is '$manualUpdateFetchedAt'"
 }
 
@@ -783,6 +789,21 @@ if ($latestReleaseMarker) {
 
   if ($Reinstall -and $storedReleaseMarker -and ($storedReleaseMarker -eq $latestReleaseMarker)) {
     Write-Verbose "-Reinstall was specified; re-downloading current latest release"
+  }
+} elseif ($manualUpdateMarker) {
+  $storedReleaseMarker = Get-GetComputerHealthInstalledReleaseMarker -CachePath $LATEST_RELEASE_METADATA_CACHE_PATH
+
+  if ($storedReleaseMarker) {
+    Write-Verbose "Stored installed release marker is '$storedReleaseMarker'"
+    Write-UpdateEvent "Stored installed release marker is '$storedReleaseMarker'"
+  } else {
+    Write-Verbose "No stored installed release marker is available yet"
+  }
+
+  if ((-not $Reinstall) -and $storedReleaseMarker -and ($storedReleaseMarker -eq $manualUpdateMarker)) {
+    Write-Verbose "Provided zip marker already installed and -Reinstall was not specified; skipping update"
+    Write-UpdateEvent "Provided zip marker already installed and -Reinstall was not specified; skipping update"
+    return
   }
 } else {
   Write-Verbose "$passLabel No latest release marker is available"
@@ -828,9 +849,9 @@ if ($updated) {
   if ($latestReleaseMarker) {
     Write-Verbose "$passLabel Persisting installed release marker before self-rerun"
     Set-GetComputerHealthInstalledReleaseMarker -CachePath $LATEST_RELEASE_METADATA_CACHE_PATH -Marker $latestReleaseMarker
-  } elseif ($manualUpdateMarkerPath) {
+  } elseif ($manualUpdateMarker) {
     Write-Verbose "$passLabel Persisting manual update marker before self-rerun"
-    Set-GetComputerHealthInstalledReleaseMarker -CachePath $LATEST_RELEASE_METADATA_CACHE_PATH -Marker $manualUpdateMarkerPath -FetchedAt $manualUpdateFetchedAt
+    Set-GetComputerHealthInstalledReleaseMarker -CachePath $LATEST_RELEASE_METADATA_CACHE_PATH -Marker $manualUpdateMarker -FetchedAt $manualUpdateFetchedAt
   }
 
   if ($SelfRerunCount -ge 1) {
@@ -885,8 +906,8 @@ if ($PersistReleaseMarker) {
   Set-GetComputerHealthInstalledReleaseMarker -CachePath $LATEST_RELEASE_METADATA_CACHE_PATH -Marker $PersistReleaseMarker
 } elseif ($latestReleaseMarker) {
   Set-GetComputerHealthInstalledReleaseMarker -CachePath $LATEST_RELEASE_METADATA_CACHE_PATH -Marker $latestReleaseMarker
-} elseif ($manualUpdateMarkerPath) {
-  Set-GetComputerHealthInstalledReleaseMarker -CachePath $LATEST_RELEASE_METADATA_CACHE_PATH -Marker $manualUpdateMarkerPath -FetchedAt $manualUpdateFetchedAt
+} elseif ($manualUpdateMarker) {
+  Set-GetComputerHealthInstalledReleaseMarker -CachePath $LATEST_RELEASE_METADATA_CACHE_PATH -Marker $manualUpdateMarker -FetchedAt $manualUpdateFetchedAt
 }
 
 if ((Get-Date) -le [datetime]'2026-04-30') {
