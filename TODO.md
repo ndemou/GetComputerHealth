@@ -2,8 +2,22 @@
 
 ## I think `-PushUpdate` is causing unnecessary attempt to updates
 
-It seems that the zip is extracted even when it is the same as the one used during the last run.
-(Invoke-GetHealthDomainComputers.ps1)
+Regarding the updater: It seems that the zip is expanded even when it has the same version tag and the same hash as the one already installed.
+(Invoke-GetHealthDomainComputers.ps1). At least this happens with the -PushUpdate option but I think we could easily avoid the waste of time.
+
+Example:
+```
+# FIRST EXECUTION (UPDATE IS NEEDED)
+[pass 1/2] Parameters: Reinstall=False UpdateFromZip='C:\it\temp\GetComputerHealth-3.0.4.zip' ForceRefreshReleaseMetadata=False SelfRerunCount=0 PersistReleaseMarker=''
+[pass 1/2] Updating from provided zip 'C:\it\temp\GetComputerHealth-3.0.4.zip'
+Expanding release zip 'C:\it\temp\GetComputerHealth-3.0.4.zip'
+Applied GetComputerHealth update from zip 'GetComputerHealth-3.0.4.zip'   
+
+# SECOND EXECUTION (UPDATE NOT NEEDED)
+[pass 1/2] Parameters: Reinstall=False UpdateFromZip='C:\it\temp\GetComputerHealth-3.0.4.zip' ForceRefreshReleaseMetadata=False SelfRerunCount=0 PersistReleaseMarker=''
+[pass 1/2] Updating from provided zip 'C:\it\temp\GetComputerHealth-3.0.4.zip'
+Expanding release zip 'C:\it\temp\GetComputerHealth-3.0.4.zip'
+```
 
 ## When printing to the console, show the Emitter similarily to how we show the Comments
 
