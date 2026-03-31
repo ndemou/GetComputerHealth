@@ -1,15 +1,40 @@
 # TODO
 
-## Policy Tests - How to introduce new tests, with new findings, without also causing new alerts
+## Tags in test names
 
-Policy tests are tests with function names starting with `HealthTest-Policy`. They use Write-Warning to emit messages of levels `[warning]` or `[notice]` for every policy deviation finding. Serious failures that are not a matter of policy can still use the `[failure]` level. The first time a policy test is run (and provided that `-DontAutosetPolicy` was not used) code emits and *then* automatically supresses every finding of `[warning]` or `[notice]` level (but not `[failure]`). 
+The name of a HealthTest- function (either builtin or custom) can be suffixed with two underscores followed by letters or digits. 
+E.g. `HealthTest-SomeName__SP`. The characters after the `__` are tags. 
+
+For the moment these tags are used:
+
+ - `S` Slow test
+ - `E` Quick Essential test
+ - `P` Policy test
+
+## Policy Tests - How to introduce new tests, with new findings, without causing new alerts
+
+Policy tests are those tagged with 'P'. They use Write-Warning to emit messages of levels `[warning]` or `[notice]` for every policy deviation finding. Serious failures that are not a matter of policy can still use the `[failure]` level. The first time a policy test is run (and provided that `-DontAutosetPolicy` was not used) code emits and *then* automatically supresses every finding of `[warning]` or `[notice]` level (but not `[failure]`). 
 On first run code appends a line to `Get-ComputerHealth.sigs-to-suppress.txt` to note that the first-time supression was performed. The line has this format: `POLICY_TEST_WAS_RUN: HealthTest-PolicyOpenPorts` (which allows code to distinguish the first run from every other). After the first run no automatic suppression is performed again.
 
 This automatic suppression on first run only, allows developers of get-computerhealth to add policy tests without anoying users with new findings. The existing policy status of the system is automatically considered the accepted baseline. 
 
-An example of such a policy test which is on our todo list is `HealthTest-PolicyInstalledSW`.
+An example of such a policy test which is on our todo list is `HealthTest-InstalledSW__P`.
 
-## Maybe I could have an option to exclude policy tests (`-SkipPolicyTests`)
+## Quick Essential Tests
+
+Quick Essential tests are those tagged with `E`. When using the todo switch `-SkipNonEssentialTests` (alias `-Quick`) only Quick Essential tests will be executed.
+
+## New & Renamed switchs
+
+Add switch to exclude policy tests (`-SkipPolicyTests`)
+
+Rename `-DebugSkipSlowTests` to `-SkipSlowTests` but keep `-DebugSkipSlowTests` as an alias
+
+## Append the healthtest name to the Comments of every failure/warning/notice
+
+E.g. "HealthTest-ScheduledTasks".
+If comment is empty it is set.
+This helps with rerunning only the tests that failed to check if a finding is transient.
 
 ## Review the hundrends of warnings from Invoke-ScriptAnalyzer (and 3 errors)
 
@@ -506,7 +531,7 @@ function Get-NormalizedSoftwareName {
     }
 }
 
-function HealthTest-InstalledSW {
+function HealthTest-InstalledSW__P {
     Get-InstalledSW | %{ 
         $normalizedName = Get-NormalizedSoftwareName $_.Name
         Log-Notice "Found this program installed: $normalizedName" -Comment "Full program name: $($_.Name); Publisher: $($_.Publisher); Installation Date: $($_.InstallDate)"
