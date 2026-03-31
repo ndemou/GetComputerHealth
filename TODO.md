@@ -17,9 +17,10 @@ This helps when one runs manually and wants to rerun only the tests that failed 
 
 Also all these tests should not emit [Failure] for findings of services/shares/admins/roles but only for unambigouous serious failures.
 
-Also remove any exceptions for findings that are currently ignored as benign from these tests.
+Also in these tests: remove any exceptions for findings that are currently ignored as benign.
 E.g. all services are to be reported (including Microsoft ones), and all 
 shares(including default ones) and all administrators and all roles.
+So we need to adjust their names accordingly NonMicrosoftServices -> Services & NonDefaultShares -> Shares
 
 ## I don't have tests that verify a TCP port is indeed open, or a SW is indeed installed
 
