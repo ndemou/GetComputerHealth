@@ -2,7 +2,7 @@
 Tests that are only applicable to Windows Server O.S.
 #>
 
-function HealthTest-DhcpInAd{
+function HealthTest-DhcpInAd__E{
 <#
 .SYNOPSIS
 Checks Dhcp In Ad
@@ -23,7 +23,7 @@ FalsePositives: None.
   if($isAuth){ Write-Warning "[pass] DHCP server is authorized in AD ($fqdn)" } else { Write-Warning "[failure] DHCP server is NOT authorized in AD ($fqdn)" }
 }
 
-function HealthTest-DhcpScopeUtilization {
+function HealthTest-DhcpScopeUtilization__E {
 <#
 .SYNOPSIS
 Checks Dhcp Scope Utilization

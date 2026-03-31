@@ -45,7 +45,7 @@ Filters out ports listening only on the loopback addresses (127.0.0.1 and ::1) b
   return $false
 }
 
-function HealthTest-TimeSyncPolicy {
+function HealthTest-TimeSyncPolicy__E {
 <#
 .SYNOPSIS
 Checks Time Sync Policy
@@ -323,7 +323,7 @@ FalsePositives: None.
 }
 
 
-function HealthTest-UpdateAge {
+function HealthTest-UpdateAge__E {
 <#
 .SYNOPSIS
 Checks Update Age
@@ -352,7 +352,7 @@ FalsePositives: None.
 }
 
 
-function HealthTest-CertExpiry {
+function HealthTest-CertExpiry__E {
 <#
 .SYNOPSIS
 Checks Cert Expiry
@@ -387,7 +387,7 @@ FalsePositives: None.
 # I think the later seems does more robust detection of issues based on Last Result
 
 
-function HealthTest-IisBindings {
+function HealthTest-IisBindings__E {
 <#
 .SYNOPSIS
 Checks Iis Bindings
@@ -695,7 +695,7 @@ FalsePositives: None.
 }
 
 
-function HealthTest-DisksHaveFreeSpace {
+function HealthTest-DisksHaveFreeSpace__E {
 <#
 .SYNOPSIS
 Checks Disks Have Free Space
@@ -725,7 +725,7 @@ FalsePositives: None.
 }
 
 
-function HealthTest-RequiredSrvRecords{
+function HealthTest-RequiredSrvRecords__E{
 <#
 .SYNOPSIS
 Checks Required Srv Records
@@ -748,7 +748,7 @@ FalsePositives: None.
   if(-not $missing){ Write-Warning "[pass] Required AD SRV records present" }
 }
 
-function HealthTest-LdapSigningChannelBinding {
+function HealthTest-LdapSigningChannelBinding__E {
 <#
 .SYNOPSIS
 Checks Ldap Signing Channel Binding
@@ -954,7 +954,7 @@ FalsePositives: None.
 }
 
 
-function HealthTest-PagefileSanity{
+function HealthTest-PagefileSanity__E{
 <#
 .SYNOPSIS
 Checks Pagefile Sanity
@@ -1091,7 +1091,7 @@ FalsePositives: None.
 }
 
 
-function HealthTest-NtfsDirtyBit {
+function HealthTest-NtfsDirtyBit__E {
 <#
 .SYNOPSIS
 Checks Ntfs Dirty Bit
@@ -1191,7 +1191,7 @@ function Test-DiskHasFreeSpace {
     }
 }
 
-function HealthTest-EventLogMaxSizes{
+function HealthTest-EventLogMaxSizes__E{
 <#
 .SYNOPSIS
 Checks Event Log Max Sizes

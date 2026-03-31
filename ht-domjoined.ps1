@@ -2,7 +2,7 @@
 Tests only for domain joined servers (including DC/PDC)
 #>
 
-function HealthTest-DnsSuffixBaseline {
+function HealthTest-DnsSuffixBaseline__E {
 <#
 .SYNOPSIS
 Checks Dns Suffix Baseline
@@ -87,7 +87,7 @@ TODO: maybe part of these tests are for non-domain joined Computers also
     }
 }
 
-function HealthTest-ConnectivityToDCs {
+function HealthTest-ConnectivityToDCs__E {
 <#
 .SYNOPSIS
 Checks Connectivity To D Cs
@@ -147,7 +147,7 @@ FalsePositives: None.
 }
 
 
-function HealthTest-EfsRecoveryAgents{
+function HealthTest-EfsRecoveryAgents__E{
 <#
 .SYNOPSIS
 Checks Efs Recovery Agents
@@ -166,7 +166,7 @@ FalsePositives: None.
 }
 
 
-function HealthTest-GpWmiFilterNamespacesOnLocalHost{
+function HealthTest-GpWmiFilterNamespacesOnLocalHost__E{
 <#
 .SYNOPSIS
 Checks Gp Wmi Filters Namespaces

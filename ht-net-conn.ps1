@@ -13,7 +13,7 @@ function Get-PropValue {
     return $default
 }
 
-function HealthTest-NetworkConnectionProfiles {
+function HealthTest-NetworkConnectionProfiles__E {
 <#
 .SYNOPSIS
 Checks Network Connection Profiles
@@ -286,7 +286,7 @@ function Test-MultipleGatewayConfiguration {
   }
 }
 
-function HealthTest-IPv6Binding__S{
+function HealthTest-IPv6Binding__SE{
 <#
 .SYNOPSIS
 Checks I Pv 6 Binding
@@ -314,7 +314,7 @@ FalsePositives: None.
   }
 }
 
-function HealthTest-Nic {
+function HealthTest-Nic__E {
 <#
 .SYNOPSIS
 Checks Nic
@@ -398,7 +398,7 @@ FalsePositives: None.
         Write-Warning "[pass] Network interfaces healthy; no significant error rates or disconnected interfaces detected"}
 }
 
-function HealthTest-WinRMListening{
+function HealthTest-WinRMListening__E{
 <#
 .SYNOPSIS
 Checks Win RM Listening

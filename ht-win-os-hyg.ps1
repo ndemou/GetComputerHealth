@@ -134,7 +134,7 @@ function Get-DaysSinceLastVirusScan {
   return [pscustomobject]@{DaysSinceScan=$null;Details='No scan timestamps or ages'}
 }
 
-function HealthTest-RecentWindowsScan {
+function HealthTest-RecentWindowsScan__E {
 <#
 .SYNOPSIS
 Checks Recent Windows Scan
@@ -178,7 +178,7 @@ FalsePositives: None.
 }
 
 
-function HealthTest-SchanelBaseline{
+function HealthTest-SchanelBaseline__E{
 <#
 .SYNOPSIS
 Checks Schanel Baseline
@@ -246,7 +246,7 @@ Checks the effective Schannel server-side protocol baseline for SSL 3.0, TLS 1.0
   }
 }
 
-function HealthTest-DefenderStatus {
+function HealthTest-DefenderStatus__E {
 <#
 .SYNOPSIS
 Checks Defender Status
@@ -315,7 +315,7 @@ FalsePositives: None.
   if($disabled){ Write-Warning "[pass] SMBv1 is disabled"} else { Write-Warning "[warning] SMBv1 is enabled`nState=$state" }
 }
 
-function HealthTest-WmiRepository{
+function HealthTest-WmiRepository__E{
 <#
 .SYNOPSIS
 Checks Wmi Repository
@@ -467,7 +467,7 @@ FalsePositives: None.
 }
 
 
-function HealthTest-CrashDumpSignals {
+function HealthTest-CrashDumpSignals__E {
 <#
 .SYNOPSIS
 Checks Crash Dump Signals
@@ -577,7 +577,7 @@ FalsePositives: None.
 }
 
 
-function HealthTest-HotfixBaseline{
+function HealthTest-HotfixBaseline__E{
 <#
 .SYNOPSIS
 Checks Hotfix Baseline
@@ -600,7 +600,7 @@ FalsePositives: None.
   if($miss.Count -eq 0){ Write-Warning "[pass] All required hotfixes are installed"}
 }
 
-function HealthTest-BitLockerStatus {
+function HealthTest-BitLockerStatus__E {
 <#
 .SYNOPSIS
 Checks Bit Locker Status
@@ -636,7 +636,7 @@ FalsePositives: None.
 }
 
 
-function HealthTest-NtlmHardening {
+function HealthTest-NtlmHardening__E {
 <#
 .SYNOPSIS
 Checks Ntlm Hardening
@@ -670,7 +670,7 @@ FalsePositives: None.
 }
 
 
-function HealthTest-RdpHardening {
+function HealthTest-RdpHardening__E {
 <#
 .SYNOPSIS
 Checks Rdp Hardening
@@ -707,7 +707,7 @@ FalsePositives: None.
   }
 }
 
-function HealthTest-NonDefaultShares {
+function HealthTest-NonDefaultShares__E {
 <#
 .SYNOPSIS
 Checks Non Default Shares
@@ -743,7 +743,7 @@ FalsePositives: None.
 }
 
 
-function HealthTest-LocalAcntRequirePass {
+function HealthTest-LocalAcntRequirePass__E {
 <#
 .SYNOPSIS
 Checks Local Acnt Require Pass
@@ -771,7 +771,7 @@ FalsePositives: None.
 }
 
 
-function HealthTest-RestrictAnonymous {
+function HealthTest-RestrictAnonymous__E {
 <#
 .SYNOPSIS
 Checks Restrict Anonymous
@@ -799,7 +799,7 @@ FalsePositives: None.
   }
 }
 
-function HealthTest-DefaultLocale {
+function HealthTest-DefaultLocale__E {
 <#
 .SYNOPSIS
 Checks Default Locale
@@ -824,7 +824,7 @@ FalsePositives: None.
     }
 }
 
-function HealthTest-PendingReboot {
+function HealthTest-PendingReboot__E {
 <#
 .SYNOPSIS
 Checks Pending Reboot
@@ -846,7 +846,7 @@ FalsePositives: None.
     Write-Warning "[pass] No pending reboot indicators"
 }
 
-function HealthTest-SmbSigningRequired{
+function HealthTest-SmbSigningRequired__E{
 <#
 .SYNOPSIS
 Checks Smb Signing Required
@@ -872,7 +872,7 @@ FalsePositives: None.
   }
 }
 
-function HealthTest-ShadowStorage {
+function HealthTest-ShadowStorage__E {
 <#
 .SYNOPSIS
 Checks if Shadow Storage is enabled on internal drives (for servers) or on C: (for workstations)
@@ -1058,7 +1058,7 @@ FalsePositives: None.
 }
 
 
-function HealthTest-DnsClientService{
+function HealthTest-DnsClientService__E{
 <#
 .SYNOPSIS
 Checks Dns Client Service
@@ -1150,7 +1150,7 @@ FalsePositives: None.
         Write-Warning "[pass] No unexpected accounts in Local Administrators"}
 }
 
-function HealthTest-UnexpectedListeningPorts__S {
+function HealthTest-UnexpectedListeningPorts__SE {
 <#
 .SYNOPSIS
 Checks Unexpected Listening Ports

@@ -151,6 +151,10 @@ param(
   [switch]$SkipPolicyTests,
 
   [Parameter(ParameterSetName='Run')]
+  [Alias('Quick')]
+  [switch]$SkipNonEssentialTests,
+
+  [Parameter(ParameterSetName='Run')]
   [switch]$DontAutosetPolicy,
 
   [Parameter(ParameterSetName='Run')]
@@ -356,7 +360,9 @@ FunctionName, Time, ElapsedMilliseconds, Output, Success, Error, Category, Reaso
 
   $start_time = Get-Date
 
-  if ($ExcludeTests -contains $FunctionName) {
+  $metaForExclude = Get-HealthTestTagsMetadata -FunctionName $FunctionName
+  $baseFunctionName = "HealthTest-$($metaForExclude.TestName)"
+  if (($ExcludeTests -contains $FunctionName) -or ($ExcludeTests -contains $baseFunctionName)) {
       Log-Debug "Skipping test $FunctionName"
       return
   }
@@ -641,6 +647,7 @@ function Get-HealthTestTagsMetadata {
     Tags         = @($tags)
     IsSlowTest   = ('S' -in $tags)
     IsPolicyTest = ('P' -in $tags)
+    IsQuickEssentialTest = ('E' -in $tags)
   }
 }
 
@@ -672,6 +679,10 @@ function Invoke-HealthTestWithPolicyAutoset {
   }
   if ($SkipPolicyTests -and $meta.IsPolicyTest) {
     Log-Info "Skipping policy test $FunctionName because of -SkipPolicyTests switch"
+    return
+  }
+  if ($SkipNonEssentialTests -and (-not $meta.IsQuickEssentialTest)) {
+    Log-Info "Skipping non-essential test $FunctionName because of -SkipNonEssentialTests (-Quick) switch"
     return
   }
   $isPolicyTest = $meta.IsPolicyTest
@@ -936,6 +947,7 @@ Log-Debug "-ExcludeTests (semicolon separated): $($ExcludeTests -join ';')"
   ForEach-Object { $_.Trim() } |
   Where-Object { $_ }
 Log-Debug "-OnlyTheseTests (semicolon separated): $($OnlyTheseTests -join ';')"
+Log-Debug "-SkipNonEssentialTests '$SkipNonEssentialTests'"
 Log-Debug "-WhitelistSigs '$WhitelistSigs'"
 $cfg = Get-LogConfig
 Log-debug "Final list of suppressed signatures: $((@($cfg.SuppressedSignatures) | Sort-Object -Unique) -join ', ')"
@@ -950,15 +962,23 @@ if ($OnlyTheseTests) {
 # -OnlyTheseTests
     $valid_cmdlet_name_regex = '^ *[A-Za-z][A-Za-z0-9_-]*[A-Za-z0-9]+ *$'
     $loadedTestsByName = @{}
+    $loadedTestsByBaseName = @{}
     $allHealthTests | ForEach-Object {
-        $loadedTestsByName[$_.Name] = $true
+        $loadedTestsByName[$_.Name] = $_.Name
+        $meta = Get-HealthTestTagsMetadata -FunctionName $_.Name
+        $baseName = "HealthTest-$($meta.TestName)"
+        if (-not $loadedTestsByBaseName.ContainsKey($baseName)) {
+          $loadedTestsByBaseName[$baseName] = $_.Name
+        }
     }
 
     foreach ($item in $OnlyTheseTests) {
         if ($item -match $valid_cmdlet_name_regex) {
             $testName = $item.Trim()
             if ($loadedTestsByName.ContainsKey($testName)) {
-                Invoke-HealthTestWithPolicyAutoset $testName
+                Invoke-HealthTestWithPolicyAutoset $loadedTestsByName[$testName]
+            } elseif ($loadedTestsByBaseName.ContainsKey($testName)) {
+                Invoke-HealthTestWithPolicyAutoset $loadedTestsByBaseName[$testName]
             } else {
                 Log-Notice "Skipping unavailable test '$testName' (not loaded/applicable on this host)."
             }
