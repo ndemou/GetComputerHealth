@@ -123,6 +123,16 @@ These are tests that report a finding for every item of a particular aspect of t
 
 So these tests help you define a "Baseline Inventory" or "Expected Surface" and then detect drift/deviations.
 
+Special handling on first run:
+
+- The first time a `P` test runs, and only if `-DontAutosetPolicy` was **not** used, code emits and then automatically suppresses every `[warning]` and `[notice]` finding from that policy test (but **not** `[failure]` findings).
+- On that first run, code appends a marker line to `Get-ComputerHealth.sigs-to-suppress.txt` in this format:
+  - `POLICY_TEST_WAS_RUN: HealthTest-PolicyOpenPorts`
+- This marker lets the code distinguish the first execution from all later executions.
+- After that first run, the automatic suppression is not performed again for that policy test.
+
+This "first run only" behavior allows you to add new policy inventory tests without immediately creating noisy findings for users. The current policy state on that first run is treated as the accepted baseline.
+
 ## Required help-block format for built-in `HealthTest-*` functions
 
 This is not mandatory for custom health tests but every built-in `HealthTest-*` function must include an **in-function** comment-based help block immediately after the opening `{`.
