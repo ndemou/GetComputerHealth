@@ -142,8 +142,13 @@ function Invoke-HealthEmail {
   if ($BodyAsHtml) { $mailParams['BodyAsHtml'] = $true }
   if ($Attachments -and $Attachments.Count) { $mailParams['Attachments'] = $Attachments }
   Write-host -for gray   "Sending email... " -NoNewLine
-  & $SEND_MESSAGE_SCRIPT_PATH @mailParams
-  Write-host -for gray   "email sent."
+  try {
+    & $SEND_MESSAGE_SCRIPT_PATH @mailParams
+    Write-host -for gray   "email sent."
+  } catch {
+    Write-host -for yellow "email failed."
+    throw
+  }
 }
 
 function Get-DomainServers {

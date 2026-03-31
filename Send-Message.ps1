@@ -1,28 +1,36 @@
 <#
 .SYNOPSIS
-  Sends an email alert using SMTP settings stored in a JSON config file.
+Sends an email alert using SMTP settings stored in a JSON config file.
 
 .DESCRIPTION
-  Required parameters:
-    -Subject
-    -ConfigFile
 
-  Optional parameters:
-    -Body
-    -Attachments
-    -BodyAsHtml
-    -GenerateConfig <Path> : Interactively creates a new JSON config file at the specified path.
+# Normal Operation
 
-  Config file (JSON) required keys:
-    Server, From, To
+Required parameters:
+  - Subject
+  - ConfigFile
 
-  Optional config keys:
-    Port   (default: 25)
-    UseSsl (default: false)
+Optional parameters:
+  - Body
+  - Attachments
+  - BodyAsHtml
 
-  Behavior:
+Behavior:
   - Supports -WhatIf / -Confirm (ShouldProcess).
   - Validates config and attachment paths before sending.
+
+# First time run/configuration
+
+To configure it run it like this: 
+```
+& C:\it\bin\Send-Message.ps1 -GenerateConfig c:\it\config\Send-Message.conf 
+```
+It will interactively create a new JSON config file at the specified path.
+
+Config file keys:
+    Server, From, To (required)
+    Port   (default: 25)
+    UseSsl (default: false)
 
 .NOTES
   - Send-MailMessage is obsolete (shows a warning), but still works in many environments.
@@ -62,6 +70,75 @@ function Send-MailMessageWithRetry {
     [int]$BaseDelaySeconds = 2
   )
 
+  function Get-CleanExceptionMessage {
+    param(
+      [Parameter(Mandatory)]
+      [System.Exception]$Exception
+    )
+
+    $base = $Exception.GetBaseException()
+    $parts = @()
+
+    if ($base -and -not [string]::IsNullOrWhiteSpace($base.Message)) {
+      $parts += $base.Message.Trim()
+    }
+
+    if ($Exception -ne $base -and -not [string]::IsNullOrWhiteSpace($Exception.Message)) {
+      $outer = $Exception.Message.Trim()
+      if ($outer -notlike "*$($parts[0])*") {
+        $parts += $outer
+      }
+    }
+
+    return (($parts | Select-Object -Unique) -join ' | ')
+  }
+
+  function Test-IsRetryableNetworkFailure {
+    param(
+      [Parameter(Mandatory)]
+      [System.Exception]$Exception
+    )
+
+    for ($cur = $Exception; $null -ne $cur; $cur = $cur.InnerException) {
+      if ($cur -is [System.Net.Sockets.SocketException]) { return $true }
+      if ($cur -is [System.TimeoutException]) { return $true }
+      if ($cur -is [System.IO.IOException] -and $cur.Message -match 'forcibly closed|transport connection|connection.*closed') { return $true }
+
+      if ($cur -is [System.Net.WebException]) {
+        switch ($cur.Status) {
+          ([System.Net.WebExceptionStatus]::NameResolutionFailure) { return $true }
+          ([System.Net.WebExceptionStatus]::ConnectFailure) { return $true }
+          ([System.Net.WebExceptionStatus]::ConnectionClosed) { return $true }
+          ([System.Net.WebExceptionStatus]::Timeout) { return $true }
+          ([System.Net.WebExceptionStatus]::ProxyNameResolutionFailure) { return $true }
+          ([System.Net.WebExceptionStatus]::UnknownError) { return $true }
+          ([System.Net.WebExceptionStatus]::SendFailure) { return $true }
+          ([System.Net.WebExceptionStatus]::ReceiveFailure) { return $true }
+          ([System.Net.WebExceptionStatus]::KeepAliveFailure) { return $true }
+          ([System.Net.WebExceptionStatus]::PipelineFailure) { return $true }
+        }
+      }
+
+      if ($cur -is [System.Net.Mail.SmtpException]) {
+        switch ($cur.StatusCode) {
+          ([System.Net.Mail.SmtpStatusCode]::GeneralFailure) { return $true }
+          ([System.Net.Mail.SmtpStatusCode]::MailboxBusy) { return $true }
+          ([System.Net.Mail.SmtpStatusCode]::ServiceNotAvailable) { return $true }
+          ([System.Net.Mail.SmtpStatusCode]::TransactionFailed) { return $true }
+          ([System.Net.Mail.SmtpStatusCode]::ClientNotPermitted) { return $true }
+          ([System.Net.Mail.SmtpStatusCode]::InsufficientStorage) { return $true }
+          ([System.Net.Mail.SmtpStatusCode]::LocalErrorInProcessing) { return $true }
+        }
+      }
+
+      if ($cur.Message -match 'timeout|timed out|closing transmission channel|remote name could not be resolved|name could not be resolved|no such host is known|name resolution|connection|reset|refused|unreachable|network path|host is down|temporar') {
+        return $true
+      }
+    }
+
+    return $false
+  }
+
   $attempt = 0
   $lastErr = $null
 
@@ -78,23 +155,24 @@ function Send-MailMessageWithRetry {
       $ex = $_.Exception
       $lastErr = $_
 
-      $msg = $ex.Message
+      $msg = Get-CleanExceptionMessage -Exception $ex
       $inner = if ($ex.InnerException) { $ex.InnerException.Message } else { $null }
 
       $isTransient = $false
 
       if ($msg -match '^\s*4\.\d\.\d') { $isTransient = $true }               # 4.x.x SMTP temp
       elseif ($msg -match '4\d{2}\s') { $isTransient = $true }                # "4xx " (some servers)
-      elseif ($msg -match 'timeout|timed out|closing transmission channel') { $isTransient = $true }
-      elseif ($inner -match 'timeout|timed out|temporar|connection|reset|refused|unreachable') { $isTransient = $true }
-      elseif ($ex -is [System.Net.Mail.SmtpException] -and $ex.StatusCode -ne [System.Net.Mail.SmtpStatusCode]::GeneralFailure) {
-        if ($ex.StatusCode.ToString() -match 'MailboxBusy|ServiceNotAvailable|TransactionFailed|ClientNotPermitted') { $isTransient = $true }
-      }
+      elseif (Test-IsRetryableNetworkFailure -Exception $ex) { $isTransient = $true }
 
-      Write-Warning ("Send-MailMessage FAILED (attempt $attempt/$MaxAttempts, {0} ms): {1}" -f ([int]$sw.Elapsed.TotalMilliseconds), $msg)
+      $retryText = if ($isTransient -and $attempt -lt $MaxAttempts) { 'retrying' } else { 'giving up' }
+      Write-Warning ("Send-MailMessage FAILED (attempt $attempt/$MaxAttempts, {0} ms, $retryText): {1}" -f ([int]$sw.Elapsed.TotalMilliseconds), $msg)
       if ($inner) { Write-Verbose ("InnerException: " + $inner) }
 
-      if (-not $isTransient -or $attempt -ge $MaxAttempts) { throw }
+      if (-not $isTransient -or $attempt -ge $MaxAttempts) {
+        $base = $ex.GetBaseException()
+        $finalMessage = "Send-MailMessage failed after $attempt attempt(s): $msg"
+        throw [System.Exception]::new($finalMessage, $base)
+      }
 
       $delay = [Math]::Min(60, [Math]::Pow(2, ($attempt-1)) * $BaseDelaySeconds)
       $jitter = Get-Random -Minimum 0 -Maximum 1000
@@ -294,10 +372,6 @@ $target = "$($cfg.Server):$($cfg.Port) -> $($cfg.To -join ', ')"
 $action = "Send email '$subjectWithTrace'"
 
 if ($PSCmdlet.ShouldProcess($target, $action)) {
-  try {
-    Send-MailMessageWithRetry -MailParams $mailParams -MaxAttempts 5 -BaseDelaySeconds 2
-    Write-Verbose "Mail send completed."
-  } catch {
-    throw
-  }
+  Send-MailMessageWithRetry -MailParams $mailParams -MaxAttempts 5 -BaseDelaySeconds 2
+  Write-Verbose "Mail send completed."
 }
