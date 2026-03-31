@@ -663,14 +663,22 @@ function Invoke-HealthTestWithPolicyAutoset {
   $records = @(Invoke-HealthTest $FunctionName)
 
   if ($shouldAutoset) {
-    $newSuppressionSigs = @(
+    $policyFindings = @(
       $records |
-        Where-Object { $_.Level -in @('notice','warning') -and (-not $_.Suppressed) -and ($_.Hash -match '^[0-9a-f]{8}$') } |
-        Select-Object -ExpandProperty Hash -Unique
+        Where-Object { $_.Level -in @('notice','warning') -and (-not $_.Suppressed) -and ($_.Hash -match '^[0-9a-f]{8}$') }
     )
 
+    $newSuppressionSigs = @($policyFindings | Select-Object -ExpandProperty Hash -Unique)
+    $sigToMessage = @{}
+    foreach ($finding in $policyFindings) {
+      if (-not $sigToMessage.ContainsKey($finding.Hash)) {
+        $sigToMessage[$finding.Hash] = [string]$finding.Message
+      }
+    }
+
     foreach ($sig in $newSuppressionSigs) {
-      $line = "$sig # $(Get-Date -format yyyy-MM-dd` HH:mm) # policy auto-baseline from $($meta.TestName)"
+      $findingMessage = $sigToMessage[$sig]
+      $line = "$sig # $(Get-Date -format yyyy-MM-dd` HH:mm) # policy auto-baseline from $($meta.TestName): $findingMessage"
       Add-AsciiLine -Line $line -Path $script:Config.SuppressSignaturesPath
     }
     if ($newSuppressionSigs.Count -gt 0) {
