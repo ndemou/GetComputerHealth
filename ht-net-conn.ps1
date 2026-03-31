@@ -286,7 +286,7 @@ function Test-MultipleGatewayConfiguration {
   }
 }
 
-function HealthTest-IPv6Binding__SE{
+function HealthTest-IPv6Binding__E{
 <#
 .SYNOPSIS
 Checks I Pv 6 Binding
