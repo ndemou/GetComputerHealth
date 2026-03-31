@@ -19,10 +19,6 @@ Applied GetComputerHealth update from zip 'GetComputerHealth-3.0.4.zip'
 Expanding release zip 'C:\it\temp\GetComputerHealth-3.0.4.zip'
 ```
 
-## When printing to the console, show the Emitter similarily to how we show the Comments
-
-This helps when one runs manually and wants to rerun only the tests that failed to check if a finding is transient.
-
 ## Add the "P" Tag to these functions:
   - HealthTest-NonMicrosoftServices__S
   - HealthTest-NonDefaultShares
