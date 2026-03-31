@@ -2,27 +2,211 @@
 
 ## Tags in test names
 
-The name of a HealthTest- function (either builtin or custom) can be suffixed with two underscores followed by letters or digits. 
-E.g. `HealthTest-SomeName__SP`. The characters after the `__` are tags. 
+This is a way to be able to attach tags to health tests.
+The name of a `HealthTest-` function (either builtin or custom) can be suffixed 
+with two underscores followed by one or more letters or digits.
+The letters or digits after the `__` are tags. E.g. `HealthTest-SomeName__SP`
 
-For the moment these tags are used:
+For the moment these are the supported tags:
 
  - `S` Slow test
  - `E` Quick Essential test
  - `P` Policy test
+ - `D` Domain-wide test; a test that need only be performed from one server of the domain (RESERVED BUT NOT YET IN USE)
 
 ## Policy Tests - How to introduce new tests, with new findings, without causing new alerts
 
-Policy tests are those tagged with 'P'. They use Write-Warning to emit messages of levels `[warning]` or `[notice]` for every policy deviation finding. Serious failures that are not a matter of policy can still use the `[failure]` level. The first time a policy test is run (and provided that `-DontAutosetPolicy` was not used) code emits and *then* automatically supresses every finding of `[warning]` or `[notice]` level (but not `[failure]`). 
-On first run code appends a line to `Get-ComputerHealth.sigs-to-suppress.txt` to note that the first-time supression was performed. The line has this format: `POLICY_TEST_WAS_RUN: HealthTest-PolicyOpenPorts` (which allows code to distinguish the first run from every other). After the first run no automatic suppression is performed again.
+Policy tests are those tagged with 'P' (example `HealthTest-InstalledSW__P`). They use Write-Warning to emit messages of levels `[warning]` or `[notice]` for every policy deviation finding. Serious failures that are not a matter of policy can still use the `[failure]` level. The first time a policy test is run (and provided that `-DontAutosetPolicy` was not used) code emits and *then* automatically supresses every finding of `[warning]` or `[notice]` level (but not `[failure]`). 
+On first run code appends a line to `Get-ComputerHealth.sigs-to-suppress.txt` to note that the first-time supression was performed. The line has this format: `POLICY_TEST_WAS_RUN: InstalledSW` (which allows code to distinguish the first run from every other). After the first run no automatic suppression is performed again. Note that the full function name `HealthTest-InstalledSW__P` results in just `InstalledSW` being written (for brevity and resistance to changes in tags). Code that reads signatures from `Get-ComputerHealth.sigs-to-suppress.txt` ignores these lines.
 
-This automatic suppression on first run only, allows developers of get-computerhealth to add policy tests without anoying users with new findings. The existing policy status of the system is automatically considered the accepted baseline. 
+This automatic suppression on first run only, allows developers of get-computerhealth to add policy tests without anoying users with new findings (the existing policy status of the system is automatically considered the accepted baseline). 
 
-An example of such a policy test which is on our todo list is `HealthTest-InstalledSW__P`.
+An example of such a policy test which you can implement to test this change is `HealthTest-InstalledSW__P`:
+
+```
+function Get-InstalledSW {
+    #.SYNOPSIS
+    # Gets an exhaustive list of all installed software, avoiding WMI/Win32_Product.
+    #
+    # .DESCRIPTION
+    # Uses .NET Registry classes to explicitly query 64-bit, 32-bit, and User registry hives,
+    # bypassing PowerShell provider bitness redirection. Queries Appx packages safely.
+    # Leaves deduplication to the caller to prevent data loss.
+    # Everything that would show up in the "Add or Remove Programs" control panel should be listed.
+    [CmdletBinding()]
+    param ()
+
+    $installedSoftware = [System.Collections.Generic.List[PSCustomObject]]::new()
+
+    # 1. .NET Registry Scrape (Fast, Bitness-Aware)
+    $registryTargets = @(
+        @{ Hive = [Microsoft.Win32.RegistryHive]::LocalMachine; View = [Microsoft.Win32.RegistryView]::Registry64; Scope = 'Machine'; Arch = '64-bit' },
+        @{ Hive = [Microsoft.Win32.RegistryHive]::LocalMachine; View = [Microsoft.Win32.RegistryView]::Registry32; Scope = 'Machine'; Arch = '32-bit' },
+        @{ Hive = [Microsoft.Win32.RegistryHive]::CurrentUser;  View = [Microsoft.Win32.RegistryView]::Default;    Scope = 'User';    Arch = 'Native' }
+    )
+
+    $baseKeyPath = "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"
+
+    Write-Verbose "Scanning Registry for desktop applications via .NET..."
+    
+    foreach ($target in $registryTargets) {
+        try {
+            $baseKey = [Microsoft.Win32.RegistryKey]::OpenBaseKey($target.Hive, $target.View)
+            $uninstallKey = $baseKey.OpenSubKey($baseKeyPath)
+
+            if ($uninstallKey) {
+                foreach ($subKeyName in $uninstallKey.GetSubKeyNames()) {
+                    $appKey = $uninstallKey.OpenSubKey($subKeyName)
+                    if (-not $appKey) { continue }
+
+                    $displayName = $appKey.GetValue("DisplayName") -as [string]
+                    
+                    # Skip if it doesn't have a name (not a real tracked install)
+                    if ([string]::IsNullOrWhiteSpace($displayName)) { 
+                        $appKey.Close()
+                        continue 
+                    }
+
+                    # Attempt to parse YYYYMMDD into a DateTime object
+                    $rawDate = $appKey.GetValue("InstallDate") -as [string]
+                    $parsedDate = $null
+                    if ($rawDate -match '^\d{8}$') {
+                        try { $parsedDate = [datetime]::ParseExact($rawDate, 'yyyyMMdd', $null) } catch { }
+                    }
+
+                    $installedSoftware.Add([PSCustomObject]@{
+                        Name              = $displayName.Trim()
+                        Version           = $appKey.GetValue("DisplayVersion") -as [string]
+                        Publisher         = $appKey.GetValue("Publisher") -as [string]
+                        InstallDate       = $parsedDate
+                        UninstallString   = $appKey.GetValue("UninstallString") -as [string]
+                        RegistryKeyName   = $subKeyName
+                        AppxPackageName   = $null
+                        Source            = "Registry"
+                        Scope             = $target.Scope
+                        Architecture      = $target.Arch
+                        IsSystemComponent = ($appKey.GetValue("SystemComponent") -eq 1)
+                        IsFramework       = $null
+                    })
+                    $appKey.Close()
+                }
+                $uninstallKey.Close()
+            }
+            $baseKey.Close()
+        }
+        catch {
+            Write-Warning "Failed to read registry target $($target.Hive) ($($target.Arch)): $_"
+        }
+    }
+
+    # 2. AppxPackage Scrape (Safe, Cmdlet-Aware)
+    Write-Verbose "Scanning Appx packages..."
+    
+    if (Get-Command Get-AppxPackage -ErrorAction SilentlyContinue) {
+        $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+        
+        try {
+            if ($isAdmin) {
+                $appxPackages = Get-AppxPackage -AllUsers -ErrorAction Stop
+                $appxScope = "Machine (All Users)"
+            } else {
+                Write-Verbose "Running without Administrator rights. Appx packages limited to current user."
+                $appxPackages = Get-AppxPackage -ErrorAction Stop
+                $appxScope = "User"
+            }
+
+            foreach ($app in $appxPackages) {
+                $installedSoftware.Add([PSCustomObject]@{
+                    Name              = $app.Name
+                    Version           = $app.Version
+                    Publisher         = $app.Publisher
+                    InstallDate       = $null # not exposed by Appx
+                    UninstallString   = $null # not exposed by Appx
+                    RegistryKeyName   = $null
+                    AppxPackageName   = $app.PackageFullName
+                    Source            = "Appx"
+                    Scope             = $appxScope
+                    Architecture      = $app.Architecture.ToString()
+                    IsSystemComponent = $null
+                    IsFramework       = $app.IsFramework
+                })
+            }
+        }
+        catch {
+            Write-Warning "Failed to query Appx Packages: $_"
+        }
+    } else {
+        Write-Verbose "Get-AppxPackage cmdlet not found. Skipping Appx scan (expected on Server Core)."
+    }
+
+    # Output the raw array (Deduplication / Filtering is left to the caller)
+    $installedSoftware
+}
+
+function Get-NormalizedSoftwareName {
+    #.SYNOPSIS
+    # Simplifies software names to their core product identifier to prevent false positives from minor version or date updates.
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
+        [string]$Name
+    )
+
+    process {
+        $cleanName = $Name
+
+        # Remove Noise Words (version, release, Preview)
+        $cleanName = $cleanName -replace '(?i)\b(version|release|preview|edition)\b', ' '
+
+        # Remove Bitness Indicators (x64, x86, amd64, 64-bit, 32-bit)
+        $cleanName = $cleanName -replace '(?i)\b(x64|x86|amd64|64-?bit|32-?bit)\b', ' '
+
+        # Replace Dates (YYYYMMDD, YYYY-MM-DD, MM/DD/YYYY) with DATE
+        # Matches formats like 20240203, 01/28/2016, 2024-02-03
+        $cleanName = $cleanName -replace '\b(20\d{2}[-./]?\d{2}[-./]?\d{2}|\d{2}[-./]\d{2}[-./]20\d{2})\b', 'DATE'
+
+        # Replace 20YYMMDD with DATE even without surounding word limits (BUT NOT inside biger numbers)
+        $cleanName = $cleanName -replace '([^\d])20\d{2}[-./]?\d{2}[-./]?\d{2}([^\d])', '$1DATE$2'
+
+        # Replace Minor Versions but keep Major (e.g., 4.6.2 -> 4.VER)
+        # Looks for a number followed by one or more dot-number sequences
+        $cleanName = $cleanName -replace '\b(\d+)\.\d+(\.\d+)*\b', '$1.VER'
+
+        # Replace brackets and commas with spaces
+        $cleanName = $cleanName -replace '[\(\)\{\}\[\],]', ' '
+
+        # Clean up hanging dashes/dots often left behind by removed versions
+        $cleanName = $cleanName -replace '\s-\s', ' '
+
+        # Condense multiple spaces into a single space and trim edges
+        $cleanName = $cleanName -replace '\s+', ' '
+        
+        return $cleanName.Trim()
+    }
+}
+
+function HealthTest-InstalledSW__P {
+    Get-InstalledSW | %{ 
+        $normalizedName = Get-NormalizedSoftwareName $_.Name
+        Log-Notice "Found this program installed: $normalizedName" -Comment "Full program name: $($_.Name); Publisher: $($_.Publisher); Installation Date: $($_.InstallDate)"
+    }
+}
+
+```
 
 ## Quick Essential Tests
 
 Quick Essential tests are those tagged with `E`. When using the todo switch `-SkipNonEssentialTests` (alias `-Quick`) only Quick Essential tests will be executed.
+
+This mode of operation should also be supported by `Invoke-GetHealthDomainComputers.ps1`.
+In fact Invoke-GetHealthDomainComputers.ps1 should, if possible, be copying all extra arguments from its command line to Invoke-GetComputerHealth.ps1. If we do this `-SkipNonEssentialTests` will automatically be supported
+
+## Tag the essential tests with `E`
+
+## I think `-PushUpdate` is causing unnecessary attempt to updates
+
+It seems that the zip is extracted even when it is the same as the one used during the last run.
+(Invoke-GetHealthDomainComputers.ps1)
 
 ## New & Renamed switchs
 
@@ -35,6 +219,8 @@ Rename `-DebugSkipSlowTests` to `-SkipSlowTests` but keep `-DebugSkipSlowTests` 
 E.g. "HealthTest-ScheduledTasks".
 If comment is empty it is set.
 This helps with rerunning only the tests that failed to check if a finding is transient.
+
+
 
 ## Review the hundrends of warnings from Invoke-ScriptAnalyzer (and 3 errors)
 
@@ -363,180 +549,6 @@ function Test-BitLockerRecoveryInAD($computerName){
   if(($ri | Measure-Object).Count -gt 0){ Log-pass ("BitLocker recovery objects present for this computer ($($ri.Count))") } else { Log-failure "No BitLocker recovery objects found for this computer in AD" }
 }
 
-
-```
-
-## List installed SW
-
-```
-c:\it\bin\run-script-on-allDomainServers.ps1 -SkipHosts ac2,epsilonnet -code {
-function Get-InstalledSW {
-    #.SYNOPSIS
-    # Gets an exhaustive list of all installed software, avoiding WMI/Win32_Product.
-    #
-    # .DESCRIPTION
-    # Uses .NET Registry classes to explicitly query 64-bit, 32-bit, and User registry hives,
-    # bypassing PowerShell provider bitness redirection. Queries Appx packages safely.
-    # Leaves deduplication to the caller to prevent data loss.
-    # Everything that would show up in the "Add or Remove Programs" control panel should be listed.
-    [CmdletBinding()]
-    param ()
-
-    $installedSoftware = [System.Collections.Generic.List[PSCustomObject]]::new()
-
-    # 1. .NET Registry Scrape (Fast, Bitness-Aware)
-    $registryTargets = @(
-        @{ Hive = [Microsoft.Win32.RegistryHive]::LocalMachine; View = [Microsoft.Win32.RegistryView]::Registry64; Scope = 'Machine'; Arch = '64-bit' },
-        @{ Hive = [Microsoft.Win32.RegistryHive]::LocalMachine; View = [Microsoft.Win32.RegistryView]::Registry32; Scope = 'Machine'; Arch = '32-bit' },
-        @{ Hive = [Microsoft.Win32.RegistryHive]::CurrentUser;  View = [Microsoft.Win32.RegistryView]::Default;    Scope = 'User';    Arch = 'Native' }
-    )
-
-    $baseKeyPath = "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"
-
-    Write-Verbose "Scanning Registry for desktop applications via .NET..."
-    
-    foreach ($target in $registryTargets) {
-        try {
-            $baseKey = [Microsoft.Win32.RegistryKey]::OpenBaseKey($target.Hive, $target.View)
-            $uninstallKey = $baseKey.OpenSubKey($baseKeyPath)
-
-            if ($uninstallKey) {
-                foreach ($subKeyName in $uninstallKey.GetSubKeyNames()) {
-                    $appKey = $uninstallKey.OpenSubKey($subKeyName)
-                    if (-not $appKey) { continue }
-
-                    $displayName = $appKey.GetValue("DisplayName") -as [string]
-                    
-                    # Skip if it doesn't have a name (not a real tracked install)
-                    if ([string]::IsNullOrWhiteSpace($displayName)) { 
-                        $appKey.Close()
-                        continue 
-                    }
-
-                    # Attempt to parse YYYYMMDD into a DateTime object
-                    $rawDate = $appKey.GetValue("InstallDate") -as [string]
-                    $parsedDate = $null
-                    if ($rawDate -match '^\d{8}$') {
-                        try { $parsedDate = [datetime]::ParseExact($rawDate, 'yyyyMMdd', $null) } catch { }
-                    }
-
-                    $installedSoftware.Add([PSCustomObject]@{
-                        Name              = $displayName.Trim()
-                        Version           = $appKey.GetValue("DisplayVersion") -as [string]
-                        Publisher         = $appKey.GetValue("Publisher") -as [string]
-                        InstallDate       = $parsedDate
-                        UninstallString   = $appKey.GetValue("UninstallString") -as [string]
-                        RegistryKeyName   = $subKeyName
-                        AppxPackageName   = $null
-                        Source            = "Registry"
-                        Scope             = $target.Scope
-                        Architecture      = $target.Arch
-                        IsSystemComponent = ($appKey.GetValue("SystemComponent") -eq 1)
-                        IsFramework       = $null
-                    })
-                    $appKey.Close()
-                }
-                $uninstallKey.Close()
-            }
-            $baseKey.Close()
-        }
-        catch {
-            Write-Warning "Failed to read registry target $($target.Hive) ($($target.Arch)): $_"
-        }
-    }
-
-    # 2. AppxPackage Scrape (Safe, Cmdlet-Aware)
-    Write-Verbose "Scanning Appx packages..."
-    
-    if (Get-Command Get-AppxPackage -ErrorAction SilentlyContinue) {
-        $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
-        
-        try {
-            if ($isAdmin) {
-                $appxPackages = Get-AppxPackage -AllUsers -ErrorAction Stop
-                $appxScope = "Machine (All Users)"
-            } else {
-                Write-Verbose "Running without Administrator rights. Appx packages limited to current user."
-                $appxPackages = Get-AppxPackage -ErrorAction Stop
-                $appxScope = "User"
-            }
-
-            foreach ($app in $appxPackages) {
-                $installedSoftware.Add([PSCustomObject]@{
-                    Name              = $app.Name
-                    Version           = $app.Version
-                    Publisher         = $app.Publisher
-                    InstallDate       = $null # not exposed by Appx
-                    UninstallString   = $null # not exposed by Appx
-                    RegistryKeyName   = $null
-                    AppxPackageName   = $app.PackageFullName
-                    Source            = "Appx"
-                    Scope             = $appxScope
-                    Architecture      = $app.Architecture.ToString()
-                    IsSystemComponent = $null
-                    IsFramework       = $app.IsFramework
-                })
-            }
-        }
-        catch {
-            Write-Warning "Failed to query Appx Packages: $_"
-        }
-    } else {
-        Write-Verbose "Get-AppxPackage cmdlet not found. Skipping Appx scan (expected on Server Core)."
-    }
-
-    # Output the raw array (Deduplication / Filtering is left to the caller)
-    $installedSoftware
-}
-
-function Get-NormalizedSoftwareName {
-    #.SYNOPSIS
-    # Simplifies software names to their core product identifier to prevent false positives from minor version or date updates.
-    [CmdletBinding()]
-    param (
-        [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
-        [string]$Name
-    )
-
-    process {
-        $cleanName = $Name
-
-        # Remove Noise Words (version, release, Preview)
-        $cleanName = $cleanName -replace '(?i)\b(version|release|preview|edition)\b', ' '
-
-        # Remove Bitness Indicators (x64, x86, amd64, 64-bit, 32-bit)
-        $cleanName = $cleanName -replace '(?i)\b(x64|x86|amd64|64-?bit|32-?bit)\b', ' '
-
-        # Replace Dates (YYYYMMDD, YYYY-MM-DD, MM/DD/YYYY) with DATE
-        # Matches formats like 20240203, 01/28/2016, 2024-02-03
-        $cleanName = $cleanName -replace '\b(20\d{2}[-./]?\d{2}[-./]?\d{2}|\d{2}[-./]\d{2}[-./]20\d{2})\b', 'DATE'
-
-        # Replace 20YYMMDD with DATE even without surounding word limits (BUT NOT inside biger numbers)
-        $cleanName = $cleanName -replace '([^\d])20\d{2}[-./]?\d{2}[-./]?\d{2}([^\d])', '$1DATE$2'
-
-        # Replace Minor Versions but keep Major (e.g., 4.6.2 -> 4.VER)
-        # Looks for a number followed by one or more dot-number sequences
-        $cleanName = $cleanName -replace '\b(\d+)\.\d+(\.\d+)*\b', '$1.VER'
-
-        # Replace brackets and commas with spaces
-        $cleanName = $cleanName -replace '[\(\)\{\}\[\],]', ' '
-
-        # Clean up hanging dashes/dots often left behind by removed versions
-        $cleanName = $cleanName -replace '\s-\s', ' '
-
-        # Condense multiple spaces into a single space and trim edges
-        $cleanName = $cleanName -replace '\s+', ' '
-        
-        return $cleanName.Trim()
-    }
-}
-
-function HealthTest-InstalledSW__P {
-    Get-InstalledSW | %{ 
-        $normalizedName = Get-NormalizedSoftwareName $_.Name
-        Log-Notice "Found this program installed: $normalizedName" -Comment "Full program name: $($_.Name); Publisher: $($_.Publisher); Installation Date: $($_.InstallDate)"
-    }
-}
 
 ```
 
