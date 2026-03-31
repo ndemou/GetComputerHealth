@@ -4,7 +4,51 @@
 
 Quick Essential tests are those tagged with `E`. When using the todo switch `-SkipNonEssentialTests` (alias `-Quick`) only Quick Essential tests will be executed.
 
-We must tag the essential tests with `E`. Start with AutoStartServicesRunning, DisksHaveFreeSpace and any that run under a second.
+We must tag these tests with `E` (they all run in under a second):
+  - HealthTest-DnsClientService
+  - HealthTest-HotfixBaseline
+  - HealthTest-BitLockerStatus
+  - HealthTest-CrashDumpSignals
+  - HealthTest-DhcpScopeUtilization
+  - HealthTest-DefaultLocale
+  - HealthTest-CertExpiry
+  - HealthTest-WinRMListening
+  - HealthTest-StartupItems
+  - HealthTest-RestrictAnonymous
+  - HealthTest-RequiredSrvRecords
+  - HealthTest-DomainARecordPointsToDcIp
+  - HealthTest-NtlmHardening
+  - HealthTest-GpWmiFilterNamespacesOnLocalHost
+  - HealthTest-SmbSigningRequired
+  - HealthTest-LocalAcntRequirePass
+  - HealthTest-RdpHardening
+  - HealthTest-EfsRecoveryAgents
+  - HealthTest-NetworkConnectionProfiles
+  - HealthTest-EventLogMaxSizes
+  - HealthTest-DnsSuffixMatchesDomain
+  - HealthTest-PagefileSanity
+  - HealthTest-LdapSigningChannelBinding
+  - HealthTest-Nic
+  - HealthTest-ShadowStorage
+  - HealthTest-NtfsDirtyBit
+  - HealthTest-DefenderStatus
+  - HealthTest-TimeSyncPolicy
+  - HealthTest-PendingReboot
+  - HealthTest-RecentWindowsScan
+  - HealthTest-NonDefaultShares
+  - HealthTest-DisksHaveFreeSpace
+  - HealthTest-InterfaceDnsServersUseDcs
+  - HealthTest-SchanelBaseline
+  - HealthTest-MalwareProtectionFeatures
+  - HealthTest-DnsSuffixBaseline
+  - HealthTest-WmiRepository
+  - HealthTest-AutoStartServicesRunning
+  - HealthTest-IPv6Binding
+  - HealthTest-ConnectivityToDCs
+  - HealthTest-DhcpInAd
+  - HealthTest-UpdateAge
+  - HealthTest-IisBindings
+  - HealthTest-UnexpectedListeningPorts
 
 This mode of operation should also be supported by `Invoke-GetHealthDomainComputers.ps1`.
 In fact Invoke-GetHealthDomainComputers.ps1 should, if possible, be copying 
