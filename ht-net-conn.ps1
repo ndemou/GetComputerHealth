@@ -28,7 +28,7 @@ FalsePositives: None.
 #>
   [CmdletBinding()]
   param()
-  
+
   $POPULAR_HOSTS = @('8.8.8.8','8.8.4.4','1.1.1.1','1.1.1.2')
   $hostFacts = $Global:GCHDQMTA
 
@@ -71,7 +71,7 @@ FalsePositives: None.
   }
 }
 
-function HealthTest-SingleDefaultGateway{
+function HealthTest-SingleDefaultGateway__S{
 <#
 .SYNOPSIS
 Checks Single Default Gateway
@@ -85,7 +85,7 @@ Uses: Get-NetIPConfiguration.
 FalsePositives: None.
 #>
   [CmdletBinding()] param([switch]$AllowOnePerFamily)
-if ($Global:GCHDQMTA.DebugSkipSlowTests) {Write-Warning "[info] Skipping slow test $($MyInvocation.MyCommand.Name) because of -DebugSkipSlowTests switch"; return}
+
   $cfg = Get-NetIPConfiguration
   $gws = @(
     $cfg | ForEach-Object {
@@ -286,7 +286,7 @@ function Test-MultipleGatewayConfiguration {
   }
 }
 
-function HealthTest-IPv6Binding{
+function HealthTest-IPv6Binding__S{
 <#
 .SYNOPSIS
 Checks I Pv 6 Binding
@@ -300,7 +300,7 @@ Uses: Get-NetAdapterBinding.
 FalsePositives: None.
 #>
   [CmdletBinding()] param([switch]$RequireEnabled)
-if ($Global:GCHDQMTA.DebugSkipSlowTests) {Write-Warning "[info] Skipping slow test $($MyInvocation.MyCommand.Name) because of -DebugSkipSlowTests switch"; return}
+
   $rows = Get-NetAdapterBinding -ComponentID ms_tcpip6 | Select-Object Name,Enabled
   if(-not $rows){ Write-Warning "[failure] No adapters returned for IPv6 binding (ms_tcpip6)"; return }
   $bad=$false

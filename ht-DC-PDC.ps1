@@ -114,7 +114,7 @@ FalsePositives: None.
 }
 
 
-function HealthTest-Dcdiag {
+function HealthTest-Dcdiag__S {
 <#
 .SYNOPSIS
 Checks Dcdiag
@@ -127,7 +127,7 @@ Impact: High(Time)
 Uses: Write-Progress.
 FalsePositives: None.
 #>
-    if ($Global:GCHDQMTA.DebugSkipSlowTests) {Write-Warning "[info] Skipping slow test $($MyInvocation.MyCommand.Name) because of -DebugSkipSlowTests switch"; return}
+
     write-progress "Runing DCDIAG /c /v"
     $AllTestResults = Get-DcDiagFailures -Comprehensive
     if($AllTestResults){
@@ -403,7 +403,7 @@ FalsePositives: None.
   if(-not $bad){ Write-Warning "[pass] SYSVOL does not grant write to broad principals (Everyone/Auth Users)" }
 }
 
-function HealthTest-DfsDiagTestDCs {
+function HealthTest-DfsDiagTestDCs__S {
 <#
 .SYNOPSIS
 Checks Dfs Diag Test D Cs
@@ -416,7 +416,7 @@ Impact: Medium(Time), High(Time)
 Uses: Write-Progress.
 FalsePositives: None.
 #>
-    if ($Global:GCHDQMTA.DebugSkipSlowTests) {Write-Warning "[info] Skipping slow test $($MyInvocation.MyCommand.Name) because of -DebugSkipSlowTests switch"; return}
+
     write-progress "Runing 'DFSDIAG /TestDCs'"
     $out=(DFSDIAG /TestDCs | sls -NotMatch '^$|^(Information|[A-Za-z]+ing|Success)[ :]|^Finished TestDcs[.] *$')
     if ($out) {
@@ -879,7 +879,7 @@ FalsePositives: None.
   Write-Warning "[pass] AD replication (RSAT): replication partner results healthy for $($me.HostName)."
 }
 
-function HealthTest-DisabledGpoLinksAtDomainRoot{
+function HealthTest-DisabledGpoLinksAtDomainRoot__S{
 <#
 .SYNOPSIS
 Checks Disabled Gpo Links At Domain Root
@@ -892,7 +892,7 @@ Impact: Medium(Time), High(Time)
 Uses: Get-GPO, Get-ADDomain, Get-GPOReport.
 FalsePositives: None.
 #>
-    if ($Global:GCHDQMTA.DebugSkipSlowTests) {Write-Warning "[info] Skipping slow test $($MyInvocation.MyCommand.Name) because of -DebugSkipSlowTests switch"; return}
+
   if(-not (Get-Command Get-GPO -ErrorAction SilentlyContinue)){
     Write-Warning "[warning] GroupPolicy cmdlets not available; install RSAT/GPMC (GroupPolicy module)."; return
   }
@@ -973,7 +973,7 @@ FalsePositives: None.
   }
 }
 
-function HealthTest-SysvolContentConsistency{
+function HealthTest-SysvolContentConsistency__S{
 <#
 .SYNOPSIS
 Checks Sysvol Content Consistency
@@ -986,7 +986,7 @@ Impact: High(Time)
 Uses: Get-ADDomainController.
 FalsePositives: None.
 #>
-    if ($Global:GCHDQMTA.DebugSkipSlowTests) {Write-Warning "[info] Skipping slow test $($MyInvocation.MyCommand.Name) because of -DebugSkipSlowTests switch"; return}
+
     $dom=(Get-CimInstance Win32_ComputerSystem).Domain
     $dcs=Get-ADDomainController -Filter * | Select-Object -ExpandProperty HostName
 

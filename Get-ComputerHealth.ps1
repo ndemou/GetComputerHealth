@@ -53,7 +53,7 @@ Default: empty (show all). Typical value: `DIP`
 (Parameter set: Run) Path to a folder containing `.ps1` files (or a single `.ps1` path). Files are loaded in an isolated module scope; any functions named `HealthTest-*` discovered are invoked.
 
 .PARAMETER DebugSkipSlowTests
-(Parameter set: Run) Skips a predefined subset of "slow" built-in tests (those gated by the script's `$DebugSkipSlowTests` check).
+(Parameter set: Run) Skips health tests tagged with `S` (slow) in their function name, such as `HealthTest-Example__S`.
 
 .PARAMETER DontAutosetPolicy
 (Parameter set: Run) Disables first-run auto-baselining for policy tests (tests tagged with `P`, e.g. `HealthTest-InstalledSW__P`). By default, first run auto-suppresses emitted `[notice]`/`[warning]` findings for each policy test and records a marker in the suppression file.
@@ -629,6 +629,7 @@ function Get-HealthTestTagsMetadata {
     FunctionName = $FunctionName
     TestName     = $normalizedTestName
     Tags         = @($tags)
+    IsSlowTest   = ('S' -in $tags)
     IsPolicyTest = ('P' -in $tags)
   }
 }
@@ -655,6 +656,10 @@ function Invoke-HealthTestWithPolicyAutoset {
   )
 
   $meta = Get-HealthTestTagsMetadata -FunctionName $FunctionName
+  if ($DebugSkipSlowTests -and $meta.IsSlowTest) {
+    Write-Warning "[info] Skipping slow test $FunctionName because of -DebugSkipSlowTests switch"
+    return
+  }
   $isPolicyTest = $meta.IsPolicyTest
   $policyTestName = $meta.TestName
   $shouldAutoset = $isPolicyTest -and (-not $DontAutosetPolicy) -and `
