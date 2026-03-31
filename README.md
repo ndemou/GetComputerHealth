@@ -210,14 +210,14 @@ New-ScheduledTaskForPSScript -ScriptPath "C:\IT\bin\Invoke-GetComputerHealth.ps1
 ```powershell
 # Executes Invoke-GetComputerHealth.ps1 with proper arguments to select all domain joined servers
 # Uses -PushUpdate so remotes are updated from the master's cached release zip (fewer GitHub calls).
-param([string]$Hide="DIP",[string]$OnlyTheseTests,[switch]$DebugSkipSlowTests,[switch]$NoSendMessage,[switch]$NoUpdate)
+param([string]$Hide="DIP",[string]$OnlyTheseTests,[switch]$SkipSlowTests,[switch]$SkipPolicyTests,[switch]$NoSendMessage,[switch]$NoUpdate)
 
 $IpsOfAllDcs = @(
   "10.10.0.10", # dc1
   "10.10.0.11"  # dc2
 )
 
-& c:\it\bin\Invoke-GetComputerHealth.ps1 -Computers "ALL_DOMAIN_SERVERS,workstation1,workstation2" -ExcludeServers "server1,server2" -Hide:$Hide -OnlyTheseTests $OnlyTheseTests -DebugSkipSlowTests:$DebugSkipSlowTests -NoSendMessage:$NoSendMessage -NoUpdate:$NoUpdate -PushUpdate -IpsOfAllDcs $IpsOfAllDcs
+& c:\it\bin\Invoke-GetComputerHealth.ps1 -Computers "ALL_DOMAIN_SERVERS,workstation1,workstation2" -ExcludeServers "server1,server2" -Hide:$Hide -OnlyTheseTests $OnlyTheseTests -SkipSlowTests:$SkipSlowTests -SkipPolicyTests:$SkipPolicyTests -NoSendMessage:$NoSendMessage -NoUpdate:$NoUpdate -PushUpdate -IpsOfAllDcs $IpsOfAllDcs
 ```
 
 `Invoke-GetHealthDomainComputers.ps1` must supply `-IpsOfAllDcs` when calling `Invoke-GetComputerHealth.ps1`.

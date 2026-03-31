@@ -52,8 +52,14 @@ Default: empty (show all). Typical value: `DIP`
 .PARAMETER IncludeTestsFromFolder
 (Parameter set: Run) Path to a folder containing `.ps1` files (or a single `.ps1` path). Files are loaded in an isolated module scope; any functions named `HealthTest-*` discovered are invoked.
 
-.PARAMETER DebugSkipSlowTests
+.PARAMETER SkipSlowTests
 (Parameter set: Run) Skips health tests tagged with `S` (slow) in their function name, such as `HealthTest-Example__S`.
+
+.PARAMETER DebugSkipSlowTests
+(Parameter set: Run) Alias for `-SkipSlowTests` (kept for backward compatibility).
+
+.PARAMETER SkipPolicyTests
+(Parameter set: Run) Skips health tests tagged with `P` (policy) in their function name, such as `HealthTest-InstalledSW__P`.
 
 .PARAMETER DontAutosetPolicy
 (Parameter set: Run) Disables first-run auto-baselining for policy tests (tests tagged with `P`, e.g. `HealthTest-InstalledSW__P`). By default, first run auto-suppresses emitted `[notice]`/`[warning]` findings for each policy test and records a marker in the suppression file.
@@ -138,7 +144,11 @@ param(
   [string]$IncludeTestsFromFolder,
 
   [Parameter(ParameterSetName='Run')]
-  [switch]$DebugSkipSlowTests,
+  [Alias('DebugSkipSlowTests')]
+  [switch]$SkipSlowTests,
+
+  [Parameter(ParameterSetName='Run')]
+  [switch]$SkipPolicyTests,
 
   [Parameter(ParameterSetName='Run')]
   [switch]$DontAutosetPolicy,
@@ -656,8 +666,12 @@ function Invoke-HealthTestWithPolicyAutoset {
   )
 
   $meta = Get-HealthTestTagsMetadata -FunctionName $FunctionName
-  if ($DebugSkipSlowTests -and $meta.IsSlowTest) {
-    Log-Info "Skipping slow test $FunctionName because of -DebugSkipSlowTests switch"
+  if ($SkipSlowTests -and $meta.IsSlowTest) {
+    Log-Info "Skipping slow test $FunctionName because of -SkipSlowTests switch"
+    return
+  }
+  if ($SkipPolicyTests -and $meta.IsPolicyTest) {
+    Log-Info "Skipping policy test $FunctionName because of -SkipPolicyTests switch"
     return
   }
   $isPolicyTest = $meta.IsPolicyTest
@@ -806,7 +820,7 @@ $Global:GCHDQMTA = [pscustomobject]@{
     isHostHyperisor        = $isHostHyperisor
     isHostInDomainButNotDC = $isHostInDomainButNotDC
     GetCurrentDomain       = $currentDomain
-    DebugSkipSlowTests     = $DebugSkipSlowTests
+    SkipSlowTests          = $SkipSlowTests
     IpsOfAllDcs            = @($validIpsOfAllDcs)
 }
 
