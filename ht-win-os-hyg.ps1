@@ -1150,7 +1150,7 @@ FalsePositives: None.
         Write-Warning "[pass] No unexpected accounts in Local Administrators"}
 }
 
-function HealthTest-UnexpectedListeningPorts__SE {
+function HealthTest-UnexpectedListeningPorts__S {
 <#
 .SYNOPSIS
 Checks Unexpected Listening Ports
