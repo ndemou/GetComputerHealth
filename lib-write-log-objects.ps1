@@ -421,19 +421,31 @@ function Log-Msg {
 
   if ((-not $script:cfgOutputConsoleMessages) -or $Hide) { return }
 
+  function Write-ConsoleMetadataLines {
+    param(
+      [string]$CommentText,
+      [string]$EmitterText
+    )
+
+    if ($CommentText -and ($script:cfgHideStr -notlike '*C*')) {
+      if ($CommentText -match '\n') {
+        ($CommentText -replace '^(?:\s*\r?\n)+|(?:\s*\r?\n)+$', '') -split '\n' | %{ Write-Host -ForegroundColor DarkGray "  #       $_" }
+      } else {
+        Write-Host -ForegroundColor DarkGray "  #       $CommentText"
+      }
+    }
+
+    if ($EmitterText) {
+      Write-Host -ForegroundColor DarkGray "  #       Emitter: $EmitterText"
+    }
+  }
+
   if ($must_suppress_sig) {
     if ($script:cfgHideStr -like '*S*') { return }
     Write-Host -ForegroundColor DarkGreen -NoNewline '  SUPRSD :'
     Write-Host -ForegroundColor DarkGray -NoNewline (" [{0}] " -f $sig)
     Write-Host -ForegroundColor DarkGray $Msg
-
-    if ($Comment -and ($script:cfgHideStr -notlike '*C*')) {
-      if ($Comment -match '\n') {
-        ($Comment -replace '^(?:\s*\r?\n)+|(?:\s*\r?\n)+$', '') -split '\n' | %{ Write-Host -ForegroundColor DarkGray "  #       $_" }
-      } else {
-        Write-Host -ForegroundColor DarkGray "  #       $Comment"
-      }
-    }
+    Write-ConsoleMetadataLines -CommentText $Comment -EmitterText $logEmitter
     return
   }
 
@@ -443,14 +455,7 @@ function Log-Msg {
   Write-Host -ForegroundColor $LabelColor -NoNewline ('  {0}' -f $LabelText)
   Write-Host -ForegroundColor $SigColor   -NoNewline (" [{0}] " -f $sig)
   Write-Host -ForegroundColor $MsgColor    $Msg
-
-  if ($Comment -and ($script:cfgHideStr -notlike '*C*')) {
-    if ($Comment -match '\n') {
-      ($Comment -replace '^(?:\s*\r?\n)+|(?:\s*\r?\n)+$', '') -split '\n' | %{ Write-Host -ForegroundColor DarkGray "  #       $_" }
-    } else {
-      Write-Host -ForegroundColor DarkGray "  #       $Comment"
-    }
-  }
+  Write-ConsoleMetadataLines -CommentText $Comment -EmitterText $logEmitter
 }
 
 # Convenience functions (e.g. Log-Debug "..." instead of Log-Msg "Debug" "...")

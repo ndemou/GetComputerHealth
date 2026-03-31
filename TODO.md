@@ -18,7 +18,6 @@ Applied GetComputerHealth update from zip 'GetComputerHealth-3.0.4.zip'
 [pass 1/2] Updating from provided zip 'C:\it\temp\GetComputerHealth-3.0.4.zip'
 Expanding release zip 'C:\it\temp\GetComputerHealth-3.0.4.zip'
 ```
-
 ## Add the "P" Tag to these functions:
   - HealthTest-NonMicrosoftServices__S
   - HealthTest-NonDefaultShares
