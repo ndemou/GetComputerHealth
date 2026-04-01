@@ -10,58 +10,36 @@
 2. Create a `.ps1` file with any name you like (e.g. `"tests-for-$env:COMPUTERNAME.ps1"`):
 
    ```powershell
-   # If you wish, you can have helper functions (or dot-source them).
+   # You *can* have helper functions and dot-source other ps1 files
      
-   # This is the function that implemets the test.
-   # It's name starts with HealthTest-. and it doesn't return anything.
-   # It outputs either information for a passed test or findings using  Write-Warning.
+   # This function implemets the test, it's name starts with HealthTest-. and it returns nothing
    function HealthTest-LargeDirectories {
        $issueFound = $false
-       # Don't bother catching exceptions if you can't work around them.
-       # The caller catches and reports them nicely.
        foreach ($dir in Find-LargeDirectory -Path 'C:\' -Threshold 10000) {
            $issueFound = $true
 
            # The synopsis should be a single terse line, that uniqely identifies the problem.
-           # The synopsis should not change if the essense of the issue remains the same.
-           # So this is good:
-           $synopsis = "Directory $($dir.Path) has more than 10000 child items"
-		   #
-           # And this is a bad:
-           # $synopsis = "Directory $($dir.Path) has $($dir.ItemsCount) items"
-		   #
-		   # Note that both the bad and the good synopsis contain variables but
-		   # the variable on the good message ($dir.path) is an essential part of 
-		   # the finding (which folder has too many files), while the variable
-		   # in the bad synopsis is not. Rather it adds information that may change
-           # even if the issue remains (e.g. if a file is added, ItemsCount will
-		   # increase while the fact that this specific folder has too many files 
-		   # will not change).
+           $issueSynopsis = "Directory $($dir.Path) has more than 10000 child items"
    
-           # The optional details can contain one or more lines(up to 32K characters)
-		   # and there's no other limitation on what you can include in them. 
-		   # If you do include details you must prefix them with a newline:
-           $details = "`n" +"$($dir.ItemsCount) items" + "`n" + `
+           # You can emit optional text details along with the synopsis. 
+           # You can have multiple lines and up to 32K characters.
+           $details = "$($dir.ItemsCount) items" + "`n" + `
                "Most of them ($(dir.MostCommonExtCount)) are .$(dir.MostCommonExt)"
-		   # If you don't want to include details, set $details = ""
    
-           # We use [notice] here, which is the lightest level for a finding.
-           # You can also use [warning], and [failure] for more sever findings
-           # and [info] for non-findings (informational messages).
-		   Write-Warning "[notice] $synopsis$details"
+           # Chose between [notice],[warning] and [failure]
+           Write-Warning "[notice] $issueSynopsis" + "`n" + $details
+           # If you have no $details to include this is enough:
+           #    Write-Warning "[notice] $issueSynopsis"
        }
        if (-not $issueFound) {
-           $synopsis = "No directories found with >10000 items"
-           $details = "" 
-           Write-Warning "[pass] $synopsis$details"
-           # Note a counter-intuitive fact: we *always* report using Write-Warning, 
-		   # even for *passed* tests.
+           Write-Warning "[pass] No directories found with >10000 items"
+           # Notice that we also use Write-Warning to report a passed test
        }
    }
 
    # You can have more than one HealthTest-... functions.
    
-   # Do not write any other code outside of functions. 
+   # But don't write any code besides functions. 
    ```
 3. Test your function:
    ```powershell
@@ -76,6 +54,33 @@
    ```
 
 If you wish you can have more than one .ps1 files in `C:\IT\config\Custom-HealthTests\`
+
+## How to write a good synopsis
+
+The synopsis should not change if the essense of the issue remains the same. 
+So this synopsis is good:
+
+```
+$synopsis = "Directory $($dir.Path) has more than 10000 child items"
+```
+
+But this is a bad:
+
+```
+$synopsis = "Directory $($dir.Path) has $($dir.ItemsCount) items"
+```
+
+It's bad because the text will change even if just one file is added. But that change will be irelevant: it's hardly any more of a problem to have a folder with 10002 files compared to a folder with 10001.
+
+  > Note that both the bad and the good synopsis contain variables but
+  > the variable on the good message ($dir.path) is an essential part of 
+  > the finding (which folder has too many files), while the variable
+  > in the bad synopsis only adds an irelevant detail/noise.
+
+## Error handling
+
+Don't bother catching exceptions if you can't work around them.
+The caller catches and reports exceptions nicely.
 
 ## Runtime context available to custom health tests
 
@@ -96,7 +101,7 @@ Available properties include these self-documenting booleans:
 
 And `.GetCurrentDomain = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain()`
 
-## Optional
+## Optional features
 
 Consider the "Optional Features for Health Tests" mentioned in `How-to-add-built-in-health-tests.md`. They are not mandatory however.
 
