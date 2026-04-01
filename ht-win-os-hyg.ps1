@@ -373,6 +373,42 @@ FalsePositives: None.
   param([string[]]$WhitelistDeviceIdRegex = @('^BTHENUM\\'))
 
   $bad=$false
+  $canUseAppLocker = $null -ne (Get-Command Get-AppLockerFileInformation -ErrorAction SilentlyContinue)
+  $signatureCache = @{}
+  $TestDriverSignature = {
+    param([string]$DriverPath,[string]$DeviceName)
+
+    if([string]::IsNullOrWhiteSpace($DriverPath) -or -not (Test-Path $DriverPath)){
+      return @{ IsSigned = $false; Source = 'Missing' }
+    }
+
+    if($signatureCache.ContainsKey($DriverPath)){ return $signatureCache[$DriverPath] }
+
+    $result = @{ IsSigned = $false; Source = 'None' }
+    $sig = Get-AuthenticodeSignature $DriverPath
+    if($sig.Status -eq 'Valid'){
+      $result = @{ IsSigned = $true; Source = 'Authenticode' }
+      $signatureCache[$DriverPath] = $result
+      return $result
+    }
+
+    if($canUseAppLocker){
+      try{
+        $appLockerInfo = Get-AppLockerFileInformation -Path $DriverPath -ErrorAction Stop
+        if($appLockerInfo.Publisher -and $appLockerInfo.Publisher.PublisherName){
+          $result = @{ IsSigned = $true; Source = 'Catalog' }
+        }
+      } catch {}
+    }
+
+    $signatureCache[$DriverPath] = $result
+    return $result
+  }
+
+  if(-not $canUseAppLocker){
+    Write-Warning "[notice] Get-AppLockerFileInformation is unavailable. Driver signing checks may produce more false positives on catalog-signed drivers."
+  }
+
   $drivers = Get-CimInstance Win32_PnPSignedDriver -ErrorAction SilentlyContinue | Where-Object { -not [string]::IsNullOrWhiteSpace($_.DeviceName) }
 
   foreach($d in $drivers){
@@ -419,9 +455,9 @@ FalsePositives: None.
               $full = $expanded -replace '^\s*\\SystemRoot', "$env:SystemRoot"
               $sysPath = ($full -split '\s+')[0]
               if(Test-Path $sysPath){
-                $sig = Get-AuthenticodeSignature $sysPath
-                if($sig.Status -eq 'Valid'){
-                  Write-Warning (("[notice] Benign logical child without INF: {0} (ParentSvc={1}, Signed={2})" -f $d.DeviceName,$svc,$sig.SignerCertificate.Subject))
+                $validation = & $TestDriverSignature -DriverPath $sysPath -DeviceName $d.DeviceName
+                if($validation.IsSigned){
+                  Write-Warning (("[notice] Benign logical child without INF: {0} (ParentSvc={1}, SignatureSource={2})" -f $d.DeviceName,$svc,$validation.Source))
                   continue
                 }
               }
@@ -444,8 +480,8 @@ FalsePositives: None.
             $path = $null
             if($p1 -and (Test-Path $p1)){ $path=$p1 } elseif($p2 -and (Test-Path $p2)){ $path=$p2 }
             if($path){
-              $sig = Get-AuthenticodeSignature $path
-              if($sig.Status -ne 'Valid'){ $anyBad=$true }
+              $validation = & $TestDriverSignature -DriverPath $path -DeviceName $d.DeviceName
+              if(-not $validation.IsSigned){ $anyBad=$true }
             }
           }
           if(-not $anyBad){
