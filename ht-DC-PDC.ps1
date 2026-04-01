@@ -137,7 +137,7 @@ FalsePositives: None.
           $testName = $_.failureline -replace '^[ .]*'
           if($_.Test -in $BasicTestResults.Test){
             $interesting_lines = (($_.BlockText -split "`n"|?{$_.trim()}|sls -NotMatch '\bno ([A-Za-z]+ )?errors?\b|\bPASS +FAIL\b|\.\.\.\.\.\..* failed test ').line|sls 'error|fail').line -replace '^ +'
-            if ($testName -in @('DFSREvent','SystemLog')) {
+            if ($testName -like '*DFSREvent*' -or $testName -like '*SystemLog*') {
                 Write-Warning "[notice] 'DCDIAG /v' reports a failure in this basic test that examines the event log: $testName`nSince this test fails when warnings/errors appear in the event log, false positives are likely.`nRun DCDIAG /v, search for '$testName' and examine the detailed report above it.`nBelow are lines from that report that contain words like error/fail:`n$interesting_lines"
             } else {
                 Write-Warning "[failure] 'DCDIAG /v' reports a failure in this basic test: $testName`nRun DCDIAG /v, search for '$testName' and examine the detailed report above it.`nBelow are lines from that report that contain words like error/fail:`n$interesting_lines"

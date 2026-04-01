@@ -1,23 +1,5 @@
 # TODO
 
-## I think `-PushUpdate` is causing unnecessary attempt to updates
-
-Regarding the updater: It seems that the zip is expanded even when it has the same version tag and the same hash as the one already installed.
-(Invoke-GetHealthDomainComputers.ps1). At least this happens with the -PushUpdate option but I think we could easily avoid the waste of time.
-
-Example:
-```
-# FIRST EXECUTION (UPDATE IS NEEDED)
-[pass 1/2] Parameters: Reinstall=False UpdateFromZip='C:\it\temp\GetComputerHealth-3.0.4.zip' ForceRefreshReleaseMetadata=False SelfRerunCount=0 PersistReleaseMarker=''
-[pass 1/2] Updating from provided zip 'C:\it\temp\GetComputerHealth-3.0.4.zip'
-Expanding release zip 'C:\it\temp\GetComputerHealth-3.0.4.zip'
-Applied GetComputerHealth update from zip 'GetComputerHealth-3.0.4.zip'   
-
-# SECOND EXECUTION (UPDATE NOT NEEDED)
-[pass 1/2] Parameters: Reinstall=False UpdateFromZip='C:\it\temp\GetComputerHealth-3.0.4.zip' ForceRefreshReleaseMetadata=False SelfRerunCount=0 PersistReleaseMarker=''
-[pass 1/2] Updating from provided zip 'C:\it\temp\GetComputerHealth-3.0.4.zip'
-Expanding release zip 'C:\it\temp\GetComputerHealth-3.0.4.zip'
-```
 ## Add the "P" Tag to these functions:
   - HealthTest-NonMicrosoftServices__S
   - HealthTest-NonDefaultShares
@@ -31,11 +13,17 @@ So after this change all services are to be reported (including Microsoft ones),
 shares(including default ones) and all administrators and all roles.
 Thus we also need to adjust the function names accordingly: NonMicrosoftServices -> Services; NonDefaultShares -> Shares
 
-## I don't have tests that verify a TCP port is indeed open, or a SW is indeed installed
+## REQUIRED signatures
 
-At least for ports this is often a very important indicator of "everything's good".
+I don't have tests that verify a TCP port is expected to be open. This is often a very important indicator of "everything's good". Imagine this rule:
+```
+{'type':'REQUIRED_FINDING', 'TestName':'UnexpectedListeningPorts', 'Signature':'bfc162fa', 'Description':'Listening port 443', 'ts':'2025-11-01 12:42', 'User':'ndemou-admin'}
+```
+All such rules are loaded at the start of the program. If their HealthTest function is executed but does not emit the specified signature a failure is emitted: "Required finding did not surface during test: listening port 443"
 
-But I only have tests that check for any extra new open port.
+It's very useful (the deault mostly) for ports, installed SW, services and roles. 
+
+Must use the same json format for the suppression rules (but with 'type':'SUPPRESSED_FINDING') and for `{'type':'POLICY_TEST_WAS_RUN', 'TestName':'InstalledSW'}`
 
 ## Review the hundrends of warnings from Invoke-ScriptAnalyzer (and 3 errors)
 
