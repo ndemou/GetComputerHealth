@@ -267,7 +267,7 @@ C:\IT\bin\Get-ComputerHealth.ps1 -OutputConsoleMessages -OutputObjects -Hide DIP
 
 ## How to Add Custom Tests
 
-You do not need to modify the core library. [Follow these instructions](./how-to-add-custom-tests.md)
+You do not need to modify the core library. [Follow these instructions](./doc/how-to-add-custom-tests.md)
 
 # 5. Directory Structure Reference
 
