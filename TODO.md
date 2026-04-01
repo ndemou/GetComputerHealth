@@ -38,6 +38,10 @@ It's very useful (the deault mostly) for ports, installed SW, services and roles
 
 For now, I expect an admin that wants to use this feature, to manually edit `Get-ComputerHealth.state` and change `SUPPRESSED_FINDING` to `REQUIRED_FINDING`.
 
+
+## Use the new installer (~\dev\TI)
+
+
 ## Review the hundrends of warnings from Invoke-ScriptAnalyzer (and 3 errors)
 
 See also : .\tests\script-analysis.ps1
