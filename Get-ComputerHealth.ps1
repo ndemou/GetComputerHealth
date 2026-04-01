@@ -117,6 +117,14 @@ $out | Out-GridView
 
 [CmdletBinding(DefaultParameterSetName='Run')]
 param(
+  [Parameter(ParameterSetName='PrettifyWarning')]
+  [Alias('Prettify')]
+  [switch]$PrettifyWriteWarning,
+
+  [Parameter(ParameterSetName='PrettifyWarning', ValueFromPipeline=$true)]
+  [AllowNull()]
+  [object]$InputObject,
+
   # ----------------------------
   # Normal run (execute tests)
   # ----------------------------
@@ -321,43 +329,6 @@ FunctionName, Time, ElapsedMilliseconds, Output, Success, Error, Category, Reaso
     [string]$FunctionName
   )
 
-  function Convert-TextToLogRecord {
-    param([Parameter(Mandatory)][string]$Text)
-
-    $normalized = ($Text -replace "`r", '')
-    $lines = @($normalized -split "`n")
-    if (-not $lines -or ($lines.Count -eq 1 -and [string]::IsNullOrWhiteSpace($lines[0]))) {
-      return [pscustomobject]@{ Message=''; Comment='' }
-    }
-
-    $msg = [string]$lines[0]
-    $comment = ''
-    if ($lines.Count -gt 1) {
-      $comment = ($lines | Select-Object -Skip 1) -join "`n"
-    }
-    [pscustomobject]@{ Message=$msg.Trim(); Comment=$comment.Trim() }
-  }
-
-  function Convert-WarningRecordToLog {
-    param([Parameter(Mandatory)][System.Management.Automation.WarningRecord]$WarningRecord)
-
-    $parts = Convert-TextToLogRecord ([string]$WarningRecord.Message)
-    $level = 'warning'
-    $msg = $parts.Message
-    $comment = $parts.Comment
-
-    if ($parts.Message -match '^\s*\[([a-z]+)\]\s*(.*)$') {
-      $candidate = $matches[1].ToLowerInvariant()
-      if ($candidate -in @('debug','pass','info','notice','warning','failure')) {
-        $level = $candidate
-        $msg = [string]$matches[2]
-      }
-    }
-
-    if ([string]::IsNullOrWhiteSpace($msg)) { $msg = '<empty warning message>' }
-    Log-Msg -Level $level -Msg $msg.Trim() -Comment $comment
-  }
-
   $start_time = Get-Date
 
   $metaForExclude = Get-HealthTestTagsMetadata -FunctionName $FunctionName
@@ -396,7 +367,8 @@ FunctionName, Time, ElapsedMilliseconds, Output, Success, Error, Category, Reaso
 
     $result | ForEach-Object {
       if ($_ -is [System.Management.Automation.WarningRecord]) {
-        Convert-WarningRecordToLog $_
+        $record = Convert-WarningLikeObjectToLogRecord -Value $_
+        Log-Msg -Level $record.Level -Msg $record.Msg -Comment $record.Comment
         $cntProperRecord += 1
         if (($_.Message -as [string]) -match '^\s*\[\s*pass\s*\]') { $cntPassRecord += 1 }
       } elseif ($_ -and $_.PSObject.Properties['Hash'] -and $null -ne $_.PSObject.Properties['Message'] -and $_.PSObject.Properties['level']){
@@ -724,6 +696,75 @@ function Invoke-HealthTestWithPolicyAutoset {
   $records
 }
 
+function Convert-TextToLogRecord {
+  [CmdletBinding()]
+  param([Parameter(Mandatory)][string]$Text)
+
+  $normalized = ($Text -replace "`r", '')
+  $lines = @($normalized -split "`n")
+  if (-not $lines -or ($lines.Count -eq 1 -and [string]::IsNullOrWhiteSpace($lines[0]))) {
+    return [pscustomobject]@{ Message=''; Comment='' }
+  }
+
+  $msg = [string]$lines[0]
+  $comment = ''
+  if ($lines.Count -gt 1) {
+    $comment = ($lines | Select-Object -Skip 1) -join "`n"
+  }
+
+  [pscustomobject]@{ Message=$msg.Trim(); Comment=$comment.Trim() }
+}
+
+function Convert-WarningLikeObjectToLogRecord {
+  [CmdletBinding()]
+  param([AllowNull()][object]$Value)
+
+  if ($null -eq $Value) { return $null }
+
+  $rawText = if ($Value -is [System.Management.Automation.WarningRecord]) {
+    [string]$Value.Message
+  } else {
+    [string]$Value
+  }
+
+  $parts = Convert-TextToLogRecord -Text $rawText
+  $level = 'warning'
+  $msg = $parts.Message
+  $comment = $parts.Comment
+
+  if ($parts.Message -match '^\s*\[([a-z]+)\]\s*(.*)$') {
+    $candidate = $matches[1].ToLowerInvariant()
+    if ($candidate -in @('debug','pass','info','notice','warning','failure')) {
+      $level = $candidate
+      $msg = [string]$matches[2]
+    }
+  }
+
+  if ([string]::IsNullOrWhiteSpace($msg)) { $msg = '<empty warning message>' }
+  [pscustomobject]@{
+    Level = $level
+    Msg = $msg.Trim()
+    Comment = $comment
+  }
+}
+
+function Invoke-PrettifyWriteWarningMode {
+  [CmdletBinding()]
+  param([AllowNull()][object[]]$Values)
+
+  Initialize-LogSystem `
+    -OutputConsoleMessages $true `
+    -HideStr '' `
+    -SuppressionFilePath $script:Config.SuppressSignaturesPath `
+    -AdditionalSuppressedSignatures @()
+
+  foreach ($item in @($Values)) {
+    $record = Convert-WarningLikeObjectToLogRecord -Value $item
+    if ($null -eq $record) { continue }
+    Log-Msg -Level $record.Level -Msg $record.Msg -Comment $record.Comment
+  }
+}
+
 #=============================================================================
 #
 # MAIN CODE
@@ -737,6 +778,16 @@ function Invoke-HealthTestWithPolicyAutoset {
 # With this command we remove all HealthTest-* functions)
 Get-ChildItem Function:\HealthTest-*, Function:\Global:HealthTest-* -ErrorAction SilentlyContinue |
   Remove-Item -Force -ErrorAction SilentlyContinue
+
+if ($PrettifyWriteWarning) {
+  $pipelineValues = @($input)
+  $allValues = @($pipelineValues)
+  if ($PSBoundParameters.ContainsKey('InputObject')) {
+    $allValues += @($InputObject)
+  }
+  Invoke-PrettifyWriteWarningMode -Values $allValues
+  return
+}
 
 #+-----------------------------------------------------------
 #| Collect system information
