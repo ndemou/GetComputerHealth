@@ -15,7 +15,7 @@ Thus we also need to adjust the function names accordingly: NonMicrosoftServices
 
 ## New format for Get-ComputerHealth.sigs-to-suppress.txt
 
-Must use this json format for the lines of Get-ComputerHealth.sigs-to-suppress.txt:
+Must use this json-like format for the lines of Get-ComputerHealth.sigs-to-suppress.txt (all of the text inside `{...}` must be in one line):
 ```
 {'type':'SUPPRESSED_FINDING', 'TestName':'UnexpectedListeningPorts', 'Signature':'bfc162fa', 'Description':'Computer is listening to port 443', 'ts':'2025-11-01 12:42', 'User':'ndemou-admin'}
 
