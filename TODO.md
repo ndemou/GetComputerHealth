@@ -13,17 +13,30 @@ So after this change all services are to be reported (including Microsoft ones),
 shares(including default ones) and all administrators and all roles.
 Thus we also need to adjust the function names accordingly: NonMicrosoftServices -> Services; NonDefaultShares -> Shares
 
-## REQUIRED signatures
+## New format for Get-ComputerHealth.sigs-to-suppress.txt
 
-I don't have tests that verify a TCP port is expected to be open. This is often a very important indicator of "everything's good". Imagine this rule:
+Must use this json format for the lines of Get-ComputerHealth.sigs-to-suppress.txt:
+```
+{'type':'SUPPRESSED_FINDING', 'TestName':'UnexpectedListeningPorts', 'Signature':'bfc162fa', 'Description':'Computer is listening to port 443', 'ts':'2025-11-01 12:42', 'User':'ndemou-admin'}
+
+{'type':'POLICY_TEST_WAS_RUN', 'TestName':'InstalledSW', 'ts':'2025-11-01 12:42', 'User':'ndemou-admin'}
+```
+
+And rename it to `Get-ComputerHealth.state` (the updater needs to perform the rename on existing installations)
+
+## New feature: "*Required* Findings"
+
+I want a test that verifies a TCP port is indeed open (This is often a very important indicator of "everything's good"). 
+
+Imagine this rule in `Get-ComputerHealth.state`:
 ```
 {'type':'REQUIRED_FINDING', 'TestName':'UnexpectedListeningPorts', 'Signature':'bfc162fa', 'Description':'Listening port 443', 'ts':'2025-11-01 12:42', 'User':'ndemou-admin'}
 ```
-All such rules are loaded at the start of the program. If their HealthTest function is executed but does not emit the specified signature a failure is emitted: "Required finding did not surface during test: listening port 443"
+Rules like this are loaded at the start of the program. When the specified HealthTest function(`UnexpectedListeningPorts`) is executed all the finding signatures it emits are recorded. If they don't include the REQUIRED signature a failure is emitted: `[failure] This finding that must appear in a healthy system did not: Computer is listening to port 443`. If the function is not executed nothing happens.
 
-It's very useful (the deault mostly) for ports, installed SW, services and roles. 
+It's very useful (the deault mostly) for ports, installed SW, services and roles.
 
-Must use the same json format for the suppression rules (but with 'type':'SUPPRESSED_FINDING') and for `{'type':'POLICY_TEST_WAS_RUN', 'TestName':'InstalledSW'}`
+For now, I expect an admin that wants to use this feature, to manually edit `Get-ComputerHealth.state` and change `SUPPRESSED_FINDING` to `REQUIRED_FINDING`.
 
 ## Review the hundrends of warnings from Invoke-ScriptAnalyzer (and 3 errors)
 
