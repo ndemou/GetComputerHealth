@@ -780,10 +780,10 @@ Get-ChildItem Function:\HealthTest-*, Function:\Global:HealthTest-* -ErrorAction
   Remove-Item -Force -ErrorAction SilentlyContinue
 
 if ($PrettifyWriteWarning) {
-  $pipelineValues = @($input)
-  $allValues = @($pipelineValues)
-  if ($PSBoundParameters.ContainsKey('InputObject')) {
-    $allValues += @($InputObject)
+  $allValues = if ($PSBoundParameters.ContainsKey('InputObject')) {
+    @($InputObject)
+  } else {
+    @($input)
   }
   Invoke-PrettifyWriteWarningMode -Values $allValues
   return
