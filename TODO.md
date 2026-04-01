@@ -1,5 +1,18 @@
 # TODO
 
+## Add a new mode of operation to Get-ComputerHealth (prettify write warning)
+
+Example execution:
+```
+Write-Warning "[failure] message "+"`n"+"Comments..." | Get-ComputerHealth -PrettifyWriteWarning
+```
+
+If called like that it preety-prints to the console the warning stream as it would do if it was comming from a healthtest-function.
+
+Note in the documentation (how-to-add-custom-tests) that this is the nicest way to view the output of functions while debugging them.
+
+(Alias `-Prettify`)
+ 
 ## Add the "P" Tag to these functions:
   - HealthTest-NonMicrosoftServices__S
   - HealthTest-NonDefaultShares
