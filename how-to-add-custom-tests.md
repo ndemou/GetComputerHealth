@@ -71,12 +71,10 @@ These instrunction are also valid for contributing health tests in the core libr
    . "C:\IT\config\Custom-HealthTests\tests-for-$env:COMPUTERNAME.ps1" # <-- the name of your ps1 file here
    HealthTest-LargeDirectories # <-- the name of your function here
    ```
-
-   During debugging, the easiest way to preview output exactly as Get-ComputerHealth formats it is:
+   
+   Or to get both nicely colored console output and structured results:
    ```powershell
-   HealthTest-LargeDirectories 3>&1 | C:\IT\bin\Get-ComputerHealth.ps1 -PrettifyWriteWarning
-   # Alias:
-   HealthTest-LargeDirectories 3>&1 | C:\IT\bin\Get-ComputerHealth.ps1 -Prettify
+   $results = HealthTest-LargeDirectories 3>&1 | C:\IT\bin\Get-ComputerHealth.ps1 -PrettifyWriteWarning
    ```
 
 If you wish you can have more than one .ps1 files in `C:\IT\config\Custom-HealthTests\`
