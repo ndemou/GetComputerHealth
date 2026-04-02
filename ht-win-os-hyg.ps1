@@ -1687,7 +1687,7 @@ FalsePositives: New software can be expected in some environments.
         $seen += 1
         $normalizedName = Get-NormalizedSoftwareName -Name $sw.Name
         $details = "Full program name: $($sw.Name); Publisher: $($sw.Publisher); Install Date: $($sw.InstallDate); Source: $($sw.Source); Scope: $($sw.Scope)"
-        Write-Warning "[notice] Found installed software baseline entry: $normalizedName`n$details"
+        Write-Warning "[notice] New installed software: $normalizedName`n$details"
     }
 
     if ($seen -eq 0) {
