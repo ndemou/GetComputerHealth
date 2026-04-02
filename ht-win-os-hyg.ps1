@@ -1034,6 +1034,606 @@ FalsePositives: None.
   }
 }
 
+function Get-LiveSessionInfo {
+<#
+.SYNOPSIS
+Gets live/current Desktop Sessions details.
+
+.OUTPUTS
+Produces one psCustomObject for each matching session:
+  ComputerName      : Computer that was queried.
+  SessionId         : Session ID.
+  State             : Current session state.
+  SessionName       : Session name reported by the host.
+  UserName          : Session user name, if available.
+  Domain            : Session domain, if available.
+  UserPrincipal     : Domain\user when both are known; otherwise user.
+  ClientName        : Client computer name, if available.
+  ClientAddress     : Client IP address, if available.
+  Protocol          : Connection protocol description, if available.
+  ClientBuild       : Client build number, if available.
+  ClientDisplay     : Client display summary, if available.
+  ClientDirectory   : Client install path, if available.
+  LogonTime         : Session logon time, if available.
+  ConnectTime       : Last connect time, if available.
+  DisconnectTime    : Last disconnect time, if available.
+  LastInputTime     : Last observed user input time, if available.
+  SnapshotTime      : Time of the timing snapshot, if available.
+  IdleTime          : Time since last input, if available.
+  SessionAge        : Time since logon, if available.
+  ConnectedDuration : Time since connect for connected sessions, if
+                      available.
+  DisconnectedTime  : Time since disconnect for disconnected sessions,
+                      if available.
+
+.DESCRIPTION
+Queries the current session table of the target computer and returns
+zero or more matching sessions.
+
+Intended for live state:
+who owns the session now, whether it is active or disconnected, where
+the client came from, and how long it has been idle or disconnected.
+
+If SessionId is omitted, all sessions are considered. If SessionId is
+specified, only matching sessions are returned. Unknown session IDs
+result in no output for those IDs.
+
+A terminating error is raised if the target cannot be opened for
+session queries or if session enumeration fails.
+
+.PARAMETER ComputerName
+Target computer to query.
+
+Use a remote computer name to query that host. Values that refer to
+the local computer are treated as a local query.
+
+.PARAMETER SessionId
+Limits results to the specified session IDs.
+
+When set, only sessions whose ID is in this list are returned;
+otherwise all sessions are returned.
+#>
+  [CmdletBinding()]
+  param(
+    [string]$ComputerName = $env:COMPUTERNAME,
+    [int[]]$SessionId
+  )
+
+  if (-not ('Toula.WtsEx.NativeMethods' -as [type])) {
+    Add-Type -TypeDefinition @"
+using System;
+using System.Runtime.InteropServices;
+
+namespace Toula.WtsEx
+{
+    public enum WTS_CONNECTSTATE_CLASS
+    {
+        WTSActive,
+        WTSConnected,
+        WTSConnectQuery,
+        WTSShadow,
+        WTSDisconnected,
+        WTSIdle,
+        WTSListen,
+        WTSReset,
+        WTSDown,
+        WTSInit
+    }
+
+    public enum WTS_INFO_CLASS
+    {
+        WTSInitialProgram,
+        WTSApplicationName,
+        WTSWorkingDirectory,
+        WTSOEMId,
+        WTSSessionId,
+        WTSUserName,
+        WTSWinStationName,
+        WTSDomainName,
+        WTSConnectState,
+        WTSClientBuildNumber,
+        WTSClientName,
+        WTSClientDirectory,
+        WTSClientProductId,
+        WTSClientHardwareId,
+        WTSClientAddress,
+        WTSClientDisplay,
+        WTSClientProtocolType,
+        WTSIdleTime,
+        WTSLogonTime,
+        WTSIncomingBytes,
+        WTSOutgoingBytes,
+        WTSIncomingFrames,
+        WTSOutgoingFrames,
+        WTSClientInfo,
+        WTSSessionInfo,
+        WTSSessionInfoEx,
+        WTSConfigInfo,
+        WTSValidationInfo,
+        WTSSessionAddressV4,
+        WTSIsRemoteSession
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct WTS_SESSION_INFO
+    {
+        public Int32 SessionID;
+        public IntPtr pWinStationName;
+        public WTS_CONNECTSTATE_CLASS State;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct WTS_CLIENT_ADDRESS
+    {
+        public Int32 AddressFamily;
+
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 20)]
+        public byte[] Address;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct WTS_CLIENT_DISPLAY
+    {
+        public Int32 HorizontalResolution;
+        public Int32 VerticalResolution;
+        public Int32 ColorDepth;
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    public struct WTSINFOEX_LEVEL1_W
+    {
+        public UInt32 SessionId;
+        public WTS_CONNECTSTATE_CLASS SessionState;
+        public Int32 SessionFlags;
+
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 33)]
+        public string WinStationName;
+
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 21)]
+        public string UserName;
+
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 18)]
+        public string DomainName;
+
+        public Int64 LogonTime;
+        public Int64 ConnectTime;
+        public Int64 DisconnectTime;
+        public Int64 LastInputTime;
+        public Int64 CurrentTime;
+        public UInt32 IncomingBytes;
+        public UInt32 OutgoingBytes;
+        public UInt32 IncomingFrames;
+        public UInt32 OutgoingFrames;
+        public UInt32 IncomingCompressedBytes;
+        public UInt32 OutgoingCompressedBytes;
+    }
+
+    [StructLayout(LayoutKind.Explicit, CharSet = CharSet.Unicode)]
+    public struct WTSINFOEX_LEVEL_W
+    {
+        [FieldOffset(0)]
+        public WTSINFOEX_LEVEL1_W WTSInfoExLevel1;
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    public struct WTSINFOEXW
+    {
+        public UInt32 Level;
+        public WTSINFOEX_LEVEL_W Data;
+    }
+
+    public static class NativeMethods
+    {
+        [DllImport("wtsapi32.dll", SetLastError = true, CharSet = CharSet.Unicode, EntryPoint = "WTSOpenServerW")]
+        public static extern IntPtr WTSOpenServer(string pServerName);
+
+        [DllImport("wtsapi32.dll", SetLastError = true)]
+        public static extern void WTSCloseServer(IntPtr hServer);
+
+        [DllImport("wtsapi32.dll", SetLastError = true, CharSet = CharSet.Unicode, EntryPoint = "WTSEnumerateSessionsW")]
+        public static extern bool WTSEnumerateSessions(
+            IntPtr hServer,
+            int Reserved,
+            int Version,
+            out IntPtr ppSessionInfo,
+            out int pCount
+        );
+
+        [DllImport("wtsapi32.dll", SetLastError = true, CharSet = CharSet.Unicode, EntryPoint = "WTSQuerySessionInformationW")]
+        public static extern bool WTSQuerySessionInformation(
+            IntPtr hServer,
+            int sessionId,
+            WTS_INFO_CLASS wtsInfoClass,
+            out IntPtr ppBuffer,
+            out int pBytesReturned
+        );
+
+        [DllImport("wtsapi32.dll")]
+        public static extern void WTSFreeMemory(IntPtr pMemory);
+    }
+}
+"@
+  }
+
+  function Get-WtsServerHandle {
+    param([string]$Name)
+    if ([string]::IsNullOrWhiteSpace($Name) -or
+        $Name -eq '.' -or
+        $Name -eq 'localhost' -or
+        $Name -ieq $env:COMPUTERNAME) {
+      return [IntPtr]::Zero
+    }
+    $handle = [Toula.WtsEx.NativeMethods]::WTSOpenServer($Name)
+    if ($handle -eq [IntPtr]::Zero) {
+      throw "Failed to open WTS server handle for '$Name'."
+    }
+    return $handle
+  }
+
+  function Convert-PtrToStringUni {
+    param([IntPtr]$Ptr)
+    if ($Ptr -eq [IntPtr]::Zero) { return $null }
+    [Runtime.InteropServices.Marshal]::PtrToStringUni($Ptr)
+  }
+
+  function Convert-WtsFileTimeToLocal {
+    param([long]$Value)
+    if ($Value -le 0) { return $null }
+    try { [DateTime]::FromFileTimeUtc($Value).ToLocalTime() } catch { $null }
+  }
+
+  function Get-WtsString {
+    param(
+      [IntPtr]$Server,
+      [int]$Id,
+      [Toula.WtsEx.WTS_INFO_CLASS]$InfoClass
+    )
+    $buf = [IntPtr]::Zero
+    $bytes = 0
+    try {
+      if (-not [Toula.WtsEx.NativeMethods]::WTSQuerySessionInformation($Server, $Id, $InfoClass, [ref]$buf, [ref]$bytes)) {
+        return $null
+      }
+      if ($buf -eq [IntPtr]::Zero -or $bytes -le 1) {
+        return $null
+      }
+      $s = [Runtime.InteropServices.Marshal]::PtrToStringUni($buf)
+      if ([string]::IsNullOrWhiteSpace($s)) { return $null }
+      $s
+    }
+    finally {
+      if ($buf -ne [IntPtr]::Zero) {
+        [Toula.WtsEx.NativeMethods]::WTSFreeMemory($buf)
+      }
+    }
+  }
+
+  function Get-WtsUInt16 {
+    param(
+      [IntPtr]$Server,
+      [int]$Id,
+      [Toula.WtsEx.WTS_INFO_CLASS]$InfoClass
+    )
+    $buf = [IntPtr]::Zero
+    $bytes = 0
+    try {
+      if (-not [Toula.WtsEx.NativeMethods]::WTSQuerySessionInformation($Server, $Id, $InfoClass, [ref]$buf, [ref]$bytes)) {
+        return $null
+      }
+      if ($buf -eq [IntPtr]::Zero -or $bytes -lt 2) {
+        return $null
+      }
+      [Runtime.InteropServices.Marshal]::ReadInt16($buf)
+    }
+    finally {
+      if ($buf -ne [IntPtr]::Zero) {
+        [Toula.WtsEx.NativeMethods]::WTSFreeMemory($buf)
+      }
+    }
+  }
+
+  function Get-WtsUInt32 {
+    param(
+      [IntPtr]$Server,
+      [int]$Id,
+      [Toula.WtsEx.WTS_INFO_CLASS]$InfoClass
+    )
+    $buf = [IntPtr]::Zero
+    $bytes = 0
+    try {
+      if (-not [Toula.WtsEx.NativeMethods]::WTSQuerySessionInformation($Server, $Id, $InfoClass, [ref]$buf, [ref]$bytes)) {
+        return $null
+      }
+      if ($buf -eq [IntPtr]::Zero -or $bytes -lt 4) {
+        return $null
+      }
+      [Runtime.InteropServices.Marshal]::ReadInt32($buf)
+    }
+    finally {
+      if ($buf -ne [IntPtr]::Zero) {
+        [Toula.WtsEx.NativeMethods]::WTSFreeMemory($buf)
+      }
+    }
+  }
+
+  function Get-WtsClientAddressText {
+    param(
+      [IntPtr]$Server,
+      [int]$Id
+    )
+    $buf = [IntPtr]::Zero
+    $bytes = 0
+    try {
+      if (-not [Toula.WtsEx.NativeMethods]::WTSQuerySessionInformation($Server, $Id, [Toula.WtsEx.WTS_INFO_CLASS]::WTSClientAddress, [ref]$buf, [ref]$bytes)) {
+        return $null
+      }
+      if ($buf -eq [IntPtr]::Zero) {
+        return $null
+      }
+      $addr = [Runtime.InteropServices.Marshal]::PtrToStructure($buf, [type][Toula.WtsEx.WTS_CLIENT_ADDRESS])
+      if ($null -eq $addr.Address -or $addr.Address.Length -lt 6) {
+        return $null
+      }
+      if ($addr.AddressFamily -eq 2) {
+        return [string]::Join('.', @($addr.Address[2], $addr.Address[3], $addr.Address[4], $addr.Address[5]))
+      }
+      if ($addr.AddressFamily -eq 23 -and $addr.Address.Length -ge 18) {
+        try { return ([Net.IPAddress]::new([byte[]]$addr.Address[2..17])).ToString() } catch { return $null }
+      }
+      $null
+    }
+    finally {
+      if ($buf -ne [IntPtr]::Zero) {
+        [Toula.WtsEx.NativeMethods]::WTSFreeMemory($buf)
+      }
+    }
+  }
+
+  function Get-WtsClientDisplayText {
+    param(
+      [IntPtr]$Server,
+      [int]$Id
+    )
+    $buf = [IntPtr]::Zero
+    $bytes = 0
+    try {
+      if (-not [Toula.WtsEx.NativeMethods]::WTSQuerySessionInformation($Server, $Id, [Toula.WtsEx.WTS_INFO_CLASS]::WTSClientDisplay, [ref]$buf, [ref]$bytes)) {
+        return $null
+      }
+      if ($buf -eq [IntPtr]::Zero) {
+        return $null
+      }
+      $display = [Runtime.InteropServices.Marshal]::PtrToStructure($buf, [type][Toula.WtsEx.WTS_CLIENT_DISPLAY])
+      if ($display.HorizontalResolution -gt 0 -and $display.VerticalResolution -gt 0) {
+        return "$($display.HorizontalResolution)x$($display.VerticalResolution)x$($display.ColorDepth)"
+      }
+      $null
+    }
+    finally {
+      if ($buf -ne [IntPtr]::Zero) {
+        [Toula.WtsEx.NativeMethods]::WTSFreeMemory($buf)
+      }
+    }
+  }
+
+  function Get-WtsSessionTiming {
+    param(
+      [IntPtr]$Server,
+      [int]$Id
+    )
+
+    $buf = [IntPtr]::Zero
+    $bytes = 0
+
+    try {
+      if (-not [Toula.WtsEx.NativeMethods]::WTSQuerySessionInformation(
+        $Server,
+        $Id,
+        [Toula.WtsEx.WTS_INFO_CLASS]::WTSSessionInfoEx,
+        [ref]$buf,
+        [ref]$bytes
+      )) {
+        return $null
+      }
+
+      if ($buf -eq [IntPtr]::Zero) {
+        return $null
+      }
+
+      $info = [Runtime.InteropServices.Marshal]::PtrToStructure($buf, [type][Toula.WtsEx.WTSINFOEXW])
+      if ($info.Level -ne 1) {
+        return $null
+      }
+
+      $x = $info.Data.WTSInfoExLevel1
+
+      $logonTime = Convert-WtsFileTimeToLocal $x.LogonTime
+      $connectTime = Convert-WtsFileTimeToLocal $x.ConnectTime
+      $disconnectTime = Convert-WtsFileTimeToLocal $x.DisconnectTime
+      $lastInputTime = Convert-WtsFileTimeToLocal $x.LastInputTime
+      $snapshotTime = Convert-WtsFileTimeToLocal $x.CurrentTime
+
+      $idleTime = $null
+      if ($snapshotTime -and $lastInputTime -and $snapshotTime -ge $lastInputTime) {
+        $idleTime = $snapshotTime - $lastInputTime
+      }
+
+      $sessionAge = $null
+      if ($snapshotTime -and $logonTime -and $snapshotTime -ge $logonTime) {
+        $sessionAge = $snapshotTime - $logonTime
+      }
+
+      $connectedDuration = $null
+      if ($snapshotTime -and $connectTime -and $snapshotTime -ge $connectTime -and
+          ($x.SessionState -eq [Toula.WtsEx.WTS_CONNECTSTATE_CLASS]::WTSActive -or
+           $x.SessionState -eq [Toula.WtsEx.WTS_CONNECTSTATE_CLASS]::WTSConnected -or
+           $x.SessionState -eq [Toula.WtsEx.WTS_CONNECTSTATE_CLASS]::WTSShadow)) {
+        $connectedDuration = $snapshotTime - $connectTime
+      }
+
+      $disconnectedTime = $null
+      if ($snapshotTime -and $disconnectTime -and $snapshotTime -ge $disconnectTime -and
+          $x.SessionState -eq [Toula.WtsEx.WTS_CONNECTSTATE_CLASS]::WTSDisconnected) {
+        $disconnectedTime = $snapshotTime - $disconnectTime
+      }
+
+      [pscustomobject]@{
+        LogonTime         = $logonTime
+        ConnectTime       = $connectTime
+        DisconnectTime    = $disconnectTime
+        LastInputTime     = $lastInputTime
+        SnapshotTime      = $snapshotTime
+        IdleTime          = $idleTime
+        SessionAge        = $sessionAge
+        ConnectedDuration = $connectedDuration
+        DisconnectedTime  = $disconnectedTime
+      }
+    }
+    finally {
+      if ($buf -ne [IntPtr]::Zero) {
+        [Toula.WtsEx.NativeMethods]::WTSFreeMemory($buf)
+      }
+    }
+  }
+
+  function Convert-WtsProtocol {
+    param([Nullable[int]]$Value)
+    if ($null -eq $Value) { return $null }
+    if ($Value -eq 0) { return 'ConsoleOrUnknown' }
+    if ($Value -eq 2) { return 'RDP' }
+    "Other($Value)"
+  }
+
+  $server = Get-WtsServerHandle -Name $ComputerName
+  $sessionsPtr = [IntPtr]::Zero
+  $count = 0
+
+  try {
+    if (-not [Toula.WtsEx.NativeMethods]::WTSEnumerateSessions($server, 0, 1, [ref]$sessionsPtr, [ref]$count)) {
+      throw "WTSEnumerateSessions failed for '$ComputerName'."
+    }
+
+    $structSize = [Runtime.InteropServices.Marshal]::SizeOf([type][Toula.WtsEx.WTS_SESSION_INFO])
+
+    for ($i = 0; $i -lt $count; $i++) {
+      $current = [IntPtr]($sessionsPtr.ToInt64() + ($i * $structSize))
+      $session = [Runtime.InteropServices.Marshal]::PtrToStructure($current, [type][Toula.WtsEx.WTS_SESSION_INFO])
+
+      if ($SessionId -and ($SessionId -notcontains $session.SessionID)) {
+        continue
+      }
+
+      $sessionName = Convert-PtrToStringUni $session.pWinStationName
+      if ([string]::IsNullOrWhiteSpace($sessionName)) { $sessionName = $null }
+
+      $user = Get-WtsString -Server $server -Id $session.SessionID -InfoClass ([Toula.WtsEx.WTS_INFO_CLASS]::WTSUserName)
+      $domain = Get-WtsString -Server $server -Id $session.SessionID -InfoClass ([Toula.WtsEx.WTS_INFO_CLASS]::WTSDomainName)
+      $clientName = Get-WtsString -Server $server -Id $session.SessionID -InfoClass ([Toula.WtsEx.WTS_INFO_CLASS]::WTSClientName)
+      $clientAddress = Get-WtsClientAddressText -Server $server -Id $session.SessionID
+      $protocolRaw = Get-WtsUInt16 -Server $server -Id $session.SessionID -InfoClass ([Toula.WtsEx.WTS_INFO_CLASS]::WTSClientProtocolType)
+      $clientBuild = Get-WtsUInt32 -Server $server -Id $session.SessionID -InfoClass ([Toula.WtsEx.WTS_INFO_CLASS]::WTSClientBuildNumber)
+      $clientDirectory = Get-WtsString -Server $server -Id $session.SessionID -InfoClass ([Toula.WtsEx.WTS_INFO_CLASS]::WTSClientDirectory)
+      $clientDisplay = Get-WtsClientDisplayText -Server $server -Id $session.SessionID
+      $timing = Get-WtsSessionTiming -Server $server -Id $session.SessionID
+
+      [pscustomobject]@{
+        ComputerName      = $ComputerName
+        SessionId         = $session.SessionID
+        State             = [string]$session.State
+        SessionName       = $sessionName
+        UserName          = $user
+        Domain            = $domain
+        UserPrincipal     = if ($user) { if ($domain) { "$domain\$user" } else { $user } } else { $null }
+        ClientName        = $clientName
+        ClientAddress     = $clientAddress
+        Protocol          = Convert-WtsProtocol -Value $protocolRaw
+        ClientBuild       = $clientBuild
+        ClientDisplay     = $clientDisplay
+        ClientDirectory   = $clientDirectory
+        LogonTime         = if ($timing) { $timing.LogonTime } else { $null }
+        ConnectTime       = if ($timing) { $timing.ConnectTime } else { $null }
+        DisconnectTime    = if ($timing) { $timing.DisconnectTime } else { $null }
+        LastInputTime     = if ($timing) { $timing.LastInputTime } else { $null }
+        SnapshotTime      = if ($timing) { $timing.SnapshotTime } else { $null }
+        IdleTime          = if ($timing) { $timing.IdleTime } else { $null }
+        SessionAge        = if ($timing) { $timing.SessionAge } else { $null }
+        ConnectedDuration = if ($timing) { $timing.ConnectedDuration } else { $null }
+        DisconnectedTime  = if ($timing) { $timing.DisconnectedTime } else { $null }
+      }
+    }
+  }
+  finally {
+    if ($sessionsPtr -ne [IntPtr]::Zero) {
+      [Toula.WtsEx.NativeMethods]::WTSFreeMemory($sessionsPtr)
+    }
+    if ($server -ne [IntPtr]::Zero) {
+      [Toula.WtsEx.NativeMethods]::WTSCloseServer($server)
+    }
+  }
+}
+
+function HealthTest-StaleRdpSessions {
+<#
+.SYNOPSIS
+Reports any stale desktop sessions (idle/disconnected for many hours).
+#>
+    [CmdletBinding()]
+    param(
+        [TimeSpan]$Threshold = ([TimeSpan]::FromHours(8))
+    )
+
+    $issueFound = $false
+
+    $sessions = @(Get-LiveSessionInfo)
+
+    foreach ($session in $sessions) {
+        if (-not $session) { continue }
+        if ([string]::IsNullOrWhiteSpace($session.UserName)) { continue }
+
+        $problemType = $null
+        $problemAge = $null
+
+        if ($session.State -eq 'WTSDisconnected' -and $session.DisconnectedTime -ge $Threshold) {
+            $problemType = 'disconnected'
+            $problemAge = $session.DisconnectedTime
+        }
+        elseif ($session.IdleTime -ge $Threshold) {
+            $problemType = 'idle'
+            $problemAge = $session.IdleTime
+        }
+
+        if (-not $problemType) { continue }
+
+        $issueFound = $true
+
+        $who = $session.UserPrincipal
+        if ([string]::IsNullOrWhiteSpace($who)) { $who = $session.UserName }
+
+        $issueSynopsis = "Session $($session.SessionId) for $who is $problemType for more than $([int]$Threshold.TotalHours) hours"
+
+        $detailLines = @()
+        $detailLines += "State: $($session.State)"
+        if ($session.SessionName)      { $detailLines += "SessionName: $($session.SessionName)" }
+        if ($session.LogonTime)        { $detailLines += "LogonTime: $($session.LogonTime)" }
+        if ($session.ConnectTime)      { $detailLines += "ConnectTime: $($session.ConnectTime)" }
+        if ($session.DisconnectTime)   { $detailLines += "DisconnectTime: $($session.DisconnectTime)" }
+        if ($session.LastInputTime)    { $detailLines += "LastInputTime: $($session.LastInputTime)" }
+        if ($session.IdleTime)         { $detailLines += "IdleTime: $($session.IdleTime)" }
+        if ($session.DisconnectedTime) { $detailLines += "DisconnectedTime: $($session.DisconnectedTime)" }
+        if ($session.SessionAge)       { $detailLines += "SessionAge: $($session.SessionAge)" }
+        if ($session.ClientName)       { $detailLines += "ClientName: $($session.ClientName)" }
+        if ($session.ClientAddress)    { $detailLines += "ClientAddress: $($session.ClientAddress)" }
+        if ($session.Protocol)         { $detailLines += "Protocol: $($session.Protocol)" }
+
+        $details = $detailLines -join "`n"
+        Write-Warning "[notice] $issueSynopsis" + "`n" + $details
+    }
+
+    if (-not $issueFound) {
+        Write-Warning "[pass] No Desktop Sessions found idle or disconnected for more than $([int]$Threshold.TotalHours) hours"
+    }
+}
+
 function HealthTest-NonDefaultShares__E {
 <#
 .SYNOPSIS
