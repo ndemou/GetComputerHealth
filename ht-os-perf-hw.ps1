@@ -999,7 +999,7 @@ FalsePositives: None.
   if($RequireOnSystemDrive){
     $sys = $env:SystemDrive  # Typically 'C:'
     $okSys = (($entries | Where-Object {$_.Name -like "$sys\*"}).Count -gt 0)
-    if(-not $okSys){ Write-Warning "[FAILURE] No pagefile on system drive`nSystemDrive=$sys; Entries="+(($entries | ForEach-Object {"$($_.Name):$($_.AllocMB)MB"}) -join ', ') }
+    if(-not $okSys){ Write-Warning ("[FAILURE] No pagefile on system drive`nSystemDrive=$sys; Entries="+(($entries | ForEach-Object {"$($_.Name):$($_.AllocMB)MB"}) -join ', ')) }
   }
   if(-not $okSize){ Write-Warning "[FAILURE] Total pagefile size below threshold`nTotalAllocMB=$sumAlloc; MinMB=$MinMB" }
 

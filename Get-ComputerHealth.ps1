@@ -587,8 +587,8 @@ function Write-DummyHealthTest {
     Write-Warning "[info] Dummy info message"
     Write-Warning "[PASS] Dummy pass message"
     Write-Warning "[NOTICE] Dummy notice message"
-    Write-Warning "[WARNING] Dummy warning message" + "`n" + "This one has a comment(details) also"
-    Write-Warning "[FAILURE] Dummy failure message" + "`n" + "This one has a comment(details) also`nWith 2 lines of text!"
+    Write-Warning ("[WARNING] Dummy warning message" + "`n" + "This one has a comment(details) also")
+    Write-Warning ("[FAILURE] Dummy failure message" + "`n" + "This one has a comment(details) also`nWith 2 lines of text!")
 }
 
 function Get-HealthTestTagsMetadata {
