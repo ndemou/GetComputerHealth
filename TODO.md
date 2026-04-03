@@ -4,7 +4,7 @@
 
 Example execution:
 ```
-Write-Warning "[failure] message "+"`n"+"Comments..." | Get-ComputerHealth -PrettifyWriteWarning
+Write-Warning ("[failure] message "+"`n"+"Comments...") | Get-ComputerHealth -PrettifyWriteWarning
 ```
 
 If called like that it preety-prints to the console the warning stream as it would do if it was comming from a healthtest-function.
