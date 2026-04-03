@@ -14,36 +14,36 @@ If both are provided, values from -ConfigPath are used for credentials while -Ro
 for the backup path.
 
 Config file is json based. Examples:
-	{
-	  "RootPath": "\\\\10.1.2.3\\share\\path\\to\\Backups",
-	  "Username": "foo",
-	  "Password": "bar"
-	}
+    {
+      "RootPath": "\\\\10.1.2.3\\share\\path\\to\\Backups",
+      "Username": "foo",
+      "Password": "bar"
+    }
 Or:
-	{
-	  "RootPath": "C:\\path\\to\\Backups"
-	}
+    {
+      "RootPath": "C:\\path\\to\\Backups"
+    }
 
 .EXAMPLE
 
-	Start-HealthTestVeeamRecentBackupsExist `
-		-ConfigPath 'C:\it\config\HealthTest-RecentBackupsExist.config' `
-		-MaxAgeHoursForVibVbm 23 `
-		-MaxAgeHoursForVBK 480
+    Start-HealthTestVeeamRecentBackupsExist `
+        -ConfigPath 'C:\it\config\HealthTest-RecentBackupsExist.config' `
+        -MaxAgeHoursForVibVbm 23 `
+        -MaxAgeHoursForVBK 480
 
 .EXAMPLE
-	Start-HealthTestVeeamRecentBackupsExist `
-		-RootPath 'C:\path\to\Backups' `
-		-MaxAgeHoursForVibVbm 23 `
-		-MaxAgeHoursForVBK 480
+    Start-HealthTestVeeamRecentBackupsExist `
+        -RootPath 'C:\path\to\Backups' `
+        -MaxAgeHoursForVibVbm 23 `
+        -MaxAgeHoursForVBK 480
 
 #>
 [CmdletBinding()]
 param(
-	[string]$ConfigPath,
-	[string]$RootPath,
-	[int]$MaxAgeHoursForVBK = 480,
-	[int]$MaxAgeHoursForVibVbm=23
+    [string]$ConfigPath,
+    [string]$RootPath,
+    [int]$MaxAgeHoursForVBK = 480,
+    [int]$MaxAgeHoursForVibVbm=23
 )
 
     if ([string]::IsNullOrWhiteSpace($ConfigPath) -and [string]::IsNullOrWhiteSpace($RootPath)) {
@@ -111,16 +111,16 @@ param(
         $fresh_vbk       = Get-RecentFilesConditional -Path $root -Pattern '*.vbk' -MinBytes (10*1024*1024*1024) -MaxAgeHours $MaxAgeHoursForVibVbm
         $atleast_one_vbk = Get-RecentFilesConditional -Path $root -Pattern '*.vbk' -MinBytes (10*1024*1024*1024) -MaxAgeHours $MaxAgeHoursForVBK 
 
-        $configHint = if ($ConfigPath) { "If you want to change the configuration edit: $ConfigPath" } else { "Used -RootPath directly (no config file)." }
+        $configHint = if ($ConfigPath) { "If you want to change the configuration edit: $ConfigPath" } else { "" }
 
         if ($fresh_vbm -and ($fresh_vib -or $fresh_vbk) -and $atleast_one_vbk) {
-            Write-Warning "[pass] Found recent Veeam backups. $configHint"
+            Write-Warning "[pass] Found recent Veeam backups at $root"
         } else {
-            Write-Warning "[failure] No recent Veeam backups found at: $RootPath`n" + ("$configHint`n" + `
+            Write-Warning ("[failure] No recent Veeam backups found at: $RootPath" + "`n" + ("$configHint`n" + `
                 "fresh_vbm=$fresh_vbm, fresh_vib=$fresh_vib, fresh_vbk=$fresh_vbk, atleast_one_vbk=$atleast_one_vbk`n" + `
                 "Condition for pass is: " + `
                 '($fresh_vbm -and ($fresh_vib -or $fresh_vbk) -and $atleast_one_vbk)' + `
-                (Get-ChildItem $root|Out-String))
+                (Get-ChildItem $root|Out-String)))
         }
     }
     finally {
