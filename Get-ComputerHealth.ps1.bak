@@ -62,7 +62,7 @@ Default: empty (show all). Typical value: `DIP`
 (Parameter set: Run) Skips health tests tagged with `P` (policy) in their function name, such as `HealthTest-InstalledSW__P`.
 
 .PARAMETER DontAutosetPolicy
-(Parameter set: Run) Disables first-run auto-baselining for policy tests (tests tagged with `P`, e.g. `HealthTest-InstalledSW__P`). By default, first run auto-suppresses emitted `[NOTICE]`/`[WARNING]` findings for each policy test and records a marker in the suppression file.
+(Parameter set: Run) Disables first-run auto-baselining for policy tests (tests tagged with `P`, e.g. `HealthTest-InstalledSW__P`). By default, first run auto-suppresses emitted `[notice]`/`[WARNING]` findings for each policy test and records a marker in the suppression file.
 
 .PARAMETER IpsOfAllDcs
 (Parameter set: Run) Optional list of Domain Controller IP addresses passed in by the orchestrator. Stored in `$Global:GCHDQMTA.IpsOfAllDcs` for health tests that need it.
@@ -586,7 +586,7 @@ function Write-DummyHealthTest {
     Write-Output "Dummy debug message"
     Write-Warning "[info] Dummy info message"
     Write-Warning "[PASS] Dummy pass message"
-    Write-Warning "[NOTICE] Dummy notice message"
+    Write-Warning "[notice] Dummy notice message"
     Write-Warning "[WARNING] Dummy warning message" + "`n" + "This one has a comment(details) also"
     Write-Warning "[FAILURE] Dummy failure message" + "`n" + "This one has a comment(details) also`nWith 2 lines of text!"
 }

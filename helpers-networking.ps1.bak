@@ -589,7 +589,7 @@ instead returns the list of responsive hosts.
     Write-Warning "[PASS] $message"
     $message = "Note that some hosts of $NetworkDescription did not reply to pings (that's often normal)"
     $comment = "List of hosts that didn't reply: ($($dead -join ', '))`nIf some hosts are consistently failing, consider if you should update the list of hosts you ping"
-    Write-Warning "[NOTICE] $message`n$comment" 
+    Write-Warning "[notice] $message`n$comment" 
   } else {
     $message = "The $NetworkDescription network is reachable; all known hosts replied to pings"
     $comment = "List of hosts that replied: ($($ips -join ', '))"

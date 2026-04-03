@@ -18,7 +18,7 @@ FalsePositives: None.
     $ok=$true
     $all_vm = Get-VM
     $all_vm |?{$_.state -ne 'Running' -and $_.AutomaticStartAction -eq 'Start'} | %{
-        Write-Warning "[FAILURE] VM $($_.name) should be running but is not"
+        Write-Warning "[failure] VM $($_.name) should be running but is not"
         $ok=$false
     }
     if ($all_vm |?{$_.AutomaticStartAction -eq 'Start'}) {

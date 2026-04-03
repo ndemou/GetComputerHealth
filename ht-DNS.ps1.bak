@@ -135,7 +135,7 @@ FalsePositives: None.
   $public = $ipAddresses | Where-Object { -not (& $private $_) }
 
   if($public){
-    Write-Warning "[NOTICE] The DNS service on this DC, will forward queries for non-local zones to specific DNS servers`nThis means that these DNS servers (view them with Get-DnsServerForwarder) can inspect and log the domains your domain contact. For extra privacy, you may wish to configure the DNS service to rely on root hints instead of DNS forwarders."
+    Write-Warning "[notice] The DNS service on this DC, will forward queries for non-local zones to specific DNS servers`nThis means that these DNS servers (view them with Get-DnsServerForwarder) can inspect and log the domains your domain contact. For extra privacy, you may wish to configure the DNS service to rely on root hints instead of DNS forwarders."
     return
   } else {
     Write-Warning "[PASS] All DNS forwarders are private/internal: $($ipAddresses -join ', ')"
@@ -183,7 +183,7 @@ Uses: Get-DnsServerRecursion, Get-DnsServerCache, Get-DnsServerEDns.
 FalsePositives: None.
 #>
     if (-not (Get-Command Get-DnsServerRecursion -ErrorAction SilentlyContinue)) {
-        Write-Warning "[NOTICE] DNS Server tools not available`nDNS role/RSAT missing?"
+        Write-Warning "[notice] DNS Server tools not available`nDNS role/RSAT missing?"
         return
     }
 
@@ -230,7 +230,7 @@ FalsePositives: None.
         Write-Warning (("[PASS] No issues found in the DNS recursion configuration`nEnableRecursion={0}; MaxTTL={1}; EDNS-ECS={2}" `
                     -f $recText, $ttlText, $ecsText))
     } else {
-        Write-Warning "[NOTICE] Unable to read DNS recursion configuration on this host`nHost is probably not a DNS server"
+        Write-Warning "[notice] Unable to read DNS recursion configuration on this host`nHost is probably not a DNS server"
     }
 }
 
@@ -331,7 +331,7 @@ FalsePositives: None.
             $issueFound = $true
             $synopsis = "DNS record $($check.Name) for this domain controller is missing or unresolved"
             $details = "`nQuery: $($check.QueryName)`nType: $($check.Type)`nError: $($_.Exception.Message)"
-            Write-Warning ("[NOTICE] " + $synopsis + $details)
+            Write-Warning ("[notice] " + $synopsis + $details)
             continue
         }
 
@@ -339,7 +339,7 @@ FalsePositives: None.
             $issueFound = $true
             $synopsis = "DNS record $($check.Name) for this domain controller is missing"
             $details = "`nQuery: $($check.QueryName)`nType: $($check.Type)`nExpected target: $dcFqdn"
-            Write-Warning ("[NOTICE] " + $synopsis + $details)
+            Write-Warning ("[notice] " + $synopsis + $details)
             continue
         }
 

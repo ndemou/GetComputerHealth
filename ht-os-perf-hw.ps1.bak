@@ -250,13 +250,13 @@ FalsePositives: None.
                 else {
                     $comment = ""
                 }
-                Write-Warning "[NOTICE] $("VMICTimeProvider is enabled, but not used.")`n$($comment)"
+                Write-Warning "[notice] $("VMICTimeProvider is enabled, but not used.")`n$($comment)"
             }
             if (Looks-ExternalNtp $currentTimeSource) {
                 Write-Warning "[PASS] PDC emulator time syncing looks correct (Type=$timeSyncType, Source='$currentTimeSource')."
             }
             else {
-                Write-Warning "[NOTICE] PDC emulator Type=$timeSyncType, Source='$currentTimeSource' (not sure if this is a good external NTP)."
+                Write-Warning "[notice] PDC emulator Type=$timeSyncType, Source='$currentTimeSource' (not sure if this is a good external NTP)."
             }
         }
     }
@@ -425,7 +425,7 @@ FalsePositives: None.
         if ($x.protocol -eq 'http' -and ($x.bindingInformation -like '*:80:*') -and ($sites.count -gt 1)) {
             $commnet = ""
             if ($sites.count -gt 1) {$comment = "`nSince multiple sites are hosted, wildcard bindins may expose unintended content"}
-            Write-Warning "[NOTICE] $($s.Name): site serves plain HTTP with wildcard bindings$comment"
+            Write-Warning "[notice] $($s.Name): site serves plain HTTP with wildcard bindings$comment"
             $problem_found = $true
         }
         if ($x.protocol -eq 'https' -and ($x.bindingInformation -like '*:443:*') -and -not $x.certificateHash) {
@@ -496,7 +496,7 @@ FalsePositives: None.
 
   if ($freePcnt -lt 2) { Write-Warning "[FAILURE] Free RAM under 2%`n$freePcnt% free RAM"; return }
   elseif ($freePcnt -lt 5) { Write-Warning "[WARNING] Free RAM between 2 and 5%`n$freePcnt% free RAM"; return }
-  elseif ($freePcnt -lt 10) { Write-Warning "[NOTICE] Free RAM between 5 and 10%`n$freePcnt% free RAM"; return }
+  elseif ($freePcnt -lt 10) { Write-Warning "[notice] Free RAM between 5 and 10%`n$freePcnt% free RAM"; return }
   Write-Warning "[PASS] Free RAM at $($freePcnt)%"
   return
 }
@@ -688,7 +688,7 @@ FalsePositives: None.
   }
 
   if ($nullPipes -and $nullPipes.Count -gt 0) {
-    Write-Warning (("[NOTICE] Null session pipes (Named Pipes that can be accessed anonymously) found: {0}`n" -f ($nullPipes -join ', ')) + "Anonymous users are allowed to open those pipes. Modern domains don't need null pipes and they increase attack surface if other policies are loose. If you don't have legacy (pre-Windows 2000-era) trusts/clients, it's recommended to keep Null session pipes empty. Change Local Security Policy > Security Options > 'Network access: Named Pipes that can be accessed anonymously' (set to None), or the equivalent GPO.")
+    Write-Warning (("[notice] Null session pipes (Named Pipes that can be accessed anonymously) found: {0}`n" -f ($nullPipes -join ', ')) + "Anonymous users are allowed to open those pipes. Modern domains don't need null pipes and they increase attack surface if other policies are loose. If you don't have legacy (pre-Windows 2000-era) trusts/clients, it's recommended to keep Null session pipes empty. Change Local Security Policy > Security Options > 'Network access: Named Pipes that can be accessed anonymously' (set to None), or the equivalent GPO.")
   }
 
   if (!$riskFound) {Write-Warning "[PASS] No risks related to SMB shares were detected"}
@@ -781,7 +781,7 @@ FalsePositives: None.
     if (($sign -ge 1) -and ($cb -ge 1)) {
         Write-Warning "[PASS] LDAP signing & channel binding enforced"
     } else {
-        Write-Warning "[NOTICE] LDAP signing and/or channel binding not enforced`nLDAPServerIntegrity=$sign; LdapEnforceChannelBinding=$cb"
+        Write-Warning "[notice] LDAP signing and/or channel binding not enforced`nLDAPServerIntegrity=$sign; LdapEnforceChannelBinding=$cb"
     }
 }
 
@@ -913,7 +913,7 @@ FalsePositives: None.
   if ($exit -ne 0) {
     $hex = '0x{0:X}' -f ($exit -band 0xFFFFFFFF)
     if ($target -ne $RefTimeServer) {
-        Write-Warning "[NOTICE] Failed to test time sync via $target, retrying with $RefTimeServer`nStripchart to $target failed with error $hex"
+        Write-Warning "[notice] Failed to test time sync via $target, retrying with $RefTimeServer`nStripchart to $target failed with error $hex"
         # retry
         $sc = (w32tm /stripchart /computer:$RefTimeServer /dataonly /samples:2 2>&1) -join "`n"
         $exit = $LASTEXITCODE

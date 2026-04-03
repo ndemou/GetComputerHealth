@@ -17,8 +17,8 @@ FalsePositives: None.
 #>
   $cs = Get-CimInstance Win32_ComputerSystem
   $role = $cs.DomainRole
-  if ($role -in 0,2) { Write-Warning "[NOTICE] This test (HealthTest-InterfaceDnsServersUseDcs) is not applicable to non-domain joined hosts"; return }
-  if ($role -in 4,5) { Write-Warning "[NOTICE] This test (HealthTest-InterfaceDnsServersUseDcs) is not applicable to Domain Controllers"; return }
+  if ($role -in 0,2) { Write-Warning "[notice] This test (HealthTest-InterfaceDnsServersUseDcs) is not applicable to non-domain joined hosts"; return }
+  if ($role -in 4,5) { Write-Warning "[notice] This test (HealthTest-InterfaceDnsServersUseDcs) is not applicable to Domain Controllers"; return }
   $dcIps = @($Global:GCHDQMTA.IpsOfAllDcs)
 
   $nets = Get-CimInstance Win32_NetworkAdapterConfiguration -Filter "IPEnabled=TRUE"
@@ -33,7 +33,7 @@ FalsePositives: None.
     $dns  = $net.DNSServerSearchOrder
     $desc = $net.Description
     if (-not $dns -or $dns.Count -eq 0) {
-      Write-Warning "[NOTICE] Interface has no DNS servers configured.`n$desc"
+      Write-Warning "[notice] Interface has no DNS servers configured.`n$desc"
       continue
     }
 
@@ -79,8 +79,8 @@ FalsePositives: None.
   [CmdletBinding()] param()
   $cs = Get-CimInstance Win32_ComputerSystem
   $role = $cs.DomainRole
-  if ($role -in 0,2) { Write-Warning "[NOTICE] This test (HealthTest-DnsSuffixMatchesDomain) is not applicable to non-domain joined hosts"; return }
-  if ($role -in 4,5) { Write-Warning "[NOTICE] This test (HealthTest-DnsSuffixMatchesDomain) is not applicable to Domain Controllers"; return }
+  if ($role -in 0,2) { Write-Warning "[notice] This test (HealthTest-DnsSuffixMatchesDomain) is not applicable to non-domain joined hosts"; return }
+  if ($role -in 4,5) { Write-Warning "[notice] This test (HealthTest-DnsSuffixMatchesDomain) is not applicable to Domain Controllers"; return }
 
   $domain = $cs.Domain
   $out = ipconfig /all 2>&1
@@ -210,7 +210,7 @@ FalsePositives: None.
 
   if (-not $userOk) {
     if ($isSystem) {
-      Write-Warning ("[NOTICE] User policy update did not report success (gpupdate running under SYSTEM/non-interactive).`nThis can be expected when no interactive user is logged on.`nRaw gpupdate output:`n" + $text)
+      Write-Warning ("[notice] User policy update did not report success (gpupdate running under SYSTEM/non-interactive).`nThis can be expected when no interactive user is logged on.`nRaw gpupdate output:`n" + $text)
     } else {
       Write-Warning ("[FAILURE] User policy update did not report success.`nExpected success for interactive user.`nRaw gpupdate output:`n" + $text)
     }

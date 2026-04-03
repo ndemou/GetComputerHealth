@@ -889,7 +889,7 @@ FalsePositives: None.
             Write-EventFinding -Severity 'warning' -Synopsis 'Detected serious disk error in System log' -EventRecord $_
         }
 
-    # [NOTICE] Application crashes
+    # [notice] Application crashes
     Get-WinEvent -FilterHashtable @{ LogName = 'Application'; Id = 1000; ProviderName = 'Application Error'; StartTime = $cutoff } -ErrorAction SilentlyContinue |
         ForEach-Object {
             $totalFindings++
@@ -1029,7 +1029,7 @@ FalsePositives: None.
     if ($isServer) {
       Write-Warning "[WARNING] RDP is not hardened (NLA and/or TLS certificate binding missing)`n$rdpState`n$sev"
     } else {
-      Write-Warning "[NOTICE] RDP is not hardened (NLA and/or TLS certificate binding missing)`n$rdpState`n$sev"
+      Write-Warning "[notice] RDP is not hardened (NLA and/or TLS certificate binding missing)`n$rdpState`n$sev"
     }
   }
 }
@@ -1145,7 +1145,7 @@ FalsePositives: None.
     if($loc_acp -eq 1253 -and $loc_oemcp -eq 737){
       Write-Warning "[PASS] Host supports legacy Greek (ACP/OEMCP 1253/737)."
     }elseif($loc_acp -eq 1252 -and $loc_oemcp -eq 437){
-      Write-Warning "[NOTICE] This host uses default English/ANSI (1252/437), so legacy Greek apps may fail."
+      Write-Warning "[notice] This host uses default English/ANSI (1252/437), so legacy Greek apps may fail."
     }else{
       Write-Warning "[WARNING] Unusual non-Unicode locale: $loc_acp / $loc_oemcp (ACP/OEMCP). Greek is 1253/737; Default english is 1252/437."
     }
@@ -1169,7 +1169,7 @@ FalsePositives: None.
     if (Test-Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired') { $pending = $true }
     $pfr = Get-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager' -Name 'PendingFileRenameOperations' -ErrorAction SilentlyContinue
     if ($pfr -and $pfr.PendingFileRenameOperations) {write-debug "Found entries in HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\PendingFileRenameOperations (if you are not sure what this means, you can safely ignore it)"}
-    if ($pending) { Write-Warning "[NOTICE] Windows need a reboot to apply some changes"; return}
+    if ($pending) { Write-Warning "[notice] Windows need a reboot to apply some changes"; return}
     Write-Warning "[PASS] No pending reboot indicators"
 }
 
@@ -1360,7 +1360,7 @@ FalsePositives: None.
       $k = $v.TrimEnd('\')
       if (-not $present.ContainsKey($k)) {
         $missing += $k
-        Write-Warning "[NOTICE] Shadow storage not configured on $k"
+        Write-Warning "[notice] Shadow storage not configured on $k"
       }
     }
 
@@ -1371,12 +1371,12 @@ FalsePositives: None.
     if ($present.Count -gt 0) {
       Write-Warning ("[PASS] Shadow storage configured`nOn: " + ((@($present.Keys) | Sort-Object) -join ', '))
     } else {
-      Write-Warning "[NOTICE] Shadow storage (Volume Shadow Copies) is not enabled`nUsers won't see Previous Version for files/folders. (Note that this issue is UNRELATED to the VSS service that backup software use.)"
+      Write-Warning "[notice] Shadow storage (Volume Shadow Copies) is not enabled`nUsers won't see Previous Version for files/folders. (Note that this issue is UNRELATED to the VSS service that backup software use.)"
     }
   }
 
   if ($outOfRange -and $rangeOutOfBounds.Count -gt 0) {
-    Write-Warning ("[NOTICE] Shadow storage size outside recommended range`n" + ($rangeOutOfBounds -join '; '))
+    Write-Warning ("[notice] Shadow storage size outside recommended range`n" + ($rangeOutOfBounds -join '; '))
   }
 
   if ($rangeUnknown.Count -gt 0) {
@@ -1552,7 +1552,7 @@ FalsePositives: None.
 
         if ($OptionalNoticePorts -contains $p) {
             # Added process name to the notice message for extra context.
-            Write-Warning "[NOTICE] Optional baseline port is listening: $p ($procDescr)"
+            Write-Warning "[notice] Optional baseline port is listening: $p ($procDescr)"
             continue
         }
 
@@ -1570,7 +1570,7 @@ FalsePositives: None.
             if($isHostServer){
                 Write-Warning ("[WARNING] Unexpected listening port: $p (Process: $procDescr, Vendor: $vendor)`n$comment")
             } else {
-                Write-Warning ("[NOTICE] Unexpected listening port: $p (Process: $procDescr, Vendor: $vendor)`n$comment")
+                Write-Warning ("[notice] Unexpected listening port: $p (Process: $procDescr, Vendor: $vendor)`n$comment")
             }
         } else {
             Write-Warning ("[FAILURE] Unexpected listening port: $p (Process: $procDescr, Vendor: $vendor)`n$comment")
@@ -1687,7 +1687,7 @@ FalsePositives: New software can be expected in some environments.
         $seen += 1
         $normalizedName = Get-NormalizedSoftwareName -Name $sw.Name
         $details = "Full program name: $($sw.Name); Publisher: $($sw.Publisher); Install Date: $($sw.InstallDate); Source: $($sw.Source); Scope: $($sw.Scope)"
-        Write-Warning "[NOTICE] New installed software: $normalizedName`n$details"
+        Write-Warning "[notice] New installed software: $normalizedName`n$details"
     }
 
     if ($seen -eq 0) {

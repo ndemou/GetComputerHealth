@@ -45,7 +45,7 @@ FalsePositives: None.
         }
         catch {}
 
-        Write-Warning "[WARNING] $("Directory $($dir.Path) has more than 10000 child items")`n$($comment)"
+        Write-Warning "[warning] $("Directory $($dir.Path) has more than 10000 child items")`n$($comment)"
     }
 
     if (-not $foundLargeDirectory) {

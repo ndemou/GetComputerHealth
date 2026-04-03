@@ -74,7 +74,7 @@ param(
 
     if (-not [string]::IsNullOrWhiteSpace($ConfigPath)) {
         if (-not (Test-Path -LiteralPath $ConfigPath)) {
-            Write-Warning "[NOTICE] Not running HealthTest-RecentBackupsExist because settings file does not exist: $ConfigPath"
+            Write-Warning "[notice] Not running HealthTest-RecentBackupsExist because settings file does not exist: $ConfigPath"
             return
         }
 

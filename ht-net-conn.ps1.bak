@@ -47,7 +47,7 @@ FalsePositives: None.
   } else {
     $aliveHosts = Test-NetConnectivityToNetwork -NetworkDescription "Internet" -KnownHostIps $POPULAR_HOSTS -ReturnListOfAliveHosts
     if ($aliveHosts) {
-      Write-Warning "[NOTICE] System seems connected to the Internet but windows report it is not$details`nBut these hosts reply to pings $aliveHosts"
+      Write-Warning "[notice] System seems connected to the Internet but windows report it is not$details`nBut these hosts reply to pings $aliveHosts"
     } else {
       Write-Warning "[FAILURE] No Internet connection$details`nAlso non of these hosts replied to pings: $POPULAR_HOSTS"
     }
@@ -386,7 +386,7 @@ FalsePositives: None.
             $pass = $false
         } elseif ($errors -ge 100 -and $errorPct -ge 0.002) {
             $noticeList += "$($n.Name): errors=$pctStr ($errors/$totalPackets total)"
-            Write-Warning "[NOTICE] Network interface with some errors ($($n.Name))`nerrors=$pctStr ($errors/$totalPackets total packets)"
+            Write-Warning "[notice] Network interface with some errors ($($n.Name))`nerrors=$pctStr ($errors/$totalPackets total packets)"
             $pass = $false
         } else {
             # below 0.002%: considered OK, no log entry

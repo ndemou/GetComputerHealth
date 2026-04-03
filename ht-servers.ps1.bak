@@ -43,12 +43,12 @@ FalsePositives: None.
     }
 
     if (-not (Get-Command Get-DhcpServerv4ScopeStatistics -ErrorAction SilentlyContinue)) {
-        Write-Warning "[WARNING] DHCP server cmdlets not available on this DHCP server; skipping DHCP scope utilization test"; return
+        Write-Warning "[warning] DHCP server cmdlets not available on this DHCP server; skipping DHCP scope utilization test"; return
     }
 
     $stats = Get-DhcpServerv4ScopeStatistics -ErrorAction SilentlyContinue
     if (-not $stats) {
-        Write-Warning "[WARNING] DHCP server role present but no DHCPv4 scopes found"; return
+        Write-Warning "[warning] DHCP server role present but no DHCPv4 scopes found"; return
     }
 
     $over = @()
@@ -58,7 +58,7 @@ FalsePositives: None.
             Write-Warning "[FAILURE] DHCP scope is >=90% used: $($s.ScopeId)"
         } elseif ($s.PercentageInUse -ge 80) {
             $over += $s.ScopeId
-            Write-Warning "[WARNING] DHCP scope is >=80% used: $($s.ScopeId)"
+            Write-Warning "[warning] DHCP scope is >=80% used: $($s.ScopeId)"
         }
     }
 

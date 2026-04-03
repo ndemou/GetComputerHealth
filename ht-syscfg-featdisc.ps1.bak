@@ -63,7 +63,7 @@ FalsePositives: None.
     }
   }
   if($items.Count -gt 0){
-    Write-Warning ("[PASS] Startup items reviewed`n" + ($items -join '; '))
+    Write-Warning ("[pass] Startup items reviewed`n" + ($items -join '; '))
   } else {
-    Write-Warning "[PASS] No startup items found in standard keys"}
+    Write-Warning "[pass] No startup items found in standard keys"}
 }

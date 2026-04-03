@@ -477,9 +477,9 @@ function Log-Failure { param([Parameter(Mandatory)][string]$Msg,[string]$Comment
 function Write-BasedOnTestResult {
   param([Parameter(Mandatory)][string]$Title,[Parameter(Mandatory)][bool]$Test,[string]$Comment="")
   if($Test){ 
-    Write-Warning "[pass] $Title"
+    Write-Warning "[PASS] $Title"
   } else{
-    Write-Warning "[failure] $Title`n$Comment"
+    Write-Warning "[FAILURE] $Title`n$Comment"
   }
 }
 

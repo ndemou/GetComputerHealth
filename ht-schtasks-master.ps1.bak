@@ -75,7 +75,7 @@ FalsePositives: None.
                     ) {
                         Write-Warning "[info] Scheduled Task with just a few missed runs(<5): '$($t.TaskPath)$($t.TaskName)'`n$($i.NumberOfMissedRuns) runs where missed. Details about this task: $details"
                     } else {
-                        Write-Warning "[NOTICE] Scheduled Task with just a few missed runs(<5): '$($t.TaskPath)$($t.TaskName)'`n$($i.NumberOfMissedRuns) runs where missed. Details about this task: $details"
+                        Write-Warning "[notice] Scheduled Task with just a few missed runs(<5): '$($t.TaskPath)$($t.TaskName)'`n$($i.NumberOfMissedRuns) runs where missed. Details about this task: $details"
                     }
                 } else {
                     Write-Warning "[WARNING] Scheduled Task with missed runs: '$($t.TaskPath)$($t.TaskName)'`n$($i.NumberOfMissedRuns) runs where missed. Details about this task: $details"

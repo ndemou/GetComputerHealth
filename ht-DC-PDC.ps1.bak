@@ -138,7 +138,7 @@ FalsePositives: None.
           if($_.Test -in $BasicTestResults.Test){
             $interesting_lines = (($_.BlockText -split "`n"|?{$_.trim()}|sls -NotMatch '\bno ([A-Za-z]+ )?errors?\b|\bPASS +FAIL\b|\.\.\.\.\.\..* failed test ').line|sls 'error|fail').line -replace '^ +'
             if ($testName -like '*DFSREvent*' -or $testName -like '*SystemLog*') {
-                Write-Warning "[NOTICE] 'DCDIAG /v' reports a failure in this basic test that examines the event log: $testName`nSince this test fails when warnings/errors appear in the event log, false positives are likely.`nRun DCDIAG /v, search for '$testName' and examine the detailed report above it.`nBelow are lines from that report that contain words like error/fail:`n$interesting_lines"
+                Write-Warning "[notice] 'DCDIAG /v' reports a failure in this basic test that examines the event log: $testName`nSince this test fails when warnings/errors appear in the event log, false positives are likely.`nRun DCDIAG /v, search for '$testName' and examine the detailed report above it.`nBelow are lines from that report that contain words like error/fail:`n$interesting_lines"
             } else {
                 Write-Warning "[FAILURE] 'DCDIAG /v' reports a failure in this basic test: $testName`nRun DCDIAG /v, search for '$testName' and examine the detailed report above it.`nBelow are lines from that report that contain words like error/fail:`n$interesting_lines"
             }
@@ -318,10 +318,10 @@ FalsePositives: None.
       continue
     }
     if($metaCount -eq 0 -and $enabledCount -gt 0){
-      Write-Warning "[NOTICE] $(("Inbound connection objects exist but partner metadata returned none for " + $dc.HostName + ". Recheck with: repadmin /showrepl " + $dc.HostName))"
+      Write-Warning "[notice] $(("Inbound connection objects exist but partner metadata returned none for " + $dc.HostName + ". Recheck with: repadmin /showrepl " + $dc.HostName))"
     }
     if($metaCount -gt 0 -and $enabledCount -eq 0){
-      Write-Warning "[NOTICE] Inbound partners reported by $($dc.HostName) but no enabled nTDSConnection objects under NTDS Settings. Possible permission/cache/KCC timing; investigate ISTG/KCC."
+      Write-Warning "[notice] Inbound partners reported by $($dc.HostName) but no enabled nTDSConnection objects under NTDS Settings. Possible permission/cache/KCC timing; investigate ISTG/KCC."
     }
   }
   if(-not $anyFail){ Write-Warning "[PASS] Inbound replication present for all DCs (partner metadata OK, NTDS container cross-check performed)" }
@@ -1163,7 +1163,7 @@ FalsePositives: None.
 #>
   $f=Get-ADOptionalFeature 'Recycle Bin Feature' -ErrorAction Stop
   $enabled=($f.EnabledScopes -ne $null -and $f.EnabledScopes.Count -gt 0)
-  if($enabled){ Write-Warning "[PASS] AD Recycle Bin enabled" } else { Write-Warning "[NOTICE] AD Recycle Bin is not enabled -- consider enabling it." }
+  if($enabled){ Write-Warning "[PASS] AD Recycle Bin enabled" } else { Write-Warning "[notice] AD Recycle Bin is not enabled -- consider enabling it." }
 }
 
 function HealthTest-ReplicationLatency{
