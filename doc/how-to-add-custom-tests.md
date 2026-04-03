@@ -103,7 +103,34 @@ And `.GetCurrentDomain = [System.DirectoryServices.ActiveDirectory.Domain]::GetC
 
 ## Optional features
 
+### General
+
 Consider the "Optional Features for Health Tests" mentioned in `How-to-add-built-in-health-tests.md`. They are not mandatory however.
+
+### For Checking Backup Freshness
+
+Example of how to check Veeam Backups:
+```
+function HealthTest-FreshVeeamBackups {
+    Start-HealthTestVeeamRecentBackupsExist       -RootPath "D:\Backups\Backup Job 1"
+    Start-HealthTestVeeamRecentConfigBackupsExist -RootPath "D:\Backups\VeeamConfigBackup\SRV1"
+}
+```
+
+Example of how to verify at least one daily .BAK file exists in a folder
+```
+function HealthTest-RecentBakExist{
+param(
+    [string]$RootPath,
+    [int]$MaxAgeHours = 24
+)
+    if (Get-RecentFilesConditional -Path $RootPath -Pattern *.BAK -MinBytes 25000 -MaxAgeHours $MaxAgeHours) {
+        write-warning "[PASS] Found recent Backup in $RootPath"
+    } else {
+        write-warning "[FAILURE] No recent Backup in $RootPath"
+    }
+}
+```
 
 # Instructions for LLMs helping a novice write a custom test.
 
