@@ -53,6 +53,9 @@ Passed through to Get-ComputerHealth as `-ExcludeTests` (skips selected tests).
 .PARAMETER NoUpdate
 Skips execution of `C:\IT\bin\Update-GetHealthCode.ps1` before running `Get-ComputerHealth.ps1` on each target.
 
+.PARAMETER RunWithoutElevation
+Passes `-RunWithoutElevation` through to `Get-ComputerHealth.ps1` on each target, bypassing its normal elevation guard.
+
 .PARAMETER PushUpdate
 When targeting remote computers, copies the latest locally cached release zip from `${TEMP_DIR}` to each target and runs `Update-GetHealthCode.ps1 -UpdateFromZip <copied-zip>` before tests.
 
@@ -88,6 +91,7 @@ param(
     [Alias('Quick')]
     [switch]$SkipNonEssentialTests,
     [switch]$NoUpdate,
+    [switch]$RunWithoutElevation,
     [switch]$PushUpdate,
     [switch]$NoSendMessage,
     [string[]]$IpsOfAllDcs = @(),
@@ -349,6 +353,7 @@ foreach ($target in $targets) {
           $SkipPolicyTests,
           $SkipNonEssentialTests,
           $NoUpdate,
+          $RunWithoutElevation,
           $IpsOfAllDcs,
           $PushUpdate,
           $UpdateZipPath,
@@ -400,6 +405,7 @@ foreach ($target in $targets) {
               SkipSlowTests         = $SkipSlowTests
               SkipPolicyTests       = $SkipPolicyTests
               SkipNonEssentialTests = $SkipNonEssentialTests
+              RunWithoutElevation   = $RunWithoutElevation
               IpsOfAllDcs           = $IpsOfAllDcs
           }
           $healthOutput = & $getHealthScriptPath @getHealthParams @PassThruArgs 2>&1
@@ -430,7 +436,7 @@ foreach ($target in $targets) {
   }
 
   if ($target -eq $env:COMPUTERNAME) {
-      $output = & $healthCheckBlock $ROOT_DIR $Hide $OnlyTheseTests $ExcludeTests $WhitelistSigs $SkipSlowTests $SkipPolicyTests $SkipNonEssentialTests $NoUpdate $IpsOfAllDcs $PushUpdate $localReleaseZip $PassThruArgs
+      $output = & $healthCheckBlock $ROOT_DIR $Hide $OnlyTheseTests $ExcludeTests $WhitelistSigs $SkipSlowTests $SkipPolicyTests $SkipNonEssentialTests $NoUpdate $RunWithoutElevation $IpsOfAllDcs $PushUpdate $localReleaseZip $PassThruArgs
   }
   else {
       if (Get-TcpPortStateFast $target @(5985, 5986, 80, 443, 88, 135, 389, 636, 445, 3268, 3269) | Where-Object { $_.Open }) {
@@ -463,7 +469,7 @@ foreach ($target in $targets) {
             Copy-Item -Path $localReleaseZip -Destination $remoteZipPath -ToSession $session -Force
           }
 
-          $output = Invoke-Command -Session $session -ScriptBlock $healthCheckBlock -ArgumentList $ROOT_DIR, $Hide, $OnlyTheseTests, $ExcludeTests, $WhitelistSigs, $SkipSlowTests, $SkipPolicyTests, $SkipNonEssentialTests, $NoUpdate, $IpsOfAllDcs, $PushUpdate, $remoteZipPath, $PassThruArgs
+          $output = Invoke-Command -Session $session -ScriptBlock $healthCheckBlock -ArgumentList $ROOT_DIR, $Hide, $OnlyTheseTests, $ExcludeTests, $WhitelistSigs, $SkipSlowTests, $SkipPolicyTests, $SkipNonEssentialTests, $NoUpdate, $RunWithoutElevation, $IpsOfAllDcs, $PushUpdate, $remoteZipPath, $PassThruArgs
         } catch {
           $_ = Log-failure "Failed running update/health scripts on target $target"
           $all_messages += [pscustomobject]@{

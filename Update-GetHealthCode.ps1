@@ -720,6 +720,7 @@ $false - No files changed.
 
   $changed = $false
   $sourceRootFullPath = (Resolve-Path -LiteralPath $SourcePath).Path
+  $sourceRootWithSeparator = $sourceRootFullPath.TrimEnd('\','/') + '\'
   $excluded = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
 
   foreach ($relativePath in $ExcludeRelativePaths) {
@@ -729,7 +730,12 @@ $false - No files changed.
   }
 
   Get-ChildItem -LiteralPath $sourceRootFullPath -Recurse -File | ForEach-Object {
-    $relativePath = [System.IO.Path]::GetRelativePath($sourceRootFullPath, $_.FullName).Replace('/','\')
+    $fileFullPath = $_.FullName.Replace('/','\')
+    if ($fileFullPath.StartsWith($sourceRootWithSeparator, [System.StringComparison]::OrdinalIgnoreCase)) {
+      $relativePath = $fileFullPath.Substring($sourceRootWithSeparator.Length)
+    } else {
+      throw "Release file '$fileFullPath' is not under source root '$sourceRootFullPath'"
+    }
     if ($excluded.Contains($relativePath)) {
       Write-Verbose "Skipping excluded release file '$relativePath'"
       return

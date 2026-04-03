@@ -23,6 +23,9 @@ Dependencies & execution context:
 - Relies on companion scripts: `lib-write-log-objects.ps1` and the modules under `health-tests\*.ps1` dot-sourced below.
 - Uses a suppression config file at `C:\it\config\Get-ComputerHealth.sigs-to-suppress.txt`.
 
+.PARAMETER RunWithoutElevation
+(Parameter sets: Run, AddWhitelist, List) Bypasses the normal elevation requirement. Default behavior still requires running as Administrator.
+
 .PARAMETER OutputConsoleMessages
 (Parameter set: Run) If set, writes colorized log/messages to the console while executing tests.
 
@@ -111,6 +114,7 @@ $out | Out-GridView
 
 .NOTES
 - Elevation is enforced for normal runs and for whitelisting operations.
+- `-RunWithoutElevation` bypasses the elevation guard; some health tests may still fail or produce incomplete results when run non-elevated.
 - Permanent suppression file: `C:\it\config\Get-ComputerHealth.sigs-to-suppress.txt`.
 - Custom tests: scripts may execute arbitrary code on import; files are loaded in temporary module scope and functions named `HealthTest-*` are invoked automatically.
 #>
@@ -171,6 +175,11 @@ param(
   [Parameter(ParameterSetName='Run')]
   [switch]$DoNothing,
 
+  [Parameter(ParameterSetName='Run')]
+  [Parameter(ParameterSetName='AddWhitelist')]
+  [Parameter(ParameterSetName='List')]
+  [switch]$RunWithoutElevation,
+
   # ----------------------------
   # Add whitelisting entry
   # ----------------------------
@@ -200,7 +209,7 @@ param(
   [switch]$ListAllBuiltInTests
 )
 
-$VERSION="3.0.7"
+$VERSION="3.0.8"
 
 
 $SCRIPT_BIN_DIR = (Resolve-Path -LiteralPath $PSScriptRoot).Path
@@ -815,7 +824,11 @@ $isHostServer = ($domainRole  -in 3,4,5)
 $isHostDC = ($domainRole -in 4,5)
 $isHostDnsServer = $null -ne (Get-Service -Name DNS -ErrorAction SilentlyContinue)
 $isHostDHCPServer = ($isHostServer -and (Get-WindowsFeature DHCP -ErrorAction SilentlyContinue).InstallState -eq 'Installed')
-$isHostHyperisor = (Get-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V).State -eq 'Enabled'
+if (-not $RunWithoutElevation) {
+    $isHostHyperisor = (Get-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V).State -eq 'Enabled'
+} else {
+    $isHostHyperisor = $false
+}
 $isHostInDomainButNotDC = (Get-CimInstance Win32_ComputerSystem).DomainRole -in 1,3
 $isHostPDC = $false
 $currentDomain = $null
@@ -920,9 +933,9 @@ if ($ListAllBuiltInTests) {Get-HealthTest $allHealthTests; return}
 
 # Fail if not run as Administrator (elevated)
 # None of the functionality that follows is available to non-admins
-if (-not ([Security.Principal.WindowsPrincipal] `
+if ((-not $RunWithoutElevation) -and (-not ([Security.Principal.WindowsPrincipal] `
     [Security.Principal.WindowsIdentity]::GetCurrent() `
-).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator))) {
     Write-Error "This script must be run as Administrator (elevated)."
     exit 1
 }
