@@ -2,10 +2,28 @@
 Helper functions for Custom Health Tests
 #>
 
+function Start-HealthTestVeeamRecentConfigBackupsExist{
+<#
+.SYNOPSIS
+Reports if recent enough Veeam Configuration backups (.BCO) exist and have reasonable sizes
+#>
+[CmdletBinding()]
+param(
+    [string]$RootPath,
+    [int]$MaxAgeHours = 24
+)
+    if (Get-RecentFilesConditional -Path $RootPath -Pattern *.BCO -MinBytes 25000 -MaxAgeHours $MaxAgeHours) {
+        write-warning "[pass] Found recent Configuration Backup in $RootPath"
+    } else {
+        write-warning "[failure] No recent Configuration Backup in $RootPath"
+    }
+}
+
+
 function Start-HealthTestVeeamRecentBackupsExist{
 <#
 .SYNOPSIS
-Tests if recent enough Veeam VM backups exist and have reasonable sizes and returns Log-objects.
+Reports if recent enough Veeam VM backups exist and have reasonable sizes.
 Expects at least on .VBK file and a fresh .VBM and either a fresh .VIB or a fresh .VBK
 
 .DESCRIPTION
