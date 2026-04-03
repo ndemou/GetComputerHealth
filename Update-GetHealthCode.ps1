@@ -595,10 +595,10 @@ Keeps only the latest N cached release zips.
 function Replace-FileFromSource {
 <#
 .SYNOPSIS
-Copies a file from the extracted release and updates local copy if they differ.
+Copies a file from the extracted release tree and updates the local copy if they differ.
 
 .DESCRIPTION
-Compares SourcePath\FileName to DestinationPath\FileName.
+Compares SourcePath\<relative FileName> to DestinationPath\<relative FileName>.
 
 If the destination file does not exist, the downloaded file is placed into
 DestinationPath.
@@ -628,6 +628,7 @@ $false - No change occurred or the operation failed.
 
   $releaseFilePath = Join-Path $SourcePath $FileName
   $finalPath       = Join-Path $DestinationPath $FileName
+  $finalDir        = Split-Path -Path $finalPath -Parent
   $updated         = $false
 
   try {
@@ -673,6 +674,9 @@ $false - No change occurred or the operation failed.
       }
 
       try {
+        if (-not (Test-Path -LiteralPath $finalDir -PathType Container)) {
+          $null = New-Item -ItemType Directory -Path $finalDir -Force
+        }
         Copy-Item -LiteralPath $releaseFilePath -Destination $finalPath -Force -ErrorAction Stop
         Write-Verbose "Updated '$finalPath'"
         $updated = $true
@@ -689,6 +693,54 @@ $false - No change occurred or the operation failed.
   }
 
   return $updated
+}
+
+function Install-ReleaseFilesFromSource {
+<#
+.SYNOPSIS
+Installs all files from an extracted release tree into the destination tree.
+
+.DESCRIPTION
+Walks SourcePath recursively, computes each file path relative to SourcePath, and
+uses Replace-FileFromSource so files are only copied when missing or changed.
+Files listed in ExcludeRelativePaths are skipped.
+
+.OUTPUTS
+System.Boolean
+$true  - At least one file was created or replaced.
+$false - No files changed.
+#>
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory=$true)][string]$SourcePath,
+    [Parameter(Mandatory=$true)][string]$DestinationPath,
+    [Parameter(Mandatory=$true)][string]$BackupPath,
+    [string[]]$ExcludeRelativePaths = @()
+  )
+
+  $changed = $false
+  $sourceRootFullPath = (Resolve-Path -LiteralPath $SourcePath).Path
+  $excluded = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+
+  foreach ($relativePath in $ExcludeRelativePaths) {
+    if (-not [string]::IsNullOrWhiteSpace($relativePath)) {
+      $null = $excluded.Add($relativePath.Replace('/','\'))
+    }
+  }
+
+  Get-ChildItem -LiteralPath $sourceRootFullPath -Recurse -File | ForEach-Object {
+    $relativePath = [System.IO.Path]::GetRelativePath($sourceRootFullPath, $_.FullName).Replace('/','\')
+    if ($excluded.Contains($relativePath)) {
+      Write-Verbose "Skipping excluded release file '$relativePath'"
+      return
+    }
+
+    if (Replace-FileFromSource -FileName $relativePath -SourcePath $sourceRootFullPath -DestinationPath $DestinationPath -BackupPath $BackupPath) {
+      $changed = $true
+    }
+  }
+
+  return $changed
 }
 #
 #  HELPER FUNCTIONS END
@@ -874,28 +926,7 @@ if ($updated) {
   return
 }
 
-if (Replace-FileFromSource -FileName 'lib-write-log-objects.ps1'    -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR) { $appliedUpdate = $true }
-if (Replace-FileFromSource -FileName 'ht-DC-PDC.ps1'                -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR) { $appliedUpdate = $true }
-if (Replace-FileFromSource -FileName 'ht-DNS.ps1'                   -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR) { $appliedUpdate = $true }
-if (Replace-FileFromSource -FileName 'ht-DHCP.ps1'                  -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR) { $appliedUpdate = $true }
-if (Replace-FileFromSource -FileName 'ht-syscfg-featdisc.ps1'       -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR) { $appliedUpdate = $true }
-if (Replace-FileFromSource -FileName 'ht-srvc-exe-resolve.ps1'      -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR) { $appliedUpdate = $true }
-if (Replace-FileFromSource -FileName 'ht-file-dir-anlz.ps1'         -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR) { $appliedUpdate = $true }
-if (Replace-FileFromSource -FileName 'ht-schtasks-master.ps1'       -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR) { $appliedUpdate = $true }
-if (Replace-FileFromSource -FileName 'ht-net-conn.ps1'              -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR) { $appliedUpdate = $true }
-if (Replace-FileFromSource -FileName 'ht-os-perf-hw.ps1'            -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR) { $appliedUpdate = $true }
-if (Replace-FileFromSource -FileName 'ht-win-os-hyg.ps1'            -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR) { $appliedUpdate = $true }
-if (Replace-FileFromSource -FileName 'ht-hypervisor.ps1'            -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR) { $appliedUpdate = $true }
-if (Replace-FileFromSource -FileName 'Get-ComputerHealth.ps1'       -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR) { $appliedUpdate = $true }
-if (Replace-FileFromSource -FileName 'Invoke-GetComputerHealth.ps1' -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR) { $appliedUpdate = $true }
-if (Replace-FileFromSource -FileName 'Send-Message.ps1'             -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR) { $appliedUpdate = $true }
-if (Replace-FileFromSource -FileName 'helpers-processes.ps1'        -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR) { $appliedUpdate = $true }
-if (Replace-FileFromSource -FileName 'helpers-networking.ps1'       -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR) { $appliedUpdate = $true }
-if (Replace-FileFromSource -FileName 'helpers-for-custom-ht.ps1'    -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR) { $appliedUpdate = $true }
-if (Replace-FileFromSource -FileName 'ht-DomJoined.ps1'             -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR) { $appliedUpdate = $true }
-if (Replace-FileFromSource -FileName 'ht-member.ps1'                -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR) { $appliedUpdate = $true }
-if (Replace-FileFromSource -FileName 'ht-mobile.ps1'                -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR) { $appliedUpdate = $true }
-if (Replace-FileFromSource -FileName 'ht-servers.ps1'               -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR) { $appliedUpdate = $true }
+if (Install-ReleaseFilesFromSource -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR -ExcludeRelativePaths @('Update-GetHealthCode.ps1')) { $appliedUpdate = $true }
 
 if ($appliedUpdate) {
   $zipName = if ($preparedZipPath) { Split-Path -Path $preparedZipPath -Leaf } else { '<unknown zip>' }
@@ -911,12 +942,27 @@ if ($PersistReleaseMarker) {
 }
 
 if ((Get-Date) -le [datetime]'2026-04-30') {
-  Write-Verbose "Executing temporary cleanup for obsolete files"
+  Write-Verbose "Executing cleanups of obsolete files"
 
   $obsoleteFiles = @(
     (Join-Path $CFG_DIR  'Get-ComputerHealth-latest-release.dat')
     (Join-Path $DEST_DIR 'lib-helpers-for-health-tests.ps1')
     (Join-Path $DEST_DIR 'lib-health-tests.ps1')
+    (Join-Path $DEST_DIR 'ht-DC-PDC.ps1')
+    (Join-Path $DEST_DIR 'ht-DNS.ps1')
+    (Join-Path $DEST_DIR 'ht-DHCP.ps1')
+    (Join-Path $DEST_DIR 'ht-syscfg-featdisc.ps1')
+    (Join-Path $DEST_DIR 'ht-srvc-exe-resolve.ps1')
+    (Join-Path $DEST_DIR 'ht-file-dir-anlz.ps1')
+    (Join-Path $DEST_DIR 'ht-schtasks-master.ps1')
+    (Join-Path $DEST_DIR 'ht-net-conn.ps1')
+    (Join-Path $DEST_DIR 'ht-os-perf-hw.ps1')
+    (Join-Path $DEST_DIR 'ht-win-os-hyg.ps1')
+    (Join-Path $DEST_DIR 'ht-hypervisor.ps1')
+    (Join-Path $DEST_DIR 'ht-DomJoined.ps1')
+    (Join-Path $DEST_DIR 'ht-member.ps1')
+    (Join-Path $DEST_DIR 'ht-mobile.ps1')
+    (Join-Path $DEST_DIR 'ht-servers.ps1')
     (Join-Path $DEST_DIR 'ht-AD-GPO-mgmt.ps1')
     (Join-Path $DEST_DIR 'ht-DNS-DHCP-srvc.ps1')
     (Join-Path $DEST_DIR 'ht-hyperv-mgmt.ps1')

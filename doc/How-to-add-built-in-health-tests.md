@@ -53,7 +53,7 @@ Consider any other optional feature.
 
 ## Step 4, place in the proper file -- done.
 
-Chose the most suitable `ht-*.ps1` file to append your function. They have a short description at their top.
+Choose the most suitable script under `health-tests\` to append your function. They have a short description at their top.
 
 ## Optional Features for Health Tests
 

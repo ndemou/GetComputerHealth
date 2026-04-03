@@ -57,7 +57,7 @@ flowchart BT
  subgraph Target["Target Computer"]
         LocalRunner["Get-ComputerHealth.ps1"]
         Updater["Update-GetHealthCode.ps1"]
-        Tests["ht-*.ps1"]
+        Tests["health-tests/*.ps1"]
         Config["Suppression File"]
   end
     Entry --> Orchestrator
@@ -114,10 +114,10 @@ These scripts run locally on the servers being checked.
   * **Function:** It loads the test library and executes the tests. It handles the logic for **whitelisting** (suppressing known failures) and generates clean, colorized console output.
   * **Usage:** Can be run interactively on a specific server for troubleshooting (e.g., `.\Get-ComputerHealth.ps1 -OutputConsoleMessages`).
 
-* **`ht-*.ps1`**
+* **`health-tests\*.ps1`**
 
   * **Role:** The Logic Library.
-  * **Function:** Contains the actual code for checks like `HealthTest-DiskSpace` and `HealthTest-TimeSyncPolicy`. It is a library and does not run on its own; it is loaded by the Runner.
+  * **Function:** Contains the actual code for checks like `HealthTest-DiskSpace` and `HealthTest-TimeSyncPolicy`. These scripts live under `health-tests\` and are dot-sourced by the Runner.
 
 * **`Update-GetHealthCode.ps1`**
 
@@ -283,11 +283,11 @@ You do not need to modify the core library. [Follow these instructions](./doc/ho
 
 ## 6.1. How to Create a Built-In `HealthTest-*` Function
 
-If you want to contribute a new **built-in** check (one that ships in the `ht-*.ps1` modules and appears in `-ListAllBuiltInTests`), follow this mini playbook.
+If you want to contribute a new **built-in** check (one that ships in the `health-tests\*.ps1` modules and appears in `-ListAllBuiltInTests`), follow this mini playbook.
 
 ### 6.1.1) Copy the structure of existing tests
 
-Open the relevant `ht-*.ps1` module and model your function after nearby tests:
+Open the relevant script under `health-tests\` and model your function after nearby tests:
 
 ```powershell
 function HealthTest-YourTestName {

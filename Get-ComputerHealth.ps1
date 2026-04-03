@@ -20,7 +20,7 @@ Idempotency:
 
 Dependencies & execution context:
 - Requires elevation.
-- Relies on companion scripts: `lib-write-log-objects.ps1` and themed `ht-*.ps1` modules dot-sourced below.
+- Relies on companion scripts: `lib-write-log-objects.ps1` and the modules under `health-tests\*.ps1` dot-sourced below.
 - Uses a suppression config file at `C:\it\config\Get-ComputerHealth.sigs-to-suppress.txt`.
 
 .PARAMETER OutputConsoleMessages
@@ -894,22 +894,22 @@ $Global:GCHDQMTA = [pscustomobject]@{
 #| Dot source health tests
 #|
 
-. (Join-Path -Path $PSScriptRoot -ChildPath "ht-syscfg-featdisc.ps1")
-. (Join-Path -Path $PSScriptRoot -ChildPath "ht-srvc-exe-resolve.ps1")
-. (Join-Path -Path $PSScriptRoot -ChildPath "ht-file-dir-anlz.ps1")
-. (Join-Path -Path $PSScriptRoot -ChildPath "ht-schtasks-master.ps1")
-. (Join-Path -Path $PSScriptRoot -ChildPath "ht-net-conn.ps1")
-. (Join-Path -Path $PSScriptRoot -ChildPath "ht-os-perf-hw.ps1")
-. (Join-Path -Path $PSScriptRoot -ChildPath "ht-win-os-hyg.ps1")
+. (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\syscfg-featdisc.ps1")
+. (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\srvc-exe-resolve.ps1")
+. (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\file-dir-anlz.ps1")
+. (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\schtasks-master.ps1")
+. (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\net-conn.ps1")
+. (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\os-perf-hw.ps1")
+. (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\win-os-hyg.ps1")
 
-if ($isHostDC -or $isHostPDC){. (Join-Path -Path $PSScriptRoot -ChildPath "ht-DC-PDC.ps1")}
-if ($isHostDnsServer)        {. (Join-Path -Path $PSScriptRoot -ChildPath "ht-DNS.ps1")}
-if ($isHostDHCPServer)       {. (Join-Path -Path $PSScriptRoot -ChildPath "ht-DHCP.ps1")}
-if ($isHostDomainJoined)     {. (Join-Path -Path $PSScriptRoot -ChildPath "ht-DomJoined.ps1")}
-if ($isHostInDomainButNotDC) {. (Join-Path -Path $PSScriptRoot -ChildPath "ht-member.ps1")}
-if ($isHostMobile)           {. (Join-Path -Path $PSScriptRoot -ChildPath "ht-mobile.ps1")}
-if ($isHostHyperisor)        {. (Join-Path -Path $PSScriptRoot -ChildPath "ht-hypervisor.ps1")}
-if ($isHostServer)           {. (Join-Path -Path $PSScriptRoot -ChildPath "ht-servers.ps1")}
+if ($isHostDC -or $isHostPDC){. (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\DC-PDC.ps1")}
+if ($isHostDnsServer)        {. (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\DNS.ps1")}
+if ($isHostDHCPServer)       {. (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\DHCP.ps1")}
+if ($isHostDomainJoined)     {. (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\domjoined.ps1")}
+if ($isHostInDomainButNotDC) {. (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\member.ps1")}
+if ($isHostMobile)           {. (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\mobile.ps1")}
+if ($isHostHyperisor)        {. (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\hypervisor.ps1")}
+if ($isHostServer)           {. (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\servers.ps1")}
 #|
 #| Dot source health tests
 #+-----------------------------------------------------------
