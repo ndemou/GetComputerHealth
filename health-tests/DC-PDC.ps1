@@ -30,10 +30,6 @@ FalsePositives: None.
   }
 
   $ok = $true
-  try { Import-Module ActiveDirectory -ErrorAction Stop } catch {
-    Write-Warning "[FAILURE] ActiveDirectory module not available.`nInstall RSAT AD PowerShell tools. On a DC it's built-in; on a Domain member use Add-WindowsFeature RSAT-AD-PowerShell (Server) or RSAT package (Client)."
-    return
-  }
 
   if (-not $Servers -or $Servers.Count -eq 0) {
     try { $Servers = Get-ADDomainController -Filter * | Select-Object -ExpandProperty HostName }
@@ -819,24 +815,6 @@ FalsePositives: None.
   $isHostDC = ($domainRole -in 4,5)
 
   if (-not $isHostDC) { return }
-
-  $adModuleOk = $true
-  try {
-    if (-not (Get-Module -ListAvailable -Name ActiveDirectory)) { $adModuleOk = $false }
-  } catch {
-    $adModuleOk = $false
-  }
-
-  if (-not $adModuleOk) {
-    Write-Warning "[FAILURE] AD replication (RSAT): ActiveDirectory module not available; cannot query replication partner metadata."; return
-  }
-
-  try {
-    Import-Module ActiveDirectory -ErrorAction Stop
-  } catch {
-    Write-Warning "[FAILURE] AD replication (RSAT): failed to import ActiveDirectory module.`n$($_.Exception.Message)"
-    return
-  }
 
   $me = $null
   try {
