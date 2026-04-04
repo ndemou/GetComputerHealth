@@ -279,7 +279,7 @@ FalsePositives: None.
 function HealthTest-KccConnectivity{
 <#
 .SYNOPSIS
-Checks Kcc Connectivity
+Does this DC appear to have inbound topology at all, and do KCC objects and partner metadata make sense?
 
 .DESCRIPTION
 AppliesTo: DC
@@ -1187,7 +1187,7 @@ FalsePositives: None.
       $m=Get-ADReplicationPartnerMetadata -Target $dc.HostName -Partition $p -ErrorAction Stop
       foreach($row in $m){
         $mins = [int](((Get-Date)-$row.LastReplicationSuccess).TotalMinutes)
-        if($mins -gt $MaxMinutes){ $anyFail=$true; Write-Warning "[FAILURE] Replication latency above threshold`n$($dc.HostName) partition '$p' latency=$mins min (Max=$MaxMinutes)" }
+        if($mins -gt $MaxMinutes){ $anyFail=$true; Write-Warning ("[FAILURE] Replication latency above threshold" + "`n" + "Based on LastReplicationSuccess reported by Get-ADReplicationPartnerMetadata : $($dc.HostName) partition '$p' latency=$mins min (Max=$MaxMinutes)") }
       }
     }
   }

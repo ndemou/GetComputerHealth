@@ -1,5 +1,11 @@
 # TODO
- 
+
+## Find redundant health tests
+
+Do a quick first pass to group health tests in clusters of similar ones.
+
+The check each cluster thinking: “which tests are merely different views of the same fact” vs “which tests detect a genuinely different failure mode”. Then combine tests that are merely different views of the same fact.
+
 ## Add the "P" Tag to these functions:
   - HealthTest-NonMicrosoftServices__S
   - HealthTest-NonDefaultShares
