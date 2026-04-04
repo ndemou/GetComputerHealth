@@ -281,110 +281,17 @@ You do not need to modify the core library. [Follow these instructions](./doc/ho
 
 # 6. Contributing
 
-## 6.1. How to Create a Built-In `HealthTest-*` Function
+Contributor documentation now lives in [`CONTRIBUTING.md`](./CONTRIBUTING.md).
 
-If you want to contribute a new **built-in** check (one that ships in the `health-tests\*.ps1` modules and appears in `-ListAllBuiltInTests`), follow this mini playbook.
+Use it for:
 
-### 6.1.1) Copy the structure of existing tests
+- development workflow
+- testing and CI
+- how to add built-in `HealthTest-*` functions
 
-Open the relevant script under `health-tests\` and model your function after nearby tests:
+The user-facing guide for writing custom health tests remains separate:
 
-```powershell
-function HealthTest-YourTestName {
-<#
-.SYNOPSIS
-Short purpose and key signal logic (<=320 chars).
-
-.DESCRIPTION
-Uses: CmdletA, CmdletB.
-AppliesTo: Domain Controllers.
-TestScope: Domain.
-Category: Primary: Security & Stability Risks.
-Impact: Medium (Time/Network).
-FalsePositives: Short note.
-#>
-    # no params or params with defaults
-    # gather data
-    # evaluate data
-    # Write-Warning "[pass] ..." or Write-Warning "[failure] ..."
-}
-```
-
-For the exact contributor rules (placement, required sections, max lengths, and field order), see [`how-to-add-custom-tests.md`](./how-to-add-custom-tests.md#required-help-block-format-for-every-healthtest--function).
-
-Use **PascalCase** after the `HealthTest-` prefix (example: `HealthTest-PagefileSanity`).
-
-### 6.1.2) Keep side effects at zero
-
-Health tests should inspect and report, not change system state. In other words:
-
-* Do: read registry, services, event logs, AD, WMI/CIM, file metadata.
-* Do not: modify config, restart services, install anything, delete files.
-
-### 6.1.3) Report through `Write-Warning`
-
-The framework expects you to call `Write-Warning "[pass] ..."` or `Write-Warning "[failure] ..."` and similar.
-
-Typical pattern:
-
-```powershell
-if ($healthy) {
-    Write-Warning "[pass] Short success message"
-}
-elseif ($riskyButNotBroken) {
-    $details = "Volatile details go here"
-    Write-Warning ("[warning] Stable message text" + "`n" + $details)
-}
-else {
-    $details = "Volatile details go here"
-    Write-Warning ("[failure] Stable message text" + "`n" + $details)
-}
-```
-
-### 6.1.4) Keep message text suppression-friendly
-
-Suppression is signature-based. If message text changes every run, suppression becomes noisy.
-
-* Put **stable identity** in the message.
-* Put **changing values** (timestamps, counts, free-form output) in `-Comment`.
-
-Example:
-
-* Good: `Write-Warning ("[Failure] Windows Update is stale" + "`n" + "Last install date: $lastInstall")`
-* Bad: `Write-Warning "[Failure] Windows Update is stale by $days days"`
-
-### 6.1.5) Be explicit about scope and prerequisites
-
-If your test only makes sense for DCs, domain-joined machines, laptops, etc., short-circuit early with a pass/notice (or return silently, following surrounding style).
-
-Also guard optional commands/features:
-
-```powershell
-if (-not (Get-Command Some-Cmdlet -ErrorAction SilentlyContinue)) {
-    Write-Warning "[Notice] Some-Cmdlet not available; skipping check"
-    return
-}
-```
-
-### 6.1.6) Catch errors only if you can work around them
-
-Only use `try { } catch { }` for exceptions you can work around. Otherwise just let the exception thrown. It will be reported by Get-ComputerHealth.
-
-### 6.1.7) Validate locally before committing
-
-Useful contributor loop:
-
-```powershell
-# Run only your test while iterating
-C:\IT\bin\Get-ComputerHealth.ps1 -OnlyTheseTests HealthTest-YourTestName -OutputConsoleMessages -OutputObjects -Hide DIP
-
-# See complete built-in test list after adding your function
-C:\IT\bin\Get-ComputerHealth.ps1 -ListAllBuiltInTests
-```
-
-### 6.1.8) Add your test to the README catalog
-
-After the function works, add a one-line description in **"List of Available Tests"** so users discover it quickly.
+- [`doc/how-to-add-custom-tests.md`](./doc/how-to-add-custom-tests.md)
 
 
 # 7. List of Available Tests
