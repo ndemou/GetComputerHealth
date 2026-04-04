@@ -121,6 +121,16 @@ FalsePositives: None.
   $isMicrosoft    = { param($t) ($t.Author -match 'Microsoft') -or ($t.TaskPath -like '\Microsoft\*') }
   $shouldIgnore   = { param($path) foreach($rx in $Ignore){ if($path -match $rx){ return } } return }
   $isRequired     = { param($path) foreach($rx in $MustBeEnabled){ if($path -match $rx){ return } } return }
+  $isTriggerEnabled = {
+    param($trigger)
+    if ($null -eq $trigger) { return $false }
+
+    $enabledProp = $trigger.PSObject.Properties['Enabled']
+    if ($enabledProp) { return [bool]$enabledProp.Value }
+
+    # Some scheduled-task trigger objects do not expose Enabled; treat them as enabled.
+    return $true
+  }
 
   $tasks = Get-ScheduledTask | Where-Object { & $isSystem $_ }
   if(-not $IncludeHidden){ $tasks = $tasks | Where-Object { -not $_.Settings.Hidden } }
@@ -134,7 +144,7 @@ FalsePositives: None.
     $info = Get-ScheduledTaskInfo -TaskName $t.TaskName -TaskPath $t.TaskPath
     $enabled = [bool]$t.Settings.Enabled
     $state = $t.State
-    $hasEnabledTrigger = ($t.Triggers | Where-Object { $_.Enabled }) -ne $null
+    $hasEnabledTrigger = ($t.Triggers | Where-Object { & $isTriggerEnabled $_ } | Select-Object -First 1) -ne $null
     $lastRun = $info.LastRunTime
     if (-not $lastRun) {$lastRun = [datetime]::new(1900, 1, 1)}
     $lastRes = ('0x{0:X8}' -f ([uint32]$info.LastTaskResult))

@@ -1207,6 +1207,11 @@ FalsePositives: None.
   [CmdletBinding()]
   param([hashtable]$OverrideMinSizesMB)
 
+  if ($RunWithoutElevation) {
+    Write-Warning "[WARNING] this test requires elevation"
+    return
+  }
+
   $role = (Get-CimInstance Win32_ComputerSystem).DomainRole
   $MinSizesMB = switch ($role) {
     0 { @{Security=20; System=20;  Application=20} }     # Workstation, non-domain

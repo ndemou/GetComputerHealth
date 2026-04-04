@@ -309,6 +309,11 @@ Impact: Medium(Time)
 Uses: Get-WindowsOptionalFeature.
 FalsePositives: None.
 #>
+  if ($RunWithoutElevation) {
+    Write-Warning "[WARNING] this test requires elevation"
+    return
+  }
+
   $f=Get-WindowsOptionalFeature -Online -FeatureName SMB1Protocol -ErrorAction SilentlyContinue
   $state=$f.State
   $disabled=($state -eq 'Disabled' -or -not $f -or $state -eq 'DisabledWithPayloadRemoved')
@@ -1219,6 +1224,11 @@ FalsePositives: None.
     [Nullable[double]]$MaxRecommendedGB = $null
   )
 
+  if ($RunWithoutElevation) {
+    Write-Warning "[WARNING] this test requires elevation"
+    return
+  }
+
   $domainRole = (Get-CimInstance -ClassName Win32_ComputerSystem).DomainRole
   $isWorkstation = ($domainRole -in 0,1)
   $isServer = -not $isWorkstation
@@ -1319,6 +1329,8 @@ FalsePositives: None.
   $outOfRange = $false
 
   if ($null -ne $MinRecommendedGB -or $null -ne $MaxRecommendedGB) {
+    $minRecommendedValue = if ($null -ne $MinRecommendedGB) { [double]$MinRecommendedGB } else { $null }
+    $maxRecommendedValue = if ($null -ne $MaxRecommendedGB) { [double]$MaxRecommendedGB } else { $null }
     $targets = if ($RequireOnVolumes.Count -gt 0) {
       @($RequireOnVolumes | ForEach-Object { $_.TrimEnd('\') } | Sort-Object -Unique)
     } else {
@@ -1341,14 +1353,14 @@ FalsePositives: None.
 
       $sizeGB = [math]::Round(($maxBytes / 1GB), 2)
 
-      if ($null -ne $MinRecommendedGB -and $sizeGB -lt $MinRecommendedGB.Value) {
+      if ($null -ne $minRecommendedValue -and $sizeGB -lt $minRecommendedValue) {
         $outOfRange = $true
-        $rangeOutOfBounds.Add("$k=$sizeGB GB below min $($MinRecommendedGB.Value) GB")
+        $rangeOutOfBounds.Add("$k=$sizeGB GB below min $minRecommendedValue GB")
       }
 
-      if ($null -ne $MaxRecommendedGB -and $sizeGB -gt $MaxRecommendedGB.Value) {
+      if ($null -ne $maxRecommendedValue -and $sizeGB -gt $maxRecommendedValue) {
         $outOfRange = $true
-        $rangeOutOfBounds.Add("$k=$sizeGB GB above max $($MaxRecommendedGB.Value) GB")
+        $rangeOutOfBounds.Add("$k=$sizeGB GB above max $maxRecommendedValue GB")
       }
     }
   }

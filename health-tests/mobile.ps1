@@ -15,5 +15,10 @@ Impact: Medium(Time)
 Uses: Write-BasedOnTestResult, Get-Tpm.
 FalsePositives: None.
 #>
+  if ($RunWithoutElevation) {
+    Write-Warning "[WARNING] this test requires elevation"
+    return
+  }
+
   Write-BasedOnTestResult "Is TPM Activated?" -Test (Get-Tpm).TpmActivated
 }
