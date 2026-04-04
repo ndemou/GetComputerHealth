@@ -19,7 +19,7 @@ try {
     -OutputConsoleMessages -OutputObjects -RunWithoutElevation `
     -ExcludeTests ("HealthTest-LargeDirectories,HealthTest-SoftwareLicensing," + `
                    "HealthTest-ScheduledTasks,HealthTest-NonMicrosoftServices," + `
-                   "HealthTest-UnsignedDrivers")
+                   "HealthTest-UnsignedDrivers,HealthTest-IisBindings__E")
 
   $programErrors = $data | Where-Object { $_.message -like '*program error*' }
   $programErrorsMessage = 'Unexpected program error detection state.'

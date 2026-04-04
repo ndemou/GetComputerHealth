@@ -77,6 +77,7 @@ function Get-TestPaths {
   [pscustomobject]@{
     RepoRoot = $RepoRoot
     TestRoot = $RunRoot
+    TestsRoot = (Join-Path $RepoRoot 'tests')
     InstallRoot = (Join-Path $RunRoot 'bin')
     ConfigRoot = (Join-Path $RunRoot 'config')
     SuppressionsFile = (Join-Path $RunRoot 'config\Get-ComputerHealth.sigs-to-suppress.txt')
@@ -84,7 +85,7 @@ function Get-TestPaths {
     ReleaseZipPath = (Join-Path $RunRoot 'GetComputerHealth-under-test.zip')
     UpdateScriptSource = (Join-Path $RepoRoot 'Update-GetHealthCode.ps1')
     MainScriptSource = (Join-Path $RepoRoot 'Get-ComputerHealth.ps1')
-    HelperScript = 'C:\Users\NickDemou\dev\scripts\helpers-files.ps1'
+    HelperScript = (Join-Path $RepoRoot 'tests\helpers-files.ps1')
   }
 }
 
