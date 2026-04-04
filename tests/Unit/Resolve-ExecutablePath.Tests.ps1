@@ -1,22 +1,6 @@
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 . (Join-Path $repoRoot 'health-tests\srvc-exe-resolve.ps1')
 
-function New-ResolveExecutablePathTestRoot {
-  $root = Join-Path $env:TEMP ("ResolveExeTest_" + [guid]::NewGuid().ToString())
-  $dirItem = New-Item -ItemType Directory -Path $root -Force
-  return $dirItem.FullName
-}
-
-function Remove-ResolveExecutablePathTestRoot {
-  param(
-    [string]$Path
-  )
-
-  if ($Path) {
-    Remove-Item -LiteralPath $Path -Recurse -Force -ErrorAction SilentlyContinue
-  }
-}
-
 function Test-CaseHasProperty {
   param(
     [Parameter(Mandatory)]
@@ -28,13 +12,29 @@ function Test-CaseHasProperty {
   return $null -ne $Case.PSObject.Properties[$Name]
 }
 
+$script:NewResolveExecutablePathTestRoot = {
+  $root = Join-Path $env:TEMP ("ResolveExeTest_" + [guid]::NewGuid().ToString())
+  $dirItem = New-Item -ItemType Directory -Path $root -Force
+  return $dirItem.FullName
+}
+
+$script:RemoveResolveExecutablePathTestRoot = {
+  param(
+    [string]$Path
+  )
+
+  if ($Path) {
+    Remove-Item -LiteralPath $Path -Recurse -Force -ErrorAction SilentlyContinue
+  }
+}
+
 Describe 'Resolve-ExecutablePath' {
   $tempRoot = $null
   $originalLocation = $null
   $originalPath = $null
 
   BeforeEach {
-    $tempRoot = New-ResolveExecutablePathTestRoot
+    $tempRoot = & $script:NewResolveExecutablePathTestRoot
     $subDir = Join-Path $tempRoot 'SubFolder'
     New-Item -ItemType Directory -Path $subDir -Force | Out-Null
 
@@ -56,7 +56,7 @@ Describe 'Resolve-ExecutablePath' {
   AfterEach {
     try { Set-Location $originalLocation } catch {}
     $env:PATH = $originalPath
-    Remove-ResolveExecutablePathTestRoot -Path $tempRoot
+    & $script:RemoveResolveExecutablePathTestRoot -Path $tempRoot
   }
 
   $hasNotepad = Test-Path -LiteralPath (Join-Path $env:WINDIR 'System32\notepad.exe') -PathType Leaf
