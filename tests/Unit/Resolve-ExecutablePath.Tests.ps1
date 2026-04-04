@@ -1,54 +1,7 @@
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 . (Join-Path $repoRoot 'health-tests\srvc-exe-resolve.ps1')
 
-function Test-CaseHasProperty {
-  param(
-    [Parameter(Mandatory)]
-    [object]$Case,
-    [Parameter(Mandatory)]
-    [string]$Name
-  )
-
-  return $null -ne $Case.PSObject.Properties[$Name]
-}
-
 Describe 'Resolve-ExecutablePath' {
-  $tempRoot = $null
-  $originalLocation = $null
-  $originalPath = $null
-
-  BeforeEach {
-    $root = Join-Path $env:TEMP ("ResolveExeTest_" + [guid]::NewGuid().ToString())
-    $dirItem = New-Item -ItemType Directory -Path $root -Force
-    $tempRoot = $dirItem.FullName
-    $subDir = Join-Path $tempRoot 'SubFolder'
-    New-Item -ItemType Directory -Path $subDir -Force | Out-Null
-
-    @(
-      'rootTool.exe',
-      'script.bat',
-      'space tool.exe',
-      'SubFolder\deep.com',
-      'tool[1].exe'
-    ) | ForEach-Object {
-      New-Item -ItemType File -Path (Join-Path $tempRoot $_) -Force | Out-Null
-    }
-
-    $originalLocation = Get-Location
-    $originalPath = $env:PATH
-    $env:PATH = "$tempRoot;$env:PATH"
-  }
-
-  AfterEach {
-    try { Set-Location $originalLocation } catch {}
-    if ($null -ne $originalPath) {
-      $env:PATH = $originalPath
-    }
-    if ($tempRoot) {
-      Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
-    }
-  }
-
   $hasNotepad = Test-Path -LiteralPath (Join-Path $env:WINDIR 'System32\notepad.exe') -PathType Leaf
   $hasNetsh = Test-Path -LiteralPath (Join-Path $env:WINDIR 'System32\netsh.exe') -PathType Leaf
 
@@ -148,14 +101,39 @@ Describe 'Resolve-ExecutablePath' {
   )
 
   foreach ($t in $testCases) {
-    It $t.Name {
-      if (Test-CaseHasProperty -Case $t -Name 'Before') { & $t.Before }
+    $case = $t
+    $testBody = {
+      $tempRoot = $null
+      $originalLocation = $null
+      $originalPath = $null
+
+      if ($null -ne $case.PSObject.Properties['Before']) { & $case.Before }
       try {
-        $workDir = if ($t.WorkDir -is [scriptblock]) { & $t.WorkDir $tempRoot } else { $t.WorkDir }
+        $root = Join-Path $env:TEMP ("ResolveExeTest_" + [guid]::NewGuid().ToString())
+        $dirItem = New-Item -ItemType Directory -Path $root -Force
+        $tempRoot = $dirItem.FullName
+        $subDir = Join-Path $tempRoot 'SubFolder'
+        New-Item -ItemType Directory -Path $subDir -Force | Out-Null
+
+        @(
+          'rootTool.exe',
+          'script.bat',
+          'space tool.exe',
+          'SubFolder\deep.com',
+          'tool[1].exe'
+        ) | ForEach-Object {
+          New-Item -ItemType File -Path (Join-Path $tempRoot $_) -Force | Out-Null
+        }
+
+        $originalLocation = Get-Location
+        $originalPath = $env:PATH
+        $env:PATH = "$tempRoot;$env:PATH"
+
+        $workDir = if ($case.WorkDir -is [scriptblock]) { & $case.WorkDir $tempRoot } else { $case.WorkDir }
         Set-Location $workDir
 
-        $inputValue = if ($t.Input -is [scriptblock]) { & $t.Input $tempRoot } else { $t.Input }
-        $expectedValue = if ($t.Expected -is [scriptblock]) { & $t.Expected $tempRoot } else { $t.Expected }
+        $inputValue = if ($case.Input -is [scriptblock]) { & $case.Input $tempRoot } else { $case.Input }
+        $expectedValue = if ($case.Expected -is [scriptblock]) { & $case.Expected $tempRoot } else { $case.Expected }
 
         $result = $null
         $threw = $false
@@ -172,8 +150,17 @@ Describe 'Resolve-ExecutablePath' {
           $result.ToString().ToLowerInvariant() | Should Be $expectedValue.ToString().ToLowerInvariant()
         }
       } finally {
-        if (Test-CaseHasProperty -Case $t -Name 'After') { & $t.After }
+        try { Set-Location $originalLocation } catch {}
+        if ($null -ne $originalPath) {
+          $env:PATH = $originalPath
+        }
+        if ($tempRoot) {
+          Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
+        }
+        if ($null -ne $case.PSObject.Properties['After']) { & $case.After }
       }
-    }
+    }.GetNewClosure()
+
+    It $case.Name $testBody
   }
 }

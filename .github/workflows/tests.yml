@@ -23,6 +23,12 @@ jobs:
         run: |
           $PSVersionTable.PSVersion
 
+      - name: Install Pester 5
+        run: |
+          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+          Install-Module Pester -Scope CurrentUser -MinimumVersion 5.0.0 -MaximumVersion 5.999.999 -Force -SkipPublisherCheck
+          Get-Module -ListAvailable Pester | Sort-Object Version -Descending | Select-Object -First 5 Name,Version,Path
+
       - name: Run smoke tests for pull requests
         if: github.event_name == 'pull_request'
         run: |

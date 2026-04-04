@@ -10,6 +10,10 @@ if ($null -eq $pesterModule) {
   throw "Pester is required to run unit tests. Install it in Windows PowerShell 5.1 and retry."
 }
 
+if ($pesterModule.Version.Major -lt 5) {
+  throw "Pester 5 or newer is required to run unit tests. Found version $($pesterModule.Version). Install a newer Pester module and retry."
+}
+
 Import-Module $pesterModule.Path -Force
 
 $invokeParams = @{
