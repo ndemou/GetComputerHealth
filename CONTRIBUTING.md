@@ -25,33 +25,43 @@ The codebase is Windows-specific in important places. Do not assume Linux compat
 
 1. Make the smallest coherent change you can.
 2. Run the relevant local tests.
-3. If you touched shared behavior, run the full suite.
+3. Start with fast unit tests, then smoke tests, then full machine tests only when needed.
 4. Keep side effects explicit and test-scoped.
 5. Prefer readable PowerShell over clever PowerShell.
 
 ## Testing
 
-The repository uses a direct PowerShell test harness, not Pester.
+The repository uses a mixed testing model:
+
+- unit-like tests use Pester
+- integration-style validation remains script-based for now
 
 ### Main Commands
 
+- Run fast unit tests first:
+  `.\tests\run-unit-tests.ps1`
+- Run the smoke set second:
+  `.\tests\run-all-tests.ps1 -Smoke`
+- Run integration-like checks only when you need broader validation:
+  `.\tests\run-all-tests.ps1 -Category Integration`
 - Run everything:
   `.\tests\run-all-tests.ps1`
 - Run everything with more detail:
   `.\tests\run-all-tests.ps1 -Detailed`
-- Run unit-like checks only:
-  `.\tests\run-all-tests.ps1 -Category Unit`
-- Run integration-like checks only:
-  `.\tests\run-all-tests.ps1 -Category Integration`
-- Run the fastest low-risk smoke set:
-  `.\tests\run-all-tests.ps1 -Smoke`
 
 ### Test Categories
 
 - Unit-like:
-  Fast deterministic checks with limited machine coupling. Right now this is mainly the `Resolve-ExecutablePath` suite.
+  Fast deterministic checks with limited machine coupling. Right now this is mainly the `Resolve-ExecutablePath` Pester suite.
 - Integration-like:
   Checks that touch real services, installer behavior, or broader filesystem / machine state.
+
+### Recommended Local Validation Order
+
+1. `.\tests\run-unit-tests.ps1`
+2. `.\tests\run-all-tests.ps1 -Smoke`
+3. `.\tests\run-all-tests.ps1 -Category Integration` only when your change affects broader machine behavior
+4. `.\tests\run-all-tests.ps1` when you want the whole repo check
 
 ### Test Conventions
 
@@ -67,6 +77,7 @@ The repository uses a direct PowerShell test harness, not Pester.
 ### Test Harness Notes
 
 - Shared assertions and path helpers live in [`tests/test-helpers.ps1`](./tests/test-helpers.ps1).
+- Pester unit tests live under [`tests/Unit`](./tests/Unit).
 - Failure logs from the runner are written under `tests\artifacts\last-run\`.
 - The test runner excludes `test-helpers.ps1` from discovery.
 
@@ -189,7 +200,13 @@ C:\IT\bin\Get-ComputerHealth.ps1 -OnlyTheseTests HealthTest-YourTestName -Output
 C:\IT\bin\Get-ComputerHealth.ps1 -ListAllBuiltInTests
 ```
 
-Also run the repository test harness when your change affects shared behavior:
+Also run the unit tests first when your change affects shared behavior:
+
+```powershell
+.\tests\run-unit-tests.ps1
+```
+
+Then run broader validation when needed:
 
 ```powershell
 .\tests\run-all-tests.ps1
@@ -205,7 +222,6 @@ When contributor-facing behavior changes, update the relevant docs:
 ## Non-Goals
 
 These are not current project goals:
-- migrating the test harness to Pester
 - hiding Windows-specific assumptions
 - making health tests mutate machine state
 - replacing simple scripts with a heavy framework

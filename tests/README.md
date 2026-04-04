@@ -11,6 +11,8 @@ Use that file for:
 
 Quick reference:
 
+- run unit tests:
+  `.\tests\run-unit-tests.ps1`
 - run all tests:
   `.\tests\run-all-tests.ps1`
 - smoke run:
