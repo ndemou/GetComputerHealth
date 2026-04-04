@@ -1,5 +1,6 @@
 # Provides:
 #  - New-ZipFromFolder: Creates a zip file from a folder keeping that folder as the top-level entry in the zip.
+. (Join-Path $PSScriptRoot 'helpers-files.ps1')
 . (Join-Path $PSScriptRoot 'test-helpers.ps1')
 
 $runRoot = New-TestRunRoot -Name 'gch-installer'
