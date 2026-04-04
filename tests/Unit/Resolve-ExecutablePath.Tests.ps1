@@ -12,29 +12,15 @@ function Test-CaseHasProperty {
   return $null -ne $Case.PSObject.Properties[$Name]
 }
 
-$script:NewResolveExecutablePathTestRoot = {
-  $root = Join-Path $env:TEMP ("ResolveExeTest_" + [guid]::NewGuid().ToString())
-  $dirItem = New-Item -ItemType Directory -Path $root -Force
-  return $dirItem.FullName
-}
-
-$script:RemoveResolveExecutablePathTestRoot = {
-  param(
-    [string]$Path
-  )
-
-  if ($Path) {
-    Remove-Item -LiteralPath $Path -Recurse -Force -ErrorAction SilentlyContinue
-  }
-}
-
 Describe 'Resolve-ExecutablePath' {
   $tempRoot = $null
   $originalLocation = $null
   $originalPath = $null
 
   BeforeEach {
-    $tempRoot = & $script:NewResolveExecutablePathTestRoot
+    $root = Join-Path $env:TEMP ("ResolveExeTest_" + [guid]::NewGuid().ToString())
+    $dirItem = New-Item -ItemType Directory -Path $root -Force
+    $tempRoot = $dirItem.FullName
     $subDir = Join-Path $tempRoot 'SubFolder'
     New-Item -ItemType Directory -Path $subDir -Force | Out-Null
 
@@ -55,8 +41,12 @@ Describe 'Resolve-ExecutablePath' {
 
   AfterEach {
     try { Set-Location $originalLocation } catch {}
-    $env:PATH = $originalPath
-    & $script:RemoveResolveExecutablePathTestRoot -Path $tempRoot
+    if ($null -ne $originalPath) {
+      $env:PATH = $originalPath
+    }
+    if ($tempRoot) {
+      Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
+    }
   }
 
   $hasNotepad = Test-Path -LiteralPath (Join-Path $env:WINDIR 'System32\notepad.exe') -PathType Leaf
