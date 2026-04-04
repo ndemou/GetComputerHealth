@@ -272,7 +272,7 @@ FalsePositives: None.
 }
 
 
-function HealthTest-KccConnectivity{
+function HealthTest-ADInboundReplicationTopology{
 <#
 .SYNOPSIS
 Does this DC appear to have inbound topology at all, and do KCC objects and partner metadata make sense?
