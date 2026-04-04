@@ -1,21 +1,30 @@
 # Provides:
 #  - New-ZipFromFolder: Creates a zip file from a folder keeping that folder as the top-level entry in the zip.
-. C:\Users\NickDemou\dev\scripts\helpers-files.ps1
+. (Join-Path $PSScriptRoot 'test-helpers.ps1')
 
-Set-strictmode -version latest
+$runRoot = New-TestRunRoot -Name 'gch-installer'
+$paths = Get-TestPaths -RepoRoot (Split-Path -Parent $PSScriptRoot) -RunRoot $runRoot
 
-robocopy C:\Users\NickDemou\dev\GetComputerHealth\ C:\Users\NickDemou\dev\GetComputerHealth-v0.0.1\ /xd .git /mir /nfl /ndl /nc /ns | Out-Null
-if ($LASTEXITCODE -ge 8) {
-    Throw "Robocopy failed with exit code $LASTEXITCODE"
+try {
+  Assert-CommandAvailable 'robocopy'
+  Assert-PathExists -Path $paths.HelperScript -Message "Missing helper script required by installer test: $($paths.HelperScript)"
+  Assert-PathExists -Path $paths.UpdateScriptSource -Message "Missing installer script under test: $($paths.UpdateScriptSource)"
+  Assert-DirectoryWritable -Path $paths.ReleaseRoot
+  Assert-DirectoryWritable -Path $paths.InstallRoot
+
+  . $paths.HelperScript
+
+  Invoke-RobocopyChecked -Source $paths.RepoRoot -Destination $paths.ReleaseRoot -ExcludeDirectories @('.git')
+
+  if (Test-Path -LiteralPath $paths.ReleaseZipPath) {
+    Remove-Item -LiteralPath $paths.ReleaseZipPath -Force
+  }
+
+  New-ZipFromFolder -SourceFolderPath $paths.RepoRoot -DestinationPath $paths.ReleaseZipPath -Exclude @('*.bak','*.tmp','.git') -NoCompression
+
+  Copy-Item -LiteralPath $paths.UpdateScriptSource -Destination $paths.InstallRoot -Force
+
+  & (Join-Path $paths.InstallRoot 'Update-GetHealthCode.ps1') -Reinstall $paths.ReleaseZipPath
+} finally {
+  Remove-TestRunRoot -Path $runRoot
 }
-
-$path="C:\Users\NickDemou\dev\GetComputerHealth-v0.0.1.zip"
-if (test-path $path) {rm $path}
-New-ZipFromFolder -SourceFolderPath C:\Users\NickDemou\dev\GetComputerHealth -DestinationPath  C:\Users\NickDemou\dev\GetComputerHealth-v0.0.1.zip -Exclude @('*.bak','*.tmp','.git') -NoCompression
-
-mkdir -Force c:\it\temp-gch\bin > $null
-
-cp C:\Users\NickDemou\dev\GetComputerHealth\Update-GetHealthCode.ps1 c:\it\temp-gch\bin\
-
-c:\it\temp-gch\bin\Update-GetHealthCode.ps1 -Reinstall `
-    C:\Users\NickDemou\dev\GetComputerHealth-v0.0.1.zip  
