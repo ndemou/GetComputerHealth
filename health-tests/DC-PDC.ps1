@@ -850,7 +850,7 @@ FalsePositives: None.
   if($enabled){ Write-Warning "[PASS] AD Recycle Bin enabled" } else { Write-Warning "[NOTICE] AD Recycle Bin is not enabled -- consider enabling it." }
 }
 
-function HealthTest-ReplicationLatency{
+function HealthTest-ReplicationLatency {
 <#
 .SYNOPSIS
 Checks Replication Latency
@@ -861,21 +861,67 @@ Scope: Domain
 Category: Configuration Hygiene & Best Practices
 Impact: High(Time)
 Uses: Get-ADRootDSE, Get-ADDomainController, Get-ADReplicationPartnerMetadata.
-FalsePositives: None.
+FalsePositives: Low. Old LastReplicationSuccess alone can be benign on quiet partitions. This check only fails when elevated latency is accompanied by replication trouble signals.
 #>
-  [CmdletBinding()] param([int]$MaxMinutes=30)
-  $parts=@((Get-ADRootDSE).schemaNamingContext,(Get-ADRootDSE).configurationNamingContext)
-  $anyFail=$false
-  foreach($dc in (Get-ADDomainController -Filter *)){
-    foreach($p in $parts){
-      $m=Get-ADReplicationPartnerMetadata -Target $dc.HostName -Partition $p -ErrorAction Stop
-      foreach($row in $m){
-        $mins = [int](((Get-Date)-$row.LastReplicationSuccess).TotalMinutes)
-        if($mins -gt $MaxMinutes){ $anyFail=$true; Write-Warning ("[FAILURE] Replication latency above threshold" + "`n" + "Based on LastReplicationSuccess reported by Get-ADReplicationPartnerMetadata : $($dc.HostName) partition '$p' latency=$mins min (Max=$MaxMinutes)") }
+  [CmdletBinding()]
+  param(
+    [int]$NoticeMinutes = 30,
+    [int]$WarnMinutes   = 120,
+    [int]$FailMinutes   = 240
+  )
+
+  $rootDse = Get-ADRootDSE -ErrorAction Stop
+  $parts = @(
+    $rootDse.schemaNamingContext,
+    $rootDse.configurationNamingContext
+  )
+
+  $hadFailure = $false
+  $hadWarning = $false
+  $hadNotice  = $false
+
+  foreach ($dc in (Get-ADDomainController -Filter *)) {
+    foreach ($p in $parts) {
+      $rows = @(Get-ADReplicationPartnerMetadata -Target $dc.HostName -Partition $p -ErrorAction SilentlyContinue)
+
+      foreach ($row in $rows) {
+        if (-not $row.LastReplicationSuccess) { continue }
+
+        $mins = [int](((Get-Date) - $row.LastReplicationSuccess).TotalMinutes)
+        $hasTrouble = (($row.LastReplicationResult -ne 0) -or ($row.ConsecutiveReplicationFailures -gt 0))
+
+        $details =
+          "`nDC: $($dc.HostName)" +
+          "`nPartition: $p" +
+          "`nPartner: $($row.Partner)" +
+          "`nLatency: $mins min" +
+          "`nLastReplicationSuccess: $($row.LastReplicationSuccess)" +
+          "`nLastReplicationResult: $($row.LastReplicationResult)" +
+          "`nConsecutiveReplicationFailures: $($row.ConsecutiveReplicationFailures)"
+
+        if ($mins -ge $FailMinutes -and $hasTrouble) {
+          $hadFailure = $true
+          Write-Warning "[FAILURE] Replication latency is very high and replication trouble signals are present.$details"
+          continue
+        }
+
+        if ($mins -ge $NoticeMinutes -and $hasTrouble) {
+          $hadWarning = $true
+          Write-Warning "[WARNING] Replication latency is elevated and replication trouble signals are present.$details"
+          continue
+        }
+
+        if ($mins -ge $WarnMinutes) {
+          $hadNotice = $true
+          Write-Warning "[NOTICE] Replication latency is elevated, but current partner metadata shows no failures.$details"
+        }
       }
     }
   }
-  if(-not $anyFail){ Write-Warning "[PASS] AD replication latency acceptable (<= $MaxMinutes min on schema/config)" }
+
+  if (-not ($hadFailure -or $hadWarning -or $hadNotice)) {
+    Write-Warning "[PASS] AD replication latency looks acceptable. No elevated schema/config latency with corroborating trouble signals was found."
+  }
 }
 
 
