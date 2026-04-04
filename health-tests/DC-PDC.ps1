@@ -817,32 +817,13 @@ FalsePositives: None.
   if (-not $isHostDC) { return }
 
   $me = $null
-  try {
-    $me = Get-ADDomainController -ErrorAction Stop
-  } catch {
-    Write-Warning "[FAILURE] AD replication (RSAT): failed to identify local domain controller.`n$($_.Exception.Message)"
-    return
-  }
-
+  $me = Get-ADDomainController -ErrorAction Stop
   if (-not $me -or -not $me.HostName) {
     Write-Warning "[FAILURE] AD replication (RSAT): could not determine local DC hostname."; return
   }
 
-  try {
-    [void](Get-ADDomain -ErrorAction Stop)
-  } catch {
-    Write-Warning "[FAILURE] AD replication (RSAT): cannot query domain info (ADWS/permissions/connectivity issue).`n$($_.Exception.Message)"
-    return
-  }
-
   $md = $null
-  try {
-    $md = Get-ADReplicationPartnerMetadata -Target $me.HostName -ErrorAction Stop
-  } catch {
-    Write-Warning "[FAILURE] Exception from: Get-ADReplicationPartnerMetadata -Target $($me.HostName)`n$($_.Exception.Message)"
-    return
-  }
-
+  $md = Get-ADReplicationPartnerMetadata -Target $me.HostName -ErrorAction Stop
   if (-not $md) {
     Write-Warning "[FAILURE] AD replication (RSAT): no partner metadata returned for $($me.HostName)."; return
   }
