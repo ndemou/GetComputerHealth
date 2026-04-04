@@ -136,7 +136,10 @@ function Invoke-RobocopyChecked {
   $arguments += @('/mir', '/nfl', '/ndl', '/nc', '/ns')
 
   & robocopy @arguments | Out-Null
-  if ($LASTEXITCODE -ge 8) {
-    Fail-Test "Robocopy failed with exit code $LASTEXITCODE"
+  $robocopyExitCode = $LASTEXITCODE
+  if ($robocopyExitCode -ge 8) {
+    Fail-Test "Robocopy failed with exit code $robocopyExitCode"
   }
+
+  $global:LASTEXITCODE = 0
 }

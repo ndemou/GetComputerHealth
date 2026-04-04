@@ -267,4 +267,6 @@ if ($MyInvocation.InvocationName -ne '.') {
   if ($failedResults.Count -gt 0) {
     throw "One or more tests failed."
   }
+
+  $global:LASTEXITCODE = 0
 }
