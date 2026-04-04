@@ -1,3 +1,10 @@
+if (-not $PSScriptRoot) {
+  throw "PSScriptRoot is not available."
+}
+
+$repoRoot = Split-Path -Parent $PSScriptRoot
+. (Join-Path $repoRoot 'health-tests\srvc-exe-resolve.ps1')
+
 function Test-ResolveServiceExecutable {
 <#
 .SYNOPSIS
@@ -8,18 +15,33 @@ function Test-ResolveServiceExecutable {
   $return = $true
  
   echo "Testing Resolve-ServiceExecutable"
-  Get-CimInstance Win32_Service | Select-Object Name,PathName,DisplayName | %{ 
-	$pn=$_.PathName
-	$sn=$_.name
-	$result=Resolve-ServiceExecutable $pn $sn; 
-	if ($null -eq $result -or $null -eq $result.payloadpath -or (-not (test-path $result.payloadpath))) {
-		echo ""
-		echo "Resolve-ServiceExecutable failed to return payloadpath"
-		echo "PathOrName  = ``$pn``"
-		echo "ServiceName = ``$sn``"
-		Resolve-ServiceExecutable $pn $sn -Verbose
-		$return = $false
-	} 
+  Get-CimInstance Win32_Service | Select-Object Name,PathName,DisplayName | ForEach-Object {
+    $pn = $_.PathName
+    $sn = $_.Name
+
+    if ([string]::IsNullOrWhiteSpace($pn)) {
+      Write-Host "Skipping service with empty PathName: $sn" -ForegroundColor DarkGray
+      return
+    }
+
+    try {
+      $result = Resolve-ServiceExecutable $pn $sn
+      if ($null -eq $result -or $null -eq $result.payloadpath -or (-not (Test-Path $result.payloadpath))) {
+        echo ""
+        echo "Resolve-ServiceExecutable failed to return payloadpath"
+        echo "PathOrName  = ``$pn``"
+        echo "ServiceName = ``$sn``"
+        Resolve-ServiceExecutable $pn $sn -Verbose
+        $return = $false
+      }
+    } catch {
+      echo ""
+      echo "Resolve-ServiceExecutable threw unexpectedly"
+      echo "PathOrName  = ``$pn``"
+      echo "ServiceName = ``$sn``"
+      echo "Error       = ``$($_.Exception.Message)``"
+      $return = $false
+    }
   }
 
  return $return
@@ -223,4 +245,63 @@ try{
     if($tempRoot){ try{ Remove-Item $tempRoot -Recurse -Force -ErrorAction SilentlyContinue } catch {} }
   }  
   return $true
+}
+
+function Test-StandaloneTestScripts {
+<#
+.SYNOPSIS
+  Runs all standalone `test*.ps1` scripts in this folder and asserts they do not throw.
+.OUTPUTS
+  Boolean - Returns $true if all standalone test scripts complete without throwing, otherwise $false.
+#>
+  [CmdletBinding()]
+  param()
+
+  $thisScriptPath = [System.IO.Path]::GetFullPath($PSCommandPath)
+  $testScripts = @(
+    Get-ChildItem -LiteralPath $PSScriptRoot -Filter 'test*.ps1' -File |
+      Where-Object { [System.IO.Path]::GetFullPath($_.FullName) -ne $thisScriptPath } |
+      Sort-Object Name
+  )
+
+  if ($testScripts.Count -eq 0) {
+    Write-Host "No standalone test scripts found under $PSScriptRoot" -ForegroundColor DarkGray
+    return $true
+  }
+
+  $passed = 0
+  $failed = 0
+
+  foreach ($testScript in $testScripts) {
+    Write-Host "Running standalone test script $($testScript.Name)" -ForegroundColor Cyan
+    try {
+      & $testScript.FullName
+      Write-Host "[PASS] $($testScript.Name)" -ForegroundColor Green
+      $passed++
+    } catch {
+      Write-Host "[FAIL] $($testScript.Name)" -ForegroundColor Red
+      Write-Host (($_ | Out-String).Trim()) -ForegroundColor Red
+      $failed++
+    }
+  }
+
+  if ($failed -gt 0) {
+    Write-Host "Standalone test script summary: $passed Passed, $failed Failed." -ForegroundColor Red
+    return $false
+  }
+
+  Write-Host "Standalone test script summary: $passed Passed, $failed Failed." -ForegroundColor Green
+  return $true
+}
+
+if ($MyInvocation.InvocationName -ne '.') {
+  $results = @(
+    Test-ResolveServiceExecutable
+    Test-ResolveExecutablePath
+    Test-StandaloneTestScripts
+  )
+
+  if ($results -contains $false) {
+    throw "One or more tests failed."
+  }
 }
