@@ -196,12 +196,19 @@ Uses a local metadata cache to avoid querying GitHub too frequently.
     try {
       Write-Verbose "Reading cached data from $CachePath"
       $cachedRaw = Get-Content -LiteralPath $CachePath -Raw -ErrorAction Stop
+      if ([string]::IsNullOrWhiteSpace($cachedRaw)) {
+        Write-Verbose "Cached release metadata file '$CachePath' is empty"
+        return $null
+      }
+
       $cached = $cachedRaw | ConvertFrom-Json -ErrorAction Stop
-      if ($cached.fetchedAt -and $cached.release) {
-        $ageMinutes = ((Get-Date) - ([datetime]$cached.fetchedAt)).TotalMinutes
+      $fetchedAtProp = $cached.PSObject.Properties['fetchedAt']
+      $releaseProp = $cached.PSObject.Properties['release']
+      if ($fetchedAtProp -and $releaseProp -and $fetchedAtProp.Value -and $releaseProp.Value) {
+        $ageMinutes = ((Get-Date) - ([datetime]$fetchedAtProp.Value)).TotalMinutes
         if ($ageMinutes -lt $CacheTtlMinutes) {
           Write-Verbose ("Using cached release metadata from '{0}' (age {1:N1} minutes, TTL {2} minutes)" -f $CachePath, $ageMinutes, $CacheTtlMinutes)
-          return $cached.release
+          return $releaseProp.Value
         }
         Write-Verbose ("Cached release metadata is stale (age {0:N1} minutes >= TTL {1} minutes)" -f $ageMinutes, $CacheTtlMinutes)
       }
@@ -274,6 +281,10 @@ Reads the installed-release marker from the shared metadata cache file.
 
     Write-Verbose "Reading release marker from $CachePath"
     $cachedRaw = Get-Content -LiteralPath $CachePath -Raw -ErrorAction Stop
+    if ([string]::IsNullOrWhiteSpace($cachedRaw)) {
+      return $null
+    }
+
     $cached = $cachedRaw | ConvertFrom-Json -ErrorAction Stop
     $markerProp = $cached.PSObject.Properties['installedReleaseMarker']
     if (-not $markerProp) {
@@ -314,9 +325,13 @@ Writes the installed-release marker into the shared metadata cache file.
     if (Test-Path -LiteralPath $CachePath -PathType Leaf) {
       try {
         $cachedRaw = Get-Content -LiteralPath $CachePath -Raw -ErrorAction Stop
-        $cached = $cachedRaw | ConvertFrom-Json -ErrorAction Stop
-        if ($cached.fetchedAt) { $cachePayload['fetchedAt'] = $cached.fetchedAt }
-        if ($cached.release) { $cachePayload['release'] = $cached.release }
+        if (-not [string]::IsNullOrWhiteSpace($cachedRaw)) {
+          $cached = $cachedRaw | ConvertFrom-Json -ErrorAction Stop
+          $fetchedAtProp = $cached.PSObject.Properties['fetchedAt']
+          $releaseProp = $cached.PSObject.Properties['release']
+          if ($fetchedAtProp -and $fetchedAtProp.Value) { $cachePayload['fetchedAt'] = $fetchedAtProp.Value }
+          if ($releaseProp -and $releaseProp.Value) { $cachePayload['release'] = $releaseProp.Value }
+        }
       } catch {
         Write-Warning ("Failed to parse existing metadata cache before writing marker to {0}: {1}" -f $CachePath, $_.Exception.Message)
       }
