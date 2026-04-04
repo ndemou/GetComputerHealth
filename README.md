@@ -332,12 +332,12 @@ if ($healthy) {
     Write-Warning "[pass] Short success message"
 }
 elseif ($riskyButNotBroken) {
-    $comment = "Volatile details go here"
-    Write-Warning "[warning] Stable message text`n$comment"
+    $details = "Volatile details go here"
+    Write-Warning ("[warning] Stable message text" + "`n" + $details)
 }
 else {
-    $comment = "Volatile details go here"
-    Write-Warning "[failure] Stable message text`n$comment"
+    $details = "Volatile details go here"
+    Write-Warning ("[failure] Stable message text" + "`n" + $details)
 }
 ```
 
@@ -350,7 +350,7 @@ Suppression is signature-based. If message text changes every run, suppression b
 
 Example:
 
-* Good: `Write-Warning "[Failure] Windows Update is stale`n Last install date: $lastInstall"`
+* Good: `Write-Warning ("[Failure] Windows Update is stale" + "`n" + "Last install date: $lastInstall")`
 * Bad: `Write-Warning "[Failure] Windows Update is stale by $days days"`
 
 ### 6.1.5) Be explicit about scope and prerequisites
@@ -366,9 +366,9 @@ if (-not (Get-Command Some-Cmdlet -ErrorAction SilentlyContinue)) {
 }
 ```
 
-### 6.1.6) Handle errors defensively
+### 6.1.6) Catch errors only if you can work around them
 
-Wrap risky calls with `try { } catch { }` and convert unexpected failures into useful health output (usually a warning/failure with the exception summary in `-Comment`).
+Only use `try { } catch { }` for exceptions you can work around. Otherwise just let the exception thrown. It will be reported by Get-ComputerHealth.
 
 ### 6.1.7) Validate locally before committing
 
