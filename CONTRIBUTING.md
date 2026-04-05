@@ -133,7 +133,7 @@ Uses: Get-ChildItem.
 ```
 
 The `Field: Value` lines follow this exact order (note that some are optional):
-   1. `Description:` A description in up to 320 characters; what kind of issues it detects or what findings it uncovers.
+   1. `Description:` What kind of issues it detects or what findings it uncovers (160 chars max).
    2. `AppliesTo:`. Options are `All`, `VM`, `Mobile`, `DomainJoined`, `Server`, `Workstation`, `DC`, `PDC`
    3. `Scope:`. Options are `Computer`, `Domain`, `Forest`
    4. `Category:` primary plus optional secondary category. Options are: `Availability/Server Down Signals`,`Security & Stability Risks`,`Configuration Hygiene & Best Practices`,`Audit/Compliance/Informational`
