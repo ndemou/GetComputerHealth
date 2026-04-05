@@ -104,15 +104,7 @@ Use the structure and surrounding style of nearby tests in the same file.
 ```powershell
 function HealthTest-YourTestName {
 <#
-.SYNOPSIS
-Short purpose and key signal logic.
-
-.DESCRIPTION
-AppliesTo: Server
-Scope: Computer
-Category: Security & Stability Risks
-Impact: Medium(Time)
-Uses: Some-Cmdlet
+...(see Required Help Block)
 #>
     # gather data
     # evaluate
@@ -124,18 +116,30 @@ Use PascalCase after the `HealthTest-` prefix, for example `HealthTest-PagefileS
 
 ### Required Help Block
 
-Every built-in `HealthTest-*` function must include an in-function comment-based help block immediately after the opening `{`.
+Every built-in `HealthTest-*` function must include an in-function comment-based help block with standarized `field: value` lines immediately after the opening `{`.
 
-Rules:
-- Only two sections: `.SYNOPSIS` & `.DESCRIPTION` (No `.PARAMETER`, `.OUTPUTS`, or `.EXAMPLE`).
-- `.SYNOPSIS` must be up to 320 characters.
-- `.DESCRIPTION` is mandatory and must be a list of `Field: Value` lines in this exact order:
-   1. `AppliesTo:`. Options are `All`, `VM`, `Mobile`, `DomainJoined`, `Server`, `Workstation`, `DC`, `PDC`
-   2. `Scope:`. Options are `Computer`, `Domain`, `Forest`
-   3. `Category:` primary plus optional secondary category. Options are: `Availability/Server Down Signals`,`Security & Stability Risks`,`Configuration Hygiene & Best Practices`,`Audit/Compliance/Informational`
-   4. `Impact:` either "low" if there's low impact on all dimensions, or one or more "<level>(<dimension>)" pairs where <lever> is either "Medium" or "High" and  dimension is one of "CPU","Disk","Network","RAM","Time"
-   5. `Uses:` optional, up to three essential external cmdlets or executables if any.
-   6. `FalsePositives:` optional short note only if False Positives are to be expected
+Example:
+```
+function HealthTest-LargeDirectories__S {
+<#
+Description: Finds directories with more than 10000 files.
+AppliesTo: All
+Scope: Computer
+Category: Configuration Hygiene & Best Practices
+Impact: High(Time), Medium(Disk)
+Uses: Get-ChildItem.
+#>
+...
+```
+
+The `Field: Value` lines follow this exact order (note that some are optional):
+   1. `Description:` A description in up to 320 characters; what kind of issues it detects or what findings it uncovers.
+   2. `AppliesTo:`. Options are `All`, `VM`, `Mobile`, `DomainJoined`, `Server`, `Workstation`, `DC`, `PDC`
+   3. `Scope:`. Options are `Computer`, `Domain`, `Forest`
+   4. `Category:` primary plus optional secondary category. Options are: `Availability/Server Down Signals`,`Security & Stability Risks`,`Configuration Hygiene & Best Practices`,`Audit/Compliance/Informational`
+   5. `Impact:` either "low" if there's low impact on all dimensions, or one or more "<level>(<dimension>)" pairs where <lever> is either "Medium" or "High" and  dimension is one of "CPU","Disk","Network","RAM","Time"
+   6. `Uses:` optional, up to three essential external cmdlets or executables if any.
+   7. `FalsePositives:` optional short note only if False Positives are to be expected
 
 ### Behavior Rules
 
