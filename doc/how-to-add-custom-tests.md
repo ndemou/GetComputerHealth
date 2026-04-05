@@ -89,15 +89,15 @@ $description = "Directory $dir has $FilesCount items"           # NOT Proper
 
 Folder `C:\foo` having 1002 files is practically the same issue as `C:\foo` having 1003 files, so both situations should produce the same description string. The 2nd version is not proper because it produces a string that is sensitive to the irrelevant detail of exactly how many files the folder contains.
 
-> Note that both the proper and improper descriptions contain variables but
+> **NOTICE** Both the proper and improper descriptions contain variables but
 > the variable on the proper descriptio ($dir) reports information that is
 > an essential aspect of the finding (which folder exactly has too many files), 
 > while the variable in the improper description only adds irelevant noise.
 
-*TIP*: This is a very important detail to remember when writting descriptions of issues/findings 
-because the signature (and as a result the suppression) of issues depends on the text of the 
-description staying the same (punctuation is discarded and spacing is normalized but otherwise
-every character matters).
+> **TIP**: This is a very important detail to remember when writting descriptions of issues/findings 
+> because the signature (and as a result the suppression) of issues depends on the text of the 
+> description staying the same (punctuation is discarded and spacing is normalized but otherwise
+> every character matters).
 
 ## When to handle exceptions
 
