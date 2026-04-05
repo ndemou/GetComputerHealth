@@ -47,10 +47,7 @@ Filters out ports listening only on the loopback addresses (127.0.0.1 and ::1) b
 
 function HealthTest-TimeSyncPolicy__E {
 <#
-.SYNOPSIS
-Checks Time Sync Policy.
-
-.DESCRIPTION
+Description: Checks whether Windows Time is configured against the expected time source policy.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
@@ -324,10 +321,7 @@ Uses: Get-DnsDomainControllers, Resolve-DnsName, Test-IsLaptopOrMobile.
 
 function HealthTest-UpdateAge__E {
 <#
-.SYNOPSIS
-Checks Update Age.
-
-.DESCRIPTION
+Description: Checks how long it has been since the latest installed Windows update.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
@@ -352,10 +346,7 @@ Uses: Get-HotFix.
 
 function HealthTest-CertExpiry__E {
 <#
-.SYNOPSIS
-Checks Cert Expiry.
-
-.DESCRIPTION
+Description: Checks for certificates that are expired or nearing expiration.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
@@ -386,10 +377,7 @@ Uses: None.
 
 function HealthTest-IisBindings__E {
 <#
-.SYNOPSIS
-Checks IIS Bindings.
-
-.DESCRIPTION
+Description: Checks IIS bindings for wildcard or otherwise risky binding configurations.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
@@ -436,10 +424,7 @@ Uses: Get-Command, Get-WindowsFeature, Get-Service.
 
 function HealthTest-RamPressure {
 <#
-.SYNOPSIS
-Checks Ram Pressure.
-
-.DESCRIPTION
+Description: Checks for sustained memory pressure using available memory and commit counters.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
@@ -499,10 +484,7 @@ Uses: Get-AvailMB, Get-Counter.
 
 function HealthTest-ShareReasonableness__S {
 <#
-.SYNOPSIS
-Checks Share Reasonableness.
-
-.DESCRIPTION
+Description: Checks SMB shares for risky or unreasonable share exposure.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
@@ -691,10 +673,7 @@ Uses: Get-Service, Get-SmbShare.
 
 function HealthTest-DisksHaveFreeSpace__E {
 <#
-.SYNOPSIS
-Checks Disks Have Free Space.
-
-.DESCRIPTION
+Description: Checks whether local disks have sufficient free space.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
@@ -720,10 +699,7 @@ Uses: Test-DiskHasFreeSpace.
 
 function HealthTest-RequiredSrvRecords__E{
 <#
-.SYNOPSIS
-Checks Required SRV Records.
-
-.DESCRIPTION
+Description: Checks whether required AD DNS SRV records resolve successfully.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
@@ -742,10 +718,7 @@ Uses: Resolve-DnsName.
 
 function HealthTest-LdapSigningChannelBinding__E {
 <#
-.SYNOPSIS
-Checks LDAP Signing Channel Binding.
-
-.DESCRIPTION
+Description: Checks whether LDAP signing and channel binding enforcement are enabled.
 AppliesTo: All
 Scope: Computer
 Category: Security & Stability Risks
@@ -842,10 +815,7 @@ and returns friendly licensing status fields for reporting.
 
 function HealthTest-SoftwareLicensing__S{
 <#
-.SYNOPSIS
-Checks Software Licensing.
-
-.DESCRIPTION
+Description: Checks Windows software licensing state and activation status.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
@@ -862,10 +832,7 @@ Uses: Get-SoftwareLicensing.
 
 function HealthTest-TimeSyncAccuracy {
 <#
-.SYNOPSIS
-Checks Time Sync Accuracy.
-
-.DESCRIPTION
+Description: Checks whether the local clock appears reasonably synchronized.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
@@ -945,10 +912,7 @@ Uses: None.
 
 function HealthTest-PagefileSanity__E{
 <#
-.SYNOPSIS
-Checks Pagefile Sanity.
-
-.DESCRIPTION
+Description: Checks whether paging file configuration is present and sized sensibly.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
@@ -999,10 +963,7 @@ Uses: None.
 
 function HealthTest-Storage__S {
 <#
-.SYNOPSIS
-Checks Storage.
-
-.DESCRIPTION
+Description: Checks physical disks for predictive failure, unhealthy status, temperature, and reliability warnings.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
@@ -1080,10 +1041,7 @@ Uses: Get-PhysicalDisk, Get-StorageReliabilityCounter.
 
 function HealthTest-NtfsDirtyBit__E {
 <#
-.SYNOPSIS
-Checks NTFS Dirty Bit.
-
-.DESCRIPTION
+Description: Checks whether any NTFS volumes have the dirty bit set.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
@@ -1179,10 +1137,7 @@ function Test-DiskHasFreeSpace {
 
 function HealthTest-EventLogMaxSizes__E{
 <#
-.SYNOPSIS
-Checks Event Log Max Sizes.
-
-.DESCRIPTION
+Description: Checks whether key Windows event logs meet the configured minimum size baseline.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices

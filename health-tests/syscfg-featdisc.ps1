@@ -4,10 +4,7 @@ System Configuration & Feature Discovery
 
 function HealthTest-MalwareProtectionFeatures__E {
 <#
-.SYNOPSIS
-Checks Malware Protection Features.
-
-.DESCRIPTION
+Description: Checks Microsoft Defender malware protection status and updates signatures when needed.
 AppliesTo: All
 Scope: Computer
 Category: Security & Stability Risks
@@ -35,10 +32,7 @@ Uses: Get-MpComputerStatus, Update-MpSignature.
 
 function HealthTest-StartupItems__E{
 <#
-.SYNOPSIS
-Checks Startup Items.
-
-.DESCRIPTION
+Description: Lists startup items found in standard registry and startup-folder locations.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices

@@ -4,10 +4,7 @@ DNS & DHCP Services
 
 function HealthTest-DnsScavenging{
 <#
-.SYNOPSIS
-Checks DNS Scavenging.
-
-.DESCRIPTION
+Description: Checks whether DNS scavenging and zone aging are enabled and configured sensibly.
 AppliesTo: Server
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
@@ -35,10 +32,7 @@ Uses: Get-DnsServerScavenging, Get-DnsServerZone, Get-DnsServerZoneAging.
 
 function HealthTest-DnsZoneReplicationScope{
 <#
-.SYNOPSIS
-Checks DNS Zone Replication Scope.
-
-.DESCRIPTION
+Description: Checks whether AD-integrated DNS zones use the expected replication scope.
 AppliesTo: Server
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
@@ -54,10 +48,7 @@ Uses: Get-DnsServerZone.
 
 function HealthTest-DnsZoneTransfers{
 <#
-.SYNOPSIS
-Checks DNS Zone Transfers.
-
-.DESCRIPTION
+Description: Checks whether DNS zone transfers are disabled or restricted as expected.
 AppliesTo: Server
 Scope: Computer
 Category: Security & Stability Risks
@@ -75,10 +66,7 @@ Uses: Get-DnsServerZone.
 
 function HealthTest-ReverseZonesPresent{
 <#
-.SYNOPSIS
-Checks Reverse Zones Present.
-
-.DESCRIPTION
+Description: Checks whether required reverse lookup zones exist.
 AppliesTo: Server
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
@@ -98,10 +86,7 @@ Uses: Get-DnsServerZone.
 
 function HealthTest-DcDnsServerForwarder {
 <#
-.SYNOPSIS
-Checks DC DNS Server Forwarder.
-
-.DESCRIPTION
+Description: Checks whether a domain controller DNS server has appropriate forwarders configured.
 AppliesTo: Server
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
@@ -140,10 +125,7 @@ Uses: Get-DnsServerForwarder.
 
 function HealthTest-DnsForwarders{
 <#
-.SYNOPSIS
-Checks DNS Forwarders.
-
-.DESCRIPTION
+Description: Checks whether DNS forwarders are configured and reachable.
 AppliesTo: Server
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
@@ -165,10 +147,7 @@ Uses: Get-DnsServerForwarder, Test-Connection.
 
 function HealthTest-DnsRecursionConfig {
 <#
-.SYNOPSIS
-Checks DNS Recursion Config.
-
-.DESCRIPTION
+Description: Checks whether DNS recursion settings follow the expected baseline.
 AppliesTo: Server
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
@@ -229,10 +208,7 @@ Uses: Get-Command, Get-DnsServerRecursion, Get-DnsServerCache.
 
 function HealthTest-DcDnsARecords{
 <#
-.SYNOPSIS
-Checks DC DNS A records.
-
-.DESCRIPTION
+Description: Checks whether domain controller hostnames resolve to expected A records.
 AppliesTo: Server
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
@@ -252,10 +228,7 @@ Uses: Get-ADDomainController, Resolve-DnsName.
 
 function HealthTest-DcDnsRegistration {
 <#
-.SYNOPSIS
-Checks DC DNS Registration.
-
-.DESCRIPTION
+Description: Checks whether this domain controller has registered its expected DNS records.
 AppliesTo: Server
 Scope: Computer
 Category: Configuration Hygiene & Best Practices

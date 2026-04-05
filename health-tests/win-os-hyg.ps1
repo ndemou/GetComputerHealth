@@ -136,10 +136,7 @@ function Get-DaysSinceLastVirusScan {
 
 function HealthTest-RecentWindowsScan__E {
 <#
-.SYNOPSIS
-Checks Recent Windows Scan.
-
-.DESCRIPTION
+Description: Checks whether Microsoft Defender has performed a recent quick scan.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
@@ -179,10 +176,7 @@ Uses: Get-DaysSinceLastVirusScan, Get-WindowsOriginalInstallDate.
 
 function HealthTest-SchanelBaseline__E{
 <#
-.SYNOPSIS
-Checks Schannel Baseline.
-
-.DESCRIPTION
+Description: Checks whether Schannel disables legacy protocols and keeps TLS 1.2 enabled.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
@@ -245,10 +239,7 @@ Uses: None.
 
 function HealthTest-DefenderStatus__E {
 <#
-.SYNOPSIS
-Checks Defender Status.
-
-.DESCRIPTION
+Description: Checks Microsoft Defender signature freshness and protection status.
 AppliesTo: All
 Scope: Computer
 Category: Security & Stability Risks
@@ -273,10 +264,7 @@ Uses: Get-MpComputerStatus.
 
 function HealthTest-FirewallEnabled__S {
 <#
-.SYNOPSIS
-Checks Firewall Enabled.
-
-.DESCRIPTION
+Description: Checks whether Windows Firewall profiles are enabled and the firewall service is available.
 AppliesTo: All
 Scope: Computer
 Category: Security & Stability Risks
@@ -293,10 +281,7 @@ Uses: Get-Service, Get-NetFirewallProfile.
 
 function HealthTest-Smb1Disabled{
 <#
-.SYNOPSIS
-Checks SMB 1 Disabled.
-
-.DESCRIPTION
+Description: Checks whether SMBv1 is disabled.
 AppliesTo: All
 Scope: Computer
 Category: Security & Stability Risks
@@ -316,10 +301,7 @@ Uses: Get-WindowsOptionalFeature.
 
 function HealthTest-WmiRepository__E{
 <#
-.SYNOPSIS
-Checks WMI Repository.
-
-.DESCRIPTION
+Description: Checks whether the WMI repository is consistent.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
@@ -334,10 +316,7 @@ Uses: None.
 
 function HealthTest-VssWriters__S{
 <#
-.SYNOPSIS
-Checks VSS Writers.
-
-.DESCRIPTION
+Description: Checks whether all VSS writers report healthy stable states.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
@@ -356,10 +335,7 @@ Uses: None.
 
 function HealthTest-UnsignedDrivers {
 <#
-.SYNOPSIS
-Checks Unsigned Drivers.
-
-.DESCRIPTION
+Description: Checks for installed PnP driver packages that appear unsigned.
 AppliesTo: All
 Scope: Computer
 Category: Security & Stability Risks
@@ -792,10 +768,7 @@ namespace Toula.HealthTestUnsignedDrivers
 
 function HealthTest-CrashDumpSignals__E {
 <#
-.SYNOPSIS
-Checks Crash Dump Signals.
-
-.DESCRIPTION
+Description: Checks for recent minidumps that indicate recent system crashes.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
@@ -820,10 +793,7 @@ Uses: None.
 
 function HealthTest-SeriousRecentEventLogs__S {
 <#
-.SYNOPSIS
-Checks Serious Recent Event Logs.
-
-.DESCRIPTION
+Description: Checks recent event logs for serious shutdown, bugcheck, disk, or application crash events.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
@@ -900,10 +870,7 @@ Uses: Get-WinEvent.
 
 function HealthTest-HotfixBaseline__E{
 <#
-.SYNOPSIS
-Checks Hotfix Baseline.
-
-.DESCRIPTION
+Description: Checks whether all required hotfixes from the baseline are installed.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
@@ -922,10 +889,7 @@ Uses: Get-HotFix.
 
 function HealthTest-BitLockerStatus__E {
 <#
-.SYNOPSIS
-Checks Bit Locker Status.
-
-.DESCRIPTION
+Description: Checks whether detected volumes are protected by BitLocker.
 AppliesTo: All
 Scope: Computer
 Category: Security & Stability Risks
@@ -957,10 +921,7 @@ Uses: Get-Command, Get-BitLockerVolume.
 
 function HealthTest-NtlmHardening__E {
 <#
-.SYNOPSIS
-Checks NTLM Hardening.
-
-.DESCRIPTION
+Description: Checks whether NTLM hardening registry settings meet the security baseline.
 AppliesTo: All
 Scope: Computer
 Category: Security & Stability Risks
@@ -990,10 +951,7 @@ Uses: None.
 
 function HealthTest-RdpHardening__E {
 <#
-.SYNOPSIS
-Checks RDP Hardening.
-
-.DESCRIPTION
+Description: Checks whether RDP is hardened with NLA enabled and a TLS certificate bound.
 AppliesTo: All
 Scope: Computer
 Category: Security & Stability Risks
@@ -1564,10 +1522,7 @@ namespace Toula.WtsEx
 
 function HealthTest-StaleRdpSessions {
 <#
-.SYNOPSIS
-Checks Stale RDP Sessions.
-
-.DESCRIPTION
+Description: Checks for idle or disconnected RDP sessions older than the allowed threshold.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
@@ -1633,10 +1588,7 @@ Uses: Get-LiveSessionInfo.
 
 function HealthTest-NonDefaultShares__E {
 <#
-.SYNOPSIS
-Checks Non Default Shares.
-
-.DESCRIPTION
+Description: Detects non-default SMB shares and notes when file and print sharing is unnecessarily enabled.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
@@ -1668,10 +1620,7 @@ Uses: get-service, Set-Service, Stop-Service.
 
 function HealthTest-LocalAcntRequirePass__E {
 <#
-.SYNOPSIS
-Checks Local Acnt Require Pass.
-
-.DESCRIPTION
+Description: Checks whether local accounts require passwords.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
@@ -1695,10 +1644,7 @@ Uses: None.
 
 function HealthTest-RestrictAnonymous__E {
 <#
-.SYNOPSIS
-Checks Restrict Anonymous.
-
-.DESCRIPTION
+Description: Checks whether anonymous access hardening settings meet the baseline.
 AppliesTo: All
 Scope: Computer
 Category: Security & Stability Risks
@@ -1722,10 +1668,7 @@ Uses: None.
 
 function HealthTest-DefaultLocale__E {
 <#
-.SYNOPSIS
-Checks Default Locale.
-
-.DESCRIPTION
+Description: Checks whether the system locale matches the expected legacy language baseline.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
@@ -1746,10 +1689,7 @@ Uses: None.
 
 function HealthTest-PendingReboot__E {
 <#
-.SYNOPSIS
-Checks Pending Reboot.
-
-.DESCRIPTION
+Description: Checks for Windows pending-reboot indicators.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
@@ -1767,10 +1707,7 @@ Uses: None.
 
 function HealthTest-SmbSigningRequired__E{
 <#
-.SYNOPSIS
-Checks SMB Signing Required.
-
-.DESCRIPTION
+Description: Checks whether the SMB server requires signing when the server service is running.
 AppliesTo: All
 Scope: Computer
 Category: Security & Stability Risks
@@ -1792,10 +1729,7 @@ Uses: Get-Service, Get-SmbServerConfiguration.
 
 function HealthTest-ShadowStorage__E {
 <#
-.SYNOPSIS
-Checks Shadow Storage.
-
-.DESCRIPTION
+Description: Checks whether Volume Shadow Copy storage is configured and sized within the recommended range.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
@@ -1984,10 +1918,7 @@ Uses: None.
 
 function HealthTest-DnsClientService__E{
 <#
-.SYNOPSIS
-Checks DNS Client Service.
-
-.DESCRIPTION
+Description: Checks whether the DNS Client service is running.
 AppliesTo: All
 Scope: Computer
 Category: Security & Stability Risks
@@ -2001,10 +1932,7 @@ Uses: Get-Service.
 
 function HealthTest-LocalAdminsBaseline {
 <#
-.SYNOPSIS
-Checks Local Admins Baseline.
-
-.DESCRIPTION
+Description: Checks for unexpected members in the local Administrators group.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
@@ -2074,10 +2002,7 @@ Uses: None.
 
 function HealthTest-UnexpectedListeningPorts__S {
 <#
-.SYNOPSIS
-Checks Unexpected Listening Ports.
-
-.DESCRIPTION
+Description: Compares listening TCP ports to the baseline and identifies unexpected listeners with process context.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
@@ -2265,10 +2190,7 @@ function Get-NormalizedSoftwareName {
 
 function HealthTest-InstalledSW__P {
 <#
-.SYNOPSIS
-Checks installed software.
-
-.DESCRIPTION
+Description: Reports installed software not present in the baseline inventory.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices

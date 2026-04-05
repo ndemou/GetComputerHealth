@@ -18,10 +18,7 @@ function Normalize-DirectoryPath {
 
 function HealthTest-LargeDirectories__S {
 <#
-.SYNOPSIS
-Checks Large Directories.
-
-.DESCRIPTION
+Description: Finds directories with more than 10000 child items.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices

@@ -4,10 +4,7 @@ Only for Hyper-V servers
 
 function HealthTest-HyperVRunningVMs {
 <#
-.SYNOPSIS
-Checks Hyper-V running VMs.
-
-.DESCRIPTION
+Description: Lists running Hyper-V virtual machines on the host.
 AppliesTo: Server
 Scope: Computer
 Category: Configuration Hygiene & Best Practices

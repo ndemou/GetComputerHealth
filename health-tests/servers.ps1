@@ -4,10 +4,7 @@ Tests that are only applicable to Windows Server O.S.
 
 function HealthTest-DhcpInAd__E{
 <#
-.SYNOPSIS
-Checks DHCP in AD.
-
-.DESCRIPTION
+Description: Checks whether a local DHCP server is authorized in Active Directory.
 AppliesTo: Server
 Scope: Domain
 Category: Configuration Hygiene & Best Practices
@@ -24,10 +21,7 @@ Uses: Get-WindowsFeature, Get-DhcpServerInDC.
 
 function HealthTest-DhcpScopeUtilization__E {
 <#
-.SYNOPSIS
-Checks DHCP Scope Utilization.
-
-.DESCRIPTION
+Description: Checks DHCPv4 scopes for high address utilization.
 AppliesTo: Server
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
@@ -67,10 +61,7 @@ Uses: Get-Service, Get-Command, Get-DhcpServerv4ScopeStatistics.
 
 function HealthTest-InstalledRolesFeatures {
 <#
-.SYNOPSIS
-Checks Installed Roles Features.
-
-.DESCRIPTION
+Description: Checks for installed Windows roles or features that are outside the intended baseline.
 AppliesTo: Server
 Scope: Computer
 Category: Configuration Hygiene & Best Practices

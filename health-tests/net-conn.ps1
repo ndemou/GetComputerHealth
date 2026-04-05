@@ -15,10 +15,7 @@ function Get-PropValue {
 
 function HealthTest-NetworkConnectionProfiles__E {
 <#
-.SYNOPSIS
-Checks Network Connection Profiles.
-
-.DESCRIPTION
+Description: Checks network connection profiles and basic connectivity expectations for each active network.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
@@ -72,10 +69,7 @@ Uses: Get-NetConnectionProfile, Test-NetConnectivityToNetwork.
 
 function HealthTest-SingleDefaultGateway__S{
 <#
-.SYNOPSIS
-Checks Single Default Gateway.
-
-.DESCRIPTION
+Description: Checks for multiple default gateways and validates that the active gateway configuration is sensible.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
@@ -286,10 +280,7 @@ function Test-MultipleGatewayConfiguration {
 
 function HealthTest-IPv6Binding__E{
 <#
-.SYNOPSIS
-Checks IPv6 binding.
-
-.DESCRIPTION
+Description: Checks whether IPv6 is bound on network adapters as expected.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
@@ -313,10 +304,7 @@ Uses: Get-NetAdapterBinding.
 
 function HealthTest-Nic__E {
 <#
-.SYNOPSIS
-Checks NIC.
-
-.DESCRIPTION
+Description: Checks network adapters for unhealthy status or suspicious error counters.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
@@ -396,10 +384,7 @@ Uses: Get-NetAdapter, Get-NetAdapterStatistics.
 
 function HealthTest-WinRMListening__E{
 <#
-.SYNOPSIS
-Checks Win RM Listening.
-
-.DESCRIPTION
+Description: Checks whether the WinRM service is running and responds to WSMan requests.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices

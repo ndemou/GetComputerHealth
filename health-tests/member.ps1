@@ -4,10 +4,7 @@ Tests only for domain joined servers except DC/PDC
 
 function HealthTest-InterfaceDnsServersUseDcs__E {
 <#
-.SYNOPSIS
-Checks Interface DNS Servers Use Dcs.
-
-.DESCRIPTION
+Description: Checks whether member-server network interfaces use domain controllers as DNS servers.
 AppliesTo: DomainJoined
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
@@ -64,10 +61,7 @@ Uses: None.
 
 function HealthTest-DnsSuffixMatchesDomain__E {
 <#
-.SYNOPSIS
-Checks DNS Suffix Matches Domain.
-
-.DESCRIPTION
+Description: Checks whether the primary DNS suffix matches the joined AD domain.
 AppliesTo: DomainJoined
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
@@ -92,10 +86,7 @@ Uses: None.
 
 function HealthTest-DomainARecordPointsToDcIp__E {
 <#
-.SYNOPSIS
-Checks whether the domain A record points to a DC IP.
-
-.DESCRIPTION
+Description: Checks whether the domain A record points to a DC IP.
 AppliesTo: DomainJoined
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
@@ -126,10 +117,7 @@ Uses: Resolve-DnsName.
 
 function HealthTest-NltestSiteDiscovery {
 <#
-.SYNOPSIS
-Checks NLTest Site Discovery.
-
-.DESCRIPTION
+Description: Checks whether site discovery returns a valid AD site for the computer.
 AppliesTo: DomainJoined
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
@@ -162,10 +150,7 @@ Uses: None.
 
 function HealthTest-GpupdatePolicyApply__S {
 <#
-.SYNOPSIS
-Checks GPUpdate Policy Apply.
-
-.DESCRIPTION
+Description: Checks whether the machine secure channel is healthy enough for Group Policy processing.
 AppliesTo: DomainJoined
 Scope: Computer
 Category: Configuration Hygiene & Best Practices

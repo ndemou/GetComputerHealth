@@ -4,10 +4,7 @@ Scheduled Task Master Cluster
 
 function HealthTest-ScheduledTasks {
 <#
-.SYNOPSIS
-Checks Scheduled Tasks.
-
-.DESCRIPTION
+Description: Reviews non-Microsoft scheduled tasks for failures and excessive missed runs.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
@@ -89,10 +86,7 @@ Uses: Get-ScheduledTask, Get-ScheduledTaskInfo, Get-ScheduledTaskDeepInfo.
 
 function HealthTest-SystemScheduledTasks{
 <#
-.SYNOPSIS
-Checks System Scheduled Tasks.
-
-.DESCRIPTION
+Description: Checks relevant SYSTEM scheduled tasks for disabled, stale, or failing states.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
@@ -324,10 +318,7 @@ function Get-ScheduledTaskDeepInfo{
 
 function HealthTest-ScheduledTasksLastResult__S {
 <#
-.SYNOPSIS
-Checks Scheduled Tasks Last Result.
-
-.DESCRIPTION
+Description: Parses scheduled task last-result data and reports task failures or warnings.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices

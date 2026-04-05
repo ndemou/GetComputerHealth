@@ -4,10 +4,7 @@ Active Directory & GPO Management
 
 function HealthTest-ADViewConsistency {
 <#
-.SYNOPSIS
-Checks AD View Consistency.
-
-.DESCRIPTION
+Description: Verifies that domain controllers agree on the DC list and FSMO role holders.
 AppliesTo: DC
 Scope: Domain
 Category: Configuration Hygiene & Best Practices
@@ -111,10 +108,7 @@ Uses: Get-ADDomainController, Get-ADDomain, Get-ADForest.
 
 function HealthTest-Dcdiag__S {
 <#
-.SYNOPSIS
-Checks Dcdiag.
-
-.DESCRIPTION
+Description: Runs DCDIAG and reports failing basic and extended Active Directory diagnostics.
 AppliesTo: DC
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
@@ -148,10 +142,7 @@ Uses: dcdiag.exe.
 
 function HealthTest-RidManager{
 <#
-.SYNOPSIS
-Checks RID Manager.
-
-.DESCRIPTION
+Description: Runs the RID Manager dcdiag test and reports any detected issues.
 AppliesTo: DC
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
@@ -166,10 +157,7 @@ Uses: None.
 
 function HealthTest-DfsReplicationState {
 <#
-.SYNOPSIS
-Checks DFS Replication State.
-
-.DESCRIPTION
+Description: Checks whether DFS Replication folders are in the Normal state.
 AppliesTo: DC
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
@@ -206,10 +194,7 @@ Uses: None.
 
 function HealthTest-DfsrBacklog {
 <#
-.SYNOPSIS
-Checks DFSR Backlog.
-
-.DESCRIPTION
+Description: Checks DFS Replication backlog and warns when queued updates are high.
 AppliesTo: DC
 Scope: Domain
 Category: Configuration Hygiene & Best Practices
@@ -239,10 +224,7 @@ Uses: Get-Service, Get-Command, Get-DfsrBacklog.
 
 function HealthTest-GpoVersionConsistency{
 <#
-.SYNOPSIS
-Checks GPO Version Consistency.
-
-.DESCRIPTION
+Description: Checks whether each GPO has matching AD and SYSVOL version numbers.
 AppliesTo: DC
 Scope: Domain
 Category: Configuration Hygiene & Best Practices
@@ -268,10 +250,7 @@ Uses: Get-GPO.
 
 function HealthTest-ADInboundReplicationTopology{
 <#
-.SYNOPSIS
-Checks AD Inbound Replication Topology.
-
-.DESCRIPTION
+Description: Verifies that each domain controller has inbound AD replication partners and connection objects.
 AppliesTo: DC
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
@@ -319,10 +298,7 @@ Uses: Get-ADDomainController, Get-ADReplicationPartnerMetadata, Get-ADObject.
 
 function HealthTest-KerberosEncryptionTypes{
 <#
-.SYNOPSIS
-Checks Kerberos Encryption Types.
-
-.DESCRIPTION
+Description: Checks for AD accounts that still permit weak RC4 Kerberos encryption.
 AppliesTo: DC
 Scope: Computer
 Category: Security & Stability Risks
@@ -347,10 +323,7 @@ Uses: Get-ADObject.
 
 function HealthTest-RodcPrp{
 <#
-.SYNOPSIS
-Checks RODC Prp.
-
-.DESCRIPTION
+Description: Checks whether each read-only domain controller has a Password Replication Policy configured.
 AppliesTo: DC
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
@@ -368,10 +341,7 @@ Uses: Get-ADDomainController, Get-ADObject.
 }
 function HealthTest-SysvolAclHygiene{
 <#
-.SYNOPSIS
-Checks SYSVOL Acl Hygiene.
-
-.DESCRIPTION
+Description: Checks whether SYSVOL grants write access to overly broad principals.
 AppliesTo: DC
 Scope: Computer
 Category: Security & Stability Risks
@@ -391,10 +361,7 @@ Uses: Get-Acl.
 
 function HealthTest-DfsDiagTestDCs__S {
 <#
-.SYNOPSIS
-Checks DFS diagnostic tests across DCs.
-
-.DESCRIPTION
+Description: Runs DFSDIAG /TestDCs and reports unexpected DFS diagnostics output.
 AppliesTo: DC
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
@@ -413,10 +380,7 @@ Uses: None.
 
 function HealthTest-DfsNamespaceEnumerate{
 <#
-.SYNOPSIS
-Checks DFS Namespace Enumerate.
-
-.DESCRIPTION
+Description: Checks whether DFS namespace roots and folders can be enumerated successfully.
 AppliesTo: DC
 Scope: Domain
 Category: Configuration Hygiene & Best Practices
@@ -433,10 +397,7 @@ Uses: Get-DfsnRoot, Get-DfsnFolder.
 
 function HealthTest-PreWin2000Group{
 <#
-.SYNOPSIS
-Checks Pre Win 2000 Group.
-
-.DESCRIPTION
+Description: Checks whether the Pre-Windows 2000 Compatible Access group has unexpected members.
 AppliesTo: DC
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
@@ -452,10 +413,7 @@ Uses: Get-ADGroup, Get-ADGroupMember.
 
 function HealthTest-TrustsVerify{
 <#
-.SYNOPSIS
-Checks Trusts Verify.
-
-.DESCRIPTION
+Description: Verifies Active Directory trusts and reports any trust validation failures.
 AppliesTo: DC
 Scope: Forest
 Category: Configuration Hygiene & Best Practices
@@ -534,10 +492,7 @@ function Get-DcDiagFailures {
 
 function HealthTest-AdminSDHolderCoverage{
 <#
-.SYNOPSIS
-Checks Admin SD Holder Coverage.
-
-.DESCRIPTION
+Description: Reports whether AdminSDHolder protection is currently applied to any users.
 AppliesTo: DC
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
@@ -550,10 +505,7 @@ Uses: Get-ADUser.
 
 function HealthTest-DisabledGpoLinksAtDomainRoot__S{
 <#
-.SYNOPSIS
-Checks Disabled GPO Links At Domain Root.
-
-.DESCRIPTION
+Description: Checks for disabled or non-enforced GPO links at the domain root.
 AppliesTo: DC
 Scope: Domain
 Category: Configuration Hygiene & Best Practices
@@ -620,10 +572,7 @@ Uses: Get-Command, Get-GPO, Get-ADDomain.
 
 function HealthTest-KrbtgtAge{
 <#
-.SYNOPSIS
-Checks KRBTGT Age.
-
-.DESCRIPTION
+Description: Checks whether the KRBTGT password has been rotated within the allowed age threshold.
 AppliesTo: DC
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
@@ -642,10 +591,7 @@ Uses: Get-ADUser.
 
 function HealthTest-SysvolContentConsistency__S{
 <#
-.SYNOPSIS
-Checks SYSVOL Content Consistency.
-
-.DESCRIPTION
+Description: Checks whether SYSVOL policy content is present and consistent across domain controllers.
 AppliesTo: DC
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
@@ -693,10 +639,7 @@ Uses: Get-ADDomainController.
 
 function HealthTest-SysvolNetlogonAccessible{
 <#
-.SYNOPSIS
-Checks SYSVOL NETLOGON Accessible.
-
-.DESCRIPTION
+Description: Checks whether each domain controller exposes reachable SYSVOL and NETLOGON shares.
 AppliesTo: DC
 Scope: Domain
 Category: Configuration Hygiene & Best Practices
@@ -718,10 +661,7 @@ Uses: Resolve-DnsName.
 
 function HealthTest-UnusedEnabledAdapters{
 <#
-.SYNOPSIS
-Checks Unused Enabled Adapters.
-
-.DESCRIPTION
+Description: Checks for enabled network adapters that are disconnected and likely unused.
 AppliesTo: DC
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
@@ -738,10 +678,7 @@ Uses: Get-NetAdapter.
 
 function HealthTest-SchemaVersionConsistency{
 <#
-.SYNOPSIS
-Checks Schema Version Consistency.
-
-.DESCRIPTION
+Description: Checks whether all domain controllers report the same AD schema version.
 AppliesTo: DC
 Scope: Domain
 Category: Configuration Hygiene & Best Practices
@@ -792,10 +729,7 @@ Uses: Get-ADRootDSE, Get-ADDomainController, Get-ADObject.
 
 function HealthTest-TombstoneLifetime{
 <#
-.SYNOPSIS
-Checks Tombstone Lifetime.
-
-.DESCRIPTION
+Description: Checks whether the AD tombstoneLifetime meets the minimum baseline.
 AppliesTo: DC
 Scope: Forest
 Category: Configuration Hygiene & Best Practices
@@ -812,10 +746,7 @@ Uses: Get-ADRootDSE, Get-ADObject.
 
 function HealthTest-RecycleBinEnabled{
 <#
-.SYNOPSIS
-Checks Recycle Bin Enabled.
-
-.DESCRIPTION
+Description: Checks whether Active Directory Recycle Bin is enabled.
 AppliesTo: DC
 Scope: Forest
 Category: Configuration Hygiene & Best Practices
@@ -829,10 +760,7 @@ Uses: Get-ADOptionalFeature.
 
 function HealthTest-ReplicationLatency {
 <#
-.SYNOPSIS
-Checks Replication Latency.
-
-.DESCRIPTION
+Description: Assesses AD replication latency and correlates it with replication trouble signals.
 AppliesTo: DC
 Scope: Domain
 Category: Configuration Hygiene & Best Practices
@@ -903,10 +831,7 @@ Uses: Get-ADRootDSE, Get-ADDomainController, Get-ADReplicationPartnerMetadata.
 
 function HealthTest-NtdsLogVolumeFree{
 <#
-.SYNOPSIS
-Checks NTDS Log Volume Free.
-
-.DESCRIPTION
+Description: Checks whether the NTDS log volume has enough free space.
 AppliesTo: DC
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
@@ -934,10 +859,7 @@ Uses: None.
 
 function HealthTest-NtdsPathsLocation{
 <#
-.SYNOPSIS
-Checks NTDS Paths Location.
-
-.DESCRIPTION
+Description: Checks whether the NTDS database and log paths are on expected volumes.
 AppliesTo: DC
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
@@ -969,10 +891,7 @@ Uses: None.
 
 function HealthTest-ServiceAccountsPwdNeverExpires{
 <#
-.SYNOPSIS
-Checks Service Accounts Pwd Never Expires.
-
-.DESCRIPTION
+Description: Checks for service accounts whose passwords are set to never expire.
 AppliesTo: DC
 Scope: Domain
 Category: Security & Stability Risks
@@ -994,10 +913,7 @@ Uses: Get-ADUser.
 
 function HealthTest-UnconstrainedDelegationAccounts{
 <#
-.SYNOPSIS
-Checks Unconstrained Delegation Accounts.
-
-.DESCRIPTION
+Description: Checks for accounts that are configured for unconstrained delegation.
 AppliesTo: DC
 Scope: Domain
 Category: Security & Stability Risks
@@ -1055,10 +971,7 @@ Uses: Get-ADObject.
 
 function HealthTest-GcPlacement{
 <#
-.SYNOPSIS
-Checks GC placement.
-
-.DESCRIPTION
+Description: Checks whether each AD site has a Global Catalog and the domain has at least one GC.
 AppliesTo: DC
 Scope: Forest
 Category: Configuration Hygiene & Best Practices
@@ -1083,10 +996,7 @@ Uses: Get-ADDomainController.
 
 function HealthTest-DuplicateSpn{
 <#
-.SYNOPSIS
-Checks Duplicate SPN.
-
-.DESCRIPTION
+Description: Checks for duplicate Service Principal Names in Active Directory.
 AppliesTo: DC
 Scope: Forest
 Category: Configuration Hygiene & Best Practices
@@ -1119,10 +1029,7 @@ Uses: Get-ADObject.
 
 function HealthTest-ADReplicationHealth {
 <#
-.SYNOPSIS
-Checks AD Replication Health.
-
-.DESCRIPTION
+Description: Uses repadmin and local RSAT cross-checks to detect AD replication failures and stale replication.
 AppliesTo: DC
 Scope: Domain
 Category: Configuration Hygiene & Best Practices

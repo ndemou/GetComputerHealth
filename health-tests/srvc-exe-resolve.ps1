@@ -743,10 +743,7 @@ function Test-LooksLikePath {
 
 function HealthTest-AutoStartServicesRunning__E {
 <#
-.SYNOPSIS
-Checks Auto Start Services Running.
-
-.DESCRIPTION
+Description: Reports auto-start services that are not running, with extra context from their last exit code.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
@@ -836,10 +833,7 @@ Uses: cmd.exe.
 
 function HealthTest-NonMicrosoftServices__S {
 <#
-.SYNOPSIS
-Checks Non Microsoft Services.
-
-.DESCRIPTION
+Description: Identifies non-core Microsoft services and highlights unusual or suspicious service vendors.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices

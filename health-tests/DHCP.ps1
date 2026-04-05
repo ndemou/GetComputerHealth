@@ -1,9 +1,6 @@
 function HealthTest-DhcpDnsCredential{
 <#
-.SYNOPSIS
-Checks DHCP DNS Credential.
-
-.DESCRIPTION
+Description: Verifies that DHCP dynamic DNS update credentials are configured and resolve to a valid AD account.
 AppliesTo: Server
 Scope: Computer
 Category: Security & Stability Risks

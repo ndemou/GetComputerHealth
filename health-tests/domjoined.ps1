@@ -4,10 +4,7 @@ Tests only for domain joined servers (including DC/PDC)
 
 function HealthTest-DnsSuffixBaseline__E {
 <#
-.SYNOPSIS
-Checks DNS Suffix Baseline.
-
-.DESCRIPTION
+Description: Checks whether DNS suffix search settings match the expected domain baseline.
 AppliesTo: DomainJoined
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
@@ -86,10 +83,7 @@ Uses: Get-DnsClientGlobalSetting, Get-DnsClient.
 
 function HealthTest-ConnectivityToDCs__E {
 <#
-.SYNOPSIS
-Checks connectivity to DCs.
-
-.DESCRIPTION
+Description: Checks DNS resolution and TCP connectivity to discovered domain controllers.
 AppliesTo: DomainJoined
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
@@ -145,10 +139,7 @@ Uses: Resolve-DnsName, Test-NetConnectionFast.
 
 function HealthTest-EfsRecoveryAgents__E{
 <#
-.SYNOPSIS
-Checks EFS Recovery Agents.
-
-.DESCRIPTION
+Description: Checks whether EFS recovery agents are configured.
 AppliesTo: DomainJoined
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
@@ -163,10 +154,7 @@ Uses: None.
 
 function HealthTest-GpWmiFilterNamespacesOnLocalHost__E{
 <#
-.SYNOPSIS
-Checks Gp WMI Filter Namespaces On Local Host.
-
-.DESCRIPTION
+Description: Checks whether Group Policy WMI filter namespaces are accessible on the local host.
 AppliesTo: DomainJoined
 Scope: Computer
 Category: Configuration Hygiene & Best Practices

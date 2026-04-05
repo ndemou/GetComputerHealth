@@ -4,10 +4,7 @@ Only for laptop/Mobile device
 
 function HealthTest-IsTPMActivated {
 <#
-.SYNOPSIS
-Checks Is TPM Activated.
-
-.DESCRIPTION
+Description: Checks whether the TPM is present and activated.
 AppliesTo: Mobile
 Scope: Computer
 Category: Security & Stability Risks
