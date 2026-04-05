@@ -1623,7 +1623,7 @@ Uses: Get-LiveSessionInfo.
         if ($session.Protocol)         { $detailLines += "Protocol: $($session.Protocol)" }
 
         $details = $detailLines -join "`n"
-        Write-Warning "[notice] $issueSynopsis" + "`n" + $details
+        Write-Warning ("[NOTICE] $issueSynopsis" + $(if ($details) { "`n$details" } else { '' }))
     }
 
     if (-not $issueFound) {

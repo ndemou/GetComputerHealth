@@ -440,7 +440,9 @@ FunctionName, Time, ElapsedMilliseconds, Output, Success, Error, Category, Reaso
 
     $details =
       if ($innerLine -and $innerFunc) {
-        "Line: $innerLine" +
+        "Throw site: $innerFunc" +
+        ($(if ($innerFile) { "`nFile: $innerFile" } else { "" })) +
+        "`nLine: $innerLine" +
         ($(if ($innerCode) { "`n  #       Code: $innerCode" } else { "" }))
       } else {
         # Fallback to the catcher's position info
@@ -448,7 +450,7 @@ FunctionName, Time, ElapsedMilliseconds, Output, Success, Error, Category, Reaso
       }
 
     Log-Failure "(Program Error) Exception while running '$FunctionName'" `
-      -Comment "details: $baseMsg`nA Program Error during a test means either that the test failed or that its code has a bug."
+      -Comment "details: $baseMsg`n$details`nA Program Error during a test means either that the test failed or that its code has a bug."
   } finally {
     $sw.Stop()
     $ErrorActionPreference = $oldEap
