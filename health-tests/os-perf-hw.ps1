@@ -48,15 +48,14 @@ Filters out ports listening only on the loopback addresses (127.0.0.1 and ::1) b
 function HealthTest-TimeSyncPolicy__E {
 <#
 .SYNOPSIS
-Checks Time Sync Policy
+Checks Time Sync Policy.
 
 .DESCRIPTION
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
-Impact: Medium(Time)
-Uses: Resolve-DnsName, Test-IsLaptopOrMobile.
-FalsePositives: None.
+Impact: Medium(Time), Medium(Network)
+Uses: Get-DnsDomainControllers, Resolve-DnsName, Test-IsLaptopOrMobile.
 #>
     [CmdletBinding()]
     param()
@@ -326,7 +325,7 @@ FalsePositives: None.
 function HealthTest-UpdateAge__E {
 <#
 .SYNOPSIS
-Checks Update Age
+Checks Update Age.
 
 .DESCRIPTION
 AppliesTo: All
@@ -334,7 +333,6 @@ Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time)
 Uses: Get-HotFix.
-FalsePositives: None.
 #>
     param([int]$WarnDays=30,[int]$FailDays=45)
     $lastUpdateDate = $null
@@ -355,7 +353,7 @@ FalsePositives: None.
 function HealthTest-CertExpiry__E {
 <#
 .SYNOPSIS
-Checks Cert Expiry
+Checks Cert Expiry.
 
 .DESCRIPTION
 AppliesTo: All
@@ -363,7 +361,6 @@ Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time)
 Uses: None.
-FalsePositives: None.
 #>
     param([int]$WarnDays=60,[int]$FailDays=30)
     $now = Get-Date
@@ -390,15 +387,14 @@ FalsePositives: None.
 function HealthTest-IisBindings__E {
 <#
 .SYNOPSIS
-Checks Iis Bindings
+Checks IIS Bindings.
 
 .DESCRIPTION
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
-Impact: Medium(Time)
-Uses: Get-WindowsFeature, Get-Website, Get-WebBinding.
-FalsePositives: None.
+Impact: low
+Uses: Get-Command, Get-WindowsFeature, Get-Service.
 #>
     $iisInstalled = $false
 
@@ -441,15 +437,14 @@ FalsePositives: None.
 function HealthTest-RamPressure {
 <#
 .SYNOPSIS
-Checks Ram Pressure
+Checks Ram Pressure.
 
 .DESCRIPTION
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
-Impact: Medium(Time)
-Uses: Get-Counter.
-FalsePositives: None.
+Impact: High(RAM), Medium(CPU)
+Uses: Get-AvailMB, Get-Counter.
 #>
   [CmdletBinding()]
   [OutputType([bool])]
@@ -505,15 +500,14 @@ FalsePositives: None.
 function HealthTest-ShareReasonableness__S {
 <#
 .SYNOPSIS
-Checks Share Reasonableness
+Checks Share Reasonableness.
 
 .DESCRIPTION
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
-Impact: Medium(Time), High(Time)
-Uses: Set-SmbServerConfiguration, Get-SmbShare, Get-SmbShareAccess.
-FalsePositives: None.
+Impact: High(Time)
+Uses: Get-Service, Get-SmbShare.
 #>
   [CmdletBinding()]param(
     [string[]]$BroadPrincipals = @(
@@ -698,15 +692,14 @@ FalsePositives: None.
 function HealthTest-DisksHaveFreeSpace__E {
 <#
 .SYNOPSIS
-Checks Disks Have Free Space
+Checks Disks Have Free Space.
 
 .DESCRIPTION
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
-Impact: Medium(Time)
-Uses: None.
-FalsePositives: None.
+Impact: Medium(Disk)
+Uses: Test-DiskHasFreeSpace.
 #>
     foreach ($d in [System.IO.DriveInfo]::GetDrives()) {
         if (-not $d.IsReady) { continue }
@@ -728,15 +721,14 @@ FalsePositives: None.
 function HealthTest-RequiredSrvRecords__E{
 <#
 .SYNOPSIS
-Checks Required Srv Records
+Checks Required SRV Records.
 
 .DESCRIPTION
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
-Impact: Medium(Time)
+Impact: Medium(Network)
 Uses: Resolve-DnsName.
-FalsePositives: None.
 #>
   $dom=(Get-CimInstance Win32_ComputerSystem).Domain
   $labels=@("_ldap._tcp.dc._msdcs.$dom","_kerberos._tcp.$dom","_kerberos._udp.$dom")
@@ -751,15 +743,14 @@ FalsePositives: None.
 function HealthTest-LdapSigningChannelBinding__E {
 <#
 .SYNOPSIS
-Checks Ldap Signing Channel Binding
+Checks LDAP Signing Channel Binding.
 
 .DESCRIPTION
-AppliesTo: DC
+AppliesTo: All
 Scope: Computer
-Category: Configuration Hygiene & Best Practices
+Category: Security & Stability Risks
 Impact: Medium(Time)
-Uses: Get-ItemProperty.
-FalsePositives: None.
+Uses: Get-SoftwareLicensing.
 #>
     $p = 'HKLM:\SYSTEM\CurrentControlSet\Services\NTDS\Parameters'
 
@@ -852,15 +843,14 @@ and returns friendly licensing status fields for reporting.
 function HealthTest-SoftwareLicensing__S{
 <#
 .SYNOPSIS
-Checks Software Licensing
+Checks Software Licensing.
 
 .DESCRIPTION
 AppliesTo: All
 Scope: Computer
-Category: Audit / Compliance / Informational
-Impact: Medium(Time), High(Time)
-Uses: Unknown.
-FalsePositives: None.
+Category: Configuration Hygiene & Best Practices
+Impact: High(Time)
+Uses: Get-SoftwareLicensing.
 #>
 
     Get-SoftwareLicensing | %{
@@ -873,7 +863,7 @@ FalsePositives: None.
 function HealthTest-TimeSyncAccuracy {
 <#
 .SYNOPSIS
-Checks Time Sync Accuracy
+Checks Time Sync Accuracy.
 
 .DESCRIPTION
 AppliesTo: All
@@ -881,7 +871,6 @@ Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time)
 Uses: None.
-FalsePositives: None.
 #>
   param(
     [int]$WarnOffsetSeconds=15,
@@ -957,15 +946,14 @@ FalsePositives: None.
 function HealthTest-PagefileSanity__E{
 <#
 .SYNOPSIS
-Checks Pagefile Sanity
+Checks Pagefile Sanity.
 
 .DESCRIPTION
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
-Impact: Medium(Time)
-Uses: Get-CimInstance.
-FalsePositives: None.
+Impact: Medium(Disk), Medium(Time)
+Uses: None.
 #>
   [CmdletBinding()] param([int]$MinMB=1024,[switch]$RequireOnSystemDrive)
   $cs   = Get-CimInstance Win32_ComputerSystem -ErrorAction Stop
@@ -1012,15 +1000,14 @@ FalsePositives: None.
 function HealthTest-Storage__S {
 <#
 .SYNOPSIS
-Checks Storage
+Checks Storage.
 
 .DESCRIPTION
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
-Impact: High(Time)
+Impact: High(Time), Medium(Disk)
 Uses: Get-PhysicalDisk, Get-StorageReliabilityCounter.
-FalsePositives: None.
 #>
     [CmdletBinding()]
     param([int]$MaxTemperatureC = 70,[int]$MaxPercentUsed = 95)
@@ -1094,15 +1081,14 @@ FalsePositives: None.
 function HealthTest-NtfsDirtyBit__E {
 <#
 .SYNOPSIS
-Checks Ntfs Dirty Bit
+Checks NTFS Dirty Bit.
 
 .DESCRIPTION
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
-Impact: Medium(Time)
-Uses: Get-Volume.
-FalsePositives: None.
+Impact: Medium(Disk)
+Uses: Get-Volume, Get-FreeGB, Get-PSDrive.
 #>
     $dirty = @()
     $drives = Get-Volume -FileSystem NTFS -ErrorAction SilentlyContinue
@@ -1194,15 +1180,14 @@ function Test-DiskHasFreeSpace {
 function HealthTest-EventLogMaxSizes__E{
 <#
 .SYNOPSIS
-Checks Event Log Max Sizes
+Checks Event Log Max Sizes.
 
 .DESCRIPTION
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
-Impact: Medium(Network)
-Uses: Select-String.
-FalsePositives: None.
+Impact: Medium(Time)
+Uses: Get-WinEvent.
 #>
   [CmdletBinding()]
   param([hashtable]$OverrideMinSizesMB)

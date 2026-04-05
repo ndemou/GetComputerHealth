@@ -5,15 +5,14 @@ System Configuration & Feature Discovery
 function HealthTest-MalwareProtectionFeatures__E {
 <#
 .SYNOPSIS
-Checks Malware Protection Features
+Checks Malware Protection Features.
 
 .DESCRIPTION
 AppliesTo: All
 Scope: Computer
-Category: Configuration Hygiene & Best Practices
+Category: Security & Stability Risks
 Impact: Medium(Time)
-Uses: Get-MpComputerStatus, Write-BasedOnTestResult, Update-MpSignature.
-FalsePositives: None.
+Uses: Get-MpComputerStatus, Update-MpSignature.
 #>
     # $MPs holds the Malware Protection status
     $MPs=(Get-MpComputerStatus)
@@ -37,15 +36,14 @@ FalsePositives: None.
 function HealthTest-StartupItems__E{
 <#
 .SYNOPSIS
-Checks Startup Items
+Checks Startup Items.
 
 .DESCRIPTION
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
-Impact: Medium(Time)
-Uses: Get-ItemProperty.
-FalsePositives: None.
+Impact: low
+Uses: None.
 #>
   $paths=@(
     'HKLM:\Software\Microsoft\Windows\CurrentVersion\Run',

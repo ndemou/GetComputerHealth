@@ -744,15 +744,14 @@ function Test-LooksLikePath {
 function HealthTest-AutoStartServicesRunning__E {
 <#
 .SYNOPSIS
-Checks Auto Start Services Running
+Checks Auto Start Services Running.
 
 .DESCRIPTION
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
-Impact: Medium(Time)
+Impact: low
 Uses: cmd.exe.
-FalsePositives: None.
 #>
   function Get-ServiceExitCodeMessage {
       param([int]$ExitCode)
@@ -838,15 +837,14 @@ FalsePositives: None.
 function HealthTest-NonMicrosoftServices__S {
 <#
 .SYNOPSIS
-Checks Non Microsoft Services
+Checks Non Microsoft Services.
 
 .DESCRIPTION
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
-Impact: Medium(Time), High(Time)
-Uses: Get-CimInstance.
-FalsePositives: None.
+Impact: High(Time)
+Uses: Get-ServiceVendors.
 #>
 
     $ok = $true

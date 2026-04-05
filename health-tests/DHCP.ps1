@@ -1,15 +1,14 @@
 function HealthTest-DhcpDnsCredential{
 <#
 .SYNOPSIS
-Checks Dhcp Dns Credential
+Checks DHCP DNS Credential.
 
 .DESCRIPTION
-AppliesTo: DomainJoined AND Server
+AppliesTo: Server
 Scope: Computer
-Category: Configuration Hygiene & Best Practices
-Impact: Medium(Network)
-Uses: Get-DhcpServerDnsCredential.
-FalsePositives: None.
+Category: Security & Stability Risks
+Impact: High(Network)
+Uses: Get-DhcpServerDnsCredential, Get-ADUser.
 #>
   [CmdletBinding()] param([int]$MaxPwdAgeDays=365)
   $cred=Get-DhcpServerDnsCredential -ErrorAction SilentlyContinue

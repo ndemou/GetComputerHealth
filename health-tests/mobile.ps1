@@ -5,15 +5,14 @@ Only for laptop/Mobile device
 function HealthTest-IsTPMActivated {
 <#
 .SYNOPSIS
-Checks Is TPM Activated
+Checks Is TPM Activated.
 
 .DESCRIPTION
 AppliesTo: Mobile
 Scope: Computer
-Category: Configuration Hygiene & Best Practices
+Category: Security & Stability Risks
 Impact: Medium(Time)
-Uses: Write-BasedOnTestResult, Get-Tpm.
-FalsePositives: None.
+Uses: Get-Tpm.
 #>
   if ($RunWithoutElevation) {
     Write-Warning "[WARNING] this test requires elevation"

@@ -5,15 +5,14 @@ Tests only for domain joined servers except DC/PDC
 function HealthTest-InterfaceDnsServersUseDcs__E {
 <#
 .SYNOPSIS
-Checks Interface Dns Servers Use Dcs
+Checks Interface DNS Servers Use Dcs.
 
 .DESCRIPTION
 AppliesTo: DomainJoined
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Network)
-Uses: Get-CimInstance.
-FalsePositives: None.
+Uses: None.
 #>
   $cs = Get-CimInstance Win32_ComputerSystem
   $role = $cs.DomainRole
@@ -66,15 +65,14 @@ FalsePositives: None.
 function HealthTest-DnsSuffixMatchesDomain__E {
 <#
 .SYNOPSIS
-Checks Dns Suffix Matches Domain
+Checks DNS Suffix Matches Domain.
 
 .DESCRIPTION
 AppliesTo: DomainJoined
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Network)
-Uses: Select-String.
-FalsePositives: None.
+Uses: None.
 #>
   [CmdletBinding()] param()
   $cs = Get-CimInstance Win32_ComputerSystem
@@ -95,15 +93,14 @@ FalsePositives: None.
 function HealthTest-DomainARecordPointsToDcIp__E {
 <#
 .SYNOPSIS
-Checks Domain A Record Points To Dc Ip
+Checks whether the domain A record points to a DC IP.
 
 .DESCRIPTION
 AppliesTo: DomainJoined
 Scope: Computer
-Category: Security & Stability Risks
-Impact: Medium(Time)
+Category: Configuration Hygiene & Best Practices
+Impact: Medium(Network)
 Uses: Resolve-DnsName.
-FalsePositives: None.
 #>
   $dcIps = @($Global:GCHDQMTA.IpsOfAllDcs)
 
@@ -130,15 +127,14 @@ FalsePositives: None.
 function HealthTest-NltestSiteDiscovery {
 <#
 .SYNOPSIS
-Checks Nltest Site Discovery
+Checks NLTest Site Discovery.
 
 .DESCRIPTION
 AppliesTo: DomainJoined
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
-Impact: Medium(Time)
-Uses: Get-CimInstance.
-FalsePositives: None.
+Impact: low
+Uses: None.
 #>
   [CmdletBinding()] param()
   $dcIps = @($Global:GCHDQMTA.IpsOfAllDcs)
@@ -167,15 +163,14 @@ FalsePositives: None.
 function HealthTest-GpupdatePolicyApply__S {
 <#
 .SYNOPSIS
-Checks Gpupdate Policy Apply
+Checks GPUpdate Policy Apply.
 
 .DESCRIPTION
 AppliesTo: DomainJoined
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
-Impact: Medium(Time)
+Impact: High(Time)
 Uses: Test-ComputerSecureChannel.
-FalsePositives: None.
 #>
   [CmdletBinding()] param()
 

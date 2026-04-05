@@ -16,15 +16,14 @@ function Get-PropValue {
 function HealthTest-NetworkConnectionProfiles__E {
 <#
 .SYNOPSIS
-Checks Network Connection Profiles
+Checks Network Connection Profiles.
 
 .DESCRIPTION
 AppliesTo: All
 Scope: Computer
-Category: Availability / Server Down Signals
-Impact: Medium(Time)
+Category: Configuration Hygiene & Best Practices
+Impact: low
 Uses: Get-NetConnectionProfile, Test-NetConnectivityToNetwork.
-FalsePositives: None.
 #>
   [CmdletBinding()]
   param()
@@ -74,15 +73,14 @@ FalsePositives: None.
 function HealthTest-SingleDefaultGateway__S{
 <#
 .SYNOPSIS
-Checks Single Default Gateway
+Checks Single Default Gateway.
 
 .DESCRIPTION
 AppliesTo: All
 Scope: Computer
-Category: Availability / Server Down Signals
-Impact: Medium(Time)
-Uses: Get-NetIPConfiguration.
-FalsePositives: None.
+Category: Configuration Hygiene & Best Practices
+Impact: High(Time), Medium(Network)
+Uses: Get-NetIPConfiguration, Test-MultipleGatewayConfiguration, Test-NetConnectionFast.
 #>
   [CmdletBinding()] param([switch]$AllowOnePerFamily)
 
@@ -289,15 +287,14 @@ function Test-MultipleGatewayConfiguration {
 function HealthTest-IPv6Binding__E{
 <#
 .SYNOPSIS
-Checks I Pv 6 Binding
+Checks IPv6 binding.
 
 .DESCRIPTION
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
-Impact: Medium(Time)
+Impact: low
 Uses: Get-NetAdapterBinding.
-FalsePositives: None.
 #>
   [CmdletBinding()] param([switch]$RequireEnabled)
 
@@ -317,15 +314,14 @@ FalsePositives: None.
 function HealthTest-Nic__E {
 <#
 .SYNOPSIS
-Checks Nic
+Checks NIC.
 
 .DESCRIPTION
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
-Impact: Medium(Time)
-Uses: Get-NetAdapterStatistics.
-FalsePositives: None.
+Impact: low
+Uses: Get-NetAdapter, Get-NetAdapterStatistics.
 #>
     $nics = Get-NetAdapter -Physical -ErrorAction SilentlyContinue | Where-Object { $_.Status -eq 'Up' }
     if (-not $nics) {
@@ -401,15 +397,14 @@ FalsePositives: None.
 function HealthTest-WinRMListening__E{
 <#
 .SYNOPSIS
-Checks Win RM Listening
+Checks Win RM Listening.
 
 .DESCRIPTION
 AppliesTo: All
 Scope: Computer
-Category: Availability / Server Down Signals
-Impact: Medium(Network)
-Uses: Test-WSMan.
-FalsePositives: None.
+Category: Configuration Hygiene & Best Practices
+Impact: High(Network)
+Uses: Get-Service, Test-WSMan.
 #>
   $svc=Get-Service WinRM -ErrorAction Stop
   if($svc.Status -ne 'Running'){ Write-Warning "[FAILURE] WinRM service is not running`nStatus=$($svc.Status)"; return }

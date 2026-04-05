@@ -5,17 +5,14 @@ Tests only for domain joined servers (including DC/PDC)
 function HealthTest-DnsSuffixBaseline__E {
 <#
 .SYNOPSIS
-Checks Dns Suffix Baseline
+Checks DNS Suffix Baseline.
 
 .DESCRIPTION
 AppliesTo: DomainJoined
 Scope: Computer
-Category: Audit / Compliance / Informational
-Impact: Medium(Network)
+Category: Configuration Hygiene & Best Practices
+Impact: Medium(Network), Medium(Time)
 Uses: Get-DnsClientGlobalSetting, Get-DnsClient.
-FalsePositives: None.
-
-TODO: maybe part of these tests are for non-domain joined Computers also
 #>
     $DomainName=(Get-CimInstance Win32_ComputerSystem).Domain
 
@@ -90,15 +87,14 @@ TODO: maybe part of these tests are for non-domain joined Computers also
 function HealthTest-ConnectivityToDCs__E {
 <#
 .SYNOPSIS
-Checks Connectivity To D Cs
+Checks connectivity to DCs.
 
 .DESCRIPTION
 AppliesTo: DomainJoined
 Scope: Computer
-Category: Availability / Server Down Signals
-Impact: Medium(Network)
-Uses: Resolve-DnsName, Get-ADForest.
-FalsePositives: None.
+Category: Configuration Hygiene & Best Practices
+Impact: High(Network)
+Uses: Resolve-DnsName, Test-NetConnectionFast.
 #>
   $dcs  = Get-DomainControllers
 
@@ -150,15 +146,14 @@ FalsePositives: None.
 function HealthTest-EfsRecoveryAgents__E{
 <#
 .SYNOPSIS
-Checks Efs Recovery Agents
+Checks EFS Recovery Agents.
 
 .DESCRIPTION
 AppliesTo: DomainJoined
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time)
-Uses: Select-String.
-FalsePositives: None.
+Uses: None.
 #>
   $out=& certutil -recoveryagent 2>&1
   $has=($out | Select-String -Pattern 'Recovery Agent' -SimpleMatch)
@@ -169,15 +164,14 @@ FalsePositives: None.
 function HealthTest-GpWmiFilterNamespacesOnLocalHost__E{
 <#
 .SYNOPSIS
-Checks Gp Wmi Filters Namespaces
+Checks Gp WMI Filter Namespaces On Local Host.
 
 .DESCRIPTION
 AppliesTo: DomainJoined
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
-Impact: Medium(Time)
-Uses: New-Object.
-FalsePositives: None.
+Impact: low
+Uses: None.
 #>
   $bad=$false
   $items=@()

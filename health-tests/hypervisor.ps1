@@ -5,15 +5,14 @@ Only for Hyper-V servers
 function HealthTest-HyperVRunningVMs {
 <#
 .SYNOPSIS
-Checks if all VMs that are set to auto-start are running
+Checks Hyper-V running VMs.
 
 .DESCRIPTION
-AppliesTo: All
+AppliesTo: Server
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
-Impact: Medium(Time)
+Impact: low
 Uses: Get-VM.
-FalsePositives: None.
 #>
     $ok=$true
     $all_vm = Get-VM

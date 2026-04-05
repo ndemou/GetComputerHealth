@@ -137,15 +137,14 @@ function Get-DaysSinceLastVirusScan {
 function HealthTest-RecentWindowsScan__E {
 <#
 .SYNOPSIS
-Checks Recent Windows Scan
+Checks Recent Windows Scan.
 
 .DESCRIPTION
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time)
-Uses: None.
-FalsePositives: None.
+Uses: Get-DaysSinceLastVirusScan, Get-WindowsOriginalInstallDate.
 #>
     $MAX_WARN_DAYS = 4
     $MAX_FAILURE_DAYS = 8
@@ -181,16 +180,14 @@ FalsePositives: None.
 function HealthTest-SchanelBaseline__E{
 <#
 .SYNOPSIS
-Checks Schanel Baseline
+Checks Schannel Baseline.
 
 .DESCRIPTION
-AppliesTo: Server
+AppliesTo: All
 Scope: Computer
-Category: Audit / Compliance / Informational
+Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time)
-Uses: Get-ItemProperty.
-FalsePositives: Possible on legacy systems where older protocols are intentionally required.
-Checks the effective Schannel server-side protocol baseline for SSL 3.0, TLS 1.0, TLS 1.1, and TLS 1.2.
+Uses: None.
 #>
   $base='HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols'
   function Get-EffState($proto,$role){
@@ -249,7 +246,7 @@ Checks the effective Schannel server-side protocol baseline for SSL 3.0, TLS 1.0
 function HealthTest-DefenderStatus__E {
 <#
 .SYNOPSIS
-Checks Defender Status
+Checks Defender Status.
 
 .DESCRIPTION
 AppliesTo: All
@@ -257,7 +254,6 @@ Scope: Computer
 Category: Security & Stability Risks
 Impact: Medium(Time)
 Uses: Get-MpComputerStatus.
-FalsePositives: None.
 #>
     param([int]$WarnSigAgeDays=2,[int]$FailSigAgeDays=7)
     $s = Get-MpComputerStatus
@@ -278,15 +274,14 @@ FalsePositives: None.
 function HealthTest-FirewallEnabled__S {
 <#
 .SYNOPSIS
-Checks Firewall Enabled
+Checks Firewall Enabled.
 
 .DESCRIPTION
 AppliesTo: All
 Scope: Computer
 Category: Security & Stability Risks
-Impact: Medium(Time), High(Time)
-Uses: Write-BasedOnTestResult, Get-NetFirewallProfile.
-FalsePositives: None.
+Impact: High(Time)
+Uses: Get-Service, Get-NetFirewallProfile.
 #>
 
     Write-BasedOnTestResult "Is mpssvc (the firewall service) enabled?" -Test ((Get-Service -name mpssvc).status -eq 'Running')
@@ -299,7 +294,7 @@ FalsePositives: None.
 function HealthTest-Smb1Disabled{
 <#
 .SYNOPSIS
-Checks Smb 1 Disabled
+Checks SMB 1 Disabled.
 
 .DESCRIPTION
 AppliesTo: All
@@ -307,7 +302,6 @@ Scope: Computer
 Category: Security & Stability Risks
 Impact: Medium(Time)
 Uses: Get-WindowsOptionalFeature.
-FalsePositives: None.
 #>
   if ($RunWithoutElevation) {
     Write-Warning "[WARNING] this test requires elevation"
@@ -323,15 +317,14 @@ FalsePositives: None.
 function HealthTest-WmiRepository__E{
 <#
 .SYNOPSIS
-Checks Wmi Repository
+Checks WMI Repository.
 
 .DESCRIPTION
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
-Impact: Medium(Time)
+Impact: low
 Uses: None.
-FalsePositives: None.
 #>
   $out=& winmgmt /verifyrepository 2>&1
   $ok=($out -match 'consistent')
@@ -342,15 +335,14 @@ FalsePositives: None.
 function HealthTest-VssWriters__S{
 <#
 .SYNOPSIS
-Checks Vss Writers
+Checks VSS Writers.
 
 .DESCRIPTION
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
-Impact: Medium(Time), High(Time)
-Uses: Select-String.
-FalsePositives: None.
+Impact: High(Time)
+Uses: None.
 #>
 
   $out=& vssadmin list writers 2>&1
@@ -365,15 +357,14 @@ FalsePositives: None.
 function HealthTest-UnsignedDrivers {
 <#
 .SYNOPSIS
-Reports unsigned drivers if any; ignores Bluetooth Enumeration devices (DeviceID like "BTHENUM\*")
+Checks Unsigned Drivers.
 
 .DESCRIPTION
 AppliesTo: All
 Scope: Computer
 Category: Security & Stability Risks
 Impact: Medium(Time)
-Uses: Get-CimInstance Win32_PnPSignedDriver, SetupVerifyInfFile, Get-PnpDeviceProperty.
-FalsePositives: Low.
+Uses: Get-PnpPropertyDataValue, Resolve-InfPath, Get-PnpPropertiesCached.
 #>
   [CmdletBinding()]
   param([string[]]$WhitelistDeviceIdRegex = @('^BTHENUM\\'))
@@ -802,15 +793,14 @@ namespace Toula.HealthTestUnsignedDrivers
 function HealthTest-CrashDumpSignals__E {
 <#
 .SYNOPSIS
-Checks Crash Dump Signals
+Checks Crash Dump Signals.
 
 .DESCRIPTION
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
-Impact: Medium(Time)
+Impact: Medium(Disk), Medium(Time)
 Uses: None.
-FalsePositives: None.
 #>
     param([int]$Hours = 48)
 
@@ -831,15 +821,14 @@ FalsePositives: None.
 function HealthTest-SeriousRecentEventLogs__S {
 <#
 .SYNOPSIS
-Checks Serious Recent Event Logs
+Checks Serious Recent Event Logs.
 
 .DESCRIPTION
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
-Impact: Medium(Network), High(Time)
+Impact: High(Time)
 Uses: Get-WinEvent.
-FalsePositives: None.
 #>
     [CmdletBinding()]
     param([int]$Hours = 24)
@@ -912,15 +901,14 @@ FalsePositives: None.
 function HealthTest-HotfixBaseline__E{
 <#
 .SYNOPSIS
-Checks Hotfix Baseline
+Checks Hotfix Baseline.
 
 .DESCRIPTION
 AppliesTo: All
 Scope: Computer
-Category: Audit / Compliance / Informational
-Impact: Medium(Network)
+Category: Configuration Hygiene & Best Practices
+Impact: Medium(Time)
 Uses: Get-HotFix.
-FalsePositives: None.
 #>
   [CmdletBinding()] param([string[]]$RequiredKBs)
   if(-not $RequiredKBs -or $RequiredKBs.Count -eq 0){ Write-Warning "[PASS] No hotfix baseline provided"; return }
@@ -935,15 +923,14 @@ FalsePositives: None.
 function HealthTest-BitLockerStatus__E {
 <#
 .SYNOPSIS
-Checks Bit Locker Status
+Checks Bit Locker Status.
 
 .DESCRIPTION
 AppliesTo: All
 Scope: Computer
-Category: Configuration Hygiene & Best Practices
+Category: Security & Stability Risks
 Impact: Medium(Time)
-Uses: Get-BitLockerVolume.
-FalsePositives: None.
+Uses: Get-Command, Get-BitLockerVolume.
 #>
     if ($Global:GCHDQMTA.isHostVM) {
         Write-Warning "[info] Computer is a VM; skipping HealthTest-BitLockerStatus"
@@ -971,15 +958,14 @@ FalsePositives: None.
 function HealthTest-NtlmHardening__E {
 <#
 .SYNOPSIS
-Checks Ntlm Hardening
+Checks NTLM Hardening.
 
 .DESCRIPTION
 AppliesTo: All
 Scope: Computer
 Category: Security & Stability Risks
 Impact: Medium(Time)
-Uses: Get-ItemProperty.
-FalsePositives: None.
+Uses: None.
 #>
   $lsa = 'HKLM:\SYSTEM\CurrentControlSet\Control\Lsa'
 
@@ -1005,15 +991,14 @@ FalsePositives: None.
 function HealthTest-RdpHardening__E {
 <#
 .SYNOPSIS
-Checks Rdp Hardening
+Checks RDP Hardening.
 
 .DESCRIPTION
 AppliesTo: All
 Scope: Computer
 Category: Security & Stability Risks
-Impact: Medium(Time)
-Uses: Get-ItemProperty.
-FalsePositives: None.
+Impact: Medium(Network)
+Uses: Get-LiveSessionInfo, Get-WtsServerHandle, Get-WtsString.
 #>
   $k = 'HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp'
 
@@ -1580,7 +1565,14 @@ namespace Toula.WtsEx
 function HealthTest-StaleRdpSessions {
 <#
 .SYNOPSIS
-Reports any stale desktop sessions (idle/disconnected for many hours).
+Checks Stale RDP Sessions.
+
+.DESCRIPTION
+AppliesTo: All
+Scope: Computer
+Category: Configuration Hygiene & Best Practices
+Impact: Medium(Network)
+Uses: Get-LiveSessionInfo.
 #>
     [CmdletBinding()]
     param(
@@ -1642,15 +1634,14 @@ Reports any stale desktop sessions (idle/disconnected for many hours).
 function HealthTest-NonDefaultShares__E {
 <#
 .SYNOPSIS
-Checks Non Default Shares
+Checks Non Default Shares.
 
 .DESCRIPTION
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
-Impact: Medium(Time)
-Uses: Set-Service, Stop-Service.
-FalsePositives: None.
+Impact: low
+Uses: get-service, Set-Service, Stop-Service.
 #>
   # 0(Workstation standalone),  1(Workstation domain joined), 2(Server standalone), 3(Server joined), 4(DC non-FSMO), 5(DC with FSMO role)
   $domainRole = (Get-CimInstance Win32_ComputerSystem).DomainRole
@@ -1678,15 +1669,14 @@ FalsePositives: None.
 function HealthTest-LocalAcntRequirePass__E {
 <#
 .SYNOPSIS
-Checks Local Acnt Require Pass
+Checks Local Acnt Require Pass.
 
 .DESCRIPTION
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
-Impact: Medium(Time)
-Uses: Get-CimInstance.
-FalsePositives: None.
+Impact: low
+Uses: None.
 #>
     $ok = $true
     $no_req_pass_accounts=Get-CimInstance -Class Win32_UserAccount -Filter `
@@ -1706,15 +1696,14 @@ FalsePositives: None.
 function HealthTest-RestrictAnonymous__E {
 <#
 .SYNOPSIS
-Checks Restrict Anonymous
+Checks Restrict Anonymous.
 
 .DESCRIPTION
 AppliesTo: All
 Scope: Computer
 Category: Security & Stability Risks
 Impact: Medium(Time)
-Uses: Get-ItemProperty.
-FalsePositives: None.
+Uses: None.
 #>
   $p  = 'HKLM:\SYSTEM\CurrentControlSet\Control\Lsa'
   $ra = (Get-ItemProperty $p -Name restrictanonymous      -ErrorAction SilentlyContinue).restrictanonymous
@@ -1734,15 +1723,14 @@ FalsePositives: None.
 function HealthTest-DefaultLocale__E {
 <#
 .SYNOPSIS
-Checks Default Locale
+Checks Default Locale.
 
 .DESCRIPTION
 AppliesTo: All
 Scope: Computer
-Category: Audit / Compliance / Informational
-Impact: Medium(Time)
-Uses: Get-ItemProperty.
-FalsePositives: None.
+Category: Configuration Hygiene & Best Practices
+Impact: low
+Uses: None.
 #>
     # see https://newbedev.com/how-can-i-manually-determine-the-codepage-and-locale-of-the-current-os
     $loc = Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Nls\CodePage' | Select-Object ACP,OEMCP
@@ -1759,15 +1747,14 @@ FalsePositives: None.
 function HealthTest-PendingReboot__E {
 <#
 .SYNOPSIS
-Checks Pending Reboot
+Checks Pending Reboot.
 
 .DESCRIPTION
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
-Impact: Medium(Time)
-Uses: Write-Debug.
-FalsePositives: None.
+Impact: low
+Uses: None.
 #>
     $pending = $false
     if (Test-Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending') { $pending = $true }
@@ -1781,15 +1768,14 @@ FalsePositives: None.
 function HealthTest-SmbSigningRequired__E{
 <#
 .SYNOPSIS
-Checks Smb Signing Required
+Checks SMB Signing Required.
 
 .DESCRIPTION
 AppliesTo: All
 Scope: Computer
 Category: Security & Stability Risks
 Impact: Medium(Time)
-Uses: Get-SmbServerConfiguration.
-FalsePositives: None.
+Uses: Get-Service, Get-SmbServerConfiguration.
 #>
   if ((Get-PropValue -obj (Get-Service -Name LanmanServer) -name Status) -ne 'running') {
       Write-Warning "[PASS] Skipping HealthTest-SmbSigningRequired; LanmanServer service not running."
@@ -1807,15 +1793,14 @@ FalsePositives: None.
 function HealthTest-ShadowStorage__E {
 <#
 .SYNOPSIS
-Checks if Shadow Storage is enabled on internal drives (for servers) or on C: (for workstations)
+Checks Shadow Storage.
 
 .DESCRIPTION
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
-Impact: Low
-Uses: Get-CimInstance.
-FalsePositives: None.
+Impact: High(Disk), Medium(Time)
+Uses: None.
 #>
   [CmdletBinding()]
   param(
@@ -2000,15 +1985,14 @@ FalsePositives: None.
 function HealthTest-DnsClientService__E{
 <#
 .SYNOPSIS
-Checks Dns Client Service
+Checks DNS Client Service.
 
 .DESCRIPTION
 AppliesTo: All
 Scope: Computer
-Category: Configuration Hygiene & Best Practices
-Impact: Low
+Category: Security & Stability Risks
+Impact: High(Network)
 Uses: Get-Service.
-FalsePositives: None.
 #>
   $s=Get-Service Dnscache -ErrorAction Stop
   if($s.Status -eq 'Running'){ Write-Warning "[PASS] DNS Client service running" } else { Write-Warning "[FAILURE] DNS Client service is not running`nStatus=$($s.Status)" }
@@ -2018,15 +2002,14 @@ FalsePositives: None.
 function HealthTest-LocalAdminsBaseline {
 <#
 .SYNOPSIS
-Checks Local Admins Baseline
+Checks Local Admins Baseline.
 
 .DESCRIPTION
 AppliesTo: All
 Scope: Computer
-Category: Audit / Compliance / Informational
+Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time)
 Uses: None.
-FalsePositives: None.
 #>
     param(
         [string[]]$Allowed = @(
@@ -2092,15 +2075,14 @@ FalsePositives: None.
 function HealthTest-UnexpectedListeningPorts__S {
 <#
 .SYNOPSIS
-Checks Unexpected Listening Ports
+Checks Unexpected Listening Ports.
 
 .DESCRIPTION
 AppliesTo: All
 Scope: Computer
-Category: Security & Stability Risks
-Impact: Medium(Time), High(Time)
-Uses: Get-NetTCPConnection.
-FalsePositives: None.
+Category: Configuration Hygiene & Best Practices
+Impact: High(Time), Medium(Network)
+Uses: Get-NetTCPConnection, Get-Process, Resolve-ExecutablePath.
 #>
     [CmdletBinding()] param(
         [int[]]$AllowedPorts = @(53, 88, 123, 135, 139, 389, 445, 464, 636, 3268, 3269, 5722, 5985, 5986, 9389),
@@ -2284,15 +2266,14 @@ function Get-NormalizedSoftwareName {
 function HealthTest-InstalledSW__P {
 <#
 .SYNOPSIS
-Checks installed software baseline drift.
+Checks installed software.
 
 .DESCRIPTION
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time)
-Uses: Get-AppxPackage.
-FalsePositives: New software can be expected in some environments.
+Uses: Get-InstalledSW, Get-NormalizedSoftwareName.
 #>
     $seen = 0
     foreach ($sw in (Get-InstalledSW)) {

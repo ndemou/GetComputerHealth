@@ -5,15 +5,14 @@ Active Directory & GPO Management
 function HealthTest-ADViewConsistency {
 <#
 .SYNOPSIS
-Checks AD View Consistency
+Checks AD View Consistency.
 
 .DESCRIPTION
 AppliesTo: DC
-Scope: Computer
+Scope: Domain
 Category: Configuration Hygiene & Best Practices
-Impact: Medium(Time)
-Uses: Get-ADDomain, Get-ADDomainController, Get-ADForest.
-FalsePositives: None.
+Impact: Medium(Network)
+Uses: Get-ADDomainController, Get-ADDomain, Get-ADForest.
 #>
   [CmdletBinding()]
   param(
@@ -113,15 +112,14 @@ FalsePositives: None.
 function HealthTest-Dcdiag__S {
 <#
 .SYNOPSIS
-Checks Dcdiag
+Checks Dcdiag.
 
 .DESCRIPTION
 AppliesTo: DC
 Scope: Computer
-Category: Availability / Server Down Signals
+Category: Configuration Hygiene & Best Practices
 Impact: High(Time)
-Uses: Write-Progress.
-FalsePositives: None.
+Uses: dcdiag.exe.
 #>
 
     write-progress "Runing DCDIAG /c /v"
@@ -151,15 +149,14 @@ FalsePositives: None.
 function HealthTest-RidManager{
 <#
 .SYNOPSIS
-Checks Rid Manager
+Checks RID Manager.
 
 .DESCRIPTION
 AppliesTo: DC
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time)
-Uses: Select-String.
-FalsePositives: None.
+Uses: None.
 #>
   $out=& dcdiag /test:ridmanager /v 2>&1
   $fail=($out | Select-String -Pattern 'failed test RidManager','is low' -SimpleMatch)
@@ -170,15 +167,14 @@ FalsePositives: None.
 function HealthTest-DfsReplicationState {
 <#
 .SYNOPSIS
-Checks Dfs Replication State
+Checks DFS Replication State.
 
 .DESCRIPTION
 AppliesTo: DC
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: High(Time)
-Uses: Get-CimInstance.
-FalsePositives: None.
+Uses: None.
 #>
   $stateNames = @{0='Uninitialized';1='Initialized';2='Initial_Sync';3='Auto_Recovery';4='Normal';5='Error'}
 
@@ -211,15 +207,14 @@ FalsePositives: None.
 function HealthTest-DfsrBacklog {
 <#
 .SYNOPSIS
-Checks Dfsr Backlog
+Checks DFSR Backlog.
 
 .DESCRIPTION
 AppliesTo: DC
-Scope: Computer
+Scope: Domain
 Category: Configuration Hygiene & Best Practices
 Impact: High(Time)
-Uses: Get-DfsrBacklog, Install-WindowsFeature, Get-DfsrConnection.
-FalsePositives: None.
+Uses: Get-Service, Get-Command, Get-DfsrBacklog.
 #>
     param([string]$RGName='Domain System Volume')
     if (-not(Get-Service DFSR -ErrorAction SilentlyContinue)) {
@@ -245,15 +240,14 @@ FalsePositives: None.
 function HealthTest-GpoVersionConsistency{
 <#
 .SYNOPSIS
-Checks Gpo Version Consistency
+Checks GPO Version Consistency.
 
 .DESCRIPTION
 AppliesTo: DC
-Scope: Computer
+Scope: Domain
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time)
 Uses: Get-GPO.
-FalsePositives: None.
 #>
     $dom=(Get-CimInstance Win32_ComputerSystem).Domain
     $base="\\$dom\SYSVOL\$dom\Policies"
@@ -275,15 +269,14 @@ FalsePositives: None.
 function HealthTest-ADInboundReplicationTopology{
 <#
 .SYNOPSIS
-Does this DC appear to have inbound topology at all, and do KCC objects and partner metadata make sense?
+Checks AD Inbound Replication Topology.
 
 .DESCRIPTION
 AppliesTo: DC
 Scope: Computer
-Category: Availability / Server Down Signals
-Impact: Medium(Network)
+Category: Configuration Hygiene & Best Practices
+Impact: High(Time)
 Uses: Get-ADDomainController, Get-ADReplicationPartnerMetadata, Get-ADObject.
-FalsePositives: None.
 #>
   $dcs = Get-ADDomainController -Filter *
   $anyFail = $false
@@ -327,7 +320,7 @@ FalsePositives: None.
 function HealthTest-KerberosEncryptionTypes{
 <#
 .SYNOPSIS
-Checks Kerberos Encryption Types
+Checks Kerberos Encryption Types.
 
 .DESCRIPTION
 AppliesTo: DC
@@ -335,7 +328,6 @@ Scope: Computer
 Category: Security & Stability Risks
 Impact: Medium(Time)
 Uses: Get-ADObject.
-FalsePositives: None.
 #>
   $objs=Get-ADObject -LDAPFilter '(msDS-SupportedEncryptionTypes=*)' -Properties msDS-SupportedEncryptionTypes,sAMAccountName,objectClass
   $bad_count = 0
@@ -356,15 +348,14 @@ FalsePositives: None.
 function HealthTest-RodcPrp{
 <#
 .SYNOPSIS
-Checks Rodc Prp
+Checks RODC Prp.
 
 .DESCRIPTION
 AppliesTo: DC
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
-Impact: Medium(Time)
+Impact: low
 Uses: Get-ADDomainController, Get-ADObject.
-FalsePositives: None.
 #>
   $rodcs=Get-ADDomainController -Filter {IsReadOnly -eq $true}
   if(-not $rodcs){ Write-Warning "[PASS] No RODCs found (PRP not applicable)"; return }
@@ -378,15 +369,14 @@ FalsePositives: None.
 function HealthTest-SysvolAclHygiene{
 <#
 .SYNOPSIS
-Checks Sysvol Acl Hygiene
+Checks SYSVOL Acl Hygiene.
 
 .DESCRIPTION
 AppliesTo: DC
 Scope: Computer
-Category: Configuration Hygiene & Best Practices
+Category: Security & Stability Risks
 Impact: Medium(Time)
 Uses: Get-Acl.
-FalsePositives: None.
 #>
   $path="C:\Windows\SYSVOL\sysvol"
   $acl=Get-Acl -Path $path
@@ -402,15 +392,14 @@ FalsePositives: None.
 function HealthTest-DfsDiagTestDCs__S {
 <#
 .SYNOPSIS
-Checks Dfs Diag Test D Cs
+Checks DFS diagnostic tests across DCs.
 
 .DESCRIPTION
 AppliesTo: DC
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
-Impact: Medium(Time), High(Time)
-Uses: Write-Progress.
-FalsePositives: None.
+Impact: High(Time)
+Uses: None.
 #>
 
     write-progress "Runing 'DFSDIAG /TestDCs'"
@@ -425,15 +414,14 @@ FalsePositives: None.
 function HealthTest-DfsNamespaceEnumerate{
 <#
 .SYNOPSIS
-Checks Dfs Namespace Enumerate
+Checks DFS Namespace Enumerate.
 
 .DESCRIPTION
 AppliesTo: DC
-Scope: Computer
+Scope: Domain
 Category: Configuration Hygiene & Best Practices
-Impact: Medium(Time)
+Impact: low
 Uses: Get-DfsnRoot, Get-DfsnFolder.
-FalsePositives: None.
 #>
   $roots=Get-DfsnRoot -ErrorAction SilentlyContinue
   if(-not $roots){ Write-Warning "[PASS] No DFS Namespace roots found (nothing to check)"; return }
@@ -446,15 +434,14 @@ FalsePositives: None.
 function HealthTest-PreWin2000Group{
 <#
 .SYNOPSIS
-Checks Pre Win 2000 Group
+Checks Pre Win 2000 Group.
 
 .DESCRIPTION
 AppliesTo: DC
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
-Impact: Medium(Time)
+Impact: low
 Uses: Get-ADGroup, Get-ADGroupMember.
-FalsePositives: None.
 #>
   $g=Get-ADGroup -Identity 'Pre-Windows 2000 Compatible Access'
   $m=Get-ADGroupMember $g -Recursive -ErrorAction SilentlyContinue
@@ -466,15 +453,14 @@ FalsePositives: None.
 function HealthTest-TrustsVerify{
 <#
 .SYNOPSIS
-Checks Trusts Verify
+Checks Trusts Verify.
 
 .DESCRIPTION
 AppliesTo: DC
-Scope: Domain
+Scope: Forest
 Category: Configuration Hygiene & Best Practices
-Impact: Medium(Time)
-Uses: netdom.exe, Get-ADTrust.
-FalsePositives: None.
+Impact: low
+Uses: netdom.exe, Get-ADTrust, dcdiag.exe.
 #>
   $trusts=Get-ADTrust -Filter * -ErrorAction Stop
   if(-not $trusts){ Write-Warning "[PASS] No inter-domain trusts configured"; return }
@@ -549,7 +535,7 @@ function Get-DcDiagFailures {
 function HealthTest-AdminSDHolderCoverage{
 <#
 .SYNOPSIS
-Checks Admin SD Holder Coverage
+Checks Admin SD Holder Coverage.
 
 .DESCRIPTION
 AppliesTo: DC
@@ -557,7 +543,6 @@ Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time)
 Uses: Get-ADUser.
-FalsePositives: None.
 #>
   $prot=Get-ADUser -LDAPFilter '(adminCount=1)' -Properties MemberOf | Select-Object -ExpandProperty SamAccountName
   if($prot){ Write-Warning "[PASS] AdminSDHolder applied; protected users: $($prot -join ", ")" } else { Write-Warning "[PASS] No users currently protected by AdminSDHolder" }
@@ -566,15 +551,14 @@ FalsePositives: None.
 function HealthTest-DisabledGpoLinksAtDomainRoot__S{
 <#
 .SYNOPSIS
-Checks Disabled Gpo Links At Domain Root
+Checks Disabled GPO Links At Domain Root.
 
 .DESCRIPTION
 AppliesTo: DC
-Scope: Computer
+Scope: Domain
 Category: Configuration Hygiene & Best Practices
-Impact: Medium(Time), High(Time)
-Uses: Get-GPO, Get-ADDomain, Get-GPOReport.
-FalsePositives: None.
+Impact: High(Time)
+Uses: Get-Command, Get-GPO, Get-ADDomain.
 #>
 
   if(-not (Get-Command Get-GPO -ErrorAction SilentlyContinue)){
@@ -637,7 +621,7 @@ FalsePositives: None.
 function HealthTest-KrbtgtAge{
 <#
 .SYNOPSIS
-Checks Krbtgt Age
+Checks KRBTGT Age.
 
 .DESCRIPTION
 AppliesTo: DC
@@ -645,7 +629,6 @@ Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time)
 Uses: Get-ADUser.
-FalsePositives: None.
 #>
   [CmdletBinding()] param([int]$MaxDays=720)
   $u=Get-ADUser krbtgt -Properties pwdLastSet
@@ -660,7 +643,7 @@ FalsePositives: None.
 function HealthTest-SysvolContentConsistency__S{
 <#
 .SYNOPSIS
-Checks Sysvol Content Consistency
+Checks SYSVOL Content Consistency.
 
 .DESCRIPTION
 AppliesTo: DC
@@ -668,7 +651,6 @@ Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: High(Time)
 Uses: Get-ADDomainController.
-FalsePositives: None.
 #>
 
     $dom=(Get-CimInstance Win32_ComputerSystem).Domain
@@ -712,15 +694,14 @@ FalsePositives: None.
 function HealthTest-SysvolNetlogonAccessible{
 <#
 .SYNOPSIS
-Checks Sysvol Netlogon Accessible
+Checks SYSVOL NETLOGON Accessible.
 
 .DESCRIPTION
 AppliesTo: DC
 Scope: Domain
-Category: Availability / Server Down Signals
-Impact: Medium(Time)
-Uses: None.
-FalsePositives: None.
+Category: Configuration Hygiene & Best Practices
+Impact: Medium(Network)
+Uses: Resolve-DnsName.
 #>
     $dcs = Get-DomainControllers
     $bad = @()
@@ -738,15 +719,14 @@ FalsePositives: None.
 function HealthTest-UnusedEnabledAdapters{
 <#
 .SYNOPSIS
-Checks Unused Enabled Adapters
+Checks Unused Enabled Adapters.
 
 .DESCRIPTION
 AppliesTo: DC
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
-Impact: Medium(Time)
+Impact: low
 Uses: Get-NetAdapter.
-FalsePositives: None.
 #>
   $nics=Get-NetAdapter | Where-Object {$_.AdminStatus -eq 'Up' -and $_.Status -ne 'Up'}
   foreach($n in $nics){ Write-Warning "[WARNING] Enabled network adapter is disconnected: $($n.Name) ($($n.Status))" }
@@ -759,7 +739,7 @@ FalsePositives: None.
 function HealthTest-SchemaVersionConsistency{
 <#
 .SYNOPSIS
-Checks Schema Version Consistency
+Checks Schema Version Consistency.
 
 .DESCRIPTION
 AppliesTo: DC
@@ -767,7 +747,6 @@ Scope: Domain
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time)
 Uses: Get-ADRootDSE, Get-ADDomainController, Get-ADObject.
-FalsePositives: None.
 #>
   $schemaNC=(Get-ADRootDSE).schemaNamingContext
   $vers=@{}; $errs=@()
@@ -814,15 +793,14 @@ FalsePositives: None.
 function HealthTest-TombstoneLifetime{
 <#
 .SYNOPSIS
-Checks Tombstone Lifetime
+Checks Tombstone Lifetime.
 
 .DESCRIPTION
 AppliesTo: DC
-Scope: Domain
+Scope: Forest
 Category: Configuration Hygiene & Best Practices
-Impact: Medium(Time)
+Impact: low
 Uses: Get-ADRootDSE, Get-ADObject.
-FalsePositives: None.
 #>
   [CmdletBinding()] param([int]$MinDays=60)
   $ds="CN=Directory Service,CN=Windows NT,CN=Services,$((Get-ADRootDSE).ConfigurationNamingContext)"
@@ -835,15 +813,14 @@ FalsePositives: None.
 function HealthTest-RecycleBinEnabled{
 <#
 .SYNOPSIS
-Checks Recycle Bin Enabled
+Checks Recycle Bin Enabled.
 
 .DESCRIPTION
 AppliesTo: DC
-Scope: Domain
+Scope: Forest
 Category: Configuration Hygiene & Best Practices
-Impact: Medium(Time)
+Impact: low
 Uses: Get-ADOptionalFeature.
-FalsePositives: None.
 #>
   $f=Get-ADOptionalFeature 'Recycle Bin Feature' -ErrorAction Stop
   $enabled=($f.EnabledScopes -ne $null -and $f.EnabledScopes.Count -gt 0)
@@ -853,7 +830,7 @@ FalsePositives: None.
 function HealthTest-ReplicationLatency {
 <#
 .SYNOPSIS
-Checks Replication Latency
+Checks Replication Latency.
 
 .DESCRIPTION
 AppliesTo: DC
@@ -861,7 +838,6 @@ Scope: Domain
 Category: Configuration Hygiene & Best Practices
 Impact: High(Time)
 Uses: Get-ADRootDSE, Get-ADDomainController, Get-ADReplicationPartnerMetadata.
-FalsePositives: Low. Old LastReplicationSuccess alone can be benign on quiet partitions. This check only fails when elevated latency is accompanied by replication trouble signals.
 #>
   [CmdletBinding()]
   param(
@@ -928,15 +904,14 @@ FalsePositives: Low. Old LastReplicationSuccess alone can be benign on quiet par
 function HealthTest-NtdsLogVolumeFree{
 <#
 .SYNOPSIS
-Checks Ntds Log Volume Free
+Checks NTDS Log Volume Free.
 
 .DESCRIPTION
 AppliesTo: DC
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
-Impact: Medium(Time)
-Uses: Get-ItemProperty.
-FalsePositives: None.
+Impact: Medium(Disk)
+Uses: None.
 #>
   [CmdletBinding()] param([int]$MinFreeGB=5)
   $p='HKLM:\SYSTEM\CurrentControlSet\Services\NTDS\Parameters'
@@ -960,15 +935,14 @@ FalsePositives: None.
 function HealthTest-NtdsPathsLocation{
 <#
 .SYNOPSIS
-Checks Ntds Paths Location
+Checks NTDS Paths Location.
 
 .DESCRIPTION
 AppliesTo: DC
 Scope: Computer
-Category: Security & Stability Risks
-Impact: Medium(Time)
-Uses: Get-ItemProperty.
-FalsePositives: None.
+Category: Configuration Hygiene & Best Practices
+Impact: low
+Uses: None.
 #>
   [CmdletBinding()]
   param(
@@ -996,15 +970,14 @@ FalsePositives: None.
 function HealthTest-ServiceAccountsPwdNeverExpires{
 <#
 .SYNOPSIS
-Checks Service Accounts Pwd Never Expires
+Checks Service Accounts Pwd Never Expires.
 
 .DESCRIPTION
 AppliesTo: DC
-Scope: Domain # SCOPE VERIFIED BY HUMAN
-Category: Configuration Hygiene & Best Practices
+Scope: Domain
+Category: Security & Stability Risks
 Impact: Medium(Time)
 Uses: Get-ADUser.
-FalsePositives: None.
 #>
   $filter='(servicePrincipalName=*)'
   $objs=Get-ADUser -LDAPFilter $filter -Properties PasswordNeverExpires,PasswordLastSet
@@ -1022,15 +995,14 @@ FalsePositives: None.
 function HealthTest-UnconstrainedDelegationAccounts{
 <#
 .SYNOPSIS
-Checks Unconstrained Delegation Accounts
+Checks Unconstrained Delegation Accounts.
 
 .DESCRIPTION
 AppliesTo: DC
-Scope: Domain # SCOPE VERIFIED BY HUMAN
+Scope: Domain
 Category: Security & Stability Risks
 Impact: Medium(Time)
 Uses: Get-ADObject.
-FalsePositives: None.
 #>
   [CmdletBinding()] param([switch]$IncludeDomainControllers)
 
@@ -1084,15 +1056,14 @@ FalsePositives: None.
 function HealthTest-GcPlacement{
 <#
 .SYNOPSIS
-Checks Gc Placement
+Checks GC placement.
 
 .DESCRIPTION
 AppliesTo: DC
-Scope: Domain # SCOPE VERIFIED BY HUMAN
+Scope: Forest
 Category: Configuration Hygiene & Best Practices
-Impact: Medium(Time)
+Impact: low
 Uses: Get-ADDomainController.
-FalsePositives: None.
 #>
   [CmdletBinding()] param([switch]$AtLeastOnePerSite=$true)
   $dcs=Get-ADDomainController -Filter *
@@ -1113,15 +1084,14 @@ FalsePositives: None.
 function HealthTest-DuplicateSpn{
 <#
 .SYNOPSIS
-Checks Duplicate Spn
+Checks Duplicate SPN.
 
 .DESCRIPTION
 AppliesTo: DC
-Scope: Domain # SCOPE VERIFIED BY HUMAN
+Scope: Forest
 Category: Configuration Hygiene & Best Practices
-Impact: Medium(Time)
+Impact: low
 Uses: Get-ADObject.
-FalsePositives: None.
 #>
   $objs = Get-ADObject -LDAPFilter "(servicePrincipalName=*)" -Properties servicePrincipalName,sAMAccountName,distinguishedName -ErrorAction Stop
   if(-not $objs){ Write-Warning "[PASS] No objects with SPN found"; return }
@@ -1150,15 +1120,14 @@ FalsePositives: None.
 function HealthTest-ADReplicationHealth {
 <#
 .SYNOPSIS
-Checks AD replication health.
+Checks AD Replication Health.
 
 .DESCRIPTION
 AppliesTo: DC
 Scope: Domain
 Category: Configuration Hygiene & Best Practices
 Impact: High(Time)
-Uses: repadmin.exe, Get-CimInstance, Get-ADDomainController, Get-ADReplicationPartnerMetadata.
-FalsePositives: Low.
+Uses: repadmin.exe, Get-MaxTimeSpan, Invoke-LocalRsatCrossCheck.
 #>
   [CmdletBinding()]
   param(

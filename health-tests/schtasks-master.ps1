@@ -5,15 +5,14 @@ Scheduled Task Master Cluster
 function HealthTest-ScheduledTasks {
 <#
 .SYNOPSIS
-Checks Scheduled Tasks
+Checks Scheduled Tasks.
 
 .DESCRIPTION
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
-Impact: High(Time)
-Uses: Get-ScheduledTask, Get-ScheduledTaskInfo.
-FalsePositives: None.
+Impact: Medium(Time)
+Uses: Get-ScheduledTask, Get-ScheduledTaskInfo, Get-ScheduledTaskDeepInfo.
 #>
     $task_name_paterns_to_ignore = @(
       'OneDrive Per-Machine Standalone Update Task*',
@@ -91,15 +90,14 @@ FalsePositives: None.
 function HealthTest-SystemScheduledTasks{
 <#
 .SYNOPSIS
-Checks System Scheduled Tasks
+Checks System Scheduled Tasks.
 
 .DESCRIPTION
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
-Impact: High(Time)
-Uses: Get-ScheduledTask, Get-ScheduledTaskInfo.
-FalsePositives: None.
+Impact: Medium(Time)
+Uses: Get-ScheduledTask, Get-ScheduledTaskInfo, Get-ScheduledTaskDeepInfo.
 #>
   [CmdletBinding()] param(
     [string[]]$MustBeEnabled = @(),  # exact paths or regex
@@ -327,15 +325,14 @@ function Get-ScheduledTaskDeepInfo{
 function HealthTest-ScheduledTasksLastResult__S {
 <#
 .SYNOPSIS
-Checks Scheduled Tasks Last Result
+Checks Scheduled Tasks Last Result.
 
 .DESCRIPTION
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: High(Time)
-Uses: None.
-FalsePositives: None.
+Uses: ConvertFrom-Csv.
 #>
 
   $mapHresult = @{

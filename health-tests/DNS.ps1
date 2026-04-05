@@ -5,15 +5,14 @@ DNS & DHCP Services
 function HealthTest-DnsScavenging{
 <#
 .SYNOPSIS
-Checks Dns Scavenging
+Checks DNS Scavenging.
 
 .DESCRIPTION
-AppliesTo: DC
+AppliesTo: Server
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Network)
 Uses: Get-DnsServerScavenging, Get-DnsServerZone, Get-DnsServerZoneAging.
-FalsePositives: None.
 #>
   $sv = Get-DnsServerScavenging -ErrorAction Stop
   $zones = Get-DnsServerZone -ErrorAction Stop | Where-Object { $_.IsDsIntegrated -and $_.ZoneType -eq 'Primary' }
@@ -37,15 +36,14 @@ FalsePositives: None.
 function HealthTest-DnsZoneReplicationScope{
 <#
 .SYNOPSIS
-Checks Dns Zone Replication Scope
+Checks DNS Zone Replication Scope.
 
 .DESCRIPTION
-AppliesTo: DC
+AppliesTo: Server
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
-Impact: High(Time)
+Impact: Medium(Network), Medium(Time)
 Uses: Get-DnsServerZone.
-FalsePositives: None.
 #>
   $zones = Get-DnsServerZone -ErrorAction Stop | Where-Object { $_.IsDsIntegrated }
   if(-not $zones){ Write-Warning "[PASS] No AD-integrated zones present"; return }
@@ -57,15 +55,14 @@ FalsePositives: None.
 function HealthTest-DnsZoneTransfers{
 <#
 .SYNOPSIS
-Checks Dns Zone Transfers
+Checks DNS Zone Transfers.
 
 .DESCRIPTION
-AppliesTo: DC
+AppliesTo: Server
 Scope: Computer
-Category: Configuration Hygiene & Best Practices
+Category: Security & Stability Risks
 Impact: Medium(Network)
 Uses: Get-DnsServerZone.
-FalsePositives: None.
 #>
   $zones=Get-DnsServerZone | Where-Object { -not $_.IsAutoCreated }
   $bad=$false
@@ -79,15 +76,14 @@ FalsePositives: None.
 function HealthTest-ReverseZonesPresent{
 <#
 .SYNOPSIS
-Checks Reverse Zones Present
+Checks Reverse Zones Present.
 
 .DESCRIPTION
-AppliesTo: DC
+AppliesTo: Server
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
-Impact: Medium(Time)
+Impact: low
 Uses: Get-DnsServerZone.
-FalsePositives: None.
 #>
   [CmdletBinding()] param([string[]]$ExpectedReverseZones)
   $zones=Get-DnsServerZone | Where-Object {$_.IsReverseLookupZone} | Select-Object -ExpandProperty ZoneName
@@ -103,15 +99,14 @@ FalsePositives: None.
 function HealthTest-DcDnsServerForwarder {
 <#
 .SYNOPSIS
-Checks Dc Dns Server Forwarder
+Checks DC DNS Server Forwarder.
 
 .DESCRIPTION
-AppliesTo: DC
+AppliesTo: Server
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
-Impact: Medium(Network)
+Impact: High(Network)
 Uses: Get-DnsServerForwarder.
-FalsePositives: None.
 #>
   [CmdletBinding()]
   [OutputType([bool])]
@@ -146,15 +141,14 @@ FalsePositives: None.
 function HealthTest-DnsForwarders{
 <#
 .SYNOPSIS
-Checks Dns Forwarders
+Checks DNS Forwarders.
 
 .DESCRIPTION
-AppliesTo: DC
+AppliesTo: Server
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
-Impact: Medium(Network)
+Impact: High(Network)
 Uses: Get-DnsServerForwarder, Test-Connection.
-FalsePositives: None.
 #>
   $f=Get-DnsServerForwarder -ErrorAction Stop
   if(-not $f -or -not $f.IPAddress){ Write-Warning "[PASS] No DNS forwarders configured"; return }
@@ -172,15 +166,14 @@ FalsePositives: None.
 function HealthTest-DnsRecursionConfig {
 <#
 .SYNOPSIS
-Checks Dns Recursion Config
+Checks DNS Recursion Config.
 
 .DESCRIPTION
-AppliesTo: DC
+AppliesTo: Server
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Network)
-Uses: Get-DnsServerRecursion, Get-DnsServerCache, Get-DnsServerEDns.
-FalsePositives: None.
+Uses: Get-Command, Get-DnsServerRecursion, Get-DnsServerCache.
 #>
     if (-not (Get-Command Get-DnsServerRecursion -ErrorAction SilentlyContinue)) {
         Write-Warning "[NOTICE] DNS Server tools not available`nDNS role/RSAT missing?"
@@ -237,15 +230,14 @@ FalsePositives: None.
 function HealthTest-DcDnsARecords{
 <#
 .SYNOPSIS
-Checks Dc Dns A Records
+Checks DC DNS A records.
 
 .DESCRIPTION
-AppliesTo: DC
+AppliesTo: Server
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Network)
 Uses: Get-ADDomainController, Resolve-DnsName.
-FalsePositives: None.
 #>
   $bad=@()
   foreach($dc in (Get-ADDomainController -Filter *)){
@@ -261,15 +253,14 @@ FalsePositives: None.
 function HealthTest-DcDnsRegistration {
 <#
 .SYNOPSIS
-Checks Dc Dns Registration
+Checks DC DNS Registration.
 
 .DESCRIPTION
-AppliesTo: DC
+AppliesTo: Server
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Network)
 Uses: Resolve-DnsName.
-FalsePositives: None.
 #>
     [CmdletBinding()]
     param()

@@ -19,15 +19,14 @@ function Normalize-DirectoryPath {
 function HealthTest-LargeDirectories__S {
 <#
 .SYNOPSIS
-Checks Large Directories
+Checks Large Directories.
 
 .DESCRIPTION
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
-Impact: High(Time)
-Uses: None.
-FalsePositives: None.
+Impact: High(Time), Medium(Disk)
+Uses: Get-ChildItem.
 #>
 
 	$PATHS_TO_SKIP=@("C:\windows\servicing","C:\windows\WinSxS","C:\Windows\SoftwareDistribution\Download")

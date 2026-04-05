@@ -5,15 +5,14 @@ Tests that are only applicable to Windows Server O.S.
 function HealthTest-DhcpInAd__E{
 <#
 .SYNOPSIS
-Checks Dhcp In Ad
+Checks DHCP in AD.
 
 .DESCRIPTION
-AppliesTo: DC
-Scope: Computer
+AppliesTo: Server
+Scope: Domain
 Category: Configuration Hygiene & Best Practices
-Impact: Medium(Time)
+Impact: low
 Uses: Get-WindowsFeature, Get-DhcpServerInDC.
-FalsePositives: None.
 #>
   $dhcp=Get-WindowsFeature -Name DHCP -ErrorAction SilentlyContinue
   if(-not $dhcp -or -not $dhcp.Installed){ Write-Warning "[PASS] DHCP role not installed on this server"; return }
@@ -26,15 +25,14 @@ FalsePositives: None.
 function HealthTest-DhcpScopeUtilization__E {
 <#
 .SYNOPSIS
-Checks Dhcp Scope Utilization
+Checks DHCP Scope Utilization.
 
 .DESCRIPTION
-AppliesTo: DC
+AppliesTo: Server
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
-Impact: Medium(Time)
-Uses: Get-DhcpServerv4ScopeStatistics.
-FalsePositives: None.
+Impact: Medium(Network)
+Uses: Get-Service, Get-Command, Get-DhcpServerv4ScopeStatistics.
 #>
     $svc = Get-Service -Name 'DHCPServer' -ErrorAction SilentlyContinue
     if (-not $svc) {
@@ -70,15 +68,14 @@ FalsePositives: None.
 function HealthTest-InstalledRolesFeatures {
 <#
 .SYNOPSIS
-Checks Installed Roles Features
+Checks Installed Roles Features.
 
 .DESCRIPTION
-AppliesTo: All
+AppliesTo: Server
 Scope: Computer
-Category: Audit / Compliance / Informational
-Impact: Medium(Time)
+Category: Configuration Hygiene & Best Practices
+Impact: low
 Uses: Get-WindowsFeature.
-FalsePositives: None.
 #>
   [CmdletBinding()]
   param([string[]]$DisallowedRoles = @('Web-Server','DHCP','WDS'))
