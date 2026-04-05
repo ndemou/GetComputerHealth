@@ -127,24 +127,15 @@ Use PascalCase after the `HealthTest-` prefix, for example `HealthTest-PagefileS
 Every built-in `HealthTest-*` function must include an in-function comment-based help block immediately after the opening `{`.
 
 Rules:
-- `.SYNOPSIS` is mandatory and must be 320 characters or fewer.
-- `.DESCRIPTION` is mandatory and must be 900 characters or fewer.
-- Do not add extra help sections such as `.PARAMETER`, `.OUTPUTS`, or `.EXAMPLE`.
-
-Inside `.DESCRIPTION`, use plain text with one field per line in this exact order:
-
-1. `AppliesTo:` one of `All`, `VM`, `Mobile`, `DomainJoined`, `Server`, `Workstation`, `DC`, `PDC`
-2. `Scope:` one of `Computer`, `Domain`, `Forest`
-3. `Category:` primary plus optional secondary category
-4. `Impact:` `Medium` or `High`, with resource dimension if needed, such as `CPU`, `Disk`, `Network`, `Time`
-5. `Uses:` up to three essential external cmdlets/executables, or `Uses: None.`
-6. `FalsePositives:` optional short note
-
-Allowed `Category` values:
-- `Availability / Server Down Signals`
-- `Security & Stability Risks`
-- `Configuration Hygiene & Best Practices`
-- `Audit / Compliance / Informational`
+- Only two sections: `.SYNOPSIS` & `.DESCRIPTION` (No `.PARAMETER`, `.OUTPUTS`, or `.EXAMPLE`).
+- `.SYNOPSIS` must be up to 320 characters.
+- `.DESCRIPTION` is mandatory and must be a list of `Field: Value` lines in this exact order:
+   1. `AppliesTo:`. Options are `All`, `VM`, `Mobile`, `DomainJoined`, `Server`, `Workstation`, `DC`, `PDC`
+   2. `Scope:`. Options are `Computer`, `Domain`, `Forest`
+   3. `Category:` primary plus optional secondary category. Options are: `Availability/Server Down Signals`,`Security & Stability Risks`,`Configuration Hygiene & Best Practices`,`Audit/Compliance/Informational`
+   4. `Impact:` either "low" if there's low impact on all dimensions, or one or more "<level>(<dimension>)" pairs where <lever> is either "Medium" or "High" and  dimension is one of "CPU","Disk","Network","RAM","Time"
+   5. `Uses:` optional, up to three essential external cmdlets or executables if any.
+   6. `FalsePositives:` optional short note only if False Positives are to be expected
 
 ### Behavior Rules
 
