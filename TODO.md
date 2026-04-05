@@ -1,12 +1,16 @@
 # TODO
 
+## Better way of Tagging healt tests
+
+I can stop using the hacky `__TAG` tags in healthtest function name and instead add a "Tags:" line in their help-block
+
 ## Find redundant health tests
 
 Do a quick first pass to group health tests in clusters of tests that seem like they might be checking the same stuff.
 
 The check each cluster thinking: “which tests are merely different views of the same fact” vs “which tests detect a genuinely different failure mode”. Then combine tests that are merely different views of the same fact.
 
-## Add the "P" Tag to these functions:
+## Add the "P/Policy" Tag to these functions:
   - HealthTest-NonMicrosoftServices__S
   - HealthTest-NonDefaultShares
   - HealthTest-LocalAdminsBaseline
