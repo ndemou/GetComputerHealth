@@ -463,16 +463,25 @@ FunctionName, Time, ElapsedMilliseconds, Output, Success, Error, Category, Reaso
 function Get-HealthTest($allHealthTests) {
 <#
 .SYNOPSIS
-Lists all loaded HealthTest-* functions with their synopsis text.
+Lists all loaded HealthTest-* functions with their description text.
 #>
     [CmdletBinding()]
     [OutputType([pscustomobject])]
 
     $allHealthTests | ForEach-Object {
-        $help = Get-Help $_.Name -ErrorAction SilentlyContinue
+        $definition = $_.Definition
+        $description = $null
+
+        if ($definition) {
+            $match = [regex]::Match($definition, '(?im)^\s*Description:\s*(.+?)\s*$')
+            if ($match.Success) {
+                $description = $match.Groups[1].Value.Trim()
+            }
+        }
+
         [pscustomobject]@{
-            Name     = $_.Name
-            Synopsis = $help.Synopsis
+            Name        = $_.Name
+            Description = $description
         }
     }
 }
@@ -794,6 +803,16 @@ if ($PrettifyWriteWarning) {
     @($input)
   }
   Invoke-PrettifyWriteWarningMode -Values $allValues
+  return
+}
+
+if ($ListAllBuiltInTests) {
+  Get-ChildItem -Path (Join-Path -Path $PSScriptRoot -ChildPath 'health-tests') -Filter *.ps1 -File |
+    Sort-Object Name |
+    ForEach-Object { . $_.FullName }
+
+  $allHealthTests = Get-Command -CommandType Function -Name 'HealthTest-*' -ErrorAction SilentlyContinue
+  Get-HealthTest $allHealthTests
   return
 }
 
