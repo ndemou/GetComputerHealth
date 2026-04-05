@@ -16,8 +16,8 @@ The steps to add a custom test are:
 ```powershell
 # This function implemets the test. It returns nothing
 function HealthTest-IsFooLessThanLimit {
-     # Code that sets $issueFound if a specific issue is found 
      # ...
+     # Code that will set $issueFound if Foo>$limit
      # ...
 
      if ($issueFound) {
