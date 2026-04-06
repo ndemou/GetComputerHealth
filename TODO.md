@@ -1,5 +1,7 @@
 # TODO
 
+## Sign the alert emails with the version and last update date
+
 ## Better way of Tagging healt tests
 
 I can stop using the hacky `__TAG` tags in healthtest function name and instead add a "Tags:" line in their help-block
