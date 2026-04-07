@@ -296,7 +296,7 @@ The user-facing guide for writing custom health tests remains separate:
 
 # 7. List of Available Tests
 
-This list is derived from the current `*` functions under [`health-tests`](./health-tests). Run `Get-ComputerHealth.ps1 -ListAllBuiltInTests` to get the live list from the code.
+Run `Get-ComputerHealth.ps1 -ListAllBuiltInTests` to get the live list from the code.
 
 ### Configuration Hygiene & Best Practices
 
