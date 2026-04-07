@@ -112,7 +112,7 @@ Catch exceptions only when you want to achieve some other goal, such as working 
 
 ### Host facts available to custom health tests
 
-`Get-ComputerHealth.ps1` populates a global variable named `$Global:GCHDQMTA` with host facts.
+`Get-ComputerHealth.ps1` populates a global variable named `$Global:GCHDQMTA` with host facts. Custom health tests can access these host facts instead of recomputing them.
 
 Available properties:
 
@@ -129,11 +129,10 @@ Available properties:
 * `$Global:GCHDQMTA.DebugSkipSlowTests = $DebugSkipSlowTests`
 * `$Global:GCHDQMTA.GetCurrentDomain = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain()`
 
-Custom health tests can reuse these host facts instead of recomputing them.
-
 ### How to check that recent Veeam backups exist in a folder
 
 #### For backups stored in local drives (NOT mapped drives)
+
 ```powershell
 function HealthTest-FreshVeeamBackups {
     Start-HealthTestVeeamRecentBackupsExist       -RootPath "D:\Backups\Backup Job 1"
@@ -143,6 +142,7 @@ function HealthTest-FreshVeeamBackups {
 #### For backups stored in network shares
 
 First create a configuration file with this information (note that you need to double all backslashes in paths):
+```powershell
 @"
     {
       "RootPath": "\\\\10.1.2.3\\share\\path\\to\\Backups",
@@ -150,7 +150,7 @@ First create a configuration file with this information (note that you need to d
       "Password": "bar"
     }
 "@ > "C:\it\config\HealthTest-RecentBackupsExist.config"
-
+```
 And then create a custom health test that references this config file:
 
 ```powershell
@@ -180,7 +180,7 @@ function HealthTest-RecentBakExist {
 
 ### Other
 
-The “Optional Features for Health Tests” mentioned in `How-to-add-built-in-health-tests.md` are not mandatory, but you may still want to consider them.
+You may want to consider the “Optional Features for Health Tests” mentioned in `How-to-add-built-in-health-tests.md`.
 
 # Instructions for LLMs Helping a Novice Write a Custom Test
 
