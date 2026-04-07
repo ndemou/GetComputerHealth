@@ -12,9 +12,11 @@ For domains the only requirement is to enable PowerShell remoting to the servers
 
 This code is actively used in production across several domains and multiple servers, but as far as I know, I am its only user.
 
-It has worked well for months. There's still a possibility of some annoying change happening.
+It has worked well for months. There's still a possibility of some annoying change happening, but mostly just annoying extra alerts you shouldn't be receiving.
 
-I am happy to help when I can, but my availability is limited. If you decide to use it, **assume you are on your own**. You should be comfortable with PowerShell and prepared to invest time and LLM tokens. On the plus side, the codebase is surprisingly small and straightforward: **the core is about 1,000 lines, including comments**. The tests total well over ten thousand lines, but the vast majority are self-contained and small.
+I am happy to help when I can, but my availability is limited. If you decide to use it, **assume you are on your own**. You should be comfortable with PowerShell.
+
+On the plus side, in the unlikely event that you need to dive into the code, it is surprisingly small and straightforward: **the core is about 1,000 lines, including comments**. The tests *are* over ten thousand lines, but the vast majority are self-contained and small.
 
 # Security
 
