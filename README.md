@@ -238,9 +238,10 @@ C:\IT\bin\Invoke-GetComputerHealth.ps1
 
 * **Result:** This scans the local machine, saves an Excel report to `C:\IT\temp\`, and emails you any “Notable” issues (Notices/Warnings/Failures).
 
-## How to Run a Full Domain Health Check
+## How to Run a Domain Health Check (scan all domain computers running Server editions of Windows)
 
-Open PowerShell as Administrator and run:
+If you have created `C:\IT\bin\Invoke-GetHealthDomainComputers.ps1`execute it. 
+Otherwise open PowerShell as Administrator and run:
 
 ```powershell
 & c:\it\bin\Invoke-GetComputerHealth.ps1 -Computers "ALL_DOMAIN_SERVERS,workstation1,workstation2" -ExcludeServers "server1,server2"
@@ -283,20 +284,14 @@ You do not need to modify the core library. [Follow these instructions](./doc/ho
 
 Contributor documentation now lives in [`CONTRIBUTING.md`](./CONTRIBUTING.md).
 
-Use it for:
-
-- development workflow
-- testing and CI
-- how to add built-in `*` functions
-
-The user-facing guide for writing custom health tests remains separate:
+The guide for writing custom health tests remains separate:
 
 - [`doc/how-to-add-custom-tests.md`](./doc/how-to-add-custom-tests.md)
 
 
 # 7. List of Available Tests
 
-Run `Get-ComputerHealth.ps1 -ListAllBuiltInTests` to get the live list from the code.
+(Run `Get-ComputerHealth.ps1 -ListAllBuiltInTests` to get an always up to date list.)
 
 ### Configuration Hygiene & Best Practices
 
