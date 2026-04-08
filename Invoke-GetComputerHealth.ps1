@@ -117,6 +117,7 @@ $GET_HEALTH_SCRIPT_PATH = Join-Path $SCRIPT_BIN_DIR 'Get-ComputerHealth.ps1'
 $SEND_MESSAGE_SCRIPT_PATH = Join-Path $SCRIPT_BIN_DIR 'Send-Message.ps1'
 $LIB_LOG_OBJECTS_PATH = Join-Path $SCRIPT_BIN_DIR 'lib-write-log-objects.ps1'
 $CUSTOM_TESTS_DIR = Join-Path $CONFIG_DIR 'Custom-HealthTests'
+$VERSION_FILE_PATH = Join-Path $SCRIPT_BIN_DIR 'VERSION'
 
 $OutputConsoleMessages = $true
 $SmtpSubject = 'Notable Messages from Get-ComputerHealth of LIST_OF_COMPUTERS'
@@ -159,6 +160,84 @@ function Invoke-HealthEmail {
     Write-host -for yellow "email failed."
     throw
   }
+}
+
+function Get-HealthEmailSignature {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)][string]$VersionFilePath,
+    [Parameter(Mandatory)][string]$FallbackVersion,
+    [Parameter(Mandatory)][string]$FallbackTimestampPath
+  )
+
+  $version = $FallbackVersion
+  $timestampPath = $FallbackTimestampPath
+
+  if (Test-Path -LiteralPath $VersionFilePath -PathType Leaf) {
+    try {
+      $rawVersion = Get-Content -LiteralPath $VersionFilePath -Raw -ErrorAction Stop
+      $trimmedVersion = [string]$rawVersion
+      if ($trimmedVersion) {
+        $trimmedVersion = $trimmedVersion.Trim()
+      }
+      if (-not [string]::IsNullOrWhiteSpace($trimmedVersion)) {
+        $version = $trimmedVersion
+      }
+      $timestampPath = $VersionFilePath
+    } catch {
+      # Fall back to the embedded version and script timestamp.
+    }
+  }
+
+  $lastUpdate = 'unknown'
+  try {
+    $item = Get-Item -LiteralPath $timestampPath -ErrorAction Stop
+    $lastUpdate = $item.LastWriteTime.ToString('yyyy-MM-dd HH:mm')
+  } catch {
+    # Keep "unknown" if file metadata is unavailable.
+  }
+
+  return [pscustomobject]@{
+    Text = "Get-ComputerHealth version $version, last update $lastUpdate"
+    Html = "Get-ComputerHealth version $([System.Net.WebUtility]::HtmlEncode($version)), last update $([System.Net.WebUtility]::HtmlEncode($lastUpdate))"
+  }
+}
+
+function Add-HealthEmailSignature {
+  [CmdletBinding()]
+  param(
+    [string]$Body,
+    [switch]$BodyAsHtml,
+    [Parameter(Mandatory)]$Signature
+  )
+
+  if ($BodyAsHtml) {
+    $baseBody = if ([string]::IsNullOrEmpty($Body)) { '' } else { $Body }
+    return ($baseBody + "<div style='margin-top:12px; color:#666; font-family:Consolas, ""Courier New"", monospace; font-size:12px'>$($Signature.Html)</div>")
+  }
+
+  if ([string]::IsNullOrEmpty($Body)) {
+    return $Signature.Text
+  }
+
+  return ($Body.TrimEnd() + "`r`n`r`n" + $Signature.Text)
+}
+
+function Get-EmbeddedGetComputerHealthVersion {
+  [CmdletBinding()]
+  param([Parameter(Mandatory)][string]$ScriptPath)
+
+  try {
+    $content = Get-Content -LiteralPath $ScriptPath -Raw -ErrorAction Stop
+    $match = [regex]::Match($content, '(?m)^\$VERSION\s*=\s*"(?<Version>[^"]+)"')
+    if ($match.Success) {
+      return $match.Groups['Version'].Value
+    }
+  } catch {
+    # Fall back to unknown if the file cannot be read.
+  }
+
+  return 'unknown'
 }
 
 function Get-DomainServers {
@@ -296,6 +375,8 @@ $timestamp = $(get-date -Format 'yyyy-MM-dd_HH.mm')
 if (-not (Test-Path -LiteralPath $LOG_DIR)) { New-Item -ItemType Directory -Path $LOG_DIR -Force | Out-Null }
 Start-Transcript (Join-Path $LOG_DIR "Invoke-GetHealthDomainComputers-$timestamp.log")
 . $LIB_LOG_OBJECTS_PATH
+$embeddedVersion = Get-EmbeddedGetComputerHealthVersion -ScriptPath $GET_HEALTH_SCRIPT_PATH
+$emailSignature = Get-HealthEmailSignature -VersionFilePath $VERSION_FILE_PATH -FallbackVersion $embeddedVersion -FallbackTimestampPath $GET_HEALTH_SCRIPT_PATH
 
 if (-not (Get-Module -ListAvailable -Name ImportExcel)) {
     throw "Required module 'ImportExcel' is missing. Run C:\IT\bin\Update-GetHealthCode.ps1 to install prerequisites."
@@ -564,11 +645,13 @@ if ($all_messages){
       $encoded = [System.Net.WebUtility]::HtmlEncode($body)
       $html = "<pre style='font-family: Consolas, ""Courier New"", monospace; white-space:pre-wrap; margin:0; font-size:12px; line-height:1.35'>$encoded</pre>"
 
-      Invoke-HealthEmail -Subject $SmtpSubject -Body $html -BodyAsHtml -Attachments "${TEMP_DIR}\notable-messages-$($timestamp).xlsx" -ConfigFile $SmtpConfig -NoSendMessage:$NoSendMessage
+      $signedHtml = Add-HealthEmailSignature -Body $html -BodyAsHtml -Signature $emailSignature
+      Invoke-HealthEmail -Subject $SmtpSubject -Body $signedHtml -BodyAsHtml -Attachments "${TEMP_DIR}\notable-messages-$($timestamp).xlsx" -ConfigFile $SmtpConfig -NoSendMessage:$NoSendMessage
   } else {
     Write-host -for green    "GOOD, Nothing notable to record. I have saved less notable messages here:"
     Write-host -for gray     "    ${TEMP_DIR}\all-messages-$($timestamp).xlsx"
-    Invoke-HealthEmail -Subject $SmtpSubjectAllGood -Body 'Relax :-)' -ConfigFile $SmtpConfig -NoSendMessage:$NoSendMessage
+    $signedBody = Add-HealthEmailSignature -Body 'Relax :-)' -Signature $emailSignature
+    Invoke-HealthEmail -Subject $SmtpSubjectAllGood -Body $signedBody -ConfigFile $SmtpConfig -NoSendMessage:$NoSendMessage
   }
 } else {
 }
