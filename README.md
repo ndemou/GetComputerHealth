@@ -12,7 +12,7 @@ For domains the only requirement is to enable PowerShell remoting to the servers
 
 This code is actively used in production across several domains and multiple servers, but as far as I know, I am its only user.
 
-It has worked well for months. There's still a possibility of some annoying change happening, but mostly just annoying extra alerts you shouldn't be receiving.
+It has worked well for months. There's still a possibility of some annoying change happening; mostly just some alerts that you'll need to suppress.
 
 I am happy to help when I can, but my availability is limited. If you decide to use it, **assume you are on your own**. You should be comfortable with PowerShell.
 
