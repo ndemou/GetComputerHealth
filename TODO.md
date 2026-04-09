@@ -65,11 +65,6 @@ For now, I expect an admin that wants to use this feature, to manually edit `Get
 
 See also : .\tests\script-analysis.ps1
 
-## Automate tests in GitHub
-
-ChatGPT said: GitHub Actions can run Windows PowerShell 5.1 by using the powershell shell (which invokes powershell.exe on Windows runners).
-See also: https://docs.github.com/actions/automating-builds-and-tests/building-and-testing-powershell
-
 ## Other
 
   - Re-evaluate notice/warning/failure levels.
@@ -80,12 +75,11 @@ See also: https://docs.github.com/actions/automating-builds-and-tests/building-a
 
   - I could be monitoring the CPU and memory pressure *while* running all/most 
     other tests. This has pros and cons so I can make it a separate check 
-    (e.g. some tests *do* streess the CPU (maybe RAM also). I wonder if I could
-    tag them so that they do not run while measuring CPU or RAM)
+    (e.g. some tests *do* streess the CPU (maybe RAM also).
 
   - Also measure CPU, board temperature.
 
-  - -AddWhitelisting should be deleting any existing line for the signature.
+  - `-AddWhitelisting` should be deleting any existing line for the signature.
     Note that even without this fix, everything works as it should 
     (because the last config line wins), but it's confusing to have
     conflicting lines.
@@ -99,13 +93,9 @@ See also: https://docs.github.com/actions/automating-builds-and-tests/building-a
          -Arg1 "test foo bar"           --> "test foo bar" 
     If I don't expect the values to have spaces or commas I could fix the last 2 cases manually
 
-  - `Start-HealthTestVeeamRecentBackupsExist` expects to read a text in clear text from a file. Maybe use credentials manager (note that the credentials manager stores passwords per user which complicates stuff -- you run it from your account and works, run from SYSTEM and doesn't)
+  - `Start-HealthTestVeeamRecentBackupsExist` expects to read a text in clear text from a file. Maybe use credentials manager (note that credentials manager stores passwords per user which complicates stuff -- you run it from your account and works, run from SYSTEM and doesn't)
 
-## Finalize HealthTest help-block standards and add code tests to verify we follow them
-
-Finalize both formatting and meaning. 
-
-I've seen GPT make a lot of mistakes. I see plenty of `Scope: Domain` that is plainly wrong. Considering one function at a time helped GPT a lot.## Some tests that have Scope: Domain should ideally be executed on one DC
+## Some tests that have Scope: Domain should ideally be executed on one DC
 
 - "HealthTest-ADReplicationDomainRepadmin"
 - "HealthTest-SysvolNetlogonAccessible"
