@@ -2,7 +2,12 @@
 
 ## Better way of Tagging healt tests
 
-I can stop using the hacky `__TAG` tags in healthtest function name and instead add a "Tags:" line in their help-block
+Stop using the hacky `__TAG` tags in healthtest function name and instead add a `Tags:` line in their help-block. Example: 
+```
+Tags: Essential, Policy
+```
+
+The S tag is already covered by `Impact:.*High(Time)` so I will not have an extra Slow tag.
 
 ## Find redundant health tests
 
