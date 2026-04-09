@@ -4,7 +4,7 @@
 
 But support any installation directory
 
-## Better way of Tagging healt tests
+## Better way of Tagging health tests
 
 Stop using the hacky `__TAG` tags in healthtest function name and instead add a `Tags:` line in their help-block. Example: 
 ```
