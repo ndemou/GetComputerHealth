@@ -11,17 +11,12 @@ Stop using the hacky `__TAG` tags in healthtest function name and instead add a 
 Tags: Essential, Policy
 ```
 
-`Impact` should not be the source of truth for `Slow` classification.
-Observed while reviewing current tests: we had `High(Time)` entries that were not consistently tied to `__S`,
-so for the migration we should derive `Slow` from explicit tags, not by regex on `Impact`.
-
 Implementation notes for this TODO:
-- Keep `Impact:` as runtime cost metadata only.
-- Add `Tags:` as behavior metadata (e.g. `Essential`, `Policy`, `Slow`).
-- During migration, map `__S/__P/__E` to `Tags:` directly and stop inferring `Slow` from `Impact`.
-- Add a validation check that forbids deriving behavior from `Impact` fields.
+- `Impact: ... High(Time)` should be the source of truth for `Slow` classification.
+- Add `Tags:` as behavior metadata (e.g. `Essential`, `Policy`).
+- During migration, map `__S/__P/__E` to `Tags:` and `Impact:` directly.
 
-After this change we must review all code that handles health test names, it should accept both the full function name and the name without the `HealthTest-` prefix. It should not bother freaking with `__.*` tags.
+After this change we must review all code that handles health test names, it should accept both the full function name and the name without the `HealthTest-` prefix. It should not bother dealing with the old `__.*` tags.
 
 ## Find redundant health tests
 
