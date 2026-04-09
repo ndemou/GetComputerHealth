@@ -161,7 +161,7 @@ Description: Checks whether DFS Replication folders are in the Normal state.
 AppliesTo: DC
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
-Impact: High(Time)
+Impact: Medium(Time)
 Uses: None.
 #>
   $stateNames = @{0='Uninitialized';1='Initialized';2='Initial_Sync';3='Auto_Recovery';4='Normal';5='Error'}
@@ -198,7 +198,7 @@ Description: Checks DFS Replication backlog and warns when queued updates are hi
 AppliesTo: DC
 Scope: Domain
 Category: Configuration Hygiene & Best Practices
-Impact: High(Time)
+Impact: Medium(Time)
 Uses: Get-Service, Get-Command, Get-DfsrBacklog.
 #>
     param([string]$RGName='Domain System Volume')
@@ -254,7 +254,7 @@ Description: Verifies that each domain controller has inbound AD replication par
 AppliesTo: DC
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
-Impact: High(Time)
+Impact: Medium(Time)
 Uses: Get-ADDomainController, Get-ADReplicationPartnerMetadata, Get-ADObject.
 #>
   $dcs = Get-ADDomainController -Filter *
@@ -764,7 +764,7 @@ Description: Assesses AD replication latency and correlates it with replication 
 AppliesTo: DC
 Scope: Domain
 Category: Configuration Hygiene & Best Practices
-Impact: High(Time)
+Impact: Medium(Time)
 Uses: Get-ADRootDSE, Get-ADDomainController, Get-ADReplicationPartnerMetadata.
 #>
   [CmdletBinding()]
@@ -1033,7 +1033,7 @@ Description: Uses repadmin and local RSAT cross-checks to detect AD replication 
 AppliesTo: DC
 Scope: Domain
 Category: Configuration Hygiene & Best Practices
-Impact: High(Time)
+Impact: Medium(Time)
 Uses: repadmin.exe, Get-MaxTimeSpan, Invoke-LocalRsatCrossCheck.
 #>
   [CmdletBinding()]
