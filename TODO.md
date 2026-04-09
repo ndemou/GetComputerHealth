@@ -13,6 +13,8 @@ Tags: Essential, Policy
 
 The S tag is already covered by `Impact:.*High(Time)` so I will not have an extra Slow tag.
 
+After this change we must review all code that handles health test names, it should accept both the full function name and the name without the `HealthTest-` prefix. It should not bother freaking with `__.*` tags.
+
 ## Find redundant health tests
 
 Do a quick first pass to group health tests in clusters of tests that seem like they might be checking the same stuff.
