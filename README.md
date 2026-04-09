@@ -2,21 +2,21 @@
 
 **Get-ComputerHealth** is a lightweight, extendable PowerShell framework. It is suitable both for a single workstation or server, and for a domain with a few dozen servers. It produces clean terminal output, concise Excel reports, and email alerts.
 
-It is a native, agentless alternative to heavy monitoring suites. Installation is simple, usually taking no more than two minutes per server once you are familiar with it. If you have basic PowerShell skills, you can easily add your own custom health tests.
+It is a native, agentless alternative to heavy monitoring suites. Installation is quick & simple and you can easily add your own custom health tests with PowerShell.
 
-For domains the only requirement is to enable PowerShell remoting to the servers or workstations you want to monitor. Once you can manage them through with `Enter-PSSession`/`Invoke-Command` everything works.
+For domains the only requirement is to enable PowerShell remoting to the servers or workstations you want to monitor (once you can manage them through with `Enter-PSSession`/`Invoke-Command` everything works).
 
 <img width="1086" height="251" alt="Example of the report you receive via email" src="https://github.com/user-attachments/assets/9da7e7f7-c1ef-4f3e-9d47-d164a96b2d4f" />
 
 # Status & Is this code for you?
 
-This code is actively used in production across several domains and multiple servers, but as far as I know, I am its only user.
+I am using this code daily in production across several domains and multiple servers for months.
 
-It has worked well for months. There's still a possibility of some annoying change happening; mostly just some alerts that you'll need to suppress.
+There's still a possibility of some annoying change happening; mostly just some alerts that you'll need to suppress.
 
 I am happy to help when I can, but my availability is limited. If you decide to use it, **assume you are on your own**. You should be comfortable with PowerShell.
 
-On the plus side, in the unlikely event that you need to dive into the code, it is surprisingly small and straightforward: **the core is about 1,000 lines, including comments**. The tests *are* over ten thousand lines, but the vast majority are self-contained and small.
+On the plus side, in the unlikely event that you need to dive into the code, it is surprisingly small and straightforward: **the core is about 1,000 lines, including comments**. The tests *are* over ten thousand lines, but the vast majority are self-contained and small. So modern AI agents can handle the (non)-complexity of the code just fine. In fact the vast majority of the code *is* written by Codex with my self in the role of the architect, lead developer, reviewer and QC.
 
 # Security
 
