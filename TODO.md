@@ -1,6 +1,6 @@
 # TODO
 
-## Move default installation point to C:\IT\GCH
+## Move default installation point to C:\IT\Get-ComputerHealth
 
 But support any installation directory
 
