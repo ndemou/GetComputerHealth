@@ -12,17 +12,14 @@ But support any installation directory
 
 ## Better way of Tagging health tests
 
-Stop using the hacky `__TAG` tags in healthtest function name and instead add a `Tags:` line in their help-block. Example: 
+Stop using the hacky way of tagging healthtests with `__<CHARACTER>` in their name and instead add a `Tags:` line in their help-block. For example instead of `__EP` add this Tags: line:
 ```
 Tags: Essential, Policy
 ```
 
-Implementation notes for this TODO:
-- `Impact: ... High(Time)` should be the source of truth for `Slow` classification.
-- Add `Tags:` as behavior metadata (e.g. `Essential`, `Policy`).
-- During migration, map `__S/__P/__E` to `Tags:` and `Impact:` directly.
+During migration, map `__P` to `Tags: ...Policy`, `__E` to `Tags: ...Essential` and `__S` to `Impact: High(Time)` (since we already have the Impact: line there's no needd to have a Tag word for slow tests)
 
-After this change we must review all code that handles health test names, it should accept both the full function name and the name without the `HealthTest-` prefix. It should not bother dealing with the old `__.*` tags.
+After this change we must review all code that handles health test names and make sure: a) it accepts both the full function name and the name without the `HealthTest-` prefix; b) It doesn't contain code to deal with the old `__<CHARACTER>` style of taging.
 
 ## Find redundant health tests
 
