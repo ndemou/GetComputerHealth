@@ -1,5 +1,11 @@
 # TODO
 
+## Adjust Subject: of alert according to the highest level of findings
+
+E.g. if the highest level of findings is NOTICE, set subject to "Notice(s) from Get-ComputerHealth ..." (instead of "Notable Messages from Get-ComputerHealth ..." ). Accordingly for WARNINGs & FAILUREs.
+
+Keep the "Relax" subject if there are no NOTICEs, WARNINGs, FAILUREs.
+
 ## Move default installation point to C:\IT\Get-ComputerHealth
 
 But support any installation directory
