@@ -2201,7 +2201,14 @@ Uses: Get-InstalledSW, Get-NormalizedSoftwareName.
     foreach ($sw in (Get-InstalledSW)) {
         $seen += 1
         $normalizedName = Get-NormalizedSoftwareName -Name $sw.Name
-        $details = "Full program name: $($sw.Name); Publisher: $($sw.Publisher); Install Date: $($sw.InstallDate); Source: $($sw.Source); Scope: $($sw.Scope)"
+		if ($sw.Publisher -match 'CN=.*, ') {
+    	    # Remove unneeded details from Publisher description. E.g.:
+	        # "Microsoft Windows" instead of "CN=Microsoft Windows, O=Microsoft Corporation, L=..., S=..."
+		    $publisher = $sw.Publisher -replace '^.*CN=([^,]+).*','$1'
+		} else {
+		    $publisher = $sw.Publisher
+		}
+        $details = "Full program name: $($sw.Name); Publisher: $publisher; Install Date: $($sw.InstallDate); Source: $($sw.Source); Scope: $($sw.Scope)"
         Write-Warning "[NOTICE] New installed software: $normalizedName`n$details"
     }
 
