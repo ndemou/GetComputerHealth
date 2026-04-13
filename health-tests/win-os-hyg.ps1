@@ -2188,6 +2188,65 @@ function Get-NormalizedSoftwareName {
     }
 }
 
+function Test-IsMicrosoftInstalledSoftwareUpdate {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyString()]
+        [string]$Name,
+
+        [AllowNull()]
+        [string]$Publisher
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Name)) { return $false }
+
+    $publisherLooksMicrosoft = $false
+    if (-not [string]::IsNullOrWhiteSpace($Publisher)) {
+        $publisherLooksMicrosoft = $Publisher -match '(?i)\bmicrosoft(?:\s+corporation)?\b'
+    }
+
+    $nameLooksLikeMicrosoftUpdate = $Name -match '(?ix)
+        \bKB\d{6,8}\b
+        |
+        \bSecurity\ Update\b
+        |
+        \bHotfix\b
+        |
+        \bCumulative\ Update\b
+        |
+        \bUpdate\ for\ Microsoft\b
+        |
+        \bGDR\s+\d+\s+for\s+SQL\s+Server\b
+        |
+        \bCU\d+\s+for\s+SQL\s+Server\b
+    '
+
+    if (-not $nameLooksLikeMicrosoftUpdate) { return $false }
+
+    if ($publisherLooksMicrosoft) { return $true }
+
+    return $Name -match '(?i)\b(SQL\s+Server|Microsoft)\b'
+}
+
+function Get-InstalledSoftwareFindingLevel {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyString()]
+        [string]$Name,
+
+        [AllowNull()]
+        [string]$Publisher
+    )
+
+    if (Test-IsMicrosoftInstalledSoftwareUpdate -Name $Name -Publisher $Publisher) {
+        return 'info'
+    }
+
+    return 'notice'
+}
+
 function HealthTest-InstalledSW__P {
 <#
 Description: Reports installed software not present in the baseline inventory.
@@ -2195,7 +2254,7 @@ AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time)
-Uses: Get-InstalledSW, Get-NormalizedSoftwareName.
+Uses: Get-InstalledSW, Get-NormalizedSoftwareName, Get-InstalledSoftwareFindingLevel.
 #>
     $seen = 0
     foreach ($sw in (Get-InstalledSW)) {
@@ -2209,7 +2268,8 @@ Uses: Get-InstalledSW, Get-NormalizedSoftwareName.
 		    $publisher = $sw.Publisher
 		}
         $details = "Full program name: $($sw.Name); Publisher: $publisher; Install Date: $($sw.InstallDate); Source: $($sw.Source); Scope: $($sw.Scope)"
-        Write-Warning "[NOTICE] New installed software: $normalizedName`n$details"
+        $level = Get-InstalledSoftwareFindingLevel -Name $sw.Name -Publisher $sw.Publisher
+        Write-Warning "[$level] New installed software: $normalizedName`n$details"
     }
 
     if ($seen -eq 0) {
