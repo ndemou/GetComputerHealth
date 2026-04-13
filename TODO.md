@@ -1,5 +1,24 @@
 # TODO
 
+## Reduce recurring agent friction in this repo
+
+Recent work repeatedly hit the same workflow problems:
+
+- Git safe-directory / "dubious ownership" errors unless commands use `-c safe.directory=C:/Users/NickDemou/dev/GetComputerHealth`
+- sandbox/network restrictions breaking `git pull`, `git push`, `gh release ...`, and other remote GitHub operations
+- raw `Invoke-Pester` failing in some environments while `.\tests\run-unit-tests.ps1` works
+- `git rebase --continue` trying to launch an editor and failing in this Windows environment
+- stale `.git/index.lock` files after interrupted git operations
+
+Ideas to reduce this:
+
+- document in `AGENTS.md` that agents should prefer repo wrappers like `.\tests\run-unit-tests.ps1` and `.\tests\run-all-tests.ps1` instead of calling `Invoke-Pester` directly
+- document in `AGENTS.md` that agents should expect to use `git -c safe.directory=...` in this repo until ownership is fixed at the environment level
+- consider adding repo helper scripts / wrapper commands for common git flows (`status`, `pull --rebase`, `push`) that automatically apply the safe-directory setting and avoid editor-based flows
+- consider making test wrappers accept optional path/category filters so agents do not feel forced to call raw `Invoke-Pester`
+- document in `AGENTS.md` that remote GitHub operations may require sandbox escalation and that this is environmental, not a repo bug
+- document in `AGENTS.md` that if a rebase stops, agents should use non-interactive git flows and watch for stale `.git/index.lock`
+
 ## Adjust Subject: of alert according to the highest level of findings
 
 E.g. if the highest level of findings is NOTICE, set subject to "Notice(s) from Get-ComputerHealth ..." (instead of "Notable Messages from Get-ComputerHealth ..." ). Accordingly for WARNINGs & FAILUREs.
