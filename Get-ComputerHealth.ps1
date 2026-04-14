@@ -119,97 +119,97 @@ $out | Out-GridView
 - Custom tests: scripts may execute arbitrary code on import; files are loaded in temporary module scope and functions named `HealthTest-*` are invoked automatically.
 #>
 
-[CmdletBinding(DefaultParameterSetName='Run')]
+[CmdletBinding(DefaultParameterSetName = 'Run')]
 param(
-  [Parameter(ParameterSetName='PrettifyWarning')]
+  [Parameter(ParameterSetName = 'PrettifyWarning')]
   [Alias('Prettify')]
   [switch]$PrettifyWriteWarning,
 
-  [Parameter(ParameterSetName='PrettifyWarning', ValueFromPipeline=$true)]
+  [Parameter(ParameterSetName = 'PrettifyWarning', ValueFromPipeline = $true)]
   [AllowNull()]
   [object]$InputObject,
 
   # ----------------------------
   # Normal run (execute tests)
   # ----------------------------
-  [Parameter(ParameterSetName='Run')]
+  [Parameter(ParameterSetName = 'Run')]
   [switch]$OutputConsoleMessages,
 
-  [Parameter(ParameterSetName='Run')]
+  [Parameter(ParameterSetName = 'Run')]
   [switch]$OutputObjects,
 
-  [Parameter(ParameterSetName='Run')]
+  [Parameter(ParameterSetName = 'Run')]
   [ValidatePattern('^[DIPNWFSC]*$')]
   [string]$Hide = '',
 
-  [Parameter(ParameterSetName='Run')]
+  [Parameter(ParameterSetName = 'Run')]
   [Alias('SuppressSigs')]
   [string[]]$WhitelistSigs = @(),
 
-  [Parameter(ParameterSetName='Run')]
+  [Parameter(ParameterSetName = 'Run')]
   [string[]]$OnlyTheseTests = @(),
 
-  [Parameter(ParameterSetName='Run')]
+  [Parameter(ParameterSetName = 'Run')]
   [string[]]$ExcludeTests = @(),
 
-  [Parameter(ParameterSetName='Run')]
+  [Parameter(ParameterSetName = 'Run')]
   [string]$IncludeTestsFromFolder,
 
-  [Parameter(ParameterSetName='Run')]
+  [Parameter(ParameterSetName = 'Run')]
   [Alias('DebugSkipSlowTests')]
   [switch]$SkipSlowTests,
 
-  [Parameter(ParameterSetName='Run')]
+  [Parameter(ParameterSetName = 'Run')]
   [switch]$SkipPolicyTests,
 
-  [Parameter(ParameterSetName='Run')]
+  [Parameter(ParameterSetName = 'Run')]
   [Alias('Quick')]
   [switch]$SkipNonEssentialTests,
 
-  [Parameter(ParameterSetName='Run')]
+  [Parameter(ParameterSetName = 'Run')]
   [switch]$DontAutosetPolicy,
 
-  [Parameter(ParameterSetName='Run')]
+  [Parameter(ParameterSetName = 'Run')]
   [string[]]$IpsOfAllDcs = @(),
 
-  [Parameter(ParameterSetName='Run')]
+  [Parameter(ParameterSetName = 'Run')]
   [switch]$DoNothing,
 
-  [Parameter(ParameterSetName='Run')]
-  [Parameter(ParameterSetName='AddWhitelist')]
-  [Parameter(ParameterSetName='List')]
+  [Parameter(ParameterSetName = 'Run')]
+  [Parameter(ParameterSetName = 'AddWhitelist')]
+  [Parameter(ParameterSetName = 'List')]
   [switch]$RunWithoutElevation,
 
   # ----------------------------
   # Add whitelisting entry
   # ----------------------------
-  [Parameter(ParameterSetName='AddWhitelist', Mandatory)]
+  [Parameter(ParameterSetName = 'AddWhitelist', Mandatory)]
   [switch]$AddWhitelisting,
 
-  [Parameter(ParameterSetName='AddWhitelist', Mandatory)]
+  [Parameter(ParameterSetName = 'AddWhitelist', Mandatory)]
   [ValidateNotNullOrEmpty()]
   [string]$ComputerName,
 
-  [Parameter(ParameterSetName='AddWhitelist', Mandatory)]
+  [Parameter(ParameterSetName = 'AddWhitelist', Mandatory)]
   [Alias('Sig')]
   [ValidatePattern('^[0-9A-Fa-f]{8}$')]
   [string]$Signature,
 
-  [Parameter(ParameterSetName='AddWhitelist')]
+  [Parameter(ParameterSetName = 'AddWhitelist')]
   [string]$Comment,
 
-  [Parameter(ParameterSetName='AddWhitelist')]
+  [Parameter(ParameterSetName = 'AddWhitelist')]
   [ValidatePattern('^\d{4}-\d{2}-\d{2}$')]
   [string]$Until,
 
   # ----------------------------
   # List tests
   # ----------------------------
-  [Parameter(ParameterSetName='List', Mandatory)]
+  [Parameter(ParameterSetName = 'List', Mandatory)]
   [switch]$ListAllBuiltInTests
 )
 
-$VERSION="3.2.0"
+$VERSION = "3.2.0"
 
 
 $SCRIPT_BIN_DIR = (Resolve-Path -LiteralPath $PSScriptRoot).Path
@@ -235,7 +235,7 @@ $script:Config = [pscustomobject]@{
 # Helper functions specific to this script except tests
 #
 function Add-AsciiLine {
-# Append a line to an ASCII file (replaces non ASCII chars with ?)
+  # Append a line to an ASCII file (replaces non ASCII chars with ?)
   param(
     [Parameter(Mandatory)][string]$Path,
     [Parameter(Mandatory)][string]$Line
@@ -247,79 +247,79 @@ function Add-AsciiLine {
 }
 
 function Test-IsVirtualMachine {
-# returns $true if it guesses the computer is VM
-    [CmdletBinding()]
-    [OutputType([bool])]
-    param()
+  # returns $true if it guesses the computer is VM
+  [CmdletBinding()]
+  [OutputType([bool])]
+  param()
 
-    $cs  = Get-CimInstance -ClassName Win32_ComputerSystem -ErrorAction SilentlyContinue
-    $csp = Get-CimInstance -ClassName Win32_ComputerSystemProduct -ErrorAction SilentlyContinue
+  $cs = Get-CimInstance -ClassName Win32_ComputerSystem -ErrorAction SilentlyContinue
+  $csp = Get-CimInstance -ClassName Win32_ComputerSystemProduct -ErrorAction SilentlyContinue
 
-    $man = ($cs.Manufacturer, $csp.Vendor   | Where-Object { $_ }) -join ' '
-    $mod = ($cs.Model,        $csp.Name     | Where-Object { $_ }) -join ' '
-    $txt = "$man $mod"
+  $man = ($cs.Manufacturer, $csp.Vendor   | Where-Object { $_ }) -join ' '
+  $mod = ($cs.Model, $csp.Name     | Where-Object { $_ }) -join ' '
+  $txt = "$man $mod"
 
-    if (-not $txt) { return $false }
+  if (-not $txt) { return $false }
 
-    $patterns = @{
-        'Hyper-V'    = 'Microsoft Corporation Virtual Machine'
-        'VMware'     = 'VMware'
-        'VirtualBox' = 'VirtualBox'
-        'Xen'        = 'Xen HVM domU'
-        'KVM'        = 'KVM QEMU'
-        'Azure'      = 'Microsoft Corporation Virtual Machine'
-        'EC2'        = 'EC2'
-        'GCP'        = 'Google Compute Engine'
-    }
+  $patterns = @{
+    'Hyper-V'    = 'Microsoft Corporation Virtual Machine'
+    'VMware'     = 'VMware'
+    'VirtualBox' = 'VirtualBox'
+    'Xen'        = 'Xen HVM domU'
+    'KVM'        = 'KVM QEMU'
+    'Azure'      = 'Microsoft Corporation Virtual Machine'
+    'EC2'        = 'EC2'
+    'GCP'        = 'Google Compute Engine'
+  }
 
-    foreach ($k in $patterns.Keys) {
-        foreach ($needle in $patterns[$k].Split(' ')) {
-            if ($txt -like "*$needle*") {
-                return $true
-            }
-        }
-    }
-
-    if ($txt -like '*Virtual Machine*' -or $txt -like '*VirtualBox*' -or $txt -like '*VMware*') {
+  foreach ($k in $patterns.Keys) {
+    foreach ($needle in $patterns[$k].Split(' ')) {
+      if ($txt -like "*$needle*") {
         return $true
+      }
     }
+  }
 
-    return $false
+  if ($txt -like '*Virtual Machine*' -or $txt -like '*VirtualBox*' -or $txt -like '*VMware*') {
+    return $true
+  }
+
+  return $false
 }
 
 function Test-IsLaptopOrMobile {
-# returns $true if it guesses the computer is laptop/mobile
+  # returns $true if it guesses the computer is laptop/mobile
 
-    $cs  = Get-CimInstance Win32_ComputerSystem     -ErrorAction SilentlyContinue
-    $enc = Get-CimInstance Win32_SystemEnclosure    -ErrorAction SilentlyContinue
-    $bat = Get-CimInstance Win32_Battery            -ErrorAction SilentlyContinue
+  $cs = Get-CimInstance Win32_ComputerSystem     -ErrorAction SilentlyContinue
+  $enc = Get-CimInstance Win32_SystemEnclosure    -ErrorAction SilentlyContinue
+  $bat = Get-CimInstance Win32_Battery            -ErrorAction SilentlyContinue
 
-    $chassisTypes = @()
-    if ($enc -and $enc.ChassisTypes) { $chassisTypes = @($enc.ChassisTypes) }
+  $chassisTypes = @()
+  if ($enc -and $enc.ChassisTypes) { $chassisTypes = @($enc.ChassisTypes) }
 
-    $mobileChassis  = 8,9,10,11,12,14,18,30,31,32
-    $desktopChassis = 3,4,5,6,7,13,15,24,34
+  $mobileChassis = 8, 9, 10, 11, 12, 14, 18, 30, 31, 32
+  $desktopChassis = 3, 4, 5, 6, 7, 13, 15, 24, 34
 
-    $hasMobileType  = @($chassisTypes | Where-Object { $mobileChassis  -contains $_ }).Count -gt 0
-    $hasDesktopType = @($chassisTypes | Where-Object { $desktopChassis -contains $_ }).Count -gt 0
+  $hasMobileType = @($chassisTypes | Where-Object { $mobileChassis -contains $_ }).Count -gt 0
+  $hasDesktopType = @($chassisTypes | Where-Object { $desktopChassis -contains $_ }).Count -gt 0
 
-    $pcSystemType = $null
-    if ($cs -and (Get-Member -InputObject $cs -Name PCSystemType -MemberType *Property -ErrorAction SilentlyContinue)) {
-        $pcSystemType = $cs.PCSystemType  # 2 ~= Mobile
-    }
+  $pcSystemType = $null
+  if ($cs -and (Get-Member -InputObject $cs -Name PCSystemType -MemberType *Property -ErrorAction SilentlyContinue)) {
+    $pcSystemType = $cs.PCSystemType  # 2 ~= Mobile
+  }
 
-    $hasBattery = $null -ne $bat
+  $hasBattery = $null -ne $bat
 
-    $isMobile = $false
-    if ($hasMobileType -or $pcSystemType -eq 2 -or ($hasBattery -and -not $hasDesktopType)) {
-        $isMobile = $true
-    }
+  $isMobile = $false
+  if ($hasMobileType -or $pcSystemType -eq 2 -or ($hasBattery -and -not $hasDesktopType)) {
+    $isMobile = $true
+  }
 
-    return $isMobile
+  return $isMobile
 }
 
 function Invoke-HealthTest {
-<#
+  <#
 .SYNOPSIS
 Invoke a named health-test function and return a structured result object.
 
@@ -330,26 +330,24 @@ FunctionName, Time, ElapsedMilliseconds, Output, Success, Error, Category, Reaso
   [CmdletBinding()]
   [OutputType([pscustomobject])]
   param(
-    [Parameter(Mandatory=$true)]
+    [Parameter(Mandatory = $true)]
     [ValidateNotNullOrEmpty()]
     [string]$FunctionName
   )
 
-  $start_time = Get-Date
-
   $metaForExclude = Get-HealthTestTagsMetadata -FunctionName $FunctionName
   $baseFunctionName = "HealthTest-$($metaForExclude.TestName)"
   if (($ExcludeTests -contains $FunctionName) -or ($ExcludeTests -contains $baseFunctionName)) {
-      Log-Debug "Skipping test $FunctionName"
-      return
+    Log-Debug "Skipping test $FunctionName"
+    return
   }
 
   Write-Progress -Activity "Starting test $FunctionName"
   Log-debug "Starting test $FunctionName"
   $cmd = Get-Command -Name $FunctionName -CommandType Function -ErrorAction SilentlyContinue
   if (-not $cmd) {
-      Log-failure "(Program Error) Health test function '$FunctionName' not found"
-      return
+    Log-failure "(Program Error) Health test function '$FunctionName' not found"
+    return
   }
 
   $target = (Get-Item ("Function:\{0}" -f $cmd.Name)).ScriptBlock
@@ -366,30 +364,34 @@ FunctionName, Time, ElapsedMilliseconds, Output, Success, Error, Category, Reaso
       $WarningPreference = 'Continue'
       if ($PSBoundParameters.ContainsKey('Argument')) {
         & $target $Argument 3>&1
-      } else {
+      }
+      else {
         & $target 3>&1
       }
     }
 
-    $result | ForEach-Object {
-      if ($_ -is [System.Management.Automation.WarningRecord]) {
-        $record = Convert-WarningLikeObjectToLogRecord -Value $_
+    foreach ($item in $result) {
+      if ($item -is [System.Management.Automation.WarningRecord]) {
+        $record = Convert-WarningLikeObjectToLogRecord -Value $item
         Log-Msg -Level $record.Level -Msg $record.Msg -Comment $record.Comment
         $cntProperRecord += 1
-        if (($_.Message -as [string]) -match '^\s*\[\s*pass\s*\]') { $cntPassRecord += 1 }
-      } elseif ($_ -and $_.PSObject.Properties['Hash'] -and $null -ne $_.PSObject.Properties['Message'] -and $_.PSObject.Properties['level']){
+        if (($item.Message -as [string]) -match '^\s*\[\s*pass\s*\]') { $cntPassRecord += 1 }
+      }
+      elseif ($item -and $item.PSObject.Properties['Hash'] -and $null -ne $item.PSObject.Properties['Message'] -and $item.PSObject.Properties['level']) {
         $legacyLogDetected = $true
         $cntProperRecord += 1
-        if ($_.level -eq 'pass') {$cntPassRecord += 1}
-        Write-Output $_
-      } elseif ($_ -is [string]) {
-        $parts = Convert-TextToLogRecord $_
+        if ($item.level -eq 'pass') { $cntPassRecord += 1 }
+        Write-Output $item
+      }
+      elseif ($item -is [string]) {
+        $parts = Convert-TextToLogRecord $item
         $cntImproperRecord += 1
         Log-Debug $parts.Message -Comment $parts.Comment
-      } else {
+      }
+      else {
         $cntImproperRecord += 1
-        $objType = $_.GetType().FullName
-        $objText = ($_ | Out-String).Trim()
+        $objType = $item.GetType().FullName
+        $objText = ($item | Out-String).Trim()
         if ([string]::IsNullOrWhiteSpace($objText)) { $objText = '<empty object serialization>' }
         Log-Debug "Converted output object of type $objType" -Comment $objText
       }
@@ -402,9 +404,10 @@ FunctionName, Time, ElapsedMilliseconds, Output, Success, Error, Category, Reaso
     }
 
     if ($cntProperRecord -eq 0 -and $cntImproperRecord -eq 0) {
-        Log-notice "$FunctionName returned no output (this is due to a programmer's mistake; the test may or may not have passed)"
+      Log-notice "$FunctionName returned no output (this is due to a programmer's mistake; the test may or may not have passed)"
     }
-  } catch {
+  }
+  catch {
     $err = $_
     $inv = $err.InvocationInfo
 
@@ -414,7 +417,7 @@ FunctionName, Time, ElapsedMilliseconds, Output, Success, Error, Category, Reaso
     # The ScriptStackTrace has lines like:
     # "at HealthTest-Whatever, C:\path\Module.psm1: line 123"
     $frames = ($err.ScriptStackTrace -split "`r?`n") |
-              Where-Object { $_ -match ':\s*line\s+\d+' }
+    Where-Object { $_ -match ':\s*line\s+\d+' }
 
     # Prefer the first frame that is NOT this wrapper function
     $frame = $frames | Where-Object { $_ -notmatch '\bInvoke-HealthTest\b' } | Select-Object -First 1
@@ -430,28 +433,31 @@ FunctionName, Time, ElapsedMilliseconds, Output, Success, Error, Category, Reaso
         if ($innerFile -and (Test-Path -LiteralPath $innerFile)) {
           $innerCode = (Get-Content -LiteralPath $innerFile -TotalCount $innerLine)[-1]
         }
-      } catch { Log-Debug "Program Error: Failed to fetch the actual source line"}
+      }
+      catch { Log-Debug "Program Error: Failed to fetch the actual source line" }
     }
 
     # Build a helpful message with graceful fallbacks
-    $baseMsg   = Get-LeftString $err.Exception.GetBaseException().Message 500
+    $baseMsg = Get-LeftString $err.Exception.GetBaseException().Message 500
     $outerLine = $inv.ScriptLineNumber
     $outerCode = $inv.Line
 
     $details =
-      if ($innerLine -and $innerFunc) {
-        "Throw site: $innerFunc" +
-        ($(if ($innerFile) { "`nFile: $innerFile" } else { "" })) +
-        "`nLine: $innerLine" +
-        ($(if ($innerCode) { "`n  #       Code: $innerCode" } else { "" }))
-      } else {
-        # Fallback to the catcher's position info
-        "Throw site unknown from stack; fallback to caller:`n  #       Line #$($outerLine): $outerCode"
-      }
+    if ($innerLine -and $innerFunc) {
+      "Throw site: $innerFunc" +
+      ($(if ($innerFile) { "`nFile: $innerFile" } else { "" })) +
+      "`nLine: $innerLine" +
+      ($(if ($innerCode) { "`n  #       Code: $innerCode" } else { "" }))
+    }
+    else {
+      # Fallback to the catcher's position info
+      "Throw site unknown from stack; fallback to caller:`n  #       Line #$($outerLine): $outerCode"
+    }
 
     Log-Failure "(Program Error) Exception while running '$FunctionName'" `
       -Comment "details: $baseMsg`n$details`nA Program Error during a test means either that the test failed or that its code has a bug."
-  } finally {
+  }
+  finally {
     $sw.Stop()
     $ErrorActionPreference = $oldEap
     Write-Progress -Activity "Starting test $FunctionName" -Completed
@@ -461,34 +467,34 @@ FunctionName, Time, ElapsedMilliseconds, Output, Success, Error, Category, Reaso
 }
 
 function Get-HealthTest($allHealthTests) {
-<#
+  <#
 .SYNOPSIS
 Lists all loaded HealthTest-* functions with their description text.
 #>
-    [CmdletBinding()]
-    [OutputType([pscustomobject])]
+  [CmdletBinding()]
+  [OutputType([pscustomobject])]
 
-    $allHealthTests | ForEach-Object {
-        $definition = $_.Definition
-        $description = $null
+  $allHealthTests | ForEach-Object {
+    $definition = $_.Definition
+    $description = $null
 
-        if ($definition) {
-            $match = [regex]::Match($definition, '(?im)^\s*Description:\s*(.+?)\s*$')
-            if ($match.Success) {
-                $description = $match.Groups[1].Value.Trim()
-            }
-        }
-
-        [pscustomobject]@{
-            Name        = $_.Name
-            Description = $description
-        }
+    if ($definition) {
+      $match = [regex]::Match($definition, '(?im)^\s*Description:\s*(.+?)\s*$')
+      if ($match.Success) {
+        $description = $match.Groups[1].Value.Trim()
+      }
     }
+
+    [pscustomobject]@{
+      Name        = $_.Name
+      Description = $description
+    }
+  }
 }
 
 function Invoke-HealthTestsFromFolder {
   [CmdletBinding()]
-  param([Parameter(Mandatory=$true,Position=0)][string]$FolderPath)
+  param([Parameter(Mandatory = $true, Position = 0)][string]$FolderPath)
 
   $resolved = $null
   try { $resolved = (Resolve-Path -LiteralPath $FolderPath -ErrorAction Stop).Path }
@@ -497,19 +503,21 @@ function Invoke-HealthTestsFromFolder {
     return
   }
 
-  if(-not (Test-Path -LiteralPath $resolved -PathType Container)){
+  if (-not (Test-Path -LiteralPath $resolved -PathType Container)) {
     if ($resolved -like "*.ps1") {
-        $files = @($resolved)
-    } else {
-        Log-debug "Path -IncludeTestsFromFolder $FolderPath was ignored because it's neither a folder nor a ps1 script"
-        return
+      $files = @($resolved)
     }
-  } else {
-      $files = @(Get-ChildItem -LiteralPath $resolved -Filter *.ps1 -File -ErrorAction SilentlyContinue)
+    else {
+      Log-debug "Path -IncludeTestsFromFolder $FolderPath was ignored because it's neither a folder nor a ps1 script"
+      return
+    }
+  }
+  else {
+    $files = @(Get-ChildItem -LiteralPath $resolved -Filter *.ps1 -File -ErrorAction SilentlyContinue)
   }
 
   $fileImported = $false
-  foreach($f in $files){
+  foreach ($f in $files) {
     Log-debug "Found script $($f.name) in custom tests folder $resolved"
     $m = $null
     try {
@@ -519,11 +527,11 @@ function Invoke-HealthTestsFromFolder {
       }
 
       $customHealthTests = @(& $m {
-        Get-Command -CommandType Function -Name 'HealthTest-*' -Module $ExecutionContext.SessionState.Module -ErrorAction SilentlyContinue
-      })
+          Get-Command -CommandType Function -Name 'HealthTest-*' -Module $ExecutionContext.SessionState.Module -ErrorAction SilentlyContinue
+        })
       $legacyCustomHealthTests = @(& $m {
-        Get-Command -CommandType Function -Name 'CustomHealthTest-*' -Module $ExecutionContext.SessionState.Module -ErrorAction SilentlyContinue
-      })
+          Get-Command -CommandType Function -Name 'CustomHealthTest-*' -Module $ExecutionContext.SessionState.Module -ErrorAction SilentlyContinue
+        })
 
       $allCustomTests = @($customHealthTests) + @($legacyCustomHealthTests) | Group-Object -Property Name | ForEach-Object { $_.Group[0] }
 
@@ -538,20 +546,23 @@ function Invoke-HealthTestsFromFolder {
 
       $fileImported = $true
 
-      foreach($fn in $allCustomTests){
+      foreach ($fn in $allCustomTests) {
         $existing = Get-Item -Path ("Function:\{0}" -f $fn.Name) -ErrorAction SilentlyContinue
         try {
           Set-Item -Path ("Function:\{0}" -f $fn.Name) -Value $fn.ScriptBlock -Force
           Invoke-HealthTestWithPolicyAutoset $fn.Name
-        } finally {
+        }
+        finally {
           if ($existing) {
             Set-Item -Path ("Function:\{0}" -f $fn.Name) -Value $existing.ScriptBlock -Force
-          } else {
+          }
+          else {
             Remove-Item -Path ("Function:\{0}" -f $fn.Name) -ErrorAction SilentlyContinue
           }
         }
       }
-    } catch {
+    }
+    catch {
       $errorRecord = $_
       $rootException = $errorRecord.Exception
       while ($rootException.InnerException) {
@@ -569,43 +580,44 @@ function Invoke-HealthTestsFromFolder {
       ) -join [Environment]::NewLine
 
       Log-failure "Custom test import failed for $($f.FullName)" -Comment $importErrorDetails
-    } finally {
+    }
+    finally {
       if ($m) {
         Remove-Module -ModuleInfo $m -Force -ErrorAction SilentlyContinue
       }
     }
   }
-  if (!$fileImported) {return}
+  if (!$fileImported) { return }
 
   log-info "Invoke-HealthTestsFromFolder imported at least one file with HealthTest-* functions."
 }
 
 function Write-UsageHelp {
-    [Diagnostics.CodeAnalysis.SuppressMessageAttribute(
-        'PSAvoidUsingWriteHost', '',
-        Justification='Only triggered by interactive use.'
-    )]
-    param()
+  [Diagnostics.CodeAnalysis.SuppressMessageAttribute(
+    'PSAvoidUsingWriteHost', '',
+    Justification = 'Only triggered by interactive use.'
+  )]
+  param()
 
-    Write-Host -ForegroundColor Cyan  "$((Split-Path $PSCommandPath -Leaf) -replace '.ps1') version $VERSION, Nick Demou, enLogic"
-    Write-Host -ForegroundColor Gray  ""
-    Write-Host -ForegroundColor Gray  "Most often you want to use me like this:"
-    Write-Host -ForegroundColor White "    `$out = $PSCommandPath -OutputConsoleMessages -Hide " -NoNewline
-    Write-Host -ForegroundColor DarkCyan "DIP"
-    Write-Host -ForegroundColor Gray  "          # (-Hide DIP means: hide Debug, Informational and Pass messages)"
-    Write-Host -ForegroundColor White "    `$out | ogv # or similar"
-    Write-Host -ForegroundColor Gray  ""
-    return
+  Write-Host -ForegroundColor Cyan  "$((Split-Path $PSCommandPath -Leaf) -replace '.ps1') version $VERSION, Nick Demou, enLogic"
+  Write-Host -ForegroundColor Gray  ""
+  Write-Host -ForegroundColor Gray  "Most often you want to use me like this:"
+  Write-Host -ForegroundColor White "    `$out = $PSCommandPath -OutputConsoleMessages -Hide " -NoNewline
+  Write-Host -ForegroundColor DarkCyan "DIP"
+  Write-Host -ForegroundColor Gray  "          # (-Hide DIP means: hide Debug, Informational and Pass messages)"
+  Write-Host -ForegroundColor White "    `$out | ogv # or similar"
+  Write-Host -ForegroundColor Gray  ""
+  return
 }
 
 function Write-DummyHealthTest {
-# Useful only for code testing.
-    Write-Output "Dummy debug message"
-    Write-Warning "[info] Dummy info message"
-    Write-Warning "[PASS] Dummy pass message"
-    Write-Warning "[NOTICE] Dummy notice message"
-    Write-Warning ("[WARNING] Dummy warning message" + "`n" + "This one has a comment(details) also")
-    Write-Warning ("[FAILURE] Dummy failure message" + "`n" + "This one has a comment(details) also`nWith 2 lines of text!")
+  # Useful only for code testing.
+  Write-Output "Dummy debug message"
+  Write-Warning "[info] Dummy info message"
+  Write-Warning "[PASS] Dummy pass message"
+  Write-Warning "[NOTICE] Dummy notice message"
+  Write-Warning ("[WARNING] Dummy warning message" + "`n" + "This one has a comment(details) also")
+  Write-Warning ("[FAILURE] Dummy failure message" + "`n" + "This one has a comment(details) also`nWith 2 lines of text!")
 }
 
 function Get-HealthTestTagsMetadata {
@@ -623,19 +635,19 @@ function Get-HealthTestTagsMetadata {
     if ($rawTags) {
       $tags = @(
         $rawTags.ToCharArray() |
-          ForEach-Object { $_.ToString().ToUpperInvariant() } |
-          Where-Object { $_ -match '^[A-Z0-9]$' } |
-          Sort-Object -Unique
+        ForEach-Object { $_.ToString().ToUpperInvariant() } |
+        Where-Object { $_ -match '^[A-Z0-9]$' } |
+        Sort-Object -Unique
       )
     }
   }
 
   [pscustomobject]@{
-    FunctionName = $FunctionName
-    TestName     = $normalizedTestName
-    Tags         = @($tags)
-    IsSlowTest   = ('S' -in $tags)
-    IsPolicyTest = ('P' -in $tags)
+    FunctionName         = $FunctionName
+    TestName             = $normalizedTestName
+    Tags                 = @($tags)
+    IsSlowTest           = ('S' -in $tags)
+    IsPolicyTest         = ('P' -in $tags)
     IsQuickEssentialTest = ('E' -in $tags)
   }
 }
@@ -677,14 +689,14 @@ function Invoke-HealthTestWithPolicyAutoset {
   $isPolicyTest = $meta.IsPolicyTest
   $policyTestName = $meta.TestName
   $shouldAutoset = $isPolicyTest -and (-not $DontAutosetPolicy) -and `
-    (-not (Test-PolicyAutosetAlreadyPerformed -PolicyTestName $policyTestName -SuppressionFilePath $script:Config.SuppressSignaturesPath))
+  (-not (Test-PolicyAutosetAlreadyPerformed -PolicyTestName $policyTestName -SuppressionFilePath $script:Config.SuppressSignaturesPath))
 
   $records = @(Invoke-HealthTest $FunctionName)
 
   if ($shouldAutoset) {
     $policyFindings = @(
       $records |
-        Where-Object { $_.Level -in @('notice','warning') -and (-not $_.Suppressed) -and ($_.Hash -match '^[0-9a-f]{8}$') }
+      Where-Object { $_.Level -in @('notice', 'warning') -and (-not $_.Suppressed) -and ($_.Hash -match '^[0-9a-f]{8}$') }
     )
 
     $newSuppressionSigs = @($policyFindings | Select-Object -ExpandProperty Hash -Unique)
@@ -703,7 +715,8 @@ function Invoke-HealthTestWithPolicyAutoset {
     if ($newSuppressionSigs.Count -gt 0) {
       Add-LogSuppressedSignatures -Signatures $newSuppressionSigs
       Log-Info "Auto-suppressed $($newSuppressionSigs.Count) policy findings for first run of $($meta.FunctionName)."
-    } else {
+    }
+    else {
       Log-Info "No policy findings to auto-suppress during first run of $($meta.FunctionName)."
     }
 
@@ -720,7 +733,7 @@ function Convert-TextToLogRecord {
   $normalized = ($Text -replace "`r", '')
   $lines = @($normalized -split "`n")
   if (-not $lines -or ($lines.Count -eq 1 -and [string]::IsNullOrWhiteSpace($lines[0]))) {
-    return [pscustomobject]@{ Message=''; Comment='' }
+    return [pscustomobject]@{ Message = ''; Comment = '' }
   }
 
   $msg = [string]$lines[0]
@@ -729,7 +742,7 @@ function Convert-TextToLogRecord {
     $comment = ($lines | Select-Object -Skip 1) -join "`n"
   }
 
-  [pscustomobject]@{ Message=$msg.Trim(); Comment=$comment.Trim() }
+  [pscustomobject]@{ Message = $msg.Trim(); Comment = $comment.Trim() }
 }
 
 function Convert-WarningLikeObjectToLogRecord {
@@ -740,7 +753,8 @@ function Convert-WarningLikeObjectToLogRecord {
 
   $rawText = if ($Value -is [System.Management.Automation.WarningRecord]) {
     [string]$Value.Message
-  } else {
+  }
+  else {
     [string]$Value
   }
 
@@ -751,7 +765,7 @@ function Convert-WarningLikeObjectToLogRecord {
 
   if ($parts.Message -match '^\s*\[([a-z]+)\]\s*(.*)$') {
     $candidate = $matches[1].ToLowerInvariant()
-    if ($candidate -in @('debug','pass','info','notice','warning','failure')) {
+    if ($candidate -in @('debug', 'pass', 'info', 'notice', 'warning', 'failure')) {
       $level = $candidate
       $msg = [string]$matches[2]
     }
@@ -759,8 +773,8 @@ function Convert-WarningLikeObjectToLogRecord {
 
   if ([string]::IsNullOrWhiteSpace($msg)) { $msg = '<empty warning message>' }
   [pscustomobject]@{
-    Level = $level
-    Msg = $msg.Trim()
+    Level   = $level
+    Msg     = $msg.Trim()
     Comment = $comment
   }
 }
@@ -794,12 +808,13 @@ function Invoke-PrettifyWriteWarningMode {
 # previously loaded functions in the same shell to be picked up. 
 # With this command we remove all HealthTest-* functions)
 Get-ChildItem Function:\HealthTest-*, Function:\Global:HealthTest-* -ErrorAction SilentlyContinue |
-  Remove-Item -Force -ErrorAction SilentlyContinue
+Remove-Item -Force -ErrorAction SilentlyContinue
 
 if ($PrettifyWriteWarning) {
   $allValues = if ($PSBoundParameters.ContainsKey('InputObject')) {
     @($InputObject)
-  } else {
+  }
+  else {
     @($input)
   }
   Invoke-PrettifyWriteWarningMode -Values $allValues
@@ -808,8 +823,8 @@ if ($PrettifyWriteWarning) {
 
 if ($ListAllBuiltInTests) {
   Get-ChildItem -Path (Join-Path -Path $PSScriptRoot -ChildPath 'health-tests') -Filter *.ps1 -File |
-    Sort-Object Name |
-    ForEach-Object { . $_.FullName }
+  Sort-Object Name |
+  ForEach-Object { . $_.FullName }
 
   $allHealthTests = Get-Command -CommandType Function -Name 'HealthTest-*' -ErrorAction SilentlyContinue
   Get-HealthTest $allHealthTests
@@ -837,35 +852,38 @@ $domainRole = (Get-CimInstance Win32_ComputerSystem).DomainRole
 #------------------------------------------
 $isHostVM = Test-IsVirtualMachine
 $isHostMobile = Test-IsLaptopOrMobile
-$isHostDomainJoined = ($domainRole  -in 1,3,4,5)
-$isHostServer = ($domainRole  -in 3,4,5)
-$isHostDC = ($domainRole -in 4,5)
+$isHostDomainJoined = ($domainRole -in 1, 3, 4, 5)
+$isHostServer = ($domainRole -in 3, 4, 5)
+$isHostDC = ($domainRole -in 4, 5)
 $isHostDnsServer = $null -ne (Get-Service -Name DNS -ErrorAction SilentlyContinue)
 $isHostDHCPServer = ($isHostServer -and (Get-WindowsFeature DHCP -ErrorAction SilentlyContinue).InstallState -eq 'Installed')
 if (-not $RunWithoutElevation) {
-    $isHostHyperisor = (Get-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V).State -eq 'Enabled'
-} else {
-    $isHostHyperisor = $false
+  $isHostHyperisor = (Get-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V).State -eq 'Enabled'
 }
-$isHostInDomainButNotDC = (Get-CimInstance Win32_ComputerSystem).DomainRole -in 1,3
+else {
+  $isHostHyperisor = $false
+}
+$isHostInDomainButNotDC = (Get-CimInstance Win32_ComputerSystem).DomainRole -in 1, 3
 $isHostPDC = $false
 $currentDomain = $null
-if($isHostDC){$isHostPDC=$false
-    $domainInfo=$null
-    try{
-        $domainInfo=[System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain()
-        $currentDomain = $domainInfo
-        $isHostPDC=(($domainInfo.PdcRoleOwner.Name -replace '[.].*') -eq $env:COMPUTERNAME)
-    } catch {
-        Log-Warning "Could not determine if host is the PDC emulator for its domain."
-    }
+if ($isHostDC) {
+  $isHostPDC = $false
+  $domainInfo = $null
+  try {
+    $domainInfo = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain()
+    $currentDomain = $domainInfo
+    $isHostPDC = (($domainInfo.PdcRoleOwner.Name -replace '[.].*') -eq $env:COMPUTERNAME)
+  }
+  catch {
+    Log-Warning "Could not determine if host is the PDC emulator for its domain."
+  }
 }
 
 $normalizedIpsOfAllDcs = @(
-    $IpsOfAllDcs |
-        Where-Object { $_ } |
-        ForEach-Object { $_.ToString().Trim() } |
-        Where-Object { $_ }
+  $IpsOfAllDcs |
+  Where-Object { $_ } |
+  ForEach-Object { $_.ToString().Trim() } |
+  Where-Object { $_ }
 )
 
 $ipCounts = @{}
@@ -873,28 +891,29 @@ $validIpsList = New-Object System.Collections.Generic.List[string]
 $invalidIps = New-Object System.Collections.Generic.List[string]
 
 foreach ($ip in $normalizedIpsOfAllDcs) {
-    if ($ipCounts.ContainsKey($ip)) { $ipCounts[$ip]++ } else { $ipCounts[$ip] = 1 }
+  if ($ipCounts.ContainsKey($ip)) { $ipCounts[$ip]++ } else { $ipCounts[$ip] = 1 }
 
-    $parsed = $ip -as [ipaddress]
-    $isValidV4 = ($parsed -and ($parsed.AddressFamily -eq [System.Net.Sockets.AddressFamily]::InterNetwork))
+  $parsed = $ip -as [ipaddress]
+  $isValidV4 = ($parsed -and ($parsed.AddressFamily -eq [System.Net.Sockets.AddressFamily]::InterNetwork))
 
-    if ($isValidV4) {
-        if (-not $validIpsList.Contains($ip)) {
-            [void]$validIpsList.Add($ip)
-        }
-    } else {
-        if (-not $invalidIps.Contains($ip)) {
-            [void]$invalidIps.Add($ip)
-        }
+  if ($isValidV4) {
+    if (-not $validIpsList.Contains($ip)) {
+      [void]$validIpsList.Add($ip)
     }
+  }
+  else {
+    if (-not $invalidIps.Contains($ip)) {
+      [void]$invalidIps.Add($ip)
+    }
+  }
 }
 
 foreach ($entry in $ipCounts.GetEnumerator() | Where-Object { $_.Value -gt 1 } | Sort-Object Key) {
-    Log-Warning "Duplicate IP '$($entry.Key)' provided in -IpsOfAllDcs $($entry.Value) times; using one instance."
+  Log-Warning "Duplicate IP '$($entry.Key)' provided in -IpsOfAllDcs $($entry.Value) times; using one instance."
 }
 
 if ($invalidIps.Count -gt 0) {
-    throw "Invalid IPv4 value(s) supplied in -IpsOfAllDcs: $($invalidIps -join ', ')"
+  throw "Invalid IPv4 value(s) supplied in -IpsOfAllDcs: $($invalidIps -join ', ')"
 }
 
 $validIpsOfAllDcs = @($validIpsList)
@@ -902,19 +921,19 @@ $validIpsOfAllDcs = @($validIpsList)
 # Explicitly created so host-fact values are publicly accessible to all health tests,
 # including custom health tests loaded at runtime.
 $Global:GCHDQMTA = [pscustomobject]@{
-    isHostVM               = $isHostVM
-    isHostMobile           = $isHostMobile
-    isHostDomainJoined     = $isHostDomainJoined
-    isHostServer           = $isHostServer
-    isHostDC               = $isHostDC
-    isHostPDC              = $isHostPDC
-    isHostDnsServer        = $isHostDnsServer
-    isHostDHCPServer       = $isHostDHCPServer
-    isHostHyperisor        = $isHostHyperisor
-    isHostInDomainButNotDC = $isHostInDomainButNotDC
-    GetCurrentDomain       = $currentDomain
-    SkipSlowTests          = $SkipSlowTests
-    IpsOfAllDcs            = @($validIpsOfAllDcs)
+  isHostVM               = $isHostVM
+  isHostMobile           = $isHostMobile
+  isHostDomainJoined     = $isHostDomainJoined
+  isHostServer           = $isHostServer
+  isHostDC               = $isHostDC
+  isHostPDC              = $isHostPDC
+  isHostDnsServer        = $isHostDnsServer
+  isHostDHCPServer       = $isHostDHCPServer
+  isHostHyperisor        = $isHostHyperisor
+  isHostInDomainButNotDC = $isHostInDomainButNotDC
+  GetCurrentDomain       = $currentDomain
+  SkipSlowTests          = $SkipSlowTests
+  IpsOfAllDcs            = @($validIpsOfAllDcs)
 }
 
 #|
@@ -933,69 +952,70 @@ $Global:GCHDQMTA = [pscustomobject]@{
 . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\os-perf-hw.ps1")
 . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\win-os-hyg.ps1")
 
-if ($isHostDC -or $isHostPDC){. (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\DC-PDC.ps1")}
-if ($isHostDnsServer)        {. (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\DNS.ps1")}
-if ($isHostDHCPServer)       {. (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\DHCP.ps1")}
-if ($isHostDomainJoined)     {. (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\domjoined.ps1")}
-if ($isHostInDomainButNotDC) {. (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\member.ps1")}
-if ($isHostMobile)           {. (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\mobile.ps1")}
-if ($isHostHyperisor)        {. (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\hypervisor.ps1")}
-if ($isHostServer)           {. (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\servers.ps1")}
+if ($isHostDC -or $isHostPDC) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\DC-PDC.ps1") }
+if ($isHostDnsServer) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\DNS.ps1") }
+if ($isHostDHCPServer) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\DHCP.ps1") }
+if ($isHostDomainJoined) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\domjoined.ps1") }
+if ($isHostInDomainButNotDC) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\member.ps1") }
+if ($isHostMobile) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\mobile.ps1") }
+if ($isHostHyperisor) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\hypervisor.ps1") }
+if ($isHostServer) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\servers.ps1") }
 #|
 #| Dot source health tests
 #+-----------------------------------------------------------
 
 $allHealthTests = Get-Command -CommandType Function -Name 'HealthTest-*' -ErrorAction SilentlyContinue
 
-if ($ListAllBuiltInTests) {Get-HealthTest $allHealthTests; return}
+if ($ListAllBuiltInTests) { Get-HealthTest $allHealthTests; return }
 
 # Fail if not run as Administrator (elevated)
 # None of the functionality that follows is available to non-admins
 if ((-not $RunWithoutElevation) -and (-not ([Security.Principal.WindowsPrincipal] `
-    [Security.Principal.WindowsIdentity]::GetCurrent() `
-).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator))) {
-    Write-Error "This script must be run as Administrator (elevated)."
-    exit 1
+        [Security.Principal.WindowsIdentity]::GetCurrent() `
+    ).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator))) {
+  Write-Error "This script must be run as Administrator (elevated)."
+  exit 1
 }
 
-if ($AddWhitelisting ){
-    if (-not $Signature) {throw "You must supply a -Signature"}
-    if (-not $ComputerName) {throw "You must supply a -ComputerName"}
-    if ($Signature -notmatch '^[0-9A-Fa-f]{8}$') {
-        throw "Invalid -Signature: $Signature"
-    }
-    if ($ComputerName -ne $env:COMPUTERNAME) {
-        throw "Running on $($env:COMPUTERNAME) but suppression is for $ComputerName"
-    }
-    if ($Until) {
-        $culture = [System.Globalization.CultureInfo]::InvariantCulture
-        $dt=[datetime]::MinValue
-        $ok=[DateTime]::TryParseExact($Until,'yyyy-MM-dd',$culture,[System.Globalization.DateTimeStyles]::None,[ref]$dt)
-        if(-not $ok){$ok=[DateTime]::TryParse($Until,[System.IFormatProvider]$culture,[System.Globalization.DateTimeStyles]::None,[ref]$dt)}
-        if(-not $ok){throw "Invalid date: `$Until"}
-        $line='{0} UNTIL {1:yyyy-MM-dd} # {2:yyyy-MM-dd HH:mm} # {3}' -f $Signature,$dt,(Get-Date),$Comment
-        Add-AsciiLine -Line $line -Path $script:Config.SuppressSignaturesPath
-    } else {
-        $line = "$Signature # $(Get-Date -format yyyy-MM-dd` HH:mm) # $Comment"
-        Add-AsciiLine -Line $line -Path $script:Config.SuppressSignaturesPath
-    }
-    return
+if ($AddWhitelisting ) {
+  if (-not $Signature) { throw "You must supply a -Signature" }
+  if (-not $ComputerName) { throw "You must supply a -ComputerName" }
+  if ($Signature -notmatch '^[0-9A-Fa-f]{8}$') {
+    throw "Invalid -Signature: $Signature"
+  }
+  if ($ComputerName -ne $env:COMPUTERNAME) {
+    throw "Running on $($env:COMPUTERNAME) but suppression is for $ComputerName"
+  }
+  if ($Until) {
+    $culture = [System.Globalization.CultureInfo]::InvariantCulture
+    $dt = [datetime]::MinValue
+    $ok = [DateTime]::TryParseExact($Until, 'yyyy-MM-dd', $culture, [System.Globalization.DateTimeStyles]::None, [ref]$dt)
+    if (-not $ok) { $ok = [DateTime]::TryParse($Until, [System.IFormatProvider]$culture, [System.Globalization.DateTimeStyles]::None, [ref]$dt) }
+    if (-not $ok) { throw "Invalid date: `$Until" }
+    $line = '{0} UNTIL {1:yyyy-MM-dd} # {2:yyyy-MM-dd HH:mm} # {3}' -f $Signature, $dt, (Get-Date), $Comment
+    Add-AsciiLine -Line $line -Path $script:Config.SuppressSignaturesPath
+  }
+  else {
+    $line = "$Signature # $(Get-Date -format yyyy-MM-dd` HH:mm) # $Comment"
+    Add-AsciiLine -Line $line -Path $script:Config.SuppressSignaturesPath
+  }
+  return
 }
 
 
-if ($DoNothing){return}
+if ($DoNothing) { return }
 
 if ($isHostDomainJoined -and $validIpsOfAllDcs.Count -eq 0) {
-    Log-failure "Cannot run many domain-related tests because no valid IPv4 addresses were provided in -IpsOfAllDcs. Marking this host as non-domain for test applicability."
-    $isHostDomainJoined = $false
-    $isHostDC = $false
-    $isHostPDC = $false
-    $currentDomain = $null
+  Log-failure "Cannot run many domain-related tests because no valid IPv4 addresses were provided in -IpsOfAllDcs. Marking this host as non-domain for test applicability."
+  $isHostDomainJoined = $false
+  $isHostDC = $false
+  $isHostPDC = $false
+  $currentDomain = $null
 }
 
 if (-not $OutputConsoleMessages -and -not $OutputObjects) {
-    Write-UsageHelp
-    return
+  Write-UsageHelp
+  return
 }
 
 # To reach this line either one or both of these switches where passed:
@@ -1019,15 +1039,15 @@ Log-info "$((Split-Path $PSCommandPath -Leaf) -replace '.ps1'), ver.$VERSION, Ni
 Log-info "$(Get-Date -format yyyy-MM-dd` HH:mm:ss), Computer: $($env:COMPUTERNAME), S/N: $((Get-CimInstance win32_bios).serialnumber)"
 Log-Debug "-Hide '$Hide'"
 [array]$ExcludeTests = $ExcludeTests |
-  ForEach-Object { $_ -split '[,\s]+' } |
-  ForEach-Object { $_.Trim() } |
-  Where-Object { $_ } |
-  Sort-Object -Unique
+ForEach-Object { $_ -split '[,\s]+' } |
+ForEach-Object { $_.Trim() } |
+Where-Object { $_ } |
+Sort-Object -Unique
 Log-Debug "-ExcludeTests (semicolon separated): $($ExcludeTests -join ';')"
 [array]$OnlyTheseTests = $OnlyTheseTests |
-  ForEach-Object { $_ -split '[,\s]+' } |
-  ForEach-Object { $_.Trim() } |
-  Where-Object { $_ }
+ForEach-Object { $_ -split '[,\s]+' } |
+ForEach-Object { $_.Trim() } |
+Where-Object { $_ }
 Log-Debug "-OnlyTheseTests (semicolon separated): $($OnlyTheseTests -join ';')"
 Log-Debug "-SkipNonEssentialTests '$SkipNonEssentialTests'"
 Log-Debug "-WhitelistSigs '$WhitelistSigs'"
@@ -1041,42 +1061,46 @@ Log-debug "Final list of suppressed signatures: $((@($cfg.SuppressedSignatures) 
 #=============================================================================
 
 if ($OnlyTheseTests) {
-# -OnlyTheseTests
-    $valid_cmdlet_name_regex = '^ *[A-Za-z][A-Za-z0-9_-]*[A-Za-z0-9]+ *$'
-    $loadedTestsByName = @{}
-    $loadedTestsByBaseName = @{}
-    $allHealthTests | ForEach-Object {
-        $loadedTestsByName[$_.Name] = $_.Name
-        $meta = Get-HealthTestTagsMetadata -FunctionName $_.Name
-        $baseName = "HealthTest-$($meta.TestName)"
-        if (-not $loadedTestsByBaseName.ContainsKey($baseName)) {
-          $loadedTestsByBaseName[$baseName] = $_.Name
-        }
+  # -OnlyTheseTests
+  $valid_cmdlet_name_regex = '^ *[A-Za-z][A-Za-z0-9_-]*[A-Za-z0-9]+ *$'
+  $loadedTestsByName = @{}
+  $loadedTestsByBaseName = @{}
+  $allHealthTests | ForEach-Object {
+    $loadedTestsByName[$_.Name] = $_.Name
+    $meta = Get-HealthTestTagsMetadata -FunctionName $_.Name
+    $baseName = "HealthTest-$($meta.TestName)"
+    if (-not $loadedTestsByBaseName.ContainsKey($baseName)) {
+      $loadedTestsByBaseName[$baseName] = $_.Name
     }
+  }
 
-    foreach ($item in $OnlyTheseTests) {
-        if ($item -match $valid_cmdlet_name_regex) {
-            $testName = $item.Trim()
-            if ($loadedTestsByName.ContainsKey($testName)) {
-                Invoke-HealthTestWithPolicyAutoset $loadedTestsByName[$testName]
-            } elseif ($loadedTestsByBaseName.ContainsKey($testName)) {
-                Invoke-HealthTestWithPolicyAutoset $loadedTestsByBaseName[$testName]
-            } else {
-                Log-Notice "Skipping unavailable test '$testName' (not loaded/applicable on this host)."
-            }
-        } else {
-            Log-Warning "Input '$item' is not a valid cmdlet name."
-        }
+  foreach ($item in $OnlyTheseTests) {
+    if ($item -match $valid_cmdlet_name_regex) {
+      $testName = $item.Trim()
+      if ($loadedTestsByName.ContainsKey($testName)) {
+        Invoke-HealthTestWithPolicyAutoset $loadedTestsByName[$testName]
+      }
+      elseif ($loadedTestsByBaseName.ContainsKey($testName)) {
+        Invoke-HealthTestWithPolicyAutoset $loadedTestsByBaseName[$testName]
+      }
+      else {
+        Log-Notice "Skipping unavailable test '$testName' (not loaded/applicable on this host)."
+      }
     }
-    return
-} else {
-# All tests
-    foreach($fn in $allHealthTests){
-      Invoke-HealthTestWithPolicyAutoset $fn.Name
+    else {
+      Log-Warning "Input '$item' is not a valid cmdlet name."
     }
+  }
+  return
+}
+else {
+  # All tests
+  foreach ($fn in $allHealthTests) {
+    Invoke-HealthTestWithPolicyAutoset $fn.Name
+  }
 }
 
 if ($IncludeTestsFromFolder) {
-# Also Custom HealthTest-*
-    Invoke-HealthTestsFromFolder $IncludeTestsFromFolder
+  # Also Custom HealthTest-*
+  Invoke-HealthTestsFromFolder $IncludeTestsFromFolder
 }
