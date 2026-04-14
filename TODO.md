@@ -6,6 +6,13 @@ Instead of dot-sourcing the custom scripts, discovering the functions with the c
 
 This is a breaking change that requires an automated migration to free users from having to edit all their custom health test scripts. The migration seems easy: Use `sls` to find the names of the custom health test functions and append a call to them at the end of the script. We can use `Get-TextFileEncoding` from `helpers-text-files.ps1` to make sure we append text using the correct encoding.
 
+## No NOTICE for services which are set to automatically start but have terminated with ExitCode=0
+
+These messages should be downgraded from NOTICE to INFO:
+```
+NOTICE: Service '<FOO>' which is set to automatically start is not running; calmingly its last execution terminated normally: ExitCode=0(The operation completed successfully.).
+```
+
 ## Reduce recurring agent friction in this repo
 
 Recent work repeatedly hit the same workflow problems:
