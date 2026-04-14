@@ -1,5 +1,9 @@
 # TODO
 
+## All dates or times that are shown to users should use the YYYY-MM-DD format
+
+At least examine all Write-Warning(s) and if they include dates/times make sure they use this format
+
 ## Custom health tests should be directly runnable scripts
 
 Instead of dot-sourcing the custom scripts, discovering the functions with the custom tests and calling them, we should instead just invoking the scripts directly and capturing their warnings stream. Much simpler and cleaner than the current method.
