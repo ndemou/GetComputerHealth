@@ -4,7 +4,11 @@
 
 Instead of dot-sourcing the custom scripts, discovering the functions with the custom tests and calling them, we should instead just invoking the scripts directly and capturing their warnings stream. Much simpler and cleaner than the current method.
 
-This is a breaking change that requires an automated migration to free users from having to edit all their custom health test scripts. The migration seems easy: Use `sls` to find the names of the custom health test functions and append a call to them at the end of the script. We can use `Get-TextFileEncoding` from `helpers-text-files.ps1` to make sure we append text using the correct encoding.
+We should also update `how-to-add-custom-tests.md`.
+
+Since this is a breaking change it requires a) the update of the major version number from 3 to 4 b) a migration script that will relief users from having to edit all their custom health test scripts. 
+
+The migration script seems easy: Use `sls` to find the names of the custom health test functions and append a call to them at the end of the script. We can use `Get-TextFileEncoding` from `helpers-text-files.ps1` to make sure we append text using the correct encoding. The migration script should be run by the updater/installer only when an existing version `3.x.y` is found.
 
 ## No NOTICE for services which are set to automatically start but have terminated with ExitCode=0
 
