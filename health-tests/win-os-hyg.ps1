@@ -1561,7 +1561,7 @@ Uses: Get-LiveSessionInfo.
         $who = $session.UserPrincipal
         if ([string]::IsNullOrWhiteSpace($who)) { $who = $session.UserName }
 
-        $issueSynopsis = "Session $($session.SessionId) for $who is $problemType for more than $([int]$Threshold.TotalHours) hours"
+        $issueSynopsis = "Session for $who is $problemType for more than $([int]$Threshold.TotalHours) hours"
 
         $detailLines = @()
         $detailLines += "State: $($session.State)"
@@ -2244,7 +2244,11 @@ function Get-InstalledSoftwareFindingLevel {
         return 'info'
     }
 
-    return 'notice'
+    if (-not [string]::IsNullOrWhiteSpace($Publisher) -and $Publisher -match '(?i)\bmicrosoft(?:\s+corporation)?\b') {
+        return 'notice'
+    }
+
+    return 'warning'
 }
 
 function HealthTest-InstalledSW__P {

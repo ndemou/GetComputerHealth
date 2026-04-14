@@ -41,8 +41,9 @@ Describe 'Microsoft installed software update classification' {
     Test-IsMicrosoftInstalledSoftwareUpdate -Name 'Security Update KB1234567 for Contoso App' -Publisher 'Contoso Ltd' | Should -Be $false
   }
 
-  It 'returns info for Microsoft update-like installs and notice otherwise' {
+  It 'returns info for Microsoft update-like installs, notice for Microsoft products, and warning for non-Microsoft software' {
     Get-InstalledSoftwareFindingLevel -Name 'GDR 2155 for SQL Server 2019 KB5068405' -Publisher 'Microsoft Corporation' | Should -Be 'info'
     Get-InstalledSoftwareFindingLevel -Name 'Microsoft SQL Server 2019 Setup (English)' -Publisher 'Microsoft Corporation' | Should -Be 'notice'
+    Get-InstalledSoftwareFindingLevel -Name 'Copilot' -Publisher 'Some Other Vendor' | Should -Be 'warning'
   }
 }
