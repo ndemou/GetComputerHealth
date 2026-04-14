@@ -1,5 +1,9 @@
 # TODO
 
+## Review our test suite for this repo
+
+Review /doc/test-suite-guide.md and improve our test suite if needed.
+
 ## All dates or times that are shown to users should use the YYYY-MM-DD format
 
 At least examine all Write-Warning(s) and if they include dates/times make sure they use this format
