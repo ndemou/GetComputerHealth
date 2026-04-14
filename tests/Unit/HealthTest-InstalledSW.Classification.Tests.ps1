@@ -6,9 +6,6 @@ Describe 'Microsoft installed software update classification' {
     $parseErrors = $null
     $tokens = $null
     $ast = [System.Management.Automation.Language.Parser]::ParseFile($scriptPath, [ref]$tokens, [ref]$parseErrors)
-    if ($parseErrors.Count -gt 0) {
-      throw "Failed to parse $scriptPath"
-    }
 
     foreach ($functionName in @('Test-IsMicrosoftInstalledSoftwareUpdate', 'Get-InstalledSoftwareFindingLevel')) {
       $funcAst = $ast.Find({

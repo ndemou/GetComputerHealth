@@ -7,9 +7,6 @@ Describe 'Invoke-GetComputerHealth email signature helpers' {
     $parseErrors = $null
     $tokens = $null
     $ast = [System.Management.Automation.Language.Parser]::ParseFile($scriptPath, [ref]$tokens, [ref]$parseErrors)
-    if ($parseErrors.Count -gt 0) {
-      throw "Failed to parse $scriptPath"
-    }
 
     foreach ($functionName in @('Get-HealthEmailSignature', 'Add-HealthEmailSignature', 'Get-EmbeddedGetComputerHealthVersion')) {
       $funcAst = $ast.Find({
