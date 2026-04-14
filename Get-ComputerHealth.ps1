@@ -1012,7 +1012,7 @@ Initialize-LogSystem `
 #|
 #|
 #+-----------------------------------------------------------
-Log-Debug "`$global:GCHDQMTA" -Comment "$(($global:GCHDQMTA|fl|Out-String).trim())"
+Log-Debug "`$global:GCHDQMTA" -Comment "$(($global:GCHDQMTA|Format-List|Out-String).trim())"
 Log-Debug '$allHealthTests' -comment "$(($allHealthTests).name -join ', ')"
 
 Log-info "$((Split-Path $PSCommandPath -Leaf) -replace '.ps1'), ver.$VERSION, Nick Demou, enLogic"
