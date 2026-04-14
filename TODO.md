@@ -1,5 +1,11 @@
 # TODO
 
+## Custom health tests should be directly runnable scripts
+
+Instead of dot-sourcing the custom scripts, discovering the functions with the custom tests and calling them, we should instead just invoking the scripts directly and capturing their warnings stream. Much simpler and cleaner than the current method.
+
+This is a breaking change that requires an automated migration to free users from having to edit all their custom health test scripts. The migration seems easy: Use `sls` to find the names of the custom health test functions and append a call to them at the end of the script. We can use `Get-TextFileEncoding` from `helpers-text-files.ps1` to make sure we append text using the correct encoding.
+
 ## Reduce recurring agent friction in this repo
 
 Recent work repeatedly hit the same workflow problems:
