@@ -140,8 +140,7 @@ function Send-MailMessageWithRetry {
   }
 
   $attempt = 0
-  $lastErr = $null
-
+  
   while ($true) {
     $attempt++
     $sw = [Diagnostics.Stopwatch]::StartNew()
@@ -150,10 +149,10 @@ function Send-MailMessageWithRetry {
       $sw.Stop()
       Write-Verbose "Send-MailMessage succeeded on attempt $attempt in $([int]$sw.Elapsed.TotalMilliseconds) ms."
       return
-    } catch {
+    }
+    catch {
       $sw.Stop()
       $ex = $_.Exception
-      $lastErr = $_
 
       $msg = Get-CleanExceptionMessage -Exception $ex
       $inner = if ($ex.InnerException) { $ex.InnerException.Message } else { $null }
@@ -174,9 +173,9 @@ function Send-MailMessageWithRetry {
         throw [System.Exception]::new($finalMessage, $base)
       }
 
-      $delay = [Math]::Min(60, [Math]::Pow(2, ($attempt-1)) * $BaseDelaySeconds)
+      $delay = [Math]::Min(60, [Math]::Pow(2, ($attempt - 1)) * $BaseDelaySeconds)
       $jitter = Get-Random -Minimum 0 -Maximum 1000
-      $sleepMs = [int]($delay*1000 + $jitter)
+      $sleepMs = [int]($delay * 1000 + $jitter)
       Write-Verbose "Transient SMTP failure detected; sleeping $sleepMs ms then retrying..."
       Start-Sleep -Milliseconds $sleepMs
     }
@@ -188,20 +187,20 @@ $ErrorActionPreference = "Stop"
 
 # --- Generation Logic ---
 if ($PSCmdlet.ParameterSetName -eq 'Generate') {
-    $outPath = [System.IO.Path]::GetFullPath($GenerateConfig)
-    Write-Host "Answer the following questions to generate the config file." -ForegroundColor Cyan
+  $outPath = [System.IO.Path]::GetFullPath($GenerateConfig)
+  Write-Host "Answer the following questions to generate the config file." -ForegroundColor Cyan
     
-    $genCfg = [ordered]@{
-        Server = Read-Host "Enter SMTP Server (e.g., smtp.office365.com)"
-        From   = Read-Host "Enter From Address"
-        To     = Read-Host "Enter To Address(es) (comma or semi-colon separated)"
-        Port   = [int]((Read-Host "Enter Port [25]") -replace '', '25')
-        UseSsl = (Read-Host "Use SSL? (y/N)").Trim().ToLower() -eq 'y'
-    }
+  $genCfg = [ordered]@{
+    Server = Read-Host "Enter SMTP Server (e.g., smtp.office365.com)"
+    From   = Read-Host "Enter From Address"
+    To     = Read-Host "Enter To Address(es) (comma or semi-colon separated)"
+    Port   = [int]((Read-Host "Enter Port [25]") -replace '', '25')
+    UseSsl = (Read-Host "Use SSL? (y/N)").Trim().ToLower() -eq 'y'
+  }
 
-    $genCfg | ConvertTo-Json | Out-File -FilePath $outPath -Encoding "UTF8"
-    Write-Host "Successfully created config: $outPath" -ForegroundColor Green
-    return
+  $genCfg | ConvertTo-Json | Out-File -FilePath $outPath -Encoding "UTF8"
+  Write-Host "Successfully created config: $outPath" -ForegroundColor Green
+  return
 }
 function Convert-ToStringArray {
   <#
@@ -225,8 +224,8 @@ function Convert-ToStringArray {
 
   return [string[]]@(
     ([string]$Value -split '[,;]') |
-      ForEach-Object { $_.Trim() } |
-      Where-Object { $_ }
+    ForEach-Object { $_.Trim() } |
+    Where-Object { $_ }
   )
 }
 
@@ -255,7 +254,8 @@ function Get-SendAlertConfig {
 
   try {
     $cfg = $raw | ConvertFrom-Json
-  } catch {
+  }
+  catch {
     throw "Config file is not valid JSON: $Path. Error: $($_.Exception.Message)"
   }
 
@@ -332,7 +332,8 @@ $attCount = @($paths).Count
 $subjectWithTrace = "$Subject"
 $finalBody = if ([string]::IsNullOrWhiteSpace($Body)) {
   ""
-} else {
+}
+else {
   $Body
 }
 
@@ -359,7 +360,8 @@ $mailParams = @{
 }
 if ([string]::IsNullOrWhiteSpace($finalBody)) {
   $mailParams.Body = $subjectWithTrace
-} else {
+}
+else {
   $mailParams.Body = $finalBody
 }
 

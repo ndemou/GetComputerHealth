@@ -80,24 +80,24 @@ When targeting remote computers, copies the latest locally cached release zip fr
 #>
 
 param(
-    [string]$Hide="DIP",
-    [string]$WhitelistSigs,
-    [string]$OnlyTheseTests,
-    [string]$ExcludeTests,
-    [string[]]$ExcludeServers = @(),
-    [Alias('DebugSkipSlowTests')]
-    [switch]$SkipSlowTests,
-    [switch]$SkipPolicyTests,
-    [Alias('Quick')]
-    [switch]$SkipNonEssentialTests,
-    [switch]$NoUpdate,
-    [switch]$RunWithoutElevation,
-    [switch]$PushUpdate,
-    [switch]$NoSendMessage,
-    [string[]]$IpsOfAllDcs = @(),
-    [string[]]$Computers,
-    [Parameter(ValueFromRemainingArguments = $true)]
-    [object[]]$PassThruArgs = @()
+  [string]$Hide = "DIP",
+  [string]$WhitelistSigs,
+  [string]$OnlyTheseTests,
+  [string]$ExcludeTests,
+  [string[]]$ExcludeServers = @(),
+  [Alias('DebugSkipSlowTests')]
+  [switch]$SkipSlowTests,
+  [switch]$SkipPolicyTests,
+  [Alias('Quick')]
+  [switch]$SkipNonEssentialTests,
+  [switch]$NoUpdate,
+  [switch]$RunWithoutElevation,
+  [switch]$PushUpdate,
+  [switch]$NoSendMessage,
+  [string[]]$IpsOfAllDcs = @(),
+  [string[]]$Computers,
+  [Parameter(ValueFromRemainingArguments = $true)]
+  [object[]]$PassThruArgs = @()
 )
 
 #------------------------------------------------------------------------
@@ -116,10 +116,8 @@ $UPDATE_SCRIPT_PATH = Join-Path $SCRIPT_BIN_DIR 'Update-GetHealthCode.ps1'
 $GET_HEALTH_SCRIPT_PATH = Join-Path $SCRIPT_BIN_DIR 'Get-ComputerHealth.ps1'
 $SEND_MESSAGE_SCRIPT_PATH = Join-Path $SCRIPT_BIN_DIR 'Send-Message.ps1'
 $LIB_LOG_OBJECTS_PATH = Join-Path $SCRIPT_BIN_DIR 'lib-write-log-objects.ps1'
-$CUSTOM_TESTS_DIR = Join-Path $CONFIG_DIR 'Custom-HealthTests'
 $VERSION_FILE_PATH = Join-Path $SCRIPT_BIN_DIR 'VERSION'
 
-$OutputConsoleMessages = $true
 $SmtpSubject = 'Notable Messages from Get-ComputerHealth of LIST_OF_COMPUTERS'
 $SmtpSubjectAllGood = 'RELAX. No notable Messages from Get-ComputerHealth of LIST_OF_COMPUTERS'
 $SmtpConfig = Join-Path $CONFIG_DIR 'Send-Message.conf'
@@ -128,7 +126,7 @@ $SmtpConfig = Join-Path $CONFIG_DIR 'Send-Message.conf'
 #------------------------------------------------------------------------
 
 function Invoke-HealthEmail {
-# Send the final report via email (except if -NoSendMessage is passed)
+  # Send the final report via email (except if -NoSendMessage is passed)
   [CmdletBinding()]
   param(
     [Parameter(Mandatory)][string]$Subject,
@@ -156,7 +154,8 @@ function Invoke-HealthEmail {
   try {
     & $SEND_MESSAGE_SCRIPT_PATH @mailParams
     Write-host -for gray   "email sent."
-  } catch {
+  }
+  catch {
     Write-host -for yellow "email failed."
     throw
   }
@@ -184,7 +183,8 @@ function Get-HealthEmailSignature {
         $version = $trimmedVersion
       }
       $timestampPath = $VersionFilePath
-    } catch {
+    }
+    catch {
       # Fall back to the embedded version and script timestamp.
     }
   }
@@ -193,7 +193,8 @@ function Get-HealthEmailSignature {
   try {
     $item = Get-Item -LiteralPath $timestampPath -ErrorAction Stop
     $lastUpdate = $item.LastWriteTime.ToString('yyyy-MM-dd HH:mm')
-  } catch {
+  }
+  catch {
     # Keep "unknown" if file metadata is unavailable.
   }
 
@@ -233,7 +234,8 @@ function Get-EmbeddedGetComputerHealthVersion {
     if ($match.Success) {
       return $match.Groups['Version'].Value
     }
-  } catch {
+  }
+  catch {
     # Fall back to unknown if the file cannot be read.
   }
 
@@ -258,9 +260,10 @@ function Get-DomainServers {
   if (-not $Server) {
     try {
       $srv = Resolve-DnsName -Type SRV ("_ldap._tcp.dc._msdcs.{0}" -f $Domain) -ErrorAction Stop |
-             Sort-Object -Property NameTarget -Unique
+      Sort-Object -Property NameTarget -Unique
       $Server = $srv[0].NameTarget.TrimEnd('.')
-    } catch {
+    }
+    catch {
       Write-Warning "Failed to resolve SRV records for $Domain. You can pass -Server dc.example.com. $_"
       return
     }
@@ -277,7 +280,8 @@ function Get-DomainServers {
     }
     $nc = $root.Properties["defaultNamingContext"][0]
     if (-not $nc) { throw "defaultNamingContext not found." }
-  } catch {
+  }
+  catch {
     Write-Warning "Could not bind to RootDSE on $Server ($rootDsePath): $($_.Exception.Message)"
     return
   }
@@ -295,20 +299,21 @@ function Get-DomainServers {
     $ds = New-Object System.DirectoryServices.DirectorySearcher($searchRoot)
     $ds.PageSize = 1000
     $ds.ServerTimeLimit = [TimeSpan]::FromSeconds(15)
-    $ds.ClientTimeout   = [TimeSpan]::FromSeconds(30)
+    $ds.ClientTimeout = [TimeSpan]::FromSeconds(30)
     $ds.ReferralChasing = [System.DirectoryServices.ReferralChasingOption]::All
-    [void]$ds.PropertiesToLoad.AddRange(@('dNSHostName','name','operatingSystem','userAccountControl','primaryGroupID'))
+    [void]$ds.PropertiesToLoad.AddRange(@('dNSHostName', 'name', 'operatingSystem', 'userAccountControl', 'primaryGroupID'))
 
     $dcExclusion = if ($ExcludeDomainControllers) { '(!(primaryGroupID=516))(!(userAccountControl:1.2.840.113556.1.4.803:=8192))' } else { '' }
     $ds.Filter = "(&(objectCategory=computer)(operatingSystem=*Server*)$dcExclusion)"
 
     foreach ($r in $ds.FindAll()) {
-      $dns  = $r.Properties['dnshostname']
+      $dns = $r.Properties['dnshostname']
       $name = $r.Properties['name']
       if ($dns -and $dns[0]) { [void]$results.Add($dns[0]) }
       elseif ($name -and $name[0]) { [void]$results.Add($name[0]) }
     }
-  } catch {
+  }
+  catch {
     Write-Warning ("Get-DomainServers failed against {0}: {1}" -f $Server, $_.Exception.Message)
     Write-Warning "Tips: verify DNS for $Domain, connectivity to $Server, time sync, and firewall for 389/636 (LDAP/LDAPS) and 3268/3269 (GC)."
     return
@@ -317,15 +322,15 @@ function Get-DomainServers {
   $results
 }
 
-function Get-TcpPortStateFast ($hostname,$ports,$timeout=100) {
-    $tcpobj = @{}; $open = @{}; $requestCallback = $state = $null;
-    foreach ($port in $ports) {
-        $tcpobj[$port] = New-Object System.Net.Sockets.TcpClient; $foo = $tcpobj[$port].BeginConnect($hostname,$port,$requestCallback,$state)
-        }
-        Start-Sleep -milli $timeOut;
-        foreach ($port in $ports) {
-            $open=($tcpobj[$port].Connected); $tcpobj[$port].Close(); [pscustomobject]@{port=$port;open=$open}
-        }
+function Get-TcpPortStateFast ($hostname, $ports, $timeout = 100) {
+  $tcpobj = @{}; $open = @{}; $requestCallback = $state = $null;
+  foreach ($port in $ports) {
+    $tcpobj[$port] = New-Object System.Net.Sockets.TcpClient; $null = $tcpobj[$port].BeginConnect($hostname, $port, $requestCallback, $state)
+  }
+  Start-Sleep -milli $timeOut;
+  foreach ($port in $ports) {
+    $open = ($tcpobj[$port].Connected); $tcpobj[$port].Close(); [pscustomobject]@{port = $port; open = $open }
+  }
 }
 
 function Get-LatestLocalReleaseZip {
@@ -333,7 +338,7 @@ function Get-LatestLocalReleaseZip {
   param(
     [string]$CacheDir = $TEMP_DIR,
     [string]$ConfigDir = $CONFIG_DIR,
-    [string[]]$Patterns = @('GetComputerHealth-release-*.zip','GetComputerHealth-MANUAL-UPDATE-*.zip')
+    [string[]]$Patterns = @('GetComputerHealth-release-*.zip', 'GetComputerHealth-MANUAL-UPDATE-*.zip')
   )
 
   try {
@@ -350,7 +355,8 @@ function Get-LatestLocalReleaseZip {
         ) {
           return (Resolve-Path -LiteralPath $markerPath -ErrorAction Stop).Path
         }
-      } catch {
+      }
+      catch {
         # Fall through to cache-based selection.
       }
     }
@@ -362,7 +368,8 @@ function Get-LatestLocalReleaseZip {
     return ($candidates |
       Sort-Object -Property LastWriteTime -Descending |
       Select-Object -First 1 -ExpandProperty FullName)
-  } catch {
+  }
+  catch {
     return $null
   }
 }
@@ -379,25 +386,26 @@ $embeddedVersion = Get-EmbeddedGetComputerHealthVersion -ScriptPath $GET_HEALTH_
 $emailSignature = Get-HealthEmailSignature -VersionFilePath $VERSION_FILE_PATH -FallbackVersion $embeddedVersion -FallbackTimestampPath $GET_HEALTH_SCRIPT_PATH
 
 if (-not (Get-Module -ListAvailable -Name ImportExcel)) {
-    throw "Required module 'ImportExcel' is missing. Run C:\IT\bin\Update-GetHealthCode.ps1 to install prerequisites."
+  throw "Required module 'ImportExcel' is missing. Run C:\IT\bin\Update-GetHealthCode.ps1 to install prerequisites."
 }
 
 if ($ExcludeServers) {
-    $ExcludeServers = $ExcludeServers | %{ $_ -split '[,\s]+' } | ?{ $_ }
-    write-verbose "`$ExcludeServers: $($ExcludeServers -join ';')"
+  $ExcludeServers = $ExcludeServers | ForEach-Object { $_ -split '[,\s]+' } | Where-Object { $_ }
+  write-verbose "`$ExcludeServers: $($ExcludeServers -join ';')"
 }
 
 if (-not $Computers) {
-    $targets = $env:COMPUTERNAME
-} else {
-    $targets = $Computers | %{ $_ -split '[,\s]+' } | %{$_ -replace '\s'} | ?{ $_}
+  $targets = $env:COMPUTERNAME
+}
+else {
+  $targets = $Computers | ForEach-Object { $_ -split '[,\s]+' } | ForEach-Object { $_ -replace '\s' } | Where-Object { $_ }
 }
 if ('ALL_DOMAIN_SERVERS' -in $targets) {
-    write-verbose "Adding domain servers"
-    $domainServers = (Get-DomainServers | %{$_ -replace '[.].*' -replace '\s'} | ?{$_ -notin $ExcludeServers})
-    $targets = ($targets | ?{$_ -ne 'ALL_DOMAIN_SERVERS'}) + $domainServers
+  write-verbose "Adding domain servers"
+  $domainServers = (Get-DomainServers | ForEach-Object { $_ -replace '[.].*' -replace '\s' } | Where-Object { $_ -notin $ExcludeServers })
+  $targets = ($targets | Where-Object { $_ -ne 'ALL_DOMAIN_SERVERS' }) + $domainServers
 }
-$targets = ($targets | sort)
+$targets = ($targets | Sort-Object)
 
 write-verbose "Targets: $($targets -join ';')"
 $SmtpSubject = $SmtpSubject -replace 'LIST_OF_COMPUTERS', ($targets -join ',')
@@ -405,10 +413,10 @@ $SmtpSubjectAllGood = $SmtpSubjectAllGood -replace 'LIST_OF_COMPUTERS', ($target
 
 $localReleaseZip = $null
 if ($PushUpdate) {
-    $localReleaseZip = Get-LatestLocalReleaseZip
-    if (-not $localReleaseZip) {
-        Write-Warning "-PushUpdate was requested but no local update zip was found (metadata marker or cached zip in ${TEMP_DIR}). Falling back to normal update behavior."
-    }
+  $localReleaseZip = Get-LatestLocalReleaseZip
+  if (-not $localReleaseZip) {
+    Write-Warning "-PushUpdate was requested but no local update zip was found (metadata marker or cached zip in ${TEMP_DIR}). Falling back to normal update behavior."
+  }
 }
 
 $all_messages = @()
@@ -424,193 +432,199 @@ foreach ($target in $targets) {
 
   # The code to run on the target Computer
   $healthCheckBlock = {
-      param(
-          $RootDir,
-          $Hide,
-          $OnlyTheseTests,
-          $ExcludeTests,
-          $WhitelistSigs,
-          $SkipSlowTests,
-          $SkipPolicyTests,
-          $SkipNonEssentialTests,
-          $NoUpdate,
-          $RunWithoutElevation,
-          $IpsOfAllDcs,
-          $PushUpdate,
-          $UpdateZipPath,
-          $PassThruArgs
-      )
+    param(
+      $RootDir,
+      $Hide,
+      $OnlyTheseTests,
+      $ExcludeTests,
+      $WhitelistSigs,
+      $SkipSlowTests,
+      $SkipPolicyTests,
+      $SkipNonEssentialTests,
+      $NoUpdate,
+      $RunWithoutElevation,
+      $IpsOfAllDcs,
+      $PushUpdate,
+      $UpdateZipPath,
+      $PassThruArgs
+    )
 
-      $binDir = Join-Path $RootDir 'bin'
-      $configDir = Join-Path $RootDir 'config'
-      $updateScriptPath = Join-Path $binDir 'Update-GetHealthCode.ps1'
-      $getHealthScriptPath = Join-Path $binDir 'Get-ComputerHealth.ps1'
-      $logLibPath = Join-Path $binDir 'lib-write-log-objects.ps1'
-      $customTestsDir = Join-Path $configDir 'Custom-HealthTests'
-      $records = New-Object System.Collections.Generic.List[object]
+    $binDir = Join-Path $RootDir 'bin'
+    $configDir = Join-Path $RootDir 'config'
+    $updateScriptPath = Join-Path $binDir 'Update-GetHealthCode.ps1'
+    $getHealthScriptPath = Join-Path $binDir 'Get-ComputerHealth.ps1'
+    $logLibPath = Join-Path $binDir 'lib-write-log-objects.ps1'
+    $customTestsDir = Join-Path $configDir 'Custom-HealthTests'
+    $records = New-Object System.Collections.Generic.List[object]
 
-      if (-not (Test-Path -LiteralPath $logLibPath)) {
-        throw "Logging helper file not found: $logLibPath"
-      }
-      . $logLibPath
+    if (-not (Test-Path -LiteralPath $logLibPath)) {
+      throw "Logging helper file not found: $logLibPath"
+    }
+    . $logLibPath
 
-      if (-not $NoUpdate) {
-          try {
-              $updateOutput = if ($PushUpdate -and $UpdateZipPath) {
-                  & $updateScriptPath -UpdateFromZip $UpdateZipPath 2>&1
-              } else {
-                  & $updateScriptPath 2>&1
-              }
-
-              foreach ($item in @($updateOutput)) {
-                  if ($item -is [System.Management.Automation.ErrorRecord]) {
-                      $comment = ($item | Out-String).Trim()
-                      $records.Add((Log-Failure "PowerShell error while running Update-GetHealthCode.ps1" -Comment $comment)) | Out-Null
-                  }
-              }
-          } catch {
-              $records.Add((Log-Failure "Terminating error while running Update-GetHealthCode.ps1" -Comment (($_ | Out-String).Trim()))) | Out-Null
-              return $records
-          }
-      }
-
+    if (-not $NoUpdate) {
       try {
-          $getHealthParams = @{
-              OutputObjects         = $true
-              OutputConsoleMessages = $true
-              Hide                  = $Hide
-              OnlyTheseTests        = $OnlyTheseTests
-              ExcludeTests          = $ExcludeTests
-              IncludeTestsFromFolder= $customTestsDir
-              SuppressSigs          = $WhitelistSigs
-              SkipSlowTests         = $SkipSlowTests
-              SkipPolicyTests       = $SkipPolicyTests
-              SkipNonEssentialTests = $SkipNonEssentialTests
-              RunWithoutElevation   = $RunWithoutElevation
-              IpsOfAllDcs           = $IpsOfAllDcs
-          }
-          $healthOutput = & $getHealthScriptPath @getHealthParams @PassThruArgs 2>&1
+        $updateOutput = if ($PushUpdate -and $UpdateZipPath) {
+          & $updateScriptPath -UpdateFromZip $UpdateZipPath 2>&1
+        }
+        else {
+          & $updateScriptPath 2>&1
+        }
 
-          foreach ($item in @($healthOutput)) {
-              if ($item -is [System.Management.Automation.ErrorRecord]) {
-                  $records.Add((Log-Failure "PowerShell error while running Get-ComputerHealth.ps1" -Comment (($item | Out-String).Trim()))) | Out-Null
-                  continue
-              }
-
-              if ($item -and $item.PSObject.Properties['Level'] -and $item.PSObject.Properties['Message']) {
-                  $records.Add([pscustomobject]@{
-                      Computer   = if ($item.PSObject.Properties['Computer']) { [string]$item.Computer } else { $env:COMPUTERNAME }
-                      Level      = [string]$item.Level
-                      Hash       = if ($item.PSObject.Properties['Hash']) { [string]$item.Hash } else { '00000000' }
-                      Suppressed = if ($item.PSObject.Properties['Suppressed']) { [bool]$item.Suppressed } else { $false }
-                      Message    = [string]$item.Message
-                      Comment    = if ($item.PSObject.Properties['Comment']) { [string]$item.Comment } else { '' }
-                      Emitter    = if ($item.PSObject.Properties['Emitter']) { $item.Emitter } else { $null }
-                  }) | Out-Null
-              }
+        foreach ($item in @($updateOutput)) {
+          if ($item -is [System.Management.Automation.ErrorRecord]) {
+            $comment = ($item | Out-String).Trim()
+            $records.Add((Log-Failure "PowerShell error while running Update-GetHealthCode.ps1" -Comment $comment)) | Out-Null
           }
-      } catch {
-          $records.Add((Log-Failure "Terminating error while running Get-ComputerHealth.ps1" -Comment (($_ | Out-String).Trim()))) | Out-Null
+        }
       }
+      catch {
+        $records.Add((Log-Failure "Terminating error while running Update-GetHealthCode.ps1" -Comment (($_ | Out-String).Trim()))) | Out-Null
+        return $records
+      }
+    }
 
-      return $records
+    try {
+      $getHealthParams = @{
+        OutputObjects          = $true
+        OutputConsoleMessages  = $true
+        Hide                   = $Hide
+        OnlyTheseTests         = $OnlyTheseTests
+        ExcludeTests           = $ExcludeTests
+        IncludeTestsFromFolder = $customTestsDir
+        SuppressSigs           = $WhitelistSigs
+        SkipSlowTests          = $SkipSlowTests
+        SkipPolicyTests        = $SkipPolicyTests
+        SkipNonEssentialTests  = $SkipNonEssentialTests
+        RunWithoutElevation    = $RunWithoutElevation
+        IpsOfAllDcs            = $IpsOfAllDcs
+      }
+      $healthOutput = & $getHealthScriptPath @getHealthParams @PassThruArgs 2>&1
+
+      foreach ($item in @($healthOutput)) {
+        if ($item -is [System.Management.Automation.ErrorRecord]) {
+          $records.Add((Log-Failure "PowerShell error while running Get-ComputerHealth.ps1" -Comment (($item | Out-String).Trim()))) | Out-Null
+          continue
+        }
+
+        if ($item -and $item.PSObject.Properties['Level'] -and $item.PSObject.Properties['Message']) {
+          $records.Add([pscustomobject]@{
+              Computer   = if ($item.PSObject.Properties['Computer']) { [string]$item.Computer } else { $env:COMPUTERNAME }
+              Level      = [string]$item.Level
+              Hash       = if ($item.PSObject.Properties['Hash']) { [string]$item.Hash } else { '00000000' }
+              Suppressed = if ($item.PSObject.Properties['Suppressed']) { [bool]$item.Suppressed } else { $false }
+              Message    = [string]$item.Message
+              Comment    = if ($item.PSObject.Properties['Comment']) { [string]$item.Comment } else { '' }
+              Emitter    = if ($item.PSObject.Properties['Emitter']) { $item.Emitter } else { $null }
+            }) | Out-Null
+        }
+      }
+    }
+    catch {
+      $records.Add((Log-Failure "Terminating error while running Get-ComputerHealth.ps1" -Comment (($_ | Out-String).Trim()))) | Out-Null
+    }
+
+    return $records
   }
 
   if ($target -eq $env:COMPUTERNAME) {
-      $output = & $healthCheckBlock $ROOT_DIR $Hide $OnlyTheseTests $ExcludeTests $WhitelistSigs $SkipSlowTests $SkipPolicyTests $SkipNonEssentialTests $NoUpdate $RunWithoutElevation $IpsOfAllDcs $PushUpdate $localReleaseZip $PassThruArgs
+    $output = & $healthCheckBlock $ROOT_DIR $Hide $OnlyTheseTests $ExcludeTests $WhitelistSigs $SkipSlowTests $SkipPolicyTests $SkipNonEssentialTests $NoUpdate $RunWithoutElevation $IpsOfAllDcs $PushUpdate $localReleaseZip $PassThruArgs
   }
   else {
-      if (Get-TcpPortStateFast $target @(5985, 5986, 80, 443, 88, 135, 389, 636, 445, 3268, 3269) | Where-Object { $_.Open }) {
-        Write-Progress -Activity "Checking $target" -Status "Phase #2 (copying updater and running Get-ComputerHealth.ps1)"
+    if (Get-TcpPortStateFast $target @(5985, 5986, 80, 443, 88, 135, 389, 636, 445, 3268, 3269) | Where-Object { $_.Open }) {
+      Write-Progress -Activity "Checking $target" -Status "Phase #2 (copying updater and running Get-ComputerHealth.ps1)"
 
-        $session = $null
-        try {
-          $session = New-PSSession -ComputerName $target
+      $session = $null
+      try {
+        $session = New-PSSession -ComputerName $target
 
-          Invoke-Command -Session $session -ScriptBlock {
-            param($RootDir)
-            $remoteBinDir = Join-Path $RootDir 'bin'
-            $remoteTempDir = Join-Path $RootDir 'temp'
-            if (-not (Test-Path $remoteBinDir))  { New-Item -Path $remoteBinDir  -ItemType Directory -Force | Out-Null }
-            if (-not (Test-Path $remoteTempDir)) { New-Item -Path $remoteTempDir -ItemType Directory -Force | Out-Null }
-          } -ArgumentList $ROOT_DIR
+        Invoke-Command -Session $session -ScriptBlock {
+          param($RootDir)
+          $remoteBinDir = Join-Path $RootDir 'bin'
+          $remoteTempDir = Join-Path $RootDir 'temp'
+          if (-not (Test-Path $remoteBinDir)) { New-Item -Path $remoteBinDir  -ItemType Directory -Force | Out-Null }
+          if (-not (Test-Path $remoteTempDir)) { New-Item -Path $remoteTempDir -ItemType Directory -Force | Out-Null }
+        } -ArgumentList $ROOT_DIR
 
-          $localUpdaterPath  = $UPDATE_SCRIPT_PATH
-          $remoteUpdaterPath = Join-Path (Join-Path $ROOT_DIR 'bin') 'Update-GetHealthCode.ps1'
+        $localUpdaterPath = $UPDATE_SCRIPT_PATH
+        $remoteUpdaterPath = Join-Path (Join-Path $ROOT_DIR 'bin') 'Update-GetHealthCode.ps1'
 
-          if (-not (Test-Path -LiteralPath $localUpdaterPath)) {
-            throw "Local updater file not found: $localUpdaterPath"
-          }
-
-          Copy-Item -Path $localUpdaterPath -Destination $remoteUpdaterPath -ToSession $session -Force
-
-          $remoteZipPath = $null
-          if ($PushUpdate -and $localReleaseZip) {
-            $remoteZipPath = Join-Path (Join-Path $ROOT_DIR 'temp') (Split-Path -Path $localReleaseZip -Leaf)
-            Copy-Item -Path $localReleaseZip -Destination $remoteZipPath -ToSession $session -Force
-          }
-
-          $output = Invoke-Command -Session $session -ScriptBlock $healthCheckBlock -ArgumentList $ROOT_DIR, $Hide, $OnlyTheseTests, $ExcludeTests, $WhitelistSigs, $SkipSlowTests, $SkipPolicyTests, $SkipNonEssentialTests, $NoUpdate, $RunWithoutElevation, $IpsOfAllDcs, $PushUpdate, $remoteZipPath, $PassThruArgs
-        } catch {
-          $_ = Log-failure "Failed running update/health scripts on target $target"
-          $all_messages += [pscustomobject]@{
-              Computer   = $target
-              Level      = 'failure'
-              Hash       = '00000000'
-              Suppressed = $false
-              Message    = "Failed running update/health scripts"
-              Comment    = (($_ | Out-String).Trim())
-              Emitter    = $null
-          }
-          continue
+        if (-not (Test-Path -LiteralPath $localUpdaterPath)) {
+          throw "Local updater file not found: $localUpdaterPath"
         }
-        finally {
-          if ($session) { Remove-PSSession $session }
+
+        Copy-Item -Path $localUpdaterPath -Destination $remoteUpdaterPath -ToSession $session -Force
+
+        $remoteZipPath = $null
+        if ($PushUpdate -and $localReleaseZip) {
+          $remoteZipPath = Join-Path (Join-Path $ROOT_DIR 'temp') (Split-Path -Path $localReleaseZip -Leaf)
+          Copy-Item -Path $localReleaseZip -Destination $remoteZipPath -ToSession $session -Force
         }
-      } else {
-          if ($target -in $domainServers) {
-              $comment = " (either it is down or you have a stale entry in your AD)"
-          } else {
-              $comment = " (are you sure a computer with that name exists?)"
-          }
-          $_ = Log-failure "Target $target is unreachable $comment"
-          $all_messages += [pscustomobject]@{
-              Computer   = $target
-              Level      = 'failure'
-              Hash       = '00000000'
-              Suppressed = $false
-              Message    = "Target is unreachable $comment"
-              Comment    = ""
-              Emitter    = $null
-          }
-          continue
+
+        $output = Invoke-Command -Session $session -ScriptBlock $healthCheckBlock -ArgumentList $ROOT_DIR, $Hide, $OnlyTheseTests, $ExcludeTests, $WhitelistSigs, $SkipSlowTests, $SkipPolicyTests, $SkipNonEssentialTests, $NoUpdate, $RunWithoutElevation, $IpsOfAllDcs, $PushUpdate, $remoteZipPath, $PassThruArgs
       }
+      catch {
+        $null = Log-failure "Failed running update/health scripts on target $target"
+        $all_messages += [pscustomobject]@{
+          Computer   = $target
+          Level      = 'failure'
+          Hash       = '00000000'
+          Suppressed = $false
+          Message    = "Failed running update/health scripts"
+          Comment    = (($_ | Out-String).Trim())
+          Emitter    = $null
+        }
+        continue
+      }
+      finally {
+        if ($session) { Remove-PSSession $session }
+      }
+    }
+    else {
+      if ($target -in $domainServers) {
+        $comment = " (either it is down or you have a stale entry in your AD)"
+      }
+      else {
+        $comment = " (are you sure a computer with that name exists?)"
+      }
+      $null = Log-failure "Target $target is unreachable $comment"
+      $all_messages += [pscustomobject]@{
+        Computer   = $target
+        Level      = 'failure'
+        Hash       = '00000000'
+        Suppressed = $false
+        Message    = "Target is unreachable $comment"
+        Comment    = ""
+        Emitter    = $null
+      }
+      continue
+    }
   }
 
   $all_messages += $output
   Write-Progress -Activity "Checking $target" -Completed
 }
 
-$SortOrder = @{'failure' = 1; 'warning' = 2; 'notice' = 3; 'info'=4; 'pass'=5; 'debug'=6}
+$SortOrder = @{'failure' = 1; 'warning' = 2; 'notice' = 3; 'info' = 4; 'pass' = 5; 'debug' = 6 }
 $notable_msgs = @()
-if ($all_messages){
+if ($all_messages) {
   # save
   Export-HealthMessagesToExcel -Data $all_messages -FileName "${TEMP_DIR}\all-messages-$($timestamp).xlsx"
   $notable_msgs = (`
-    $all_messages `
-        | Where-Object { -not($_.Suppressed) -and $_.level -notin @('debug','help','pass','info') } `
-        | Sort-Object -Property @{ Expression = { $SortOrder[$_.Level] } }, Computer `
+      $all_messages `
+    | Where-Object { -not($_.Suppressed) -and $_.level -notin @('debug', 'help', 'pass', 'info') } `
+    | Sort-Object -Property @{ Expression = { $SortOrder[$_.Level] } }, Computer `
   )
   if ($notable_msgs) {
-      Export-HealthMessagesToExcel -Data $notable_msgs -FileName "${TEMP_DIR}\notable-messages-$($timestamp).xlsx"
+    Export-HealthMessagesToExcel -Data $notable_msgs -FileName "${TEMP_DIR}\notable-messages-$($timestamp).xlsx"
   }
 
-  $synopsis = " " +($notable_msgs | Where-Object {$_.Level} |
+  $synopsis = " " + ($notable_msgs | Where-Object { $_.Level } |
     Group-Object Level -NoElement |
-    Sort-Object -Property @{ Expression = { $SortOrder[$_.Name] } } | %{
-        if ($_.Count) {
-            "    $($_.Count.ToString().PadRight(5)) $($_.Name)`r`n"
-        }
+    Sort-Object -Property @{ Expression = { $SortOrder[$_.Name] } } | ForEach-Object {
+      if ($_.Count) {
+        "    $($_.Count.ToString().PadRight(5)) $($_.Name)`r`n"
+      }
     })
 
   write-host ""
@@ -618,42 +632,44 @@ if ($all_messages){
   Write-host -for gray   $synopsis
   write-host ""
   if ($notable_msgs) {
-      Write-host -for yellow "Found notable messages. I have saved them in these files:"
-      Write-host -for yellow "    ${TEMP_DIR}\notable-messages-$($timestamp).xlsx"
-      Write-host -for gray   "    ${TEMP_DIR}\all-messages-$($timestamp).xlsx"
-      Write-host -for gray   "Open them on Excel or if you prefer PowerShell load them like this:"
-      Write-host -for gray   "    `$data = Import-Excel ${TEMP_DIR}\notable-messages-$($timestamp).xlsx"
-      Write-host -for gray   '    $data|ogv # GUI review'
-      Write-host -for gray   '    $data|select -Property Computer,Level,Message # Console review'
+    Write-host -for yellow "Found notable messages. I have saved them in these files:"
+    Write-host -for yellow "    ${TEMP_DIR}\notable-messages-$($timestamp).xlsx"
+    Write-host -for gray   "    ${TEMP_DIR}\all-messages-$($timestamp).xlsx"
+    Write-host -for gray   "Open them on Excel or if you prefer PowerShell load them like this:"
+    Write-host -for gray   "    `$data = Import-Excel ${TEMP_DIR}\notable-messages-$($timestamp).xlsx"
+    Write-host -for gray   '    $data|ogv # GUI review'
+    Write-host -for gray   '    $data|select -Property Computer,Level,Message # Console review'
 
-      Write-host -for gray   ""
-      Write-host -for gray   "Emailing notable messages"
+    Write-host -for gray   ""
+    Write-host -for gray   "Emailing notable messages"
 
-      $body = ""
-      if ($notable_msgs.count -gt 10) {
-          # too many messages; add a synopsis at the top
-          $body += "Synopsis of messages per level`r`n" + $synopsis + "`r`n"
-      }
-      $body += `
-          ($notable_msgs |
-              Sort-Object -Property @{ Expression = { $SortOrder[$_.Level] } }, Computer |
-              ForEach-Object {
-                  "$($_.Computer.PadRight(15)) $($_.Level.PadRight(8)) $($_.Message)"
-              } | Out-String `
-          )
+    $body = ""
+    if ($notable_msgs.count -gt 10) {
+      # too many messages; add a synopsis at the top
+      $body += "Synopsis of messages per level`r`n" + $synopsis + "`r`n"
+    }
+    $body += `
+    ($notable_msgs |
+      Sort-Object -Property @{ Expression = { $SortOrder[$_.Level] } }, Computer |
+      ForEach-Object {
+        "$($_.Computer.PadRight(15)) $($_.Level.PadRight(8)) $($_.Message)"
+      } | Out-String `
+    )
 
-      $encoded = [System.Net.WebUtility]::HtmlEncode($body)
-      $html = "<pre style='font-family: Consolas, ""Courier New"", monospace; white-space:pre-wrap; margin:0; font-size:12px; line-height:1.35'>$encoded</pre>"
+    $encoded = [System.Net.WebUtility]::HtmlEncode($body)
+    $html = "<pre style='font-family: Consolas, ""Courier New"", monospace; white-space:pre-wrap; margin:0; font-size:12px; line-height:1.35'>$encoded</pre>"
 
-      $signedHtml = Add-HealthEmailSignature -Body $html -BodyAsHtml -Signature $emailSignature
-      Invoke-HealthEmail -Subject $SmtpSubject -Body $signedHtml -BodyAsHtml -Attachments "${TEMP_DIR}\notable-messages-$($timestamp).xlsx" -ConfigFile $SmtpConfig -NoSendMessage:$NoSendMessage
-  } else {
+    $signedHtml = Add-HealthEmailSignature -Body $html -BodyAsHtml -Signature $emailSignature
+    Invoke-HealthEmail -Subject $SmtpSubject -Body $signedHtml -BodyAsHtml -Attachments "${TEMP_DIR}\notable-messages-$($timestamp).xlsx" -ConfigFile $SmtpConfig -NoSendMessage:$NoSendMessage
+  }
+  else {
     Write-host -for green    "GOOD, Nothing notable to record. I have saved less notable messages here:"
     Write-host -for gray     "    ${TEMP_DIR}\all-messages-$($timestamp).xlsx"
     $signedBody = Add-HealthEmailSignature -Body 'Relax :-)' -Signature $emailSignature
     Invoke-HealthEmail -Subject $SmtpSubjectAllGood -Body $signedBody -ConfigFile $SmtpConfig -NoSendMessage:$NoSendMessage
   }
-} else {
+}
+else {
 }
 
 Stop-Transcript

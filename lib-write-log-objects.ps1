@@ -108,9 +108,9 @@ Requires ImportExcel module.
 # Default configuration if the caller doesn't call Set-LogConfig
 #
 #
-$script:cfgSuppressedSignatures=@()
-$script:cfgOutputConsoleMessages=$true
-$script:cfgHideStr=""
+$script:cfgSuppressedSignatures = @()
+$script:cfgOutputConsoleMessages = $true
+$script:cfgHideStr = ""
 
 #=============================================================
 # START OF Low level functions
@@ -118,19 +118,19 @@ $script:cfgHideStr=""
 #
 
 # Compute a hex hash of a string (Lowercase hex digest)
-function Get-StringHash{
-  param([Parameter(Mandatory)][string]$InputString,[ValidateSet('MD5','SHA1','SHA256','SHA384','SHA512')][string]$Algorithm='MD5')
-  $bytes=[Text.Encoding]::UTF8.GetBytes($InputString)
-  $algo=[Security.Cryptography.HashAlgorithm]::Create($Algorithm)
-  try{ -join ($algo.ComputeHash($bytes)|%{ $_.ToString('x2') }) } finally{ if($algo){$algo.Dispose()} }
+function Get-StringHash {
+  param([Parameter(Mandatory)][string]$InputString, [ValidateSet('MD5', 'SHA1', 'SHA256', 'SHA384', 'SHA512')][string]$Algorithm = 'MD5')
+  $bytes = [Text.Encoding]::UTF8.GetBytes($InputString)
+  $algo = [Security.Cryptography.HashAlgorithm]::Create($Algorithm)
+  try { -join ($algo.ComputeHash($bytes) | ForEach-Object { $_.ToString('x2') }) } finally { if ($algo) { $algo.Dispose() } }
 }
 
 # Return the leftmost N characters.
 function Get-LeftString {
-  param([Parameter(Mandatory)][string]$String,[Parameter(Mandatory)][int]$Count)
-  if($Count -lt 0){ $Count=0 }
-  if($Count -gt $String.Length){ $Count = $String.Length }
-  $String.Substring(0,$Count)
+  param([Parameter(Mandatory)][string]$String, [Parameter(Mandatory)][int]$Count)
+  if ($Count -lt 0) { $Count = 0 }
+  if ($Count -gt $String.Length) { $Count = $String.Length }
+  $String.Substring(0, $Count)
 }
 #
 #
@@ -150,10 +150,10 @@ or spacing will therefore produce the same signature.
 #> 
 function Get-StringSignature {
   param([Parameter(Mandatory)][string]$InputString)
-  $s=$InputString.ToLowerInvariant().Trim()
-  $s=$s -replace "[\.,;:!\?\-_/\\\(\)\[\]\{\}']+", ' '
-  $s=$s -replace '\s+',' '
-  $hash=Get-StringHash -InputString $s -Algorithm MD5
+  $s = $InputString.ToLowerInvariant().Trim()
+  $s = $s -replace "[\.,;:!\?\-_/\\\(\)\[\]\{\}']+", ' '
+  $s = $s -replace '\s+', ' '
+  $hash = Get-StringHash -InputString $s -Algorithm MD5
   Get-LeftString -String $hash -Count 8
 }
 
@@ -175,16 +175,16 @@ function ConvertTo-SignatureList {
   [CmdletBinding()]
   param([AllowNull()][object]$InputObject)
 
-  if($null -eq $InputObject){ return @() }
+  if ($null -eq $InputObject) { return @() }
 
-  $items=@()
-  if($InputObject -is [string[]]){ $items=@($InputObject) }
-  elseif($InputObject -is [System.Collections.IEnumerable] -and -not ($InputObject -is [string])){ $items=@($InputObject) }
-  else{ $items=@([string]$InputObject) }
+  $items = @()
+  if ($InputObject -is [string[]]) { $items = @($InputObject) }
+  elseif ($InputObject -is [System.Collections.IEnumerable] -and -not ($InputObject -is [string])) { $items = @($InputObject) }
+  else { $items = @([string]$InputObject) }
 
   $flat = ($items | ForEach-Object { [string]$_ }) -join ' '
-  $flat = $flat -replace '\[|\]',''
-  $flat = $flat -replace '[^0-9A-Fa-f,\s]',' '
+  $flat = $flat -replace '\[|\]', ''
+  $flat = $flat -replace '[^0-9A-Fa-f,\s]', ' '
   $flat -split '[,\s]+' | Where-Object { $_ } | ForEach-Object { $_.ToLowerInvariant() } | Sort-Object -Unique
 }
 
@@ -199,7 +199,7 @@ function Add-LogSuppressedSignatures {
   param([Parameter(Mandatory)][object]$Signatures)
 
   $extra = ConvertTo-SignatureList $Signatures
-  if(-not $extra){ return }
+  if (-not $extra) { return }
 
   $cfg = Get-LogConfig
   $merged = @($cfg.SuppressedSignatures) + @($extra) | Sort-Object -Unique
@@ -230,19 +230,19 @@ Extra signatures to suppress for this run only.
 function Initialize-LogSystem {
   [CmdletBinding()]
   param(
-    [bool]$OutputConsoleMessages=$true,
-    [string]$HideStr="",
+    [bool]$OutputConsoleMessages = $true,
+    [string]$HideStr = "",
     [string]$SuppressionFilePath,
     [object]$AdditionalSuppressedSignatures
   )
 
   Set-LogConfig -OutputConsoleMessages $OutputConsoleMessages -HideStr $HideStr
 
-  if($SuppressionFilePath){
+  if ($SuppressionFilePath) {
     Initialize-SignatureSuppression -Path $SuppressionFilePath
   }
 
-  if($PSBoundParameters.ContainsKey('AdditionalSuppressedSignatures')){
+  if ($PSBoundParameters.ContainsKey('AdditionalSuppressedSignatures')) {
     Add-LogSuppressedSignatures $AdditionalSuppressedSignatures
   }
 }
@@ -263,33 +263,36 @@ function Initialize-SignatureSuppression {
   param([Parameter(Mandatory)][string]$Path)
 
   $set = New-Object 'System.Collections.Generic.HashSet[string]'
-  if([string]::IsNullOrWhiteSpace($Path)){ return }
+  if ([string]::IsNullOrWhiteSpace($Path)) { return }
 
-  if(-not (Test-Path -LiteralPath $Path)){ return }
+  if (-not (Test-Path -LiteralPath $Path)) { return }
 
   $today = (Get-Date).Date
   $lines = Get-Content -Encoding utf8 -LiteralPath $Path -ErrorAction SilentlyContinue
 
-  foreach($line in $lines){
-    if($null -eq $line){ continue }
+  foreach ($line in $lines) {
+    if ($null -eq $line) { continue }
 
-    $line = ($line -replace '\s+#.*$','').Trim()
-    if([string]::IsNullOrWhiteSpace($line)){ continue }
+    $line = ($line -replace '\s+#.*$', '').Trim()
+    if ([string]::IsNullOrWhiteSpace($line)) { continue }
 
-    if($line -match '^\[?([0-9A-Fa-f]{8})\]?(?:\s+until\s+(\d{4}-\d{2}-\d{2}))?$'){
+    if ($line -match '^\[?([0-9A-Fa-f]{8})\]?(?:\s+until\s+(\d{4}-\d{2}-\d{2}))?$') {
       $hash8 = $Matches[1].ToLowerInvariant()
 
-      if($Matches[2]){
-        try{
-          $expiry = [datetime]::ParseExact($Matches[2],'yyyy-MM-dd',[Globalization.CultureInfo]::InvariantCulture).Date
-        } catch { continue }
+      if ($Matches[2]) {
+        try {
+          $expiry = [datetime]::ParseExact($Matches[2], 'yyyy-MM-dd', [Globalization.CultureInfo]::InvariantCulture).Date
+        }
+        catch { continue }
 
-        if($today -le $expiry){
+        if ($today -le $expiry) {
           [void]$set.Add($hash8)
-        } else {
+        }
+        else {
           [void]$set.Remove($hash8)
         }
-      } else {
+      }
+      else {
         [void]$set.Add($hash8)
       }
     }
@@ -318,9 +321,9 @@ function Set-LogConfig {
     [bool]$OutputConsoleMessages,
     [string]$HideStr
   )
-  if($PSBoundParameters.ContainsKey('SuppressedSignatures')){ $script:cfgSuppressedSignatures=@($SuppressedSignatures) }
-  if($PSBoundParameters.ContainsKey('OutputConsoleMessages')){ $script:cfgOutputConsoleMessages=$OutputConsoleMessages }
-  if($PSBoundParameters.ContainsKey('HideStr')){ $script:cfgHideStr=[string]$HideStr }
+  if ($PSBoundParameters.ContainsKey('SuppressedSignatures')) { $script:cfgSuppressedSignatures = @($SuppressedSignatures) }
+  if ($PSBoundParameters.ContainsKey('OutputConsoleMessages')) { $script:cfgOutputConsoleMessages = $OutputConsoleMessages }
+  if ($PSBoundParameters.ContainsKey('HideStr')) { $script:cfgHideStr = [string]$HideStr }
 }
 
 <#
@@ -346,48 +349,48 @@ function Get-LogConfig {
 function Log-Msg {
   [CmdletBinding()]
   param(
-    [Parameter(Mandatory)][ValidateSet('debug','pass','info','notice','warning','failure')][string]$Level,
+    [Parameter(Mandatory)][ValidateSet('debug', 'pass', 'info', 'notice', 'warning', 'failure')][string]$Level,
     [Parameter(Mandatory)][string]$Msg,
     [string]$Comment = ""
   )
 
   [string]$SigColor = 'DarkGray'
-    switch ($Level) {
+  switch ($Level) {
     'debug' {
-      $Hide       = ($script:cfgHideStr -like '*D*') 
-      $LabelText  = 'DEBUG  :' 
+      $Hide = ($script:cfgHideStr -like '*D*') 
+      $LabelText = 'DEBUG  :' 
       $LabelColor = 'DarkGray' 
-      $MsgColor   = 'DarkGray'
+      $MsgColor = 'DarkGray'
     }
     'pass' {
-      $Hide       = ($script:cfgHideStr -like '*P*') 
-      $LabelText  = 'PASS   :' 
+      $Hide = ($script:cfgHideStr -like '*P*') 
+      $LabelText = 'PASS   :' 
       $LabelColor = 'Green' 
-      $MsgColor   = 'DarkGray'
+      $MsgColor = 'DarkGray'
     }
     'info' {
-      $Hide       = ($script:cfgHideStr -like '*I*') 
-      $LabelText  = 'INFO   :' 
+      $Hide = ($script:cfgHideStr -like '*I*') 
+      $LabelText = 'INFO   :' 
       $LabelColor = 'Cyan' 
-      $MsgColor   = 'DarkGray'
+      $MsgColor = 'DarkGray'
     }
     'notice' {
-      $Hide       = ($script:cfgHideStr -like '*N*') 
-      $LabelText  = 'NOTICE :' 
+      $Hide = ($script:cfgHideStr -like '*N*') 
+      $LabelText = 'NOTICE :' 
       $LabelColor = 'DarkYellow' 
-      $MsgColor   = 'Gray'
+      $MsgColor = 'Gray'
     }
     'warning' {
-      $Hide       = ($script:cfgHideStr -like '*W*') 
-      $LabelText  = 'WARNING:' 
+      $Hide = ($script:cfgHideStr -like '*W*') 
+      $LabelText = 'WARNING:' 
       $LabelColor = 'Yellow' 
-      $MsgColor   = 'White'
+      $MsgColor = 'White'
     }
     'failure' {
-      $Hide       = ($script:cfgHideStr -like '*F*') 
-      $LabelText  = 'FAILURE:' 
+      $Hide = ($script:cfgHideStr -like '*F*') 
+      $LabelText = 'FAILURE:' 
       $LabelColor = 'Red' 
-      $MsgColor   = 'White'
+      $MsgColor = 'White'
     }
   }
 
@@ -402,10 +405,10 @@ function Log-Msg {
   # (look up the call stack to find a function named HealthTest-* that called us)
   $logEmitter = $null
   foreach ($frame in (Get-PSCallStack | Select-Object -Skip 1 -First 5)) {
-      if ($frame.FunctionName -like 'HealthTest-*') {
-          $logEmitter = $frame.FunctionName
-          break
-      }
+    if ($frame.FunctionName -like 'HealthTest-*') {
+      $logEmitter = $frame.FunctionName
+      break
+    }
   }
 
   $out = [pscustomobject]@{
@@ -429,8 +432,9 @@ function Log-Msg {
 
     if ($CommentText -and ($script:cfgHideStr -notlike '*C*')) {
       if ($CommentText -match '\n') {
-        ($CommentText -replace '^(?:\s*\r?\n)+|(?:\s*\r?\n)+$', '') -split '\n' | %{ Write-Host -ForegroundColor DarkGray "  #       $_" }
-      } else {
+        ($CommentText -replace '^(?:\s*\r?\n)+|(?:\s*\r?\n)+$', '') -split '\n' | ForEach-Object { Write-Host -ForegroundColor DarkGray "  #       $_" }
+      }
+      else {
         Write-Host -ForegroundColor DarkGray "  #       $CommentText"
       }
     }
@@ -459,12 +463,12 @@ function Log-Msg {
 }
 
 # Convenience functions (e.g. Log-Debug "..." instead of Log-Msg "Debug" "...")
-function Log-Debug   { param([Parameter(Mandatory)][string]$Msg,[string]$Comment="") Log-Msg -Level 'debug'   -Msg $Msg -Comment $Comment }
-function Log-Pass    { param([Parameter(Mandatory)][string]$Msg,[string]$Comment="") Log-Msg -Level 'pass'    -Msg $Msg -Comment $Comment }
-function Log-Info    { param([Parameter(Mandatory)][string]$Msg,[string]$Comment="") Log-Msg -Level 'info'    -Msg $Msg -Comment $Comment }
-function Log-Notice  { param([Parameter(Mandatory)][string]$Msg,[string]$Comment="") Log-Msg -Level 'notice'  -Msg $Msg -Comment $Comment }
-function Log-Warning { param([Parameter(Mandatory)][string]$Msg,[string]$Comment="") Log-Msg -Level 'warning' -Msg $Msg -Comment $Comment }
-function Log-Failure { param([Parameter(Mandatory)][string]$Msg,[string]$Comment="") Log-Msg -Level 'failure' -Msg $Msg -Comment $Comment }
+function Log-Debug { param([Parameter(Mandatory)][string]$Msg, [string]$Comment = "") Log-Msg -Level 'debug'   -Msg $Msg -Comment $Comment }
+function Log-Pass { param([Parameter(Mandatory)][string]$Msg, [string]$Comment = "") Log-Msg -Level 'pass'    -Msg $Msg -Comment $Comment }
+function Log-Info { param([Parameter(Mandatory)][string]$Msg, [string]$Comment = "") Log-Msg -Level 'info'    -Msg $Msg -Comment $Comment }
+function Log-Notice { param([Parameter(Mandatory)][string]$Msg, [string]$Comment = "") Log-Msg -Level 'notice'  -Msg $Msg -Comment $Comment }
+function Log-Warning { param([Parameter(Mandatory)][string]$Msg, [string]$Comment = "") Log-Msg -Level 'warning' -Msg $Msg -Comment $Comment }
+function Log-Failure { param([Parameter(Mandatory)][string]$Msg, [string]$Comment = "") Log-Msg -Level 'failure' -Msg $Msg -Comment $Comment }
 
 
 <#
@@ -475,10 +479,11 @@ function Log-Failure { param([Parameter(Mandatory)][string]$Msg,[string]$Comment
 .PARAMETER Comment  Optional info to be shown when Test fails.
 #>
 function Write-BasedOnTestResult {
-  param([Parameter(Mandatory)][string]$Title,[Parameter(Mandatory)][bool]$Test,[string]$Comment="")
-  if($Test){ 
+  param([Parameter(Mandatory)][string]$Title, [Parameter(Mandatory)][bool]$Test, [string]$Comment = "")
+  if ($Test) { 
     Write-Warning "[PASS] $Title"
-  } else{
+  }
+  else {
     Write-Warning "[FAILURE] $Title`n$Comment"
   }
 }
@@ -495,23 +500,24 @@ function Export-HealthMessagesToExcel {
 
   # export the requested columns
   $Data |
-    Select-Object Computer, Suppressed, Level, Message, Comment, Hash | %{
-		$safe_quotes_msg = $_.Message -replace '"',"''"
-		if ($_.Suppressed) {
-			$command = "" 
-		} else {
-			$command = "Invoke-Command $($_.Computer) {c:\it\bin\Get-ComputerHealth.ps1 -AddWhitelisting -until 2999-12-31 -sig '$($_.hash)' -ComputerName $($_.Computer) -comment ""$($_.level) - $safe_quotes_msg""}"
-		}
-		[pscustomobject]@{
-			Computer = $_.Computer
-			Suppressed = $_.Suppressed
-			Level = $_.Level
-			Message = $_.Message
-			Comment = $_.comment
-			Hash = $_.Hash
-			CommandToSuppressMsg = $command
-		}
-	} | Export-Excel -Path $FileName -WorksheetName 'Messages' -AutoSize -BoldTopRow
+  Select-Object Computer, Suppressed, Level, Message, Comment, Hash | ForEach-Object {
+    $safe_quotes_msg = $_.Message -replace '"', "''"
+    if ($_.Suppressed) {
+      $command = "" 
+    }
+    else {
+      $command = "Invoke-Command $($_.Computer) {c:\it\bin\Get-ComputerHealth.ps1 -AddWhitelisting -until 2999-12-31 -sig '$($_.hash)' -ComputerName $($_.Computer) -comment ""$($_.level) - $safe_quotes_msg""}"
+    }
+    [pscustomobject]@{
+      Computer             = $_.Computer
+      Suppressed           = $_.Suppressed
+      Level                = $_.Level
+      Message              = $_.Message
+      Comment              = $_.comment
+      Hash                 = $_.Hash
+      CommandToSuppressMsg = $command
+    }
+  } | Export-Excel -Path $FileName -WorksheetName 'Messages' -AutoSize -BoldTopRow
 }
 
 
