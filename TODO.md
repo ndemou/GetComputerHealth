@@ -18,13 +18,6 @@ Since this is a breaking change it requires a) the update of the major version n
 
 The migration script seems easy: Use `sls` to find the names of the custom health test functions and append a call to them at the end of the script. We can use `Get-TextFileEncoding` from `helpers-text-files.ps1` to make sure we append text using the correct encoding. The migration script should be run by the updater/installer only when an existing version `3.x.y` is found.
 
-## No NOTICE for services which are set to automatically start but have terminated with ExitCode=0
-
-These messages should be downgraded from NOTICE to INFO:
-```
-NOTICE: Service '<FOO>' which is set to automatically start is not running; calmingly its last execution terminated normally: ExitCode=0(The operation completed successfully.).
-```
-
 ## Reduce recurring agent friction in this repo
 
 Recent work repeatedly hit the same workflow problems:
