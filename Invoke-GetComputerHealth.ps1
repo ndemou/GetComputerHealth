@@ -166,7 +166,8 @@ function Get-HealthEmailSignature {
   param(
     [Parameter(Mandatory)][string]$VersionFilePath,
     [Parameter(Mandatory)][string]$FallbackVersion,
-    [Parameter(Mandatory)][string]$FallbackTimestampPath
+    [Parameter(Mandatory)][string]$FallbackTimestampPath,
+    [string]$DomainName = $(if ($env:USERDNSDOMAIN) { $env:USERDNSDOMAIN } elseif ($env:USERDOMAIN) { $env:USERDOMAIN } else { $env:COMPUTERNAME })
   )
 
   $version = $FallbackVersion
@@ -198,9 +199,12 @@ function Get-HealthEmailSignature {
     # Keep "unknown" if file metadata is unavailable.
   }
 
+  $domainText = if ([string]::IsNullOrWhiteSpace($DomainName)) { 'unknown' } else { $DomainName.Trim() }
+  $signatureText = "Get-ComputerHealth version $version, last update $lastUpdate, domain $domainText"
+
   return [pscustomobject]@{
-    Text = "Get-ComputerHealth version $version, last update $lastUpdate"
-    Html = "Get-ComputerHealth version $([System.Net.WebUtility]::HtmlEncode($version)), last update $([System.Net.WebUtility]::HtmlEncode($lastUpdate))"
+    Text = $signatureText
+    Html = [System.Net.WebUtility]::HtmlEncode($signatureText)
   }
 }
 
