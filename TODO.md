@@ -65,6 +65,10 @@ During migration, map `__P` to `Tags: ...Policy`, `__E` to `Tags: ...Essential` 
 
 After this change we must review all code that handles health test names and make sure: a) it accepts both the full function name and the name without the `HealthTest-` prefix; b) It doesn't contain code to deal with the old `__<CHARACTER>` style of taging.
 
+## Stop using legacy parameter set that adapts Pester 5 syntax to Pester 4 syntax
+
+So that we don't get this warning: "You are using Legacy parameter set that adapts Pester 5 syntax to Pester 4 syntax. ..."
+    
 ## Find redundant health tests
 
 Do a quick first pass to group health tests in clusters of tests that seem like they might be checking the same stuff.
