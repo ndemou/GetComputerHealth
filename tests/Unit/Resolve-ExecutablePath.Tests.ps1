@@ -164,3 +164,55 @@ Describe 'Resolve-ExecutablePath' {
     }
   }
 }
+
+Describe 'HealthTest-AutoStartServicesRunning__E' {
+  BeforeAll {
+    . (Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) 'health-tests\srvc-exe-resolve.ps1')
+  }
+
+  It 'emits INFO when an auto-start service is stopped but last exited normally' {
+    Mock Get-CimInstance {
+      @(
+        [pscustomobject]@{
+          Name = 'FOO'
+          DisplayName = 'Foo Service'
+          State = 'Stopped'
+          StartMode = 'Auto'
+          DelayedAutoStart = $false
+          ExitCode = 0
+        }
+      )
+    } -ParameterFilter { $ClassName -eq 'Win32_Service' -and $Filter -eq "StartMode='Auto' and State!='Running'" }
+
+    Mock Write-Warning {}
+
+    HealthTest-AutoStartServicesRunning__E
+
+    Should -Invoke Write-Warning -Times 1 -Exactly -ParameterFilter {
+      $Message -eq "[INFO] Service 'FOO' which is set to automatically start, is not running, but its last execution terminated with ExitCode=0(The operation completed successfully.).`nDisplay name: Foo Service, StartMode=Auto, DelayedAutoStart=False, last ExitCode=0(The operation completed successfully.)."
+    }
+  }
+
+  It 'keeps FAILURE when an auto-start service is stopped and last exited abnormally' {
+    Mock Get-CimInstance {
+      @(
+        [pscustomobject]@{
+          Name = 'BAR'
+          DisplayName = 'Bar Service'
+          State = 'Stopped'
+          StartMode = 'Auto'
+          DelayedAutoStart = $true
+          ExitCode = 5
+        }
+      )
+    } -ParameterFilter { $ClassName -eq 'Win32_Service' -and $Filter -eq "StartMode='Auto' and State!='Running'" }
+
+    Mock Write-Warning {}
+
+    HealthTest-AutoStartServicesRunning__E
+
+    Should -Invoke Write-Warning -Times 1 -Exactly -ParameterFilter {
+      $Message -eq "[FAILURE] Service 'BAR' which is set to automatically start is not running; alarmingly its last execution terminated abnormally: ExitCode=5(Access is denied.).`nDisplay name: Bar Service, StartMode=Auto, DelayedAutoStart=True, last ExitCode=5(Access is denied.)."
+    }
+  }
+}
