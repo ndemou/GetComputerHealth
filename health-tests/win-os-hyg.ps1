@@ -1561,7 +1561,7 @@ Uses: Get-LiveSessionInfo.
         $who = $session.UserPrincipal
         if ([string]::IsNullOrWhiteSpace($who)) { $who = $session.UserName }
 
-        $issueSynopsis = "Session $($session.SessionId) for $who is $problemType for more than $([int]$Threshold.TotalHours) hours"
+        $issueSynopsis = "Session for $who is $problemType for more than $([int]$Threshold.TotalHours) hours"
 
         $detailLines = @()
         $detailLines += "State: $($session.State)"
