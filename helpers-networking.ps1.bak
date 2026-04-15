@@ -236,7 +236,7 @@ Overall time budget for the entire batch, in milliseconds. Defaults to
 Test-TcpPort -Target '10.1.11.1' -Ports 80,443,4444
 
 .EXAMPLE
-Test-TcpPort -Target 'google.com' -Ports '80,443,4444' `
+Test-TcpPort -Target 'timesheet-gr.forvismazars.com' -Ports '80,443,4444' `
   -TimeoutMs 1000
 #>
   [CmdletBinding()]
