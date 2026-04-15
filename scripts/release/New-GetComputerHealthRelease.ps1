@@ -182,7 +182,7 @@ function Test-ReleaseZipInstall {
     Pop-Location
   }
 
-  $versionFilePath = Join-Path $validateRoot 'VERSION'
+  $versionFilePath = Join-Path $binPath 'VERSION'
   if (-not (Test-Path -LiteralPath $versionFilePath -PathType Leaf)) {
     throw "Installer validation did not produce VERSION file: $versionFilePath"
   }
