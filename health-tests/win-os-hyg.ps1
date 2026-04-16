@@ -815,7 +815,8 @@ Uses: Get-WinEvent.
 
     function Write-EventFinding([string]$Severity, [string]$Synopsis, $EventRecord) {
         $msg = Get-FirstLine -Text $EventRecord.Message
-        Write-Warning "[$Severity] $Synopsis`n$($EventRecord.TimeCreated) | $($EventRecord.ProviderName) | Event ID $($EventRecord.Id)`n$msg"
+        $eventDateText = if ($EventRecord.TimeCreated) { ([datetime]$EventRecord.TimeCreated).ToString('yyyy-MM-dd') } else { 'unknown-date' }
+        Write-Warning "[$Severity] $Synopsis`n$eventDateText | $($EventRecord.ProviderName) | Event ID $($EventRecord.Id)`n$msg"
     }
 
     function Get-FaultingApplicationName($EventRecord) {

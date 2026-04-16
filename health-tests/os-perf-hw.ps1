@@ -369,10 +369,11 @@ Uses: Windows Update Agent history with fallback to registry/Get-HotFix.
       if ($hf -and $hf.InstalledOn) { $lastUpdateDate = $hf.InstalledOn }
     }
     if (-not $lastUpdateDate) { Write-Warning "[WARNING] Could not determine last successful Windows Update installation (normal only for a fresh windows installation)"; return}
+    $lastUpdateDateText = ([datetime]$lastUpdateDate).ToString('yyyy-MM-dd')
     $age = (Get-Date) - $lastUpdateDate
-    if ($age.Days -ge $FailDays) { Write-Warning "[FAILURE] Too many days since the last successful Windows Update installation`n$($age.Days)d ago ($lastUpdateDate)"; return }
-    if ($age.Days -ge $WarnDays) { Write-Warning "[WARNING] Several days since the last successful Windows Update installation`n$($age.Days)d ago ($lastUpdateDate)"; return }
-    Write-Warning "[PASS] We have a recent successful installation of a Windows Update ($($age.Days)d ago at $lastUpdateDate)"
+    if ($age.Days -ge $FailDays) { Write-Warning "[FAILURE] Too many days since the last successful Windows Update installation`n$($age.Days)d ago ($lastUpdateDateText)"; return }
+    if ($age.Days -ge $WarnDays) { Write-Warning "[WARNING] Several days since the last successful Windows Update installation`n$($age.Days)d ago ($lastUpdateDateText)"; return }
+    Write-Warning "[PASS] We have a recent successful installation of a Windows Update ($($age.Days)d ago at $lastUpdateDateText)"
 }
 
 

@@ -153,7 +153,8 @@ Uses: Get-ScheduledTask, Get-ScheduledTaskInfo, Get-ScheduledTaskDeepInfo.
     if($hasEnabledTrigger -and $StaleDays -gt 0){
       if(($lastRun -eq [datetime]::MinValue) -or ((Get-Date) - $lastRun).TotalDays -gt $StaleDays){
         $hadIssue = $true
-        Write-Warning "[WARNING] SYSTEM task appears stale: $path ; LastRun=$lastRun (> $StaleDays days or never)"
+        $lastRunText = if ($lastRun -eq [datetime]::MinValue) { 'never' } else { ([datetime]$lastRun).ToString('yyyy-MM-dd') }
+        Write-Warning "[WARNING] SYSTEM task appears stale: $path ; LastRun=$lastRunText (> $StaleDays days or never)"
       }
     }
 
