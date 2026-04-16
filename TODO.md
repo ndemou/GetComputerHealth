@@ -1,12 +1,14 @@
 # TODO
 
+## Adjust Subject: of alert according to the highest level of findings
+
+E.g. if the highest level of findings is NOTICE, set subject to "Notice(s) from Get-ComputerHealth ..." (instead of "Notable Messages from Get-ComputerHealth ..." ). Accordingly for WARNINGs & FAILUREs.
+
+Keep the "Relax" subject if there are no NOTICEs, WARNINGs, FAILUREs.
+
 ## Review our test suite for this repo
 
 Review /doc/test-suite-guide.md and improve our test suite if needed.
-
-## All dates or times that are shown to users should use the YYYY-MM-DD format
-
-At least examine all Write-Warning(s) and if they include dates/times make sure they use this format
 
 ## Custom health tests should be directly runnable scripts
 
@@ -36,12 +38,6 @@ Ideas to reduce this:
 - consider making test wrappers accept optional path/category filters so agents do not feel forced to call raw `Invoke-Pester`
 - document in `AGENTS.md` that remote GitHub operations may require sandbox escalation and that this is environmental, not a repo bug
 - document in `AGENTS.md` that if a rebase stops, agents should use non-interactive git flows and watch for stale `.git/index.lock`
-
-## Adjust Subject: of alert according to the highest level of findings
-
-E.g. if the highest level of findings is NOTICE, set subject to "Notice(s) from Get-ComputerHealth ..." (instead of "Notable Messages from Get-ComputerHealth ..." ). Accordingly for WARNINGs & FAILUREs.
-
-Keep the "Relax" subject if there are no NOTICEs, WARNINGs, FAILUREs.
 
 ## Move default installation point to C:\IT\Get-ComputerHealth
 
