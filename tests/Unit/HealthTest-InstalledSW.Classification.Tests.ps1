@@ -7,7 +7,7 @@ Describe 'Microsoft installed software update classification' {
     $tokens = $null
     $ast = [System.Management.Automation.Language.Parser]::ParseFile($scriptPath, [ref]$tokens, [ref]$parseErrors)
 
-    foreach ($functionName in @('Test-IsMicrosoftInstalledSoftwareUpdate', 'Get-InstalledSoftwareFindingLevel')) {
+    foreach ($functionName in @('Get-NormalizedSoftwareName', 'Test-IsMicrosoftInstalledSoftwareUpdate', 'Get-InstalledSoftwareFindingLevel')) {
       $funcAst = $ast.Find({
           param($node)
           $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
@@ -42,5 +42,9 @@ Describe 'Microsoft installed software update classification' {
     Get-InstalledSoftwareFindingLevel -Name 'GDR 2155 for SQL Server 2019 KB5068405' -Publisher 'Microsoft Corporation' | Should -Be 'info'
     Get-InstalledSoftwareFindingLevel -Name 'Microsoft SQL Server 2019 Setup (English)' -Publisher 'Microsoft Corporation' | Should -Be 'notice'
     Get-InstalledSoftwareFindingLevel -Name 'Copilot' -Publisher 'Contoso Ltd' | Should -Be 'warning'
+  }
+
+  It 'normalizes dotted numeric versions into VER' {
+    Get-NormalizedSoftwareName -Name '7-Zip 26.00 (x64)' | Should -Be '7-Zip VER'
   }
 }
