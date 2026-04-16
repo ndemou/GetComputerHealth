@@ -228,6 +228,36 @@ function Add-HealthEmailSignature {
   return ($Body.TrimEnd() + "`r`n`r`n" + $Signature.Text)
 }
 
+function Get-HealthNotableSubject {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)][string]$FallbackSubject,
+    [Parameter(Mandatory)][object[]]$NotableMessages
+  )
+
+  $levelToSubjectPrefix = @{
+    'failure' = 'Failure(s)'
+    'warning' = 'Warning(s)'
+    'notice'  = 'Notice(s)'
+  }
+  $priority = @('failure', 'warning', 'notice')
+
+  $levelsInRun = @(
+    $NotableMessages |
+      Where-Object { $_ -and $_.PSObject.Properties['Level'] } |
+      ForEach-Object { ([string]$_.Level).Trim().ToLowerInvariant() } |
+      Where-Object { $levelToSubjectPrefix.ContainsKey($_) } |
+      Select-Object -Unique
+  )
+
+  $highestLevel = $priority | Where-Object { $_ -in $levelsInRun } | Select-Object -First 1
+  if ($highestLevel) {
+    return $FallbackSubject -replace 'Notable Messages', $levelToSubjectPrefix[$highestLevel]
+  }
+
+  return $FallbackSubject
+}
+
 function Get-EmbeddedGetComputerHealthVersion {
   [CmdletBinding()]
   param([Parameter(Mandatory)][string]$ScriptPath)
@@ -664,7 +694,8 @@ if ($all_messages) {
     $html = "<pre style='font-family: Consolas, ""Courier New"", monospace; white-space:pre-wrap; margin:0; font-size:12px; line-height:1.35'>$encoded</pre>"
 
     $signedHtml = Add-HealthEmailSignature -Body $html -BodyAsHtml -Signature $emailSignature
-    Invoke-HealthEmail -Subject $SmtpSubject -Body $signedHtml -BodyAsHtml -Attachments "${TEMP_DIR}\notable-messages-$($timestamp).xlsx" -ConfigFile $SmtpConfig -NoSendMessage:$NoSendMessage
+    $smtpNotableSubject = Get-HealthNotableSubject -FallbackSubject $SmtpSubject -NotableMessages $notable_msgs
+    Invoke-HealthEmail -Subject $smtpNotableSubject -Body $signedHtml -BodyAsHtml -Attachments "${TEMP_DIR}\notable-messages-$($timestamp).xlsx" -ConfigFile $SmtpConfig -NoSendMessage:$NoSendMessage
   }
   else {
     Write-host -for green    "GOOD, Nothing notable to record. I have saved less notable messages here:"
