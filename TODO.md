@@ -10,13 +10,11 @@ Instead of dot-sourcing the custom scripts, discovering the functions with the c
 
 We should also update `how-to-add-custom-tests.md`.
 
-Since this is a breaking change it requires a) the update of the major version number from 3 to 4 b) a migration script that will relief users from having to edit all their custom health test scripts. 
+Since this is a breaking change it requires a) the update of the major version number from 3 to 4 b) a migration script that will relief users from having to edit all their custom health test scripts. The migration script seems easy: Use `sls` to find the names of the custom health test functions and append a call to them at the end of the script. We can use `Get-TextFileEncoding` from `helpers-text-files.ps1` to make sure we append text using the correct encoding. The migration script should be run by the updater/installer only when the existing version is `3.3.y`.
 
-The migration script seems easy: Use `sls` to find the names of the custom health test functions and append a call to them at the end of the script. We can use `Get-TextFileEncoding` from `helpers-text-files.ps1` to make sure we append text using the correct encoding. The migration script should be run by the updater/installer only when an existing version `3.x.y` is found.
+## Change default installation root to `C:\IT\Get-ComputerHealth` instead of `C:\IT`
 
-## Move default installation point to C:\IT\Get-ComputerHealth
-
-But support any installation directory
+However: a) support any other installation directory b) support installations that already reside in `C:\IT`
 
 ## Stop using legacy parameter set that adapts Pester 5 syntax to Pester 4 syntax
 
@@ -101,11 +99,12 @@ These are the functions:
   - HealthTest-LocalAdminsBaseline
   - HealthTest-InstalledRolesFeatures
 
-Phase 1) Add the "Policy" Tag to these functions. Also all these tests should not emit [Failure] for finding services,shares,admins or roles respectively but only for other serious failures. E.g. "[failure] Unintended role/feature installed" should become "[warning] Unintended role/feature installed"
+Phase 1) 
+Add the "Policy" Tag to these functions. Also all these tests should not emit [Failure] for finding services,shares,admins or roles respectively but only for other serious failures. E.g. "[failure] Unintended role/feature installed" should become "[warning] Unintended role/feature installed"
 
-Phase 2) For these functions: remove any exceptions for findings that are currently ignored as benign (e.g. Microsoft services, default shares, etc).
-So after this change all services are to be reported (including Microsoft ones), and all 
-shares(including default ones) and all administrators and all roles.
+Phase 2) 
+For these functions: remove any exceptions for findings that are currently ignored as benign (e.g. Microsoft services, default shares, etc).
+So after this change all services are to be reported (including Microsoft ones), and all shares (including default ones) and all administrators and all roles.
 Thus we also need to adjust the function names accordingly: NonMicrosoftServices -> Services; NonDefaultShares -> Shares
 
 ## New format for Get-ComputerHealth.sigs-to-suppress.txt
