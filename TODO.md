@@ -18,17 +18,6 @@ The migration script seems easy: Use `sls` to find the names of the custom healt
 
 But support any installation directory
 
-## Better way of Tagging health tests
-
-Completed in code:
-- Test tags now come from `Tags:` in each health test help block.
-- Legacy `__<CHARACTER>` suffixes have been removed from built-in test function names.
-- Migration mapping applied:
-  - `__P` -> `Tags: Policy`
-  - `__E` -> `Tags: Essential`
-  - `__S` -> `Impact: ... High(Time)`
-- Name handling accepts full names (`HealthTest-...`) and short names without the `HealthTest-` prefix.
-
 ## Stop using legacy parameter set that adapts Pester 5 syntax to Pester 4 syntax
 
 So that we don't get this warning: "You are using Legacy parameter set that adapts Pester 5 syntax to Pester 4 syntax. ..."
@@ -104,15 +93,17 @@ The check each cluster thinking: “which tests are merely different views of th
 4. `HealthTest-ScheduledTasks` + `HealthTest-ScheduledTasksLastResult` (plus overlap with `HealthTest-SystemScheduledTasks`)
 5. SRV-record portion of `HealthTest-ConnectivityToDCs` + `HealthTest-RequiredSrvRecords`
 
-## Add the "P/Policy" Tag to these functions:
+## For a few functions, 1) add the "Policy" Tag and 2) remove some exceptions
+
+These are the functions:
   - HealthTest-NonMicrosoftServices
   - HealthTest-NonDefaultShares
   - HealthTest-LocalAdminsBaseline
   - HealthTest-InstalledRolesFeatures
 
-Also all these tests should not emit [Failure] for finding services,shares,admins or roles respectively but only for other serious failures. E.g. "[failure] Unintended role/feature installed" should become "[warning] Unintended role/feature installed"
+Phase 1) Add the "Policy" Tag to these functions. Also all these tests should not emit [Failure] for finding services,shares,admins or roles respectively but only for other serious failures. E.g. "[failure] Unintended role/feature installed" should become "[warning] Unintended role/feature installed"
 
-Also in these tests: remove any exceptions for findings that are currently ignored as benign (e.g. Microsoft services, default shares, etc).
+Phase 2) For these functions: remove any exceptions for findings that are currently ignored as benign (e.g. Microsoft services, default shares, etc).
 So after this change all services are to be reported (including Microsoft ones), and all 
 shares(including default ones) and all administrators and all roles.
 Thus we also need to adjust the function names accordingly: NonMicrosoftServices -> Services; NonDefaultShares -> Shares
