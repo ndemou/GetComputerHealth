@@ -851,7 +851,7 @@ Uses: Get-ServiceVendors.
         $TrimmdServiceName = $_.ServiceName -replace '[0-9]+[.][0-9][0-9.]*$','[VERSION]'
         $ok = $false
         if ($_.ExceptionsThrown) {
-            Write-Warning "[WARNING] Either something's wrong with service '$($_.ServiceName)' or there's a bug in Get-ServiceVendors.`n$($_.ExceptionsThrown)"
+            Write-Warning "[WARNING] Either something's wrong with service '$($_.ServiceName)' or there's a bug in Get-ServiceVendors.`nError(s): $($_.ExceptionsThrown)"
         } else {
             if ($isHostServer -or ($_.Vendor -notin $COMMON_VENDORS_FOR_WORKSTATIONS)) {
                 $comment = "Admin must verify if service is legit and needed. Service Description: '$($_.DisplayName)'`nExecutable: '$($_.ExePath)'."
