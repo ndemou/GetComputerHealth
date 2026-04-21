@@ -47,4 +47,19 @@ Describe 'Microsoft installed software update classification' {
   It 'normalizes dotted numeric versions into VER' {
     Get-NormalizedSoftwareName -Name '7-Zip 26.00 (x64)' | Should -Be '7-Zip VER'
   }
+
+  It 'normalizes v-prefixed versions into VER' {
+    foreach ($name in @(
+        'test v3'
+        'test v3.1'
+        'test v3.1.2'
+        'test v3.1.2.3'
+        'test v3.1.2.3.4'
+        'test v3.1.2.3.4.5'
+        'test v3.1.2r1'
+        'test v3.1r1'
+      )) {
+      Get-NormalizedSoftwareName -Name $name | Should -Be 'test VER'
+    }
+  }
 }
