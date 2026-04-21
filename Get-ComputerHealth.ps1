@@ -56,16 +56,16 @@ Default: empty (show all). Typical value: `DIP`
 (Parameter set: Run) Path to a folder containing `.ps1` files (or a single `.ps1` path). Files are loaded in an isolated module scope; any functions named `HealthTest-*` discovered are invoked.
 
 .PARAMETER SkipSlowTests
-(Parameter set: Run) Skips health tests tagged with `S` (slow) in their function name, such as `HealthTest-Example__S`.
+(Parameter set: Run) Skips health tests that have high time impact (`Impact: ... High(Time)` in their help block).
 
 .PARAMETER DebugSkipSlowTests
 (Parameter set: Run) Alias for `-SkipSlowTests` (kept for backward compatibility).
 
 .PARAMETER SkipPolicyTests
-(Parameter set: Run) Skips health tests tagged with `P` (policy) in their function name, such as `HealthTest-InstalledSW__P`.
+(Parameter set: Run) Skips health tests tagged as policy inventory tests (`Tags: Policy` in their help block), such as `HealthTest-InstalledSW`.
 
 .PARAMETER DontAutosetPolicy
-(Parameter set: Run) Disables first-run auto-baselining for policy tests (tests tagged with `P`, e.g. `HealthTest-InstalledSW__P`). By default, first run auto-suppresses emitted `[NOTICE]`/`[WARNING]` findings for each policy test and records a marker in the suppression file.
+(Parameter set: Run) Disables first-run auto-baselining for policy tests (`Tags: Policy`, e.g. `HealthTest-InstalledSW`). By default, first run auto-suppresses emitted `[NOTICE]`/`[WARNING]` findings for each policy test and records a marker in the suppression file.
 
 .PARAMETER IpsOfAllDcs
 (Parameter set: Run) Optional list of Domain Controller IP addresses passed in by the orchestrator. Stored in `$Global:GCHDQMTA.IpsOfAllDcs` for health tests that need it.
@@ -337,7 +337,7 @@ FunctionName, Time, ElapsedMilliseconds, Output, Success, Error, Category, Reaso
 
   $metaForExclude = Get-HealthTestTagsMetadata -FunctionName $FunctionName
   $baseFunctionName = "HealthTest-$($metaForExclude.TestName)"
-  if (($ExcludeTests -contains $FunctionName) -or ($ExcludeTests -contains $baseFunctionName)) {
+  if (($ExcludeTests -contains $FunctionName) -or ($ExcludeTests -contains $baseFunctionName) -or ($ExcludeTests -contains $metaForExclude.TestName)) {
     Log-Debug "Skipping test $FunctionName"
     return
   }
@@ -628,27 +628,44 @@ function Get-HealthTestTagsMetadata {
 
   $normalizedTestName = $FunctionName -replace '^HealthTest-', ''
   $tags = @()
+  $isSlowTest = $false
 
-  if ($FunctionName -match '^HealthTest-(?<testName>.+?)(?:__(?<tags>[A-Za-z0-9]+))?$') {
-    $normalizedTestName = $matches['testName']
-    $rawTags = $matches['tags']
-    if ($rawTags) {
-      $tags = @(
-        $rawTags.ToCharArray() |
-        ForEach-Object { $_.ToString().ToUpperInvariant() } |
-        Where-Object { $_ -match '^[A-Z0-9]$' } |
-        Sort-Object -Unique
-      )
+  $cmd = Get-Command -Name $FunctionName -CommandType Function -ErrorAction SilentlyContinue
+  $definition = if ($cmd) { [string]$cmd.Definition } else { '' }
+
+  $tagsLine = $null
+  $impactLine = $null
+  if ($definition) {
+    $tagMatch = [regex]::Match($definition, '(?im)^\s*Tags:\s*(.+?)\s*$')
+    if ($tagMatch.Success) {
+      $tagsLine = $tagMatch.Groups[1].Value.Trim()
     }
+    $impactMatch = [regex]::Match($definition, '(?im)^\s*Impact:\s*(.+?)\s*$')
+    if ($impactMatch.Success) {
+      $impactLine = $impactMatch.Groups[1].Value.Trim()
+    }
+  }
+
+  if ($tagsLine) {
+    $tags = @(
+      $tagsLine -split '[,;]' |
+      ForEach-Object { $_.Trim() } |
+      Where-Object { $_ } |
+      Sort-Object -Unique
+    )
+  }
+
+  if ($impactLine) {
+    $isSlowTest = [bool]([regex]::IsMatch($impactLine, '(?i)\bHigh\s*\(\s*Time\s*\)'))
   }
 
   [pscustomobject]@{
     FunctionName         = $FunctionName
     TestName             = $normalizedTestName
     Tags                 = @($tags)
-    IsSlowTest           = ('S' -in $tags)
-    IsPolicyTest         = ('P' -in $tags)
-    IsQuickEssentialTest = ('E' -in $tags)
+    IsSlowTest           = $isSlowTest
+    IsPolicyTest         = ('Policy' -in $tags)
+    IsQuickEssentialTest = ('Essential' -in $tags)
   }
 }
 
@@ -1065,12 +1082,16 @@ if ($OnlyTheseTests) {
   $valid_cmdlet_name_regex = '^ *[A-Za-z][A-Za-z0-9_-]*[A-Za-z0-9]+ *$'
   $loadedTestsByName = @{}
   $loadedTestsByBaseName = @{}
+  $loadedTestsByShortName = @{}
   $allHealthTests | ForEach-Object {
     $loadedTestsByName[$_.Name] = $_.Name
     $meta = Get-HealthTestTagsMetadata -FunctionName $_.Name
     $baseName = "HealthTest-$($meta.TestName)"
     if (-not $loadedTestsByBaseName.ContainsKey($baseName)) {
       $loadedTestsByBaseName[$baseName] = $_.Name
+    }
+    if (-not $loadedTestsByShortName.ContainsKey($meta.TestName)) {
+      $loadedTestsByShortName[$meta.TestName] = $_.Name
     }
   }
 
@@ -1082,6 +1103,9 @@ if ($OnlyTheseTests) {
       }
       elseif ($loadedTestsByBaseName.ContainsKey($testName)) {
         Invoke-HealthTestWithPolicyAutoset $loadedTestsByBaseName[$testName]
+      }
+      elseif ($loadedTestsByShortName.ContainsKey($testName)) {
+        Invoke-HealthTestWithPolicyAutoset $loadedTestsByShortName[$testName]
       }
       else {
         Log-Notice "Skipping unavailable test '$testName' (not loaded/applicable on this host)."

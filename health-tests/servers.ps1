@@ -2,13 +2,14 @@
 Tests that are only applicable to Windows Server O.S.
 #>
 
-function HealthTest-DhcpInAd__E{
+function HealthTest-DhcpInAd{
 <#
 Description: Checks whether a local DHCP server is authorized in Active Directory.
 AppliesTo: Server
 Scope: Domain
 Category: Configuration Hygiene & Best Practices
 Impact: low
+Tags: Essential
 Uses: Get-WindowsFeature, Get-DhcpServerInDC.
 #>
   $dhcp=Get-WindowsFeature -Name DHCP -ErrorAction SilentlyContinue
@@ -19,13 +20,14 @@ Uses: Get-WindowsFeature, Get-DhcpServerInDC.
   if($isAuth){ Write-Warning "[PASS] DHCP server is authorized in AD ($fqdn)" } else { Write-Warning "[FAILURE] DHCP server is NOT authorized in AD ($fqdn)" }
 }
 
-function HealthTest-DhcpScopeUtilization__E {
+function HealthTest-DhcpScopeUtilization {
 <#
 Description: Checks DHCPv4 scopes for high address utilization.
 AppliesTo: Server
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Network)
+Tags: Essential
 Uses: Get-Service, Get-Command, Get-DhcpServerv4ScopeStatistics.
 #>
     $svc = Get-Service -Name 'DHCPServer' -ErrorAction SilentlyContinue

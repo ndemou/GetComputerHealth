@@ -120,13 +120,14 @@ Every built-in `HealthTest-*` function must include an in-function comment-based
 
 Example:
 ```
-function HealthTest-LargeDirectories__S {
+function HealthTest-LargeDirectories {
 <#
 Description: Finds directories with more than 10000 files.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: High(Time), Medium(Disk)
+Tags: Essential
 Uses: Get-ChildItem.
 #>
 ...
@@ -138,8 +139,9 @@ The `Field: Value` lines follow this exact order (note that some are optional):
    3. `Scope:`. Options are `Computer`, `Domain`, `Forest`
    4. `Category:` primary plus optional secondary category. Options are: `Availability/Server Down Signals`,`Security & Stability Risks`,`Configuration Hygiene & Best Practices`,`Audit/Compliance/Informational`
    5. `Impact:` either "low" if there's low impact on all dimensions, or one or more "<level>(<dimension>)" pairs where <lever> is either "Medium" or "High" and  dimension is one of "CPU","Disk","Network","RAM","Time"
-   6. `Uses:` optional, up to three essential external cmdlets or executables if any.
-   7. `FalsePositives:` optional short note only if False Positives are to be expected
+   6. `Tags:` optional comma-separated values. Supported values: `Essential`, `Policy`.
+   7. `Uses:` optional, up to three essential external cmdlets or executables if any.
+   8. `FalsePositives:` optional short note only if False Positives are to be expected
 
 ### Behavior Rules
 
@@ -154,23 +156,23 @@ The `Field: Value` lines follow this exact order (note that some are optional):
 - Catch exceptions only when you can recover or downgrade cleanly.
   Otherwise let the framework report the thrown error.
 
-### Tags In Test Names
+### Tags In Help Blocks
 
-You can attach tags directly in the function name by adding `__` and one or more letters or digits after the base name.
+Tag health tests using the `Tags:` field in the in-function help block.
 
 Examples:
-- `HealthTest-SomeName__SP`
-- `HealthTest-LargeDirectories__S`
+- `Tags: Essential`
+- `Tags: Essential, Policy`
 
 Supported tags:
-- `S`: Slow test, skipped by `-SkipSlowTests`
-- `E`: Quick and essential test
-- `P`: Policy inventory test
-- `D`: Domain-wide test, reserved and not yet in use
+- `Essential`: quick and essential test
+- `Policy`: policy inventory test
+
+Slow tests are indicated by impact (`Impact: ... High(Time)`), and `-SkipSlowTests` uses that impact marker.
 
 ### Policy Inventory Tests
 
-Use the `P` tag for tests that inventory a system aspect where current state may be accepted as baseline.
+Use `Tags: Policy` for tests that inventory a system aspect where current state may be accepted as baseline.
 
 Examples include:
 - open ports

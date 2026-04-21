@@ -106,7 +106,7 @@ Uses: Get-ADDomainController, Get-ADDomain, Get-ADForest.
 }
 
 
-function HealthTest-Dcdiag__S {
+function HealthTest-Dcdiag {
 <#
 Description: Runs DCDIAG and reports failing basic and extended Active Directory diagnostics.
 AppliesTo: DC
@@ -359,7 +359,7 @@ Uses: Get-Acl.
   if(-not $bad){ Write-Warning "[PASS] SYSVOL does not grant write to broad principals (Everyone/Auth Users)" }
 }
 
-function HealthTest-DfsDiagTestDCs__S {
+function HealthTest-DfsDiagTestDCs {
 <#
 Description: Runs DFSDIAG /TestDCs and reports unexpected DFS diagnostics output.
 AppliesTo: DC
@@ -503,7 +503,7 @@ Uses: Get-ADUser.
   if($prot){ Write-Warning "[PASS] AdminSDHolder applied; protected users: $($prot -join ", ")" } else { Write-Warning "[PASS] No users currently protected by AdminSDHolder" }
 }
 
-function HealthTest-DisabledGpoLinksAtDomainRoot__S{
+function HealthTest-DisabledGpoLinksAtDomainRoot{
 <#
 Description: Checks for disabled or non-enforced GPO links at the domain root.
 AppliesTo: DC
@@ -589,7 +589,7 @@ Uses: Get-ADUser.
   }
 }
 
-function HealthTest-SysvolContentConsistency__S{
+function HealthTest-SysvolContentConsistency{
 <#
 Description: Checks whether SYSVOL policy content is present and consistent across domain controllers.
 AppliesTo: DC

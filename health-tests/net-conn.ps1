@@ -13,13 +13,14 @@ function Get-PropValue {
     return $default
 }
 
-function HealthTest-NetworkConnectionProfiles__E {
+function HealthTest-NetworkConnectionProfiles {
 <#
 Description: Checks network connection profiles and basic connectivity expectations for each active network.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: low
+Tags: Essential
 Uses: Get-NetConnectionProfile, Test-NetConnectivityToNetwork.
 #>
   [CmdletBinding()]
@@ -67,7 +68,7 @@ Uses: Get-NetConnectionProfile, Test-NetConnectivityToNetwork.
   }
 }
 
-function HealthTest-SingleDefaultGateway__S{
+function HealthTest-SingleDefaultGateway{
 <#
 Description: Checks for multiple default gateways and validates that the active gateway configuration is sensible.
 AppliesTo: All
@@ -278,13 +279,14 @@ function Test-MultipleGatewayConfiguration {
   }
 }
 
-function HealthTest-IPv6Binding__E{
+function HealthTest-IPv6Binding{
 <#
 Description: Checks whether IPv6 is bound on network adapters as expected.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: low
+Tags: Essential
 Uses: Get-NetAdapterBinding.
 #>
   [CmdletBinding()] param([switch]$RequireEnabled)
@@ -302,13 +304,14 @@ Uses: Get-NetAdapterBinding.
   }
 }
 
-function HealthTest-Nic__E {
+function HealthTest-Nic {
 <#
 Description: Checks network adapters for unhealthy status or suspicious error counters.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: low
+Tags: Essential
 Uses: Get-NetAdapter, Get-NetAdapterStatistics.
 #>
     $nics = Get-NetAdapter -Physical -ErrorAction SilentlyContinue | Where-Object { $_.Status -eq 'Up' }
@@ -382,13 +385,14 @@ Uses: Get-NetAdapter, Get-NetAdapterStatistics.
         Write-Warning "[PASS] Network interfaces healthy; no significant error rates or disconnected interfaces detected"}
 }
 
-function HealthTest-WinRMListening__E{
+function HealthTest-WinRMListening{
 <#
 Description: Checks whether the WinRM service is running and responds to WSMan requests.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: High(Network)
+Tags: Essential
 Uses: Get-Service, Test-WSMan.
 #>
   $svc=Get-Service WinRM -ErrorAction Stop

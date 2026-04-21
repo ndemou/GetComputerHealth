@@ -165,7 +165,7 @@ Describe 'Resolve-ExecutablePath' {
   }
 }
 
-Describe 'HealthTest-AutoStartServicesRunning__E' {
+Describe 'HealthTest-AutoStartServicesRunning' {
   BeforeAll {
     . (Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) 'health-tests\srvc-exe-resolve.ps1')
   }
@@ -186,7 +186,7 @@ Describe 'HealthTest-AutoStartServicesRunning__E' {
 
     Mock Write-Warning {}
 
-    HealthTest-AutoStartServicesRunning__E
+    HealthTest-AutoStartServicesRunning
 
     Should -Invoke Write-Warning -Times 1 -Exactly -ParameterFilter {
       $Message -eq "[INFO] Service 'FOO' which is set to automatically start, is not running, but its last execution terminated with ExitCode=0(The operation completed successfully.).`nDisplay name: Foo Service, StartMode=Auto, DelayedAutoStart=False, last ExitCode=0(The operation completed successfully.)."
@@ -209,7 +209,7 @@ Describe 'HealthTest-AutoStartServicesRunning__E' {
 
     Mock Write-Warning {}
 
-    HealthTest-AutoStartServicesRunning__E
+    HealthTest-AutoStartServicesRunning
 
     Should -Invoke Write-Warning -Times 1 -Exactly -ParameterFilter {
       $Message -eq "[FAILURE] Service 'BAR' which is set to automatically start is not running; alarmingly its last execution terminated abnormally: ExitCode=5(Access is denied.).`nDisplay name: Bar Service, StartMode=Auto, DelayedAutoStart=True, last ExitCode=5(Access is denied.)."

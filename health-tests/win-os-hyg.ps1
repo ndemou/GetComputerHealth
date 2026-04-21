@@ -134,13 +134,14 @@ function Get-DaysSinceLastVirusScan {
   return [pscustomobject]@{DaysSinceScan=$null;Details='No scan timestamps or ages'}
 }
 
-function HealthTest-RecentWindowsScan__E {
+function HealthTest-RecentWindowsScan {
 <#
 Description: Checks whether Microsoft Defender has performed a recent quick scan.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time)
+Tags: Essential
 Uses: Get-DaysSinceLastVirusScan, Get-WindowsOriginalInstallDate.
 #>
     $MAX_WARN_DAYS = 4
@@ -174,13 +175,14 @@ Uses: Get-DaysSinceLastVirusScan, Get-WindowsOriginalInstallDate.
 }
 
 
-function HealthTest-SchanelBaseline__E{
+function HealthTest-SchanelBaseline{
 <#
 Description: Checks whether Schannel disables legacy protocols and keeps TLS 1.2 enabled.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time)
+Tags: Essential
 Uses: None.
 #>
   $base='HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols'
@@ -237,13 +239,14 @@ Uses: None.
   }
 }
 
-function HealthTest-DefenderStatus__E {
+function HealthTest-DefenderStatus {
 <#
 Description: Checks Microsoft Defender signature freshness and protection status.
 AppliesTo: All
 Scope: Computer
 Category: Security & Stability Risks
 Impact: Medium(Time)
+Tags: Essential
 Uses: Get-MpComputerStatus.
 #>
     param([int]$WarnSigAgeDays=2,[int]$FailSigAgeDays=7)
@@ -262,7 +265,7 @@ Uses: Get-MpComputerStatus.
     }
 }
 
-function HealthTest-FirewallEnabled__S {
+function HealthTest-FirewallEnabled {
 <#
 Description: Checks whether Windows Firewall profiles are enabled and the firewall service is available.
 AppliesTo: All
@@ -299,13 +302,14 @@ Uses: Get-WindowsOptionalFeature.
   if($disabled){ Write-Warning "[PASS] SMBv1 is disabled"} else { Write-Warning "[WARNING] SMBv1 is enabled`nState=$state" }
 }
 
-function HealthTest-WmiRepository__E{
+function HealthTest-WmiRepository{
 <#
 Description: Checks whether the WMI repository is consistent.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: low
+Tags: Essential
 Uses: None.
 #>
   $out=& winmgmt /verifyrepository 2>&1
@@ -314,7 +318,7 @@ Uses: None.
 }
 
 
-function HealthTest-VssWriters__S{
+function HealthTest-VssWriters{
 <#
 Description: Checks whether all VSS writers report healthy stable states.
 AppliesTo: All
@@ -766,13 +770,14 @@ namespace Toula.HealthTestUnsignedDrivers
 }
 
 
-function HealthTest-CrashDumpSignals__E {
+function HealthTest-CrashDumpSignals {
 <#
 Description: Checks for recent minidumps that indicate recent system crashes.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Disk), Medium(Time)
+Tags: Essential
 Uses: None.
 #>
     param([int]$Hours = 48)
@@ -791,7 +796,7 @@ Uses: None.
     }
 }
 
-function HealthTest-SeriousRecentEventLogs__S {
+function HealthTest-SeriousRecentEventLogs {
 <#
 Description: Checks recent event logs for serious shutdown, bugcheck, disk, or application crash events.
 AppliesTo: All
@@ -869,13 +874,14 @@ Uses: Get-WinEvent.
 }
 
 
-function HealthTest-HotfixBaseline__E{
+function HealthTest-HotfixBaseline{
 <#
 Description: Checks whether all required hotfixes from the baseline are installed.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time)
+Tags: Essential
 Uses: Get-HotFix.
 #>
   [CmdletBinding()] param([string[]]$RequiredKBs)
@@ -888,13 +894,14 @@ Uses: Get-HotFix.
   if($miss.Count -eq 0){ Write-Warning "[PASS] All required hotfixes are installed"}
 }
 
-function HealthTest-BitLockerStatus__E {
+function HealthTest-BitLockerStatus {
 <#
 Description: Checks whether detected volumes are protected by BitLocker.
 AppliesTo: All
 Scope: Computer
 Category: Security & Stability Risks
 Impact: Medium(Time)
+Tags: Essential
 Uses: Get-Command, Get-BitLockerVolume.
 #>
     if ($Global:GCHDQMTA.isHostVM) {
@@ -920,13 +927,14 @@ Uses: Get-Command, Get-BitLockerVolume.
 }
 
 
-function HealthTest-NtlmHardening__E {
+function HealthTest-NtlmHardening {
 <#
 Description: Checks whether NTLM hardening registry settings meet the security baseline.
 AppliesTo: All
 Scope: Computer
 Category: Security & Stability Risks
 Impact: Medium(Time)
+Tags: Essential
 Uses: None.
 #>
   $lsa = 'HKLM:\SYSTEM\CurrentControlSet\Control\Lsa'
@@ -950,13 +958,14 @@ Uses: None.
 }
 
 
-function HealthTest-RdpHardening__E {
+function HealthTest-RdpHardening {
 <#
 Description: Checks whether RDP is hardened with NLA enabled and a TLS certificate bound.
 AppliesTo: All
 Scope: Computer
 Category: Security & Stability Risks
 Impact: Medium(Network)
+Tags: Essential
 Uses: Get-LiveSessionInfo, Get-WtsServerHandle, Get-WtsString.
 #>
   $k = 'HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp'
@@ -1587,13 +1596,14 @@ Uses: Get-LiveSessionInfo.
     }
 }
 
-function HealthTest-NonDefaultShares__E {
+function HealthTest-NonDefaultShares {
 <#
 Description: Detects non-default SMB shares and notes when file and print sharing is unnecessarily enabled.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: low
+Tags: Essential
 Uses: get-service, Set-Service, Stop-Service.
 #>
   # 0(Workstation standalone),  1(Workstation domain joined), 2(Server standalone), 3(Server joined), 4(DC non-FSMO), 5(DC with FSMO role)
@@ -1619,13 +1629,14 @@ Uses: get-service, Set-Service, Stop-Service.
 }
 
 
-function HealthTest-LocalAcntRequirePass__E {
+function HealthTest-LocalAcntRequirePass {
 <#
 Description: Checks whether local accounts require passwords.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: low
+Tags: Essential
 Uses: None.
 #>
     $ok = $true
@@ -1643,13 +1654,14 @@ Uses: None.
 }
 
 
-function HealthTest-RestrictAnonymous__E {
+function HealthTest-RestrictAnonymous {
 <#
 Description: Checks whether anonymous access hardening settings meet the baseline.
 AppliesTo: All
 Scope: Computer
 Category: Security & Stability Risks
 Impact: Medium(Time)
+Tags: Essential
 Uses: None.
 #>
   $p  = 'HKLM:\SYSTEM\CurrentControlSet\Control\Lsa'
@@ -1667,13 +1679,14 @@ Uses: None.
   }
 }
 
-function HealthTest-DefaultLocale__E {
+function HealthTest-DefaultLocale {
 <#
 Description: Checks whether the system locale matches the expected legacy language baseline.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: low
+Tags: Essential
 Uses: None.
 #>
     # see https://newbedev.com/how-can-i-manually-determine-the-codepage-and-locale-of-the-current-os
@@ -1688,13 +1701,14 @@ Uses: None.
     }
 }
 
-function HealthTest-PendingReboot__E {
+function HealthTest-PendingReboot {
 <#
 Description: Checks for Windows pending-reboot indicators.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: low
+Tags: Essential
 Uses: None.
 #>
     $pending = $false
@@ -1706,13 +1720,14 @@ Uses: None.
     Write-Warning "[PASS] No pending reboot indicators"
 }
 
-function HealthTest-SmbSigningRequired__E{
+function HealthTest-SmbSigningRequired{
 <#
 Description: Checks whether the SMB server requires signing when the server service is running.
 AppliesTo: All
 Scope: Computer
 Category: Security & Stability Risks
 Impact: Medium(Time)
+Tags: Essential
 Uses: Get-Service, Get-SmbServerConfiguration.
 #>
   if ((Get-PropValue -obj (Get-Service -Name LanmanServer) -name Status) -ne 'running') {
@@ -1728,13 +1743,14 @@ Uses: Get-Service, Get-SmbServerConfiguration.
   }
 }
 
-function HealthTest-ShadowStorage__E {
+function HealthTest-ShadowStorage {
 <#
 Description: Checks whether Volume Shadow Copy storage is configured and sized within the recommended range.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: High(Disk), Medium(Time)
+Tags: Essential
 Uses: None.
 #>
   [CmdletBinding()]
@@ -1917,13 +1933,14 @@ Uses: None.
 }
 
 
-function HealthTest-DnsClientService__E{
+function HealthTest-DnsClientService{
 <#
 Description: Checks whether the DNS Client service is running.
 AppliesTo: All
 Scope: Computer
 Category: Security & Stability Risks
 Impact: High(Network)
+Tags: Essential
 Uses: Get-Service.
 #>
   $s=Get-Service Dnscache -ErrorAction Stop
@@ -2001,7 +2018,7 @@ Uses: None.
         Write-Warning "[PASS] No unexpected accounts in Local Administrators"}
 }
 
-function HealthTest-UnexpectedListeningPorts__S {
+function HealthTest-UnexpectedListeningPorts {
 <#
 Description: Compares listening TCP ports to the baseline and identifies unexpected listeners with process context.
 AppliesTo: All
@@ -2258,13 +2275,14 @@ function Get-InstalledSoftwareFindingLevel {
     return 'warning'
 }
 
-function HealthTest-InstalledSW__P {
+function HealthTest-InstalledSW {
 <#
 Description: Reports installed software not present in the baseline inventory.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time)
+Tags: Policy
 Uses: Get-InstalledSW, Get-NormalizedSoftwareName, Get-InstalledSoftwareFindingLevel.
 #>
     $seen = 0

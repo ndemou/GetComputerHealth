@@ -43,8 +43,21 @@ Describe 'HealthTest help blocks' {
           HasLegacySyntax         = $blockText -match '(?im)^\s*\.(SYNOPSIS|DESCRIPTION)\b'
           FirstLineIsDescription  = (@($lines).Count -gt 0) -and $lines[0] -match '^Description:\s+\S+'
           HasAllFields            = @($requiredFields | Where-Object { $_ -in $actualFields }).Count -eq $requiredFields.Count
-          HasExpectedOrder        = (@($actualFields).Count -ge $requiredFields.Count) -and ((@($actualFields)[0..($requiredFields.Count - 1)] -join '|') -eq ($requiredFields -join '|'))
+          HasExpectedOrder        = $false
         }
+        $fields = @($helpBlocks[-1].ActualFields)
+        $idx = @{}
+        for ($i = 0; $i -lt $fields.Count; $i++) {
+          if (-not $idx.ContainsKey($fields[$i])) { $idx[$fields[$i]] = $i }
+        }
+        $hasPrefixOrder = ($fields.Count -ge 5) -and ((@($fields)[0..4] -join '|') -eq 'Description|AppliesTo|Scope|Category|Impact')
+        $usesAfterImpact = $idx.ContainsKey('Uses') -and $idx.ContainsKey('Impact') -and ($idx['Uses'] -gt $idx['Impact'])
+        $tagsPositionOk = (-not $idx.ContainsKey('Tags')) -or (
+          $idx.ContainsKey('Impact') -and $idx.ContainsKey('Uses') -and
+          ($idx['Tags'] -gt $idx['Impact']) -and
+          ($idx['Tags'] -lt $idx['Uses'])
+        )
+        $helpBlocks[-1].HasExpectedOrder = $hasPrefixOrder -and $usesAfterImpact -and $tagsPositionOk
       }
     }
 
@@ -68,7 +81,7 @@ Describe 'HealthTest help blocks' {
       }
 
       if (-not $helpBlock.HasExpectedOrder) {
-        "$($helpBlock.FunctionName) in $($helpBlock.FilePath) must order fields as: $($requiredFields -join ', '). Found: $($helpBlock.ActualFields -join ', ')."
+        "$($helpBlock.FunctionName) in $($helpBlock.FilePath) must order fields as Description, AppliesTo, Scope, Category, Impact, [Tags optional], Uses. Found: $($helpBlock.ActualFields -join ', ')."
       }
     }
 

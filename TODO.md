@@ -20,14 +20,14 @@ But support any installation directory
 
 ## Better way of Tagging health tests
 
-Stop using the hacky way of tagging healthtests with `__<CHARACTER>` in their name and instead add a `Tags:` line in their help-block. For example instead of `__EP` add this Tags: line:
-```
-Tags: Essential, Policy
-```
-
-During migration, map `__P` to `Tags: ...Policy`, `__E` to `Tags: ...Essential` and `__S` to `Impact: High(Time)` (since we already have the Impact: line there's no needd to have a Tag word for slow tests)
-
-After this change we must review all code that handles health test names and make sure: a) it accepts both the full function name and the name without the `HealthTest-` prefix; b) It doesn't contain code to deal with the old `__<CHARACTER>` style of taging.
+Completed in code:
+- Test tags now come from `Tags:` in each health test help block.
+- Legacy `__<CHARACTER>` suffixes have been removed from built-in test function names.
+- Migration mapping applied:
+  - `__P` -> `Tags: Policy`
+  - `__E` -> `Tags: Essential`
+  - `__S` -> `Impact: ... High(Time)`
+- Name handling accepts full names (`HealthTest-...`) and short names without the `HealthTest-` prefix.
 
 ## Stop using legacy parameter set that adapts Pester 5 syntax to Pester 4 syntax
 
@@ -42,48 +42,48 @@ The check each cluster thinking: “which tests are merely different views of th
 ### First-pass clusters and combine candidates
 
 #### Cluster A: DNS suffix / domain identity
-- `HealthTest-DnsSuffixBaseline__E`
-- `HealthTest-DnsSuffixMatchesDomain__E`
+- `HealthTest-DnsSuffixBaseline`
+- `HealthTest-DnsSuffixMatchesDomain`
 - Recommendation: merge into one canonical suffix check.
 
 #### Cluster B: Defender posture / freshness / scan recency
-- `HealthTest-MalwareProtectionFeatures__E`
-- `HealthTest-DefenderStatus__E`
-- `HealthTest-RecentWindowsScan__E`
+- `HealthTest-MalwareProtectionFeatures`
+- `HealthTest-DefenderStatus`
+- `HealthTest-RecentWindowsScan`
 - Recommendation: merge first two as “Defender posture”; keep scan recency separate.
 
 #### Cluster C: Scheduled task health
 - `HealthTest-ScheduledTasks`
 - `HealthTest-SystemScheduledTasks`
-- `HealthTest-ScheduledTasksLastResult__S`
+- `HealthTest-ScheduledTasksLastResult`
 - Recommendation: one engine with scoped sections and dedupe by task path/name/reason.
 
 #### Cluster D: AD replication and topology
 - `HealthTest-ADInboundReplicationTopology`
 - `HealthTest-ReplicationLatency`
 - `HealthTest-ADReplicationHealth`
-- `HealthTest-Dcdiag__S` (partial overlap)
+- `HealthTest-Dcdiag` (partial overlap)
 - Recommendation: combine replication trio; keep `Dcdiag` as independent corroboration.
 
 #### Cluster E: DFSR/SYSVOL
 - `HealthTest-DfsReplicationState`
 - `HealthTest-DfsrBacklog`
-- `HealthTest-SysvolContentConsistency__S`
+- `HealthTest-SysvolContentConsistency`
 - `HealthTest-SysvolNetlogonAccessible`
 - Recommendation: combine DFSR pair; keep SYSVOL downstream checks separate.
 
 #### Cluster F: DC DNS registration / reachability
-- `HealthTest-ConnectivityToDCs__E`
-- `HealthTest-RequiredSrvRecords__E`
+- `HealthTest-ConnectivityToDCs`
+- `HealthTest-RequiredSrvRecords`
 - `HealthTest-DcDnsRegistration`
 - `HealthTest-DcDnsARecords`
 - Recommendation: share one SRV validation helper; keep A-record and connectivity checks separate.
 
 #### Cluster G: Network exposure surface
-- `HealthTest-FirewallEnabled__S`
-- `HealthTest-UnexpectedListeningPorts__S`
-- `HealthTest-WinRMListening__E`
-- `HealthTest-ShareReasonableness__S`
+- `HealthTest-FirewallEnabled`
+- `HealthTest-UnexpectedListeningPorts`
+- `HealthTest-WinRMListening`
+- `HealthTest-ShareReasonableness`
 - Recommendation: do not merge; distinct failure modes, but add cross-links in output.
 
 ### Classes of reasons to combine tests
@@ -98,14 +98,14 @@ The check each cluster thinking: “which tests are merely different views of th
 
 ### Most likely same-fact duplicates (priority)
 
-1. `HealthTest-DnsSuffixBaseline__E` + `HealthTest-DnsSuffixMatchesDomain__E`
-2. `HealthTest-MalwareProtectionFeatures__E` + `HealthTest-DefenderStatus__E`
+1. `HealthTest-DnsSuffixBaseline` + `HealthTest-DnsSuffixMatchesDomain`
+2. `HealthTest-MalwareProtectionFeatures` + `HealthTest-DefenderStatus`
 3. `HealthTest-DfsReplicationState` + `HealthTest-DfsrBacklog`
-4. `HealthTest-ScheduledTasks` + `HealthTest-ScheduledTasksLastResult__S` (plus overlap with `HealthTest-SystemScheduledTasks`)
-5. SRV-record portion of `HealthTest-ConnectivityToDCs__E` + `HealthTest-RequiredSrvRecords__E`
+4. `HealthTest-ScheduledTasks` + `HealthTest-ScheduledTasksLastResult` (plus overlap with `HealthTest-SystemScheduledTasks`)
+5. SRV-record portion of `HealthTest-ConnectivityToDCs` + `HealthTest-RequiredSrvRecords`
 
 ## Add the "P/Policy" Tag to these functions:
-  - HealthTest-NonMicrosoftServices__S
+  - HealthTest-NonMicrosoftServices
   - HealthTest-NonDefaultShares
   - HealthTest-LocalAdminsBaseline
   - HealthTest-InstalledRolesFeatures

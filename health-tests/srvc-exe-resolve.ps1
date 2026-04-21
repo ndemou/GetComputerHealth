@@ -741,13 +741,14 @@ function Test-LooksLikePath {
 }
 
 
-function HealthTest-AutoStartServicesRunning__E {
+function HealthTest-AutoStartServicesRunning {
 <#
 Description: Reports auto-start services that are not running, with extra context from their last exit code.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: low
+Tags: Essential
 Uses: cmd.exe.
 #>
   function Get-ServiceExitCodeMessage {
@@ -831,7 +832,7 @@ Uses: cmd.exe.
         Write-Warning "[PASS] All services that are set to automatically start are running"}
 }
 
-function HealthTest-NonMicrosoftServices__S {
+function HealthTest-NonMicrosoftServices {
 <#
 Description: Identifies non-core Microsoft services and highlights unusual or suspicious service vendors.
 AppliesTo: All

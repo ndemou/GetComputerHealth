@@ -16,7 +16,7 @@ function Normalize-DirectoryPath {
         return $CandidatePath.TrimEnd('\\')
     }
 
-function HealthTest-LargeDirectories__S {
+function HealthTest-LargeDirectories {
 <#
 Description: Finds directories with more than 10000 child items.
 AppliesTo: All

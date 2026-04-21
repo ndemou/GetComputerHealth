@@ -2,13 +2,14 @@
 Tests only for domain joined servers except DC/PDC
 #>
 
-function HealthTest-InterfaceDnsServersUseDcs__E {
+function HealthTest-InterfaceDnsServersUseDcs {
 <#
 Description: Checks whether member-server network interfaces use domain controllers as DNS servers.
 AppliesTo: DomainJoined
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Network)
+Tags: Essential
 Uses: None.
 #>
   $cs = Get-CimInstance Win32_ComputerSystem
@@ -59,13 +60,14 @@ Uses: None.
     Write-Warning "[PASS] All interfaces with DNS configured use only DC IPs."}
 }
 
-function HealthTest-DnsSuffixMatchesDomain__E {
+function HealthTest-DnsSuffixMatchesDomain {
 <#
 Description: Checks whether the primary DNS suffix matches the joined AD domain.
 AppliesTo: DomainJoined
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Network)
+Tags: Essential
 Uses: None.
 #>
   [CmdletBinding()] param()
@@ -84,13 +86,14 @@ Uses: None.
   }
 }
 
-function HealthTest-DomainARecordPointsToDcIp__E {
+function HealthTest-DomainARecordPointsToDcIp {
 <#
 Description: Checks whether the domain A record points to a DC IP.
 AppliesTo: DomainJoined
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Network)
+Tags: Essential
 Uses: Resolve-DnsName.
 #>
   $dcIps = @($Global:GCHDQMTA.IpsOfAllDcs)
@@ -148,7 +151,7 @@ Uses: None.
   }
 }
 
-function HealthTest-GpupdatePolicyApply__S {
+function HealthTest-GpupdatePolicyApply {
 <#
 Description: Checks whether the machine secure channel is healthy enough for Group Policy processing.
 AppliesTo: DomainJoined
