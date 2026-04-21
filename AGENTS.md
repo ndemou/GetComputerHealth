@@ -46,3 +46,4 @@ Run tests from the repository root in Windows PowerShell (v5).
 ## Releases
 
 - Use `.\scripts\release\New-GetComputerHealthRelease.ps1` from the repo root to create a release. It defaults to a minor bump; use `-Part Patch` or `-Part Major` to change the semantic-version part being incremented.
+- Use `.\scripts\release\New-GetComputerHealthRelease.ps1 -SkipTests` only when the relevant tests have already passed in the current work session and you want to avoid rerunning the unit and smoke wrappers during release. The release script still validates installation from the release zip.

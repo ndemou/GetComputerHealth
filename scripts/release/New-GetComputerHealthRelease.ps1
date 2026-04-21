@@ -6,7 +6,7 @@ Creates and publishes a new GetComputerHealth GitHub release.
 Performs the repository release flow end to end:
 - syncs `main` with `origin`
 - bumps the embedded semantic version in `Get-ComputerHealth.ps1`
-- runs the standard unit and smoke test wrappers
+- runs the standard unit and smoke test wrappers unless `-SkipTests` is used
 - builds a versioned release zip with the expected top-level folder shape
 - validates installation from that zip
 - commits and pushes the version bump
@@ -15,16 +15,25 @@ Performs the repository release flow end to end:
 .PARAMETER Part
 Semantic version part to increment. Defaults to `Minor`.
 
+.PARAMETER SkipTests
+Skips the unit and smoke test wrappers during release. The release zip installation
+validation still runs.
+
 .EXAMPLE
 .\scripts\release\New-GetComputerHealthRelease.ps1
 
 .EXAMPLE
 .\scripts\release\New-GetComputerHealthRelease.ps1 -Part Patch
+
+.EXAMPLE
+.\scripts\release\New-GetComputerHealthRelease.ps1 -SkipTests
 #>
 [CmdletBinding()]
 param(
   [ValidateSet('Major','Minor','Patch')]
-  [string]$Part = 'Minor'
+  [string]$Part = 'Minor',
+
+  [switch]$SkipTests
 )
 
 Set-StrictMode -Version Latest
@@ -233,11 +242,15 @@ if (git tag --list $releaseTag) {
 Write-Step ("Bumping version from {0} to {1}" -f $embeddedVersion, $newVersionText)
 Set-EmbeddedVersion -Path $versionScriptPath -Version $newVersionText
 
-Write-Step 'Running unit tests'
-& powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\run-unit-tests.ps1
+if ($SkipTests) {
+  Write-Step 'Skipping unit and smoke tests'
+} else {
+  Write-Step 'Running unit tests'
+  & powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\run-unit-tests.ps1
 
-Write-Step 'Running smoke tests'
-& .\tests\run-all-tests.ps1 -Smoke
+  Write-Step 'Running smoke tests'
+  & .\tests\run-all-tests.ps1 -Smoke
+}
 
 Write-Step 'Building release zip'
 $zipPath = New-ReleaseZip -RepoRoot $repoRoot -Version $newVersionText
