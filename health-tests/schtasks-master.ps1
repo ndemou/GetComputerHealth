@@ -133,7 +133,15 @@ Uses: Get-ScheduledTask, Get-ScheduledTaskInfo, Get-ScheduledTaskDeepInfo.
     $path = "$($t.TaskPath.TrimEnd('\'))\$($t.TaskName)"
     if(& $shouldIgnore $path){ continue }
 
-    $info = Get-ScheduledTaskInfo -TaskName $t.TaskName -TaskPath $t.TaskPath
+    try {
+      $info = Get-ScheduledTaskInfo -TaskName $t.TaskName -TaskPath $t.TaskPath -ErrorAction Stop
+    } catch {
+      if ($_.Exception.HResult -eq -2147024894) {
+        Write-Warning "[NOTICE] Task '$path' was deleted while we were examining it."
+        continue
+      }
+      throw
+    }
     $enabled = [bool]$t.Settings.Enabled
     $state = $t.State
     $hasEnabledTrigger = ($t.Triggers | Where-Object { & $isTriggerEnabled $_ } | Select-Object -First 1) -ne $null
