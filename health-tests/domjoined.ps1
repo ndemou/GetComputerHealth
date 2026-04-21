@@ -2,13 +2,14 @@
 Tests only for domain joined servers (including DC/PDC)
 #>
 
-function HealthTest-DnsSuffixBaseline__E {
+function HealthTest-DnsSuffixBaseline {
 <#
 Description: Checks whether DNS suffix search settings match the expected domain baseline.
 AppliesTo: DomainJoined
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Network), Medium(Time)
+Tags: Essential
 Uses: Get-DnsClientGlobalSetting, Get-DnsClient.
 #>
     $DomainName=(Get-CimInstance Win32_ComputerSystem).Domain
@@ -81,13 +82,14 @@ Uses: Get-DnsClientGlobalSetting, Get-DnsClient.
     }
 }
 
-function HealthTest-ConnectivityToDCs__E {
+function HealthTest-ConnectivityToDCs {
 <#
 Description: Checks DNS resolution and TCP connectivity to discovered domain controllers.
 AppliesTo: DomainJoined
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: High(Network)
+Tags: Essential
 Uses: Resolve-DnsName, Test-NetConnectionFast.
 #>
   $dcs  = Get-DomainControllers
@@ -137,13 +139,14 @@ Uses: Resolve-DnsName, Test-NetConnectionFast.
 }
 
 
-function HealthTest-EfsRecoveryAgents__E{
+function HealthTest-EfsRecoveryAgents{
 <#
 Description: Checks whether EFS recovery agents are configured.
 AppliesTo: DomainJoined
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time)
+Tags: Essential
 Uses: None.
 #>
   $out=& certutil -recoveryagent 2>&1
@@ -152,13 +155,14 @@ Uses: None.
 }
 
 
-function HealthTest-GpWmiFilterNamespacesOnLocalHost__E{
+function HealthTest-GpWmiFilterNamespacesOnLocalHost{
 <#
 Description: Checks whether Group Policy WMI filter namespaces are accessible on the local host.
 AppliesTo: DomainJoined
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: low
+Tags: Essential
 Uses: None.
 #>
   $bad=$false

@@ -45,13 +45,14 @@ Filters out ports listening only on the loopback addresses (127.0.0.1 and ::1) b
   return $false
 }
 
-function HealthTest-TimeSyncPolicy__E {
+function HealthTest-TimeSyncPolicy {
 <#
 Description: Checks whether Windows Time is configured against the expected time source policy.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time), Medium(Network)
+Tags: Essential
 Uses: Get-DnsDomainControllers, Resolve-DnsName, Test-IsLaptopOrMobile.
 #>
     [CmdletBinding()]
@@ -319,13 +320,14 @@ Uses: Get-DnsDomainControllers, Resolve-DnsName, Test-IsLaptopOrMobile.
 }
 
 
-function HealthTest-UpdateAge__E {
+function HealthTest-UpdateAge {
 <#
 Description: Checks how long it has been since the latest installed Windows update.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time)
+Tags: Essential
 Uses: Windows Update Agent history with fallback to registry/Get-HotFix.
 #>
     param([int]$WarnDays=30,[int]$FailDays=45)
@@ -377,13 +379,14 @@ Uses: Windows Update Agent history with fallback to registry/Get-HotFix.
 }
 
 
-function HealthTest-CertExpiry__E {
+function HealthTest-CertExpiry {
 <#
 Description: Checks for certificates that are expired or nearing expiration.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time)
+Tags: Essential
 Uses: None.
 #>
     param([int]$WarnDays=60,[int]$FailDays=30)
@@ -408,13 +411,14 @@ Uses: None.
 # I think the later seems does more robust detection of issues based on Last Result
 
 
-function HealthTest-IisBindings__E {
+function HealthTest-IisBindings {
 <#
 Description: Checks IIS bindings for wildcard or otherwise risky binding configurations.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: low
+Tags: Essential
 Uses: Get-Command, Get-WindowsFeature, Get-Service.
 #>
     $iisInstalled = $false
@@ -515,7 +519,7 @@ Uses: Get-AvailMB, Get-Counter.
 }
 
 
-function HealthTest-ShareReasonableness__S {
+function HealthTest-ShareReasonableness {
 <#
 Description: Checks SMB shares for risky or unreasonable share exposure.
 AppliesTo: All
@@ -704,13 +708,14 @@ Uses: Get-Service, Get-SmbShare.
 }
 
 
-function HealthTest-DisksHaveFreeSpace__E {
+function HealthTest-DisksHaveFreeSpace {
 <#
 Description: Checks whether local disks have sufficient free space.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Disk)
+Tags: Essential
 Uses: Test-DiskHasFreeSpace.
 #>
     foreach ($d in [System.IO.DriveInfo]::GetDrives()) {
@@ -730,13 +735,14 @@ Uses: Test-DiskHasFreeSpace.
 }
 
 
-function HealthTest-RequiredSrvRecords__E{
+function HealthTest-RequiredSrvRecords{
 <#
 Description: Checks whether required AD DNS SRV records resolve successfully.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Network)
+Tags: Essential
 Uses: Resolve-DnsName.
 #>
   $dom=(Get-CimInstance Win32_ComputerSystem).Domain
@@ -749,13 +755,14 @@ Uses: Resolve-DnsName.
   if(-not $missing){ Write-Warning "[PASS] Required AD SRV records present" }
 }
 
-function HealthTest-LdapSigningChannelBinding__E {
+function HealthTest-LdapSigningChannelBinding {
 <#
 Description: Checks whether LDAP signing and channel binding enforcement are enabled.
 AppliesTo: All
 Scope: Computer
 Category: Security & Stability Risks
 Impact: Medium(Time)
+Tags: Essential
 Uses: Get-SoftwareLicensing.
 #>
     $p = 'HKLM:\SYSTEM\CurrentControlSet\Services\NTDS\Parameters'
@@ -846,7 +853,7 @@ and returns friendly licensing status fields for reporting.
     $objects | Sort-Object ProductName, LicenseStatus
 }
 
-function HealthTest-SoftwareLicensing__S{
+function HealthTest-SoftwareLicensing{
 <#
 Description: Checks Windows software licensing state and activation status.
 AppliesTo: All
@@ -943,13 +950,14 @@ Uses: None.
 }
 
 
-function HealthTest-PagefileSanity__E{
+function HealthTest-PagefileSanity{
 <#
 Description: Checks whether paging file configuration is present and sized sensibly.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Disk), Medium(Time)
+Tags: Essential
 Uses: None.
 #>
   [CmdletBinding()] param([int]$MinMB=1024,[switch]$RequireOnSystemDrive)
@@ -994,7 +1002,7 @@ Uses: None.
 }
 
 
-function HealthTest-Storage__S {
+function HealthTest-Storage {
 <#
 Description: Checks physical disks for predictive failure, unhealthy status, temperature, and reliability warnings.
 AppliesTo: All
@@ -1072,13 +1080,14 @@ Uses: Get-PhysicalDisk, Get-StorageReliabilityCounter.
 }
 
 
-function HealthTest-NtfsDirtyBit__E {
+function HealthTest-NtfsDirtyBit {
 <#
 Description: Checks whether any NTFS volumes have the dirty bit set.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Disk)
+Tags: Essential
 Uses: Get-Volume, Get-FreeGB, Get-PSDrive.
 #>
     $dirty = @()
@@ -1168,13 +1177,14 @@ function Test-DiskHasFreeSpace {
     }
 }
 
-function HealthTest-EventLogMaxSizes__E{
+function HealthTest-EventLogMaxSizes{
 <#
 Description: Checks whether key Windows event logs meet the configured minimum size baseline.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time)
+Tags: Essential
 Uses: Get-WinEvent.
 #>
   [CmdletBinding()]

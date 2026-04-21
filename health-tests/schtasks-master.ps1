@@ -325,7 +325,7 @@ function Get-ScheduledTaskDeepInfo{
   }
 }
 
-function HealthTest-ScheduledTasksLastResult__S {
+function HealthTest-ScheduledTasksLastResult {
 <#
 Description: Parses scheduled task last-result data and reports task failures or warnings.
 AppliesTo: All

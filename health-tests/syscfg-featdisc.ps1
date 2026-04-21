@@ -2,13 +2,14 @@
 System Configuration & Feature Discovery
 #>
 
-function HealthTest-MalwareProtectionFeatures__E {
+function HealthTest-MalwareProtectionFeatures {
 <#
 Description: Checks Microsoft Defender malware protection status and updates signatures when needed.
 AppliesTo: All
 Scope: Computer
 Category: Security & Stability Risks
 Impact: Medium(Time)
+Tags: Essential
 Uses: Get-MpComputerStatus, Update-MpSignature.
 #>
     # $MPs holds the Malware Protection status
@@ -30,13 +31,14 @@ Uses: Get-MpComputerStatus, Update-MpSignature.
 
 
 
-function HealthTest-StartupItems__E{
+function HealthTest-StartupItems{
 <#
 Description: Lists startup items found in standard registry and startup-folder locations.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: low
+Tags: Essential
 Uses: None.
 #>
   $paths=@(

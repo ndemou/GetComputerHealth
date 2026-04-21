@@ -19,8 +19,8 @@ try {
     $data = & (Join-Path $paths.InstallRoot 'Get-ComputerHealth.ps1') -Hide DIPSNWFC `
       -OutputConsoleMessages -OutputObjects -RunWithoutElevation `
       -ExcludeTests ("HealthTest-LargeDirectories,HealthTest-SoftwareLicensing," + `
-                     "HealthTest-ScheduledTasks,HealthTest-ScheduledTasksLastResult__S,HealthTest-NonMicrosoftServices," + `
-                     "HealthTest-UnsignedDrivers,HealthTest-IisBindings__E")
+                     "HealthTest-ScheduledTasks,HealthTest-ScheduledTasksLastResult,HealthTest-NonMicrosoftServices," + `
+                     "HealthTest-UnsignedDrivers,HealthTest-IisBindings")
   } catch {
     $inv = $_.InvocationInfo
     $message = "Get-ComputerHealth.ps1 threw during standalone test: $($_.Exception.Message)"
