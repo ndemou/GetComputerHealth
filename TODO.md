@@ -136,6 +136,32 @@ It's very useful (the deault mostly) for ports, installed SW, services and roles
 
 For now, I expect an admin that wants to use this feature, to manually edit `Get-ComputerHealth.state` and change `SUPPRESSED_FINDING` to `REQUIRED_FINDING`.
 
+## Post-processing of long diagnostic output that may have repetitions
+
+Look at this example output regarding a failed dcdiag:
+```
+  NOTICE : [3dafa4cb] 'DCDIAG /v' reports a failure in this basic test that examines the event log: DC02 failed test SystemLog
+  #       Since this test fails when warnings/errors appear in the event log, false positives are likely.
+  #       Run DCDIAG /v, search for 'DC02 failed test SystemLog' and examine the detailed report above it.
+  #       Below are lines from that report that contain words like error/fail:
+---start of diagnostic output---
+Windows failed to apply the MDM Policy settings. MDM Policy settings might have its own log file. Please click on the "More information" link. Windows failed to apply the MDM Policy settings. MDM Policy settings might have its own log file. Please click on the "More information" link. Windows failed to apply the MDM Policy settings. MDM Policy settings might have its own log file. Please click on the "More information" link. Windows failed to apply the MDM Policy settings. MDM Policy settings might have its own log file. Please click on the "More information" link. Windows failed to apply the MDM Policy settings. MDM Policy settings might have its own log file. Please click on the "More information" link. Windows failed to apply the MDM Policy settings. MDM Policy settings might have its own log file. Please click on the "More information" link. Windows failed to apply the MDM Policy settings. MDM Policy settings might have its own log file. Please click on the "More information" link. Windows failed to apply the MDM Policy settings. MDM Policy settings might have its own log file. Please click on the "More information" link. Windows failed to apply the MDM Policy settings. MDM Policy settings might have its own log file. Please click on the "More information" link. Windows failed to apply the MDM Policy settings. MDM Policy settings might have its own log file. Please click on the "More information" link. Windows failed to apply the MDM Policy settings. MDM Policy settings might have its own log file. Please click on the "More information" link. Windows failed to apply the MDM Policy settings. MDM Policy settings might have its own log file. Please click on the "More information" link. An error event occurred.  EventID: 0x80000013
+---end of diagnostic output---
+```
+
+Notice that the diagnostic output collected from dcdiag  is a very long string of repeating sentences. We can manipulate it to make it much more succinct by following these steps:
+ - Split lines(sentences) on anything that looks like a "word. " or "word; " (e.g. with something like `$output -replace '([a-z]{2,30}[.;]) +','$1\r\n'`)
+ - Keep the first 50 lines
+ - Remove duplicate lines(sentences)
+ - Join all lines again in one
+ - If more than 2000 characters, keep the first 1997 suffixed with "...".
+
+For example, the above diagnostic output will become: 
+```
+Windows failed to apply the MDM Policy settings. MDM Policy settings might have its own log file. Please click on the "More information" link. An error event occurred. EventID: 0x80000013
+```
+
+For the moment I only noticed a need for this post-processing on the output of dcdiag but it's best to have separate function for this post-processing.
 
 ## Use the new installer (~\dev\TI)
 
