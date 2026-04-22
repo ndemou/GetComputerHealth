@@ -219,6 +219,9 @@ $IpsOfAllDcs = @(
   "10.10.0.11"  # dc2
 )
 
+# Update local version of GetComputerHealth (if needed)
+& C:\IT\bin\Update-GetHealthCode.ps1
+
 & c:\it\bin\Invoke-GetComputerHealth.ps1 -Computers "ALL_DOMAIN_SERVERS,workstation1,workstation2" -ExcludeServers "server1,server2" -Hide:$Hide -OnlyTheseTests $OnlyTheseTests -SkipSlowTests:$SkipSlowTests -SkipPolicyTests:$SkipPolicyTests -NoSendMessage:$NoSendMessage -NoUpdate:$NoUpdate -PushUpdate -IpsOfAllDcs $IpsOfAllDcs
 ```
 
