@@ -11,6 +11,13 @@ Category: Configuration Hygiene & Best Practices
 Impact: Medium(Network)
 Tags: Essential
 Uses: None.
+
+Checks the DNS suffix configuration for domain-joined member computers. It collects
+the computer's domain role and AD domain name from Win32_ComputerSystem, skips hosts
+where the test is not applicable, and inspects ipconfig /all output for DNS suffix
+entries that end with the joined domain. It detects member servers whose DNS suffix
+data does not include the AD domain, which can break domain name resolution and AD
+service discovery.
 #>
   $cs = Get-CimInstance Win32_ComputerSystem
   $role = $cs.DomainRole

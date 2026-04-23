@@ -11,6 +11,13 @@ Category: Security & Stability Risks
 Impact: Medium(Time)
 Tags: Essential
 Uses: Get-MpComputerStatus, Update-MpSignature.
+
+Checks the Microsoft Defender malware protection subsystem. It collects the
+Get-MpComputerStatus state and verifies that signatures are current, the anti-malware
+service is enabled and running in Normal mode, and the main protection layers are
+enabled: real-time protection, on-access scanning, Network Inspection System, IOAV,
+behavior monitoring, antivirus, and antispyware. It detects stale signatures and
+disabled or degraded Defender features that reduce malware protection coverage.
 #>
     # $MPs holds the Malware Protection status
     $MPs=(Get-MpComputerStatus)

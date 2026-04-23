@@ -11,6 +11,14 @@ Category: Configuration Hygiene & Best Practices
 Impact: Medium(Network), Medium(Time)
 Tags: Essential
 Uses: Get-DnsClientGlobalSetting, Get-DnsClient.
+
+Checks the DNS client suffix baseline for a domain-joined computer. It collects the
+computer's AD domain name, the primary DNS suffix from IP global properties, global
+DNS client devolution settings, and per-interface DNS client settings for active
+interfaces. It detects an empty or mismatched primary DNS suffix, disabled DNS
+devolution, inability to query DNS client settings, NICs that do not register their
+address or suffix in DNS, and connection-specific suffixes that unexpectedly differ
+from the AD DNS name.
 #>
     $DomainName=(Get-CimInstance Win32_ComputerSystem).Domain
 

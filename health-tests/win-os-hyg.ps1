@@ -143,6 +143,13 @@ Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time)
 Tags: Essential
 Uses: Get-DaysSinceLastVirusScan, Get-WindowsOriginalInstallDate.
+
+Checks the Microsoft Defender scan-history subsystem for recent quick-scan activity.
+It collects the number of days since the last virus scan from Defender status data
+when available, and falls back to the Windows original installation age when no scan
+timestamp or age can be determined. It detects machines that have not scanned recently,
+warning after several days and failing when scan history is absent or older than the
+failure threshold.
 #>
     $MAX_WARN_DAYS = 4
     $MAX_FAILURE_DAYS = 8
@@ -248,6 +255,12 @@ Category: Security & Stability Risks
 Impact: Medium(Time)
 Tags: Essential
 Uses: Get-MpComputerStatus.
+
+Checks Microsoft Defender signature freshness. It collects AntivirusSignatureAge,
+AntispywareSignatureAge, and AntivirusSignatureVersion from Get-MpComputerStatus,
+then compares the signature ages with warning and failure thresholds. It detects
+Defender definitions that are becoming stale or are too old, which can indicate
+update failures or weakened malware detection coverage.
 #>
     param([int]$WarnSigAgeDays=2,[int]$FailSigAgeDays=7)
     $s = Get-MpComputerStatus
