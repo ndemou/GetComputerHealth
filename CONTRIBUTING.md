@@ -129,6 +129,9 @@ Category: Configuration Hygiene & Best Practices
 Impact: High(Time), Medium(Disk)
 Tags: Essential
 Uses: Get-ChildItem.
+
+<OPTIONAL DETAILED DESCRIPTION>
+<...>
 #>
 ...
 ```
