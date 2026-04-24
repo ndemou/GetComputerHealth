@@ -2,12 +2,11 @@
 
 ## TL;DR
 
-All `.ps1` files in `C:\IT\config\Custom-HealthTests\` are dot-sourced, and all functions whose names match `HealthTest-*` are executed. These functions should report their result by calling one of the following:
-
+All `.ps1` files in `C:\IT\config\Custom-HealthTests\` are dot-sourced, and all functions whose names match `HealthTest-*` are executed. These functions should return nothing and should report their result(s) like this:
 ```powershell
-Write-Warning "[PASS] $message"
-Write-Warning "[FAILURE] $message"
-Write-Warning "[FAILURE] $message" + "`n" + $optionalDetails
+Write-Warning "[PASS] $allGoodDescription"
+Write-Warning "[FAILURE] $issueDescription"
+Write-Warning "[FAILURE] $issueDescription" + "`n" + $optionalDetails
 ````
 
 The code you write will run with **high privileges** and, apart from any temporary files or similar artifacts it may need, it **should not change** the system state.
@@ -19,10 +18,15 @@ To add a custom test:
 3. In your script, define one or more functions named `HealthTest-<SOME_DESCRIPTIVE_NAME>`.
 4. Dot-source the script and run the function manually to test it.
 
-## Example Code
+## More details and examples
+
+ - You may define helper functions or dot-source other .ps1 files.
+ - You may define more than one HealthTest-... function.
+ - You must not place executable code outside functions.
+
+### Partner 1, “Was an issue found”
 
 ```powershell
-# This function implements the test. It returns nothing.
 function HealthTest-IsFooLessThanLimit {
     # ...
     # Code that sets $issueFound if Foo > $limit
@@ -36,23 +40,9 @@ function HealthTest-IsFooLessThanLimit {
         Write-Warning "[PASS] Foo is within the limit (Foo<=$limit)"
     }
 }
-
-# You may define helper functions or dot-source other .ps1 files.
-
-# You may define more than one HealthTest-... function.
-
-# Do not place executable code outside functions.
 ```
 
-If you have more detail to report, use this style:
-
-```powershell
-$issueDescription = "A single terse line that uniquely describes the issue"
-$details = "More details" + "`n" + "Even in multiple lines" + "`n" + "Up to 32K characters."
-Write-Warning "[NOTICE] $issueDescription" + "`n" + $details
-```
-
-Another very common pattern is the “enumeration of findings” style:
+### Pattern 2, “Enumeration of findings”
 
 ```powershell
 function HealthTest-LargeDirectories {
@@ -70,23 +60,22 @@ function HealthTest-LargeDirectories {
 }
 ```
 
-## How to Test Your Function
+## More on the reporting style
 
+Often this style covers you needs:
 ```powershell
-. C:\IT\bin\Get-ComputerHealth.ps1 -DoNothing # only needed if your function reads `$Global:GCHDQMTA`
-. "C:\IT\config\Custom-HealthTests\tests-for-$env:COMPUTERNAME.ps1" # <-- your script
-HealthTest-LargeDirectories # <-- your function
+Write-Warning "[PASS] $allGoodDescription"
+Write-Warning "[FAILURE] $issueDescription"
+````
+
+But if you have details to report, use this style:
+```powershell
+$issueDescription = "A single terse line that uniquely describes the issue"
+$details = "More details" + "`n" + "Even in multiple lines" + "`n" + "Up to 32K characters."
+Write-Warning "[NOTICE] $issueDescription" + "`n" + $details
 ```
 
-The above gives acceptable but crude output. If you want both nicely colored console output and structured results:
-
-```powershell
-$results = HealthTest-LargeDirectories 3>&1 | C:\IT\bin\Get-ComputerHealth.ps1 -PrettifyWriteWarning
-```
-
-## How to Write Proper Issue Descriptions
-
-A proper issue description should not change when the **essence** of the issue has not changed. There is no such restriction for the optional `$details`.
+A proper issue description should not change when the **essence** of the issue has not changed. There is no restriction for the optional `$details`.
 
 For example, suppose you want to flag folders with too many files. Consider these two descriptions:
 
@@ -152,3 +141,17 @@ If custom test files already exist, suggest creating a new file for the new test
 Finally, write the code for the requested test and give your human step-by-step instructions for adding it and verifying that it works.
 
 When possible, prefer copy-paste-ready PowerShell commands.
+
+## How to Test Your Function
+
+```powershell
+. C:\IT\bin\Get-ComputerHealth.ps1 -DoNothing # only needed if your function reads `$Global:GCHDQMTA`
+. "C:\IT\config\Custom-HealthTests\tests-for-$env:COMPUTERNAME.ps1" # <-- your script
+HealthTest-LargeDirectories # <-- your function
+```
+
+The above gives acceptable but crude output. If you want both nicely colored console output and structured results:
+
+```powershell
+$results = HealthTest-LargeDirectories 3>&1 | C:\IT\bin\Get-ComputerHealth.ps1 -PrettifyWriteWarning
+```
