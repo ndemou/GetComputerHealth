@@ -10,13 +10,13 @@ Instead of dot-sourcing the custom scripts, discovering the functions with the c
 
 We should also update `how-to-add-custom-tests.md`.
 
-Since this is a breaking change it requires a) the update of the major version number from 3 to 4 b) a migration script that will relief users from having to edit all their custom health test scripts. The migration script seems easy: Use `sls` to find the names of the custom health test functions and append a call to them at the end of the script. We can use `Get-TextFileEncoding` from `helpers-text-files.ps1` to make sure we append text using the correct encoding. The migration script should be run by the updater/installer only when the existing version is `3.3.y`.
+Since this is a breaking change it requires a) the update of the major version number from 3 to 4 b) a migration script that will relieve users from having to edit all their custom health test scripts. The migration script seems easy: Use `sls` to find the names of the custom health test functions and append a call to them at the end of the script. We can use `Get-TextFileEncoding` from `helpers-text-files.ps1` to make sure we append text using the correct encoding. The migration script should be run by the updater/installer only when the existing version is `3.3.y`.
 
-## Implement functionality that will help a user create and review custome health tests
+## Implement functionality that will help a user create and review custom health tests
 
 Running `Get-ComputerHealth.ps1 -CreateCustomHealthTest` should create necessary folders and an empty ps1 script and return the path to the file.
 
-Running `Get-ComputerHealth.ps1 -ListCustomHealthTests` should return a list of scripts with custome health tests (file objects).
+Running `Get-ComputerHealth.ps1 -ListCustomHealthTests` should return a list of scripts with custom health tests (file objects).
 
 Update our documentation.
 
@@ -140,7 +140,7 @@ Imagine this rule in `Get-ComputerHealth.state`:
 ```
 Rules like this are loaded at the start of the program. When the specified HealthTest function(`UnexpectedListeningPorts`) is executed all the finding signatures it emits are recorded. If they don't include the REQUIRED signature a failure is emitted: `[failure] This finding that must appear in a healthy system did not: Computer is listening to port 443`. If the function is not executed nothing happens.
 
-It's very useful (the deault mostly) for ports, installed SW, services and roles.
+It's very useful (the default mostly) for ports, installed SW, services and roles.
 
 For now, I expect an admin that wants to use this feature, to manually edit `Get-ComputerHealth.state` and change `SUPPRESSED_FINDING` to `REQUIRED_FINDING`.
 
@@ -174,7 +174,7 @@ For the moment I only noticed a need for this post-processing on the output of d
 ## Use the new installer (~\dev\TI)
 
 
-## Review the hundrends of warnings from Invoke-ScriptAnalyzer (and 3 errors)
+## Review the hundreds of warnings from Invoke-ScriptAnalyzer (and 3 errors)
 
 See also : .\tests\script-analysis.ps1
 
@@ -188,7 +188,7 @@ See also : .\tests\script-analysis.ps1
 
   - I could be monitoring the CPU and memory pressure *while* running all/most 
     other tests. This has pros and cons so I can make it a separate check 
-    (e.g. some tests *do* streess the CPU (maybe RAM also).
+    (e.g. some tests *do* stress the CPU (maybe RAM also).
 
   - Also measure CPU, board temperature.
 
@@ -528,7 +528,7 @@ function HealthTest-OrphanedHyperVFiles {
 ```
 
 ## HealthTest-SysvolContentConsistency
-The function HealthTest-SysvolContentConsistency calculates the size and file count of the entire `\\SYSVOL\...\Policies` tree across **all** Domain Controllers over the network. In a production environment with branch offices or many GPOs, this is dangerous. It generates massive WAN traffic. Since Health Tests are already running on every single DC you could in theory compute the hashes localy on each DC (and compute real hashes instead of the pseudo sigs that this function computes) and then exchange and compare them. This will be super fast even over WAN.
+The function HealthTest-SysvolContentConsistency calculates the size and file count of the entire `\\SYSVOL\...\Policies` tree across **all** Domain Controllers over the network. In a production environment with branch offices or many GPOs, this is dangerous. It generates massive WAN traffic. Since Health Tests are already running on every single DC you could in theory compute the hashes locally on each DC (and compute real hashes instead of the pseudo sigs that this function computes) and then exchange and compare them. This will be super fast even over WAN.
 
 
 ## Look at these Gemini suggestions

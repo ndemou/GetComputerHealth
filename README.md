@@ -4,7 +4,7 @@
 
 It is a native, agentless alternative to heavy monitoring suites. Installation is quick & simple and you can easily add your own custom health tests with PowerShell.
 
-For domains the only requirement is to enable PowerShell remoting to the servers or workstations you want to monitor (once you can manage them through with `Enter-PSSession`/`Invoke-Command` everything works).
+For domains the only requirement is to enable PowerShell remoting to the servers or workstations you want to monitor (once you can manage them through `Enter-PSSession`/`Invoke-Command` everything works).
 
 <img width="1086" height="251" alt="Example of the report you receive via email" src="https://github.com/user-attachments/assets/9da7e7f7-c1ef-4f3e-9d47-d164a96b2d4f" />
 
@@ -16,11 +16,11 @@ There's still a possibility of some annoying change happening; mostly just some 
 
 I am happy to help when I can, but my availability is limited. If you decide to use it, **assume you are on your own**. You should be comfortable with PowerShell.
 
-On the plus side, in the unlikely event that you need to dive into the code, it is surprisingly small and straightforward: **the core is about 1,000 lines, including comments**. The tests *are* over ten thousand lines, but the vast majority are self-contained and small. So modern AI agents can handle the (non)-complexity of the code just fine. In fact the vast majority of the code *is* written by Codex with my self in the role of the architect, lead developer, reviewer and QC.
+On the plus side, in the unlikely event that you need to dive into the code, it is surprisingly small and straightforward: **the core is about 1,000 lines, including comments**. The tests *are* over ten thousand lines, but the vast majority are self-contained and small. So modern AI agents can handle the (non)-complexity of the code just fine. In fact the vast majority of the code *is* written by Codex with myself in the role of the architect, lead developer, reviewer and QC.
 
 # Security
 
-The installer(`Update-GetHealthCode.ps1`), downloads and updates files from this GitHub. It may do so *every* time you call `Invoke-GetComputerHealth.ps1`. It's strongly recomended that you clone this repo, audit it and then change the `$URI=` line of `Update-GetHealthCode.ps1` to point to your copy. Besides installation this code should not change the state of the system it runs on in any way. So autiting with a modern LLM is in fact quite easy. 
+The installer(`Update-GetHealthCode.ps1`), downloads and updates files from this GitHub. It may do so *every* time you call `Invoke-GetComputerHealth.ps1`. It's strongly recommended that you clone this repo, audit it and then change the `$URI=` line of `Update-GetHealthCode.ps1` to point to your copy. Besides installation this code should not change the state of the system it runs on in any way. So auditing with a modern LLM is in fact quite easy. 
 
 The installer registers and sets PSGallery as Trusted, and installs PS module `ImportExcel`.
 
@@ -245,7 +245,7 @@ C:\IT\bin\Invoke-GetComputerHealth.ps1
 
 ## How to Run a Domain Health Check (scan all domain computers running Server editions of Windows)
 
-If you have created `C:\IT\bin\Invoke-GetHealthDomainComputers.ps1`execute it. 
+If you have created `C:\IT\bin\Invoke-GetHealthDomainComputers.ps1`, execute it. 
 Otherwise open PowerShell as Administrator and run:
 
 ```powershell

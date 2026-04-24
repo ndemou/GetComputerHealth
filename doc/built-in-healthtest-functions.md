@@ -32,7 +32,7 @@ Uses: Get-ChildItem.
 }
 ```
 
-The function **must** include the top level help block immediately after the opening `{` and it must have standarized `field: value` lines.
+The function **must** include the top level help block immediately after the opening `{` and it must have standardized `field: value` lines.
 
 The `Field: Value` lines follow this exact order (note that some are optional):
    1. `Description:` What kind of issues it detects or what findings it uncovers (160 chars max).

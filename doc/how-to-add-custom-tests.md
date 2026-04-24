@@ -62,7 +62,7 @@ function HealthTest-LargeDirectories {
 
 ## More on the reporting style
 
-Often this style covers you needs:
+Often this style covers your needs:
 ```powershell
 Write-Warning "[PASS] $allGoodDescription"
 Write-Warning "[FAILURE] $issueDescription"
