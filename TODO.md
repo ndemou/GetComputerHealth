@@ -12,6 +12,14 @@ We should also update `how-to-add-custom-tests.md`.
 
 Since this is a breaking change it requires a) the update of the major version number from 3 to 4 b) a migration script that will relief users from having to edit all their custom health test scripts. The migration script seems easy: Use `sls` to find the names of the custom health test functions and append a call to them at the end of the script. We can use `Get-TextFileEncoding` from `helpers-text-files.ps1` to make sure we append text using the correct encoding. The migration script should be run by the updater/installer only when the existing version is `3.3.y`.
 
+## Implement functionality that will help a user create and review custome health tests
+
+Running `Get-ComputerHealth.ps1 -CreateCustomHealthTest` should create necessary folders and an empty ps1 script and return the path to the file.
+
+Running `Get-ComputerHealth.ps1 -ListCustomHealthTests` should return a list of scripts with custome health tests (file objects).
+
+Update our documentation.
+
 ## Change default installation root to `C:\IT\Get-ComputerHealth` instead of `C:\IT`
 
 However: a) support any other installation directory b) support installations that already reside in `C:\IT`
