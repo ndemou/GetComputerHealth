@@ -110,6 +110,8 @@ Catch exceptions only when you want to achieve some other goal, such as working 
 
 ## Optional Features You Might Find Useful
 
+It's best to consider the extra guidelines on how to write [`built-in-healthtest-functions.md`](built-in-healthtest-functions.md).
+
 ### Host facts available to custom health tests
 
 `Get-ComputerHealth.ps1` populates a global variable named `$Global:GCHDQMTA` with host facts. Custom health tests can access these host facts instead of recomputing them.
@@ -177,10 +179,6 @@ function HealthTest-RecentBakExist {
     }
 }
 ```
-
-### Other
-
-You may want to consider the extra information in [`CONTRIBUTING.md`](../CONTRIBUTING.md) under “Adding Built-In HealthTest-* Functions”.
 
 # Instructions for LLMs Helping a Novice Write a Custom Test
 
