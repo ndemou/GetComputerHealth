@@ -180,7 +180,7 @@ function HealthTest-RecentBakExist {
 
 ### Other
 
-You may want to consider the “Optional Features for Health Tests” mentioned in `How-to-add-built-in-health-tests.md`.
+You may want to consider the extra information in [`CONTRIBUTING.md`](../CONTRIBUTING.md) under “Adding Built-In HealthTest-* Functions”.
 
 # Instructions for LLMs Helping a Novice Write a Custom Test
 
