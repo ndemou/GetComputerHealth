@@ -24,7 +24,7 @@ To add a custom test:
  - You may define more than one HealthTest-... function.
  - You must not place executable code outside functions.
 
-### Partner 1, “Was an issue found”
+### Pattern 1, “Was an issue found”
 
 ```powershell
 function HealthTest-IsFooLessThanLimit {
@@ -42,7 +42,7 @@ function HealthTest-IsFooLessThanLimit {
 }
 ```
 
-### Pattern 2, “Enumeration of findings”
+### Pattern 2, “Enumeration of findings/issues”
 
 ```powershell
 function HealthTest-LargeDirectories {
