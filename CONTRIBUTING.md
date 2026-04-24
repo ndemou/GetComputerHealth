@@ -175,17 +175,15 @@ Slow tests are indicated by impact (`Impact: ... High(Time)`), and `-SkipSlowTes
 
 ### Policy Inventory Tests
 
-Use `Tags: Policy` for tests that inventory a system aspect where current state may be accepted as baseline.
+Use `Tags: Policy` for tests that inventory a system aspect where current state may be accepted as baseline. For example:
+- Open ports
+- Installed software
+- Enabled services
 
-Examples include:
-- open ports
-- installed software
-- enabled services
-
-Special handling on first run:
-- if `-DontAutosetPolicy` is not used, the first run automatically suppresses `[warning]` and `[notice]` findings from that policy test
-- `[failure]` findings are not auto-suppressed
-- a marker line is appended to `Get-ComputerHealth.sigs-to-suppress.txt` so future runs are treated normally
+Health tests with this tag have special handling on first run:
+- The first run automatically suppresses `[WARNING]` and `[NOTICE]` findings from that policy test (except if `-DontAutosetPolicy` is used)
+- `[FAILURE]` findings are not auto-suppressed
+- A flag is appended to `Get-ComputerHealth.sigs-to-suppress.txt` so future runs are treated normally
 
 ### Placement
 
