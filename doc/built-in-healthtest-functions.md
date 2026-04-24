@@ -1,26 +1,20 @@
 ## Built in HealthTest- functions
 
+### Behavior Rules
+
+- Keep side effects at zero.
+  Functions **must never** change machine state, only inspect and report.
+- Report using the expected `Write-Warning` pattern (see [`how-to-add-custom-tests.md`](how-to-add-custom-tests.md)).
+- Be explicit about scope and prerequisites.
+  If a test only applies to DCs, domain-joined machines, laptops, and so on, use the special fields in the top-level help block. If they don't cover your situation, short-circuit early.
+- Catch exceptions only when you can recover or downgrade cleanly.
+  Otherwise do nothing; the framework will gracefully handle and report.
+
 ### Function Shape
 
 Use this structure and PascalCase after the `HealthTest-` prefix:
 ```powershell
 function HealthTest-YourTestName {
-<#
-...(see Required Help Block)
-#>
-    # gather data
-    # evaluate
-    # emit findings
-}
-```
-
-### Required Help Block
-
-Every built-in `HealthTest-*` function **must** include an in-function comment-based help block with standarized `field: value` lines immediately after the opening `{`.
-
-Example:
-```
-function HealthTest-LargeDirectories {
 <#
 Description: Finds directories with more than 10000 files.
 AppliesTo: All
@@ -32,8 +26,13 @@ Uses: Get-ChildItem.
 
 <OPTIONAL DETAILED DESCRIPTION>
 #>
-...
+    # gather data
+    # evaluate
+    # emit findings
+}
 ```
+
+The function **must** include the top level help block immediately after the opening `{` and it must have standarized `field: value` lines.
 
 The `Field: Value` lines follow this exact order (note that some are optional):
    1. `Description:` What kind of issues it detects or what findings it uncovers (160 chars max).
@@ -45,41 +44,27 @@ The `Field: Value` lines follow this exact order (note that some are optional):
    7. `Uses:` optional, up to three essential external cmdlets or executables if any.
    8. `FalsePositives:` optional short note only if False Positives are to be expected
 
-### Tags In Help Blocks
+### About the Tags field
 
-Tag health tests using the `Tags:` field in the in-function help block.
-
-Examples:
+Use it to tag health tests. Examples:
 - `Tags: Essential`
 - `Tags: Essential, Policy`
 
 Supported tags:
-- `Essential`: quick and essential test
-- `Policy`: policy inventory test
+- `Essential`: indicates an essential test
+- `Policy`: indicates a policy inventory test (see below)
 
-Slow tests are indicated by impact (`Impact: ... High(Time)`), and `-SkipSlowTests` uses that impact marker.
+### Slow tests
+
+If your test needs more than 3secs to complete, indicate it in the Impact field (`Impact: ... High(Time)`). 
+`-SkipSlowTests` uses that marker.
 
 ### Policy Inventory Tests
 
-Use `Tags: Policy` for tests that inventory a system aspect where current state may be accepted as baseline. For example:
-- Open ports
-- Installed software
-- Enabled services
+Tests with the `Policy` tag are those that inventory a system aspect where the initial controlled state is accepted as a baseline. For example the Open ports, installed software and enabled services after a clean installation of a server.
 
-Health tests with this tag have special handling on first run:
+Policy Health tests have special handling:
 - The first run automatically suppresses `[WARNING]` and `[NOTICE]` findings from that policy test (except if `-DontAutosetPolicy` is used)
 - `[FAILURE]` findings are not auto-suppressed
 - A flag is appended to `Get-ComputerHealth.sigs-to-suppress.txt` so future runs are treated normally
 
-### Behavior Rules
-
-- Keep side effects at zero.
-  Health tests should inspect and report, not change machine state.
-- Report through the framework’s expected message pattern.
-  Follow nearby built-in tests and emit stable suppression-friendly messages.
-- Keep stable identity in the main message.
-  Put volatile details in comment/detail text rather than changing the stable signature each run.
-- Be explicit about scope and prerequisites.
-  If a test only applies to DCs, domain-joined machines, laptops, and so on, short-circuit early.
-- Catch exceptions only when you can recover or downgrade cleanly.
-  Otherwise let the framework report the thrown error.
