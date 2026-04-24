@@ -112,6 +112,8 @@ Catch exceptions only when you want to achieve some other goal, such as working 
 
 It's best to consider the extra guidelines on how to write [`built-in-healthtest-functions.md`](built-in-healthtest-functions.md).
 
+There are also some specialized helper functions you may wish to use. See [`helpers-for-custom-ht.md`](helpers-for-custom-ht.md).
+
 ### Host facts available to custom health tests
 
 `Get-ComputerHealth.ps1` populates a global variable named `$Global:GCHDQMTA` with host facts. Custom health tests can access these host facts instead of recomputing them.
@@ -130,55 +132,6 @@ Available properties:
 * `$Global:GCHDQMTA.isHostInDomainButNotDC`
 * `$Global:GCHDQMTA.DebugSkipSlowTests = $DebugSkipSlowTests`
 * `$Global:GCHDQMTA.GetCurrentDomain = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain()`
-
-### How to check that recent Veeam backups exist in a folder
-
-#### For backups stored in local drives (NOT mapped drives)
-
-```powershell
-function HealthTest-FreshVeeamBackups {
-    Start-HealthTestVeeamRecentBackupsExist       -RootPath "D:\Backups\Backup Job 1"
-    Start-HealthTestVeeamRecentConfigBackupsExist -RootPath "D:\Backups\VeeamConfigBackup\SRV1"
-}
-```
-#### For backups stored in network shares
-
-First create a configuration file with this information (note that you need to double all backslashes in paths):
-```powershell
-@"
-    {
-      "RootPath": "\\\\10.1.2.3\\share\\path\\to\\Backups",
-      "Username": "foo",
-      "Password": "bar"
-    }
-"@ > "C:\it\config\HealthTest-RecentBackupsExist.config"
-```
-And then create a custom health test that references this config file:
-
-```powershell
-function HealthTest-FreshVeeamBackups {
-    Start-HealthTestVeeamRecentBackupsExist `
-        -ConfigPath 'C:\it\config\HealthTest-RecentBackupsExist.config' `
-        -MaxAgeHoursForVibVbm 23 `
-        -MaxAgeHoursForVBK 480
-}
-```
-
-### How to check whether at least one recent `.BAK` file exists in a folder
-
-```powershell
-function HealthTest-RecentBakExist {
-    param(
-        [int]$MaxAgeHours = 24
-    )
-
-    if (Get-RecentFilesConditional -Path "D:\Backups" -Pattern *.BAK -MinBytes 25000 -MaxAgeHours $MaxAgeHours) {
-        Write-Warning "[PASS] Found a recent backup in D:\Backups"
-    } else {
-        Write-Warning "[FAILURE] No recent backup found in D:\Backups"
-    }
-}
-```
 
 # Instructions for LLMs Helping a Novice Write a Custom Test
 
