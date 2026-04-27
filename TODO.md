@@ -1,5 +1,10 @@
 # TODO
 
+
+## sigstore?
+
+https://docs.sigstore.dev/quickstart/quickstart-cosign/
+
 ## Review our test suite for this repo
 
 Review /doc/test-suite-guide.md and improve our test suite if needed.
