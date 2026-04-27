@@ -5,13 +5,19 @@
 
 https://docs.sigstore.dev/quickstart/quickstart-cosign/
 
+## Is the emitter property filled in properly? 
+
+I believe I often (always?) see it empty. Also it's best to rename it to TestName
+
 ## Review our test suite for this repo
 
 Review /doc/test-suite-guide.md and improve our test suite if needed.
 
 ## Custom health tests should be directly runnable scripts
 
-Instead of dot-sourcing the custom scripts, discovering the functions with the custom tests and calling them, we should instead just invoking the scripts directly and capturing their warnings stream. Much simpler and cleaner than the current method.
+Instead of dot-sourcing the custom scripts, discovering the functions with the custom tests and calling them, we should instead just invoking the scripts directly and capturing their warnings stream. Much simpler and cleaner than the current method. 
+
+A reference to the full path to the script should always appear in the comments of the message. Something like "(this message was emitted by custom test 'c:\path\to\script.ps1')". 
 
 We should also update `how-to-add-custom-tests.md`.
 
