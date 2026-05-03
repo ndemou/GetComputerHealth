@@ -179,9 +179,9 @@ Uses: None.
   foreach ($r in $notNormal) {
     $name = $stateNames[$r.state]; if (-not $name) { $name = 'Unknown' }
     if ($r.state -in 1,2,3) {
-      Write-Warning "[WARNING] $(("DFSR replication for '{0}' is at state {1} ({2}) instead of 4 (Normal)" -f $r.ReplicatedFolderName, $r.state, $name))"
+      Write-Warning ("[WARNING] DFSR replication for '{0}' is at state {1} ({2}) instead of 4 (Normal)" -f $r.ReplicatedFolderName, $r.state, $name)
     } else {
-      Write-Warning "[FAILURE] $(("DFSR replication for '{0}' is at state {1} ({2}) instead of 4 (Normal)" -f $r.ReplicatedFolderName, $r.state, $name))" `
+      Write-Warning ("[FAILURE] DFSR replication for '{0}' is at state {1} ({2}) instead of 4 (Normal)" -f $r.ReplicatedFolderName, $r.state, $name) `
         -comment ("Group: {0}. States: 0 Uninitialized, 1 Initialized, 2 Initial_Sync, 3 Auto_Recovery, 4 Normal, 5 Error." -f $r.ReplicationGroupName)
     }
   }

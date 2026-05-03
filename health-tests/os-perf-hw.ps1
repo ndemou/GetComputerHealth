@@ -588,10 +588,13 @@ Uses: Get-Service, Get-SmbShare.
     $effectivePrincipals = $effectivePrincipals | Sort-Object -Unique
 
     if ($s.Name -notin @('SYSVOL','NETLOGON','ADMIN$')){
+        $sharePrincipalsText = if($sharePrincipals){ $sharePrincipals -join ', ' } else { '<none>' }
+        $ntfsPrincipalsText = if($ntfsPrincipals){ $ntfsPrincipals -join ', ' } else { '<none>' }
+        $effectivePrincipalsText = if($effectivePrincipals){ $effectivePrincipals -join ', ' } else { '<none>' }
         Write-Warning "[info] Accounts for share '$($s.Name)' (Path: $path)"
-        Write-Warning "[info] $(("    Share-level : {0}" -f ($(if($sharePrincipals){ $sharePrincipals -join ', ' } else { '<none>' }))))"
-        Write-Warning "[info] $(("    NTFS-level  : {0}" -f ($(if($ntfsPrincipals){ $ntfsPrincipals -join ', ' } else { '<none>' }))))"
-        Write-Warning "[info] $(("    Effective(*) : {0}" -f ($(if($effectivePrincipals){ $effectivePrincipals -join ', ' } else { '<none>' }))))"
+        Write-Warning ("[info]     Share-level : {0}" -f $sharePrincipalsText)
+        Write-Warning ("[info]     NTFS-level  : {0}" -f $ntfsPrincipalsText)
+        Write-Warning ("[info]     Effective(*) : {0}" -f $effectivePrincipalsText)
         Write-Warning "[info]     (*) Effective here means present on both lists; this is a coarse check without group nesting resolution."
     }
 
@@ -631,10 +634,10 @@ Uses: Get-Service, Get-SmbShare.
           $riskFound = $true
         } elseif($r.Effective -eq 'Read') {
             if ($r.Share -ne 'SYSVOL'){
-                Write-Warning "[WARNING] $(("'$($r.Principal)' can read share '$($r.Share)'('$path')"))"
+                Write-Warning "[WARNING] '$($r.Principal)' can read share '$($r.Share)'('$path')"
             }
         } else {
-          Write-Warning "[PASS] $(("No effective access for {0} on '{1}' (blocked by layer intersection)" -f $r.Principal,$r.Share))"
+          Write-Warning ("[PASS] No effective access for {0} on '{1}' (blocked by layer intersection)" -f $r.Principal,$r.Share)
         }
       }
       # Log-Info ("ABE={0}; EncryptData={1}; Caching={2}" -f $s.FolderEnumerationMode,$s.EncryptData,$s.CachingMode)
@@ -937,10 +940,10 @@ Uses: None.
   $ok = $true
 
   if ($abs -ge $FailOffsetSeconds) {
-    Write-Warning "[FAILURE] Time offset too high`n$(("{0} s exceeds {1} s (2-samples)" -f $offsetSec,$FailOffsetSeconds))"
+    Write-Warning ("[FAILURE] Time offset too high`n{0} s exceeds {1} s (2-samples)" -f $offsetSec,$FailOffsetSeconds)
     $ok = $false
   } elseif ($abs -ge $WarnOffsetSeconds) {
-    Write-Warning "[WARNING] Time offset rather high`n$(("{0} s exceeds {1} s (2-samples)" -f $offsetSec,$WarnOffsetSeconds))"
+    Write-Warning ("[WARNING] Time offset rather high`n{0} s exceeds {1} s (2-samples)" -f $offsetSec,$WarnOffsetSeconds)
     $ok = $false
   }
 
@@ -1028,14 +1031,14 @@ Uses: Get-PhysicalDisk, Get-StorageReliabilityCounter.
             else { if ($os -eq 'Predictive Failure') { $predFail=$true } }
         }
         if ($predFail) {
-            Write-Warning "[FAILURE] $(("OperationalStatus=Predictive Failure for disk '{0}'" -f $d.FriendlyName))"
+            Write-Warning ("[FAILURE] OperationalStatus=Predictive Failure for disk '{0}'" -f $d.FriendlyName)
             $allHealthy = $false
         }
 
         # 2) HealthStatus
         if ($d.PSObject.Properties.Name -contains 'HealthStatus') {
             if ($d.HealthStatus -ne 'Healthy') {
-                Write-Warning "[FAILURE] $(("HealthStatus={0} for disk '{1}'" -f $d.HealthStatus,$d.FriendlyName))"
+                Write-Warning ("[FAILURE] HealthStatus={0} for disk '{1}'" -f $d.HealthStatus,$d.FriendlyName)
                 $allHealthy = $false
             }
         }
@@ -1046,7 +1049,7 @@ Uses: Get-PhysicalDisk, Get-StorageReliabilityCounter.
             if ($c) {
                 if ($c.PSObject.Properties.Name -contains 'Temperature') {
                     if ([double]$c.Temperature -gt $MaxTemperatureC) {
-                        Write-Warning "[FAILURE] $(("Temperature({0}) exceeds max for disk '{1}'" -f $c.Temperature,$d.FriendlyName))"
+                        Write-Warning ("[FAILURE] Temperature({0}) exceeds max for disk '{1}'" -f $c.Temperature,$d.FriendlyName)
                         $allHealthy = $false
                     }
                 }
@@ -1056,7 +1059,7 @@ Uses: Get-PhysicalDisk, Get-StorageReliabilityCounter.
                     if ($c.PSObject.Properties.Name -contains $p) { $uncorr += [int64]$c.$p }
                 }
                 if ($uncorr -gt 0) {
-                    Write-Warning "[FAILURE] $(("Uncorrectable error counter not zero for disk '{0}'" -f $d.FriendlyName))"
+                    Write-Warning ("[FAILURE] Uncorrectable error counter not zero for disk '{0}'" -f $d.FriendlyName)
                     $allHealthy = $false
                 }
 
@@ -1069,7 +1072,7 @@ Uses: Get-PhysicalDisk, Get-StorageReliabilityCounter.
                     }
                 }
                 if ($percentUsed -ne $null -and $percentUsed -ge $MaxPercentUsed) {
-                    Write-Warning "[FAILURE] $(("{0} >= {1} for disk '{2}'" -f $propName,$MaxPercentUsed,$d.FriendlyName))"
+                    Write-Warning ("[FAILURE] {0} >= {1} for disk '{2}'" -f $propName,$MaxPercentUsed,$d.FriendlyName)
                     $allHealthy = $false
                 }
             }
