@@ -51,8 +51,7 @@ function HealthTest-LargeDirectories {
         $issueFound = $true
         $details = "$($dir.ItemsCount) items in folder" + "`n" + `
             "Most of them ($($dir.MostCommonExtCount)) are .$($dir.MostCommonExt)"
-        $issueDescription = "Directory $($dir.Path) has more than 10000 child items"
-        Write-Warning "[NOTICE] $issueDescription" + "`n" + $details
+        Write-Warning ("[NOTICE] Directory $($dir.Path) has more than 10000 child items" + "`n" + $details)
     }
     if (-not $issueFound) {
         Write-Warning "[PASS] No directories found with more than 10000 items"
