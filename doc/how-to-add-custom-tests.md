@@ -7,6 +7,7 @@ All `.ps1` files in `C:\IT\config\Custom-HealthTests\` are dot-sourced, and all 
 Write-Warning "[PASS] $allGoodDescription"
 Write-Warning "[FAILURE] $issueDescription"
 Write-Warning ("[FAILURE] $issueDescription" + "`n" + $details)
+# Choose between [NOTICE], [WARNING], or [FAILURE] depending on severity
 ````
 
 The code you write will run with **high privileges** and, apart from any temporary files or similar artifacts it may need, it **should not change** the system state.
