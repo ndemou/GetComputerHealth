@@ -35,6 +35,23 @@ Update our documentation.
 
 However: a) support any other installation directory b) support installations that already reside in `C:\IT`
 
+## Avoid complex string expressions in Write-Warning
+
+This command will show one class of complex string expressions that apears many dozen times:
+```
+sls '^ *write-warning.*`n' .\health-tests\* | sls -NotMatch '`n\$[a-z]+"'
+```
+Most if not all of them should be converted to follow this pattern:
+```
+$optionalDetails = ...
+Write-Warning "[LEVEL] blah blah`n$optionalDetails"
+```
+
+After fixing the above, you can get an overview of write-warning expressions with:
+```
+(sls "write-warning" .\health-tests\*).line -replace '^.*write-warning', 'write-warning' |sls -NotMatch 'write-warning "[^"]+" *($|[;}])|write-warning \(New-WarningMessage' | sort
+```
+
 ## Stop using legacy parameter set that adapts Pester 5 syntax to Pester 4 syntax
 
 So that we don't get this warning: "You are using Legacy parameter set that adapts Pester 5 syntax to Pester 4 syntax. ..."
