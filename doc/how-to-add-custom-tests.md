@@ -10,7 +10,7 @@ Write-Warning ("[FAILURE] $issueDescription" + "`n" + $details)
 # Choose between [NOTICE], [WARNING], or [FAILURE] depending on severity
 ````
 
-The code you write will run with **high privileges** and, apart from any temporary files or similar artifacts it may need, it **should not change** the system state.
+The code you write will run with **high privileges** and, apart from any temporary files or similar artifacts it may need, it **MUST not change** the system state.
 
 To add a custom test:
 
