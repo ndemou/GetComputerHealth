@@ -1228,7 +1228,7 @@ Uses: Get-WinEvent.
       $bad=$true
       $currentMB=[math]::Round($sz/1MB)
       $comment="Fix: Run  wevtutil sl $name /ms:$minBytes"
-      Write-Warning ("[FAILURE] $name log maximum size too small: ${currentMB}MB < ${minMB}MB`n$comment")
+      Write-Warning "[FAILURE] $name log maximum size too small: ${currentMB}MB < ${minMB}MB`n$comment"
     }
   }
 

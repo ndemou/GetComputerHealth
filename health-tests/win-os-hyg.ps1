@@ -173,11 +173,11 @@ failure threshold.
     $comment = "Last scan, $days days ago. Windows installation age is $installationAge days."
 
     if ($days -lt $MAX_WARN_DAYS) {
-        Write-Warning ("[PASS] Did windows defender perform a quick scan recently?`n$comment")
+        Write-Warning "[PASS] Did windows defender perform a quick scan recently?`n$comment"
     } elseif ($days -lt $MAX_FAILURE_DAYS) {
-        Write-Warning ("[WARNING] Did windows defender perform a quick scan recently?`n$comment")
+        Write-Warning "[WARNING] Did windows defender perform a quick scan recently?`n$comment"
     } else {
-        Write-Warning ("[FAILURE] Did windows defender perform a quick scan recently?`n$comment")
+        Write-Warning "[FAILURE] Did windows defender perform a quick scan recently?`n$comment"
     }
 }
 
@@ -962,9 +962,9 @@ Uses: None.
   $details = "LmCompatibilityLevel=$level$suffix; NoLMHash=$noLM"
 
   if ($noLM -ne 1) {
-    Write-Warning ("[WARNING] NTLM is not fully hardened (NoLMHash is not 1)`n$details")
+    Write-Warning "[WARNING] NTLM is not fully hardened (NoLMHash is not 1)`n$details"
   } elseif ($level -lt 5) {
-    Write-Warning ("[WARNING] NTLM is not fully hardened (LmCompatibilityLevel<5)`n$details")
+    Write-Warning "[WARNING] NTLM is not fully hardened (LmCompatibilityLevel<5)`n$details"
   } else {
     Write-Warning "[PASS] NTLM is fully hardened`n$details"
   }
@@ -2118,12 +2118,12 @@ Uses: Get-NetTCPConnection, Get-Process, Resolve-ExecutablePath.
         # If vendor is like "Microsoft Windows*" then level becomes "WARNING" for servers and "NOTICE" for workstations
         if ($vendorDescr -like "Microsoft Windows*") {
             if($isHostServer){
-                Write-Warning ("[WARNING] Unexpected listening port: $p (Process: $procDescr, Vendor: $vendor)`n$comment")
+                Write-Warning "[WARNING] Unexpected listening port: $p (Process: $procDescr, Vendor: $vendor)`n$comment"
             } else {
-                Write-Warning ("[NOTICE] Unexpected listening port: $p (Process: $procDescr, Vendor: $vendor)`n$comment")
+                Write-Warning "[NOTICE] Unexpected listening port: $p (Process: $procDescr, Vendor: $vendor)`n$comment"
             }
         } else {
-            Write-Warning ("[FAILURE] Unexpected listening port: $p (Process: $procDescr, Vendor: $vendor)`n$comment")
+            Write-Warning "[FAILURE] Unexpected listening port: $p (Process: $procDescr, Vendor: $vendor)`n$comment"
         }
     }
 
