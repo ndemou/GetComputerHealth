@@ -960,7 +960,7 @@ Uses: Get-ADObject.
         $cls  = 'user'
       }
 
-      Write-Warning "[FAILURE] Unconstrained delegation account found`n$($cls): $name"
+      Write-Warning "[FAILURE] Unconstrained delegation account found`n${cls}: $name"
     }
 
   } else {
