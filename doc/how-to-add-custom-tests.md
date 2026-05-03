@@ -6,7 +6,7 @@ All `.ps1` files in `C:\IT\config\Custom-HealthTests\` are dot-sourced, and all 
 ```powershell
 Write-Warning "[PASS] $allGoodDescription"
 Write-Warning "[FAILURE] $issueDescription"
-Write-Warning "[FAILURE] $issueDescription" + "`n" + $optionalDetails
+Write-Warning ("[FAILURE] $issueDescription" + "`n" + $optionalDetails)
 ````
 
 The code you write will run with **high privileges** and, apart from any temporary files or similar artifacts it may need, it **should not change** the system state.
@@ -72,7 +72,7 @@ But if you have details to report, use this style:
 ```powershell
 $issueDescription = "A single terse line that uniquely describes the issue"
 $details = "More details" + "`n" + "Even in multiple lines" + "`n" + "Up to 32K characters."
-Write-Warning "[NOTICE] $issueDescription" + "`n" + $details
+Write-Warning ("[NOTICE] $issueDescription" + "`n" + $details)
 ```
 
 A proper issue description should not change when the **essence** of the issue has not changed. There is no restriction for the optional `$details`.
