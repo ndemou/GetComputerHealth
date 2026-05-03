@@ -25,7 +25,7 @@ Uses: Get-DnsServerScavenging, Get-DnsServerZone, Get-DnsServerZoneAging.
 
   if(-not $flagged){
     $on=@($zones | ForEach-Object { $_.ZoneName })
-    Write-Warning "[PASS] DNS scavenging configured on server and zones`n$(("Zones: " + ($on -join ', ')))"
+    Write-Warning ("[PASS] DNS scavenging configured on server and zones`nZones: " + ($on -join ', '))
   }
 }
 
@@ -75,7 +75,7 @@ Uses: Get-DnsServerZone.
 #>
   [CmdletBinding()] param([string[]]$ExpectedReverseZones)
   $zones=Get-DnsServerZone | Where-Object {$_.IsReverseLookupZone} | Select-Object -ExpandProperty ZoneName
-  if(-not $ExpectedReverseZones){ Write-Warning "[PASS] $(("Reverse zones present: "+(($zones -join ', ')-replace '^$','<none>')))"; return }
+  if(-not $ExpectedReverseZones){ Write-Warning ("[PASS] Reverse zones present: " + (($zones -join ', ') -replace '^$','<none>')); return }
   $missing=@()
   foreach($z in $ExpectedReverseZones){
     if($zones -notcontains $z){ $missing+=$z; Write-Warning "[FAILURE] Reverse zone missing: $z" }
@@ -141,7 +141,7 @@ Uses: Get-DnsServerForwarder, Test-Connection.
     $ok=(Test-Connection -ComputerName $ip -Count 1 -Quiet)
     if(-not $ok){ $bad=$true; Write-Warning "[FAILURE] DNS forwarder not reachable`n$ip" }
   }
-  if(-not $bad){ Write-Warning "[PASS] DNS forwarders sane & reachable`n$(("Forwarders: " + ($ips -join ', ')))" }
+  if(-not $bad){ Write-Warning ("[PASS] DNS forwarders sane & reachable`nForwarders: " + ($ips -join ', ')) }
 }
 
 
@@ -295,7 +295,7 @@ Uses: Resolve-DnsName.
             $issueFound = $true
             $synopsis = "DNS record $($check.Name) for this domain controller is missing or unresolved"
             $details = "`nQuery: $($check.QueryName)`nType: $($check.Type)`nError: $($_.Exception.Message)"
-            Write-Warning ("[NOTICE] " + $synopsis + $details)
+            Write-Warning "[NOTICE] $synopsis$details"
             continue
         }
 
@@ -303,18 +303,18 @@ Uses: Resolve-DnsName.
             $issueFound = $true
             $synopsis = "DNS record $($check.Name) for this domain controller is missing"
             $details = "`nQuery: $($check.QueryName)`nType: $($check.Type)`nExpected target: $dcFqdn"
-            Write-Warning ("[NOTICE] " + $synopsis + $details)
+            Write-Warning "[NOTICE] $synopsis$details"
             continue
         }
 
         $synopsis = "DNS record $($check.Name) for this domain controller exists"
         $details = "`nQuery: $($check.QueryName)`nType: $($check.Type)`nValue: $(& $check.Detail $result)"
-        Write-Warning ("[debug] " + $synopsis + $details)
+        Write-Warning "[debug] $synopsis$details"
     }
 
     if (-not $issueFound) {
         $synopsis = "All tested DNS records for this domain controller exist"
         $details = "`nDomain controller: $dcFqdn"
-        Write-Warning ("[PASS] " + $synopsis + $details)
+        Write-Warning "[PASS] $synopsis$details"
     }
 }

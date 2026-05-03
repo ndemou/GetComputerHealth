@@ -27,7 +27,7 @@ from the AD DNS name.
     $primarySuffix = $ipg.DomainName
 
     if ([string]::IsNullOrWhiteSpace($primarySuffix)) {
-        Write-Warning ("[FAILURE] Primary DNS suffix: Current is empty" + "`n" + "Ensure the system has a primary DNS suffix (normally set by domain join).")
+        Write-Warning "[FAILURE] Primary DNS suffix: Current is empty`nEnsure the system has a primary DNS suffix (normally set by domain join)."
     } elseif ($primarySuffix -ieq $DomainName) {
         Write-Warning "[PASS] Primary DNS suffix`n$primarySuffix"
     } else {
@@ -75,7 +75,7 @@ from the AD DNS name.
         if ($n.RegisterThisConnectionsAddress -and $n.UseSuffixWhenRegistering) {
             Write-Warning ("[PASS] NIC '{0}' DNS registration`nRegisterThisConnectionsAddress=True, UseSuffixWhenRegistering=True" -f $nicName)
         } else {
-            Write-Warning (("[FAILURE] NIC '{0}' DNS registration`nRegisterThisConnectionsAddress={1}, UseSuffixWhenRegistering={2}`nEnable both flags on important interfaces." -f $nicName,$n.RegisterThisConnectionsAddress,$n.UseSuffixWhenRegistering))
+            Write-Warning ("[FAILURE] NIC '{0}' DNS registration`nRegisterThisConnectionsAddress={1}, UseSuffixWhenRegistering={2}`nEnable both flags on important interfaces." -f $nicName, $n.RegisterThisConnectionsAddress, $n.UseSuffixWhenRegistering)
         }
 
         # 3b) Connection-specific suffix: must be Empty OR exactly the domain
@@ -85,7 +85,7 @@ from the AD DNS name.
         } elseif ($css -ieq $DomainName) {
             Write-Warning ("[PASS] NIC '{0}' Conn.-specific suffix`nEquals {1}" -f $nicName,$DomainName)
         } else {
-            Write-Warning (("[FAILURE] NIC '{0}' Conn.-specific suffix`nSet to '{1}'`nLeave blank for single-domain setups unless a specific suffix is required." -f $nicName,$css))
+            Write-Warning ("[FAILURE] NIC '{0}' Conn.-specific suffix`nSet to '{1}'`nLeave blank for single-domain setups unless a specific suffix is required." -f $nicName, $css)
         }
     }
 }

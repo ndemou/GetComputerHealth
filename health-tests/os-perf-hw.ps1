@@ -214,7 +214,7 @@ Uses: Get-DnsDomainControllers, Resolve-DnsName, Test-IsLaptopOrMobile.
       # Syncing from myself
       $cleanSource = $currentTimeSource.ToLowerInvariant() -replace '\.$','' # remove trailing dot if any
       if ($cleanSource -match "^$($env:COMPUTERNAME.ToLowerInvariant())(\.|$)") {
-          Write-Warning "[FAILURE] Misconfiguration: syncing from myself.`n$(($evidences -join "`r`n"))"
+          Write-Warning ("[FAILURE] Misconfiguration: syncing from myself.`n" + ($evidences -join "`r`n"))
       }
       # Confusion: NTP from a DC
       if ($timeSyncType -eq 'NTP' -and $isSourceDC) {
@@ -630,7 +630,7 @@ Uses: Get-Service, Get-SmbShare.
     } else {
       foreach($r in $report){
         if($r.Effective -eq 'Full' -or $r.Effective -eq 'Write'){
-          Write-Warning (("[FAILURE] '{1}' can write share '{0}'('$path')`n" -f $r.Share,$r.Principal) + ("Restrict to specific groups; ensure share grants Read or None to broad principals and tighten NTFS. Path: {0}" -f $r.Path))
+          Write-Warning ("[FAILURE] '{1}' can write share '{0}'('$path')`nRestrict to specific groups; ensure share grants Read or None to broad principals and tighten NTFS. Path: {2}" -f $r.Share, $r.Principal, $r.Path)
           $riskFound = $true
         } elseif($r.Effective -eq 'Read') {
             if ($r.Share -ne 'SYSVOL'){
@@ -644,9 +644,9 @@ Uses: Get-Service, Get-SmbShare.
     }
 
     # Hygiene extras
-    # if($s.FolderEnumerationMode -ne 'AccessBased'){ Write-Warning "[WARNING] $(("Enable Access-Based Enumeration on '{0}' if multi-tenant" -f $s.Name))" }
-    # if(-not $s.EncryptData){ Write-Warning "[WARNING] $(("Consider SMB encryption on '{0}' for sensitive data" -f $s.Name))" }
-    # if($s.CachingMode -ne 'None'){ Write-Warning "[WARNING] $(("Offline caching is {0} on '{1}' - assess if appropriate" -f $s.CachingMode,$s.Name))" }
+    # if($s.FolderEnumerationMode -ne 'AccessBased'){ Write-Warning ("[WARNING] Enable Access-Based Enumeration on '{0}' if multi-tenant" -f $s.Name) }
+    # if(-not $s.EncryptData){ Write-Warning ("[WARNING] Consider SMB encryption on '{0}' for sensitive data" -f $s.Name) }
+    # if($s.CachingMode -ne 'None'){ Write-Warning ("[WARNING] Offline caching is {0} on '{1}' - assess if appropriate" -f $s.CachingMode, $s.Name) }
   }
 
   # Global checks
@@ -704,7 +704,7 @@ Uses: Get-Service, Get-SmbShare.
   }
 
   if ($nullPipes -and $nullPipes.Count -gt 0) {
-    Write-Warning (("[NOTICE] Null session pipes (Named Pipes that can be accessed anonymously) found: {0}`n" -f ($nullPipes -join ', ')) + "Anonymous users are allowed to open those pipes. Modern domains don't need null pipes and they increase attack surface if other policies are loose. If you don't have legacy (pre-Windows 2000-era) trusts/clients, it's recommended to keep Null session pipes empty. Change Local Security Policy > Security Options > 'Network access: Named Pipes that can be accessed anonymously' (set to None), or the equivalent GPO.")
+    Write-Warning ("[NOTICE] Null session pipes (Named Pipes that can be accessed anonymously) found: {0}`nAnonymous users are allowed to open those pipes. Modern domains don't need null pipes and they increase attack surface if other policies are loose. If you don't have legacy (pre-Windows 2000-era) trusts/clients, it's recommended to keep Null session pipes empty. Change Local Security Policy > Security Options > 'Network access: Named Pipes that can be accessed anonymously' (set to None), or the equivalent GPO." -f ($nullPipes -join ', '))
   }
 
   if (!$riskFound) {Write-Warning "[PASS] No risks related to SMB shares were detected"}
@@ -985,7 +985,7 @@ Uses: None.
   }
 
   if(-not $entries){
-    Write-Warning "[FAILURE] No pagefile detected`n$(("AutomaticManagedPagefile="+[int]$auto))"
+    Write-Warning ("[FAILURE] No pagefile detected`nAutomaticManagedPagefile=" + [int]$auto)
     return
   }
 
@@ -995,12 +995,12 @@ Uses: None.
   if($RequireOnSystemDrive){
     $sys = $env:SystemDrive  # Typically 'C:'
     $okSys = (($entries | Where-Object {$_.Name -like "$sys\*"}).Count -gt 0)
-    if(-not $okSys){ Write-Warning ("[FAILURE] No pagefile on system drive`nSystemDrive=$sys; Entries="+(($entries | ForEach-Object {"$($_.Name):$($_.AllocMB)MB"}) -join ', ')) }
+    if(-not $okSys){ Write-Warning ("[FAILURE] No pagefile on system drive`nSystemDrive={0}; Entries={1}" -f $sys, (($entries | ForEach-Object { "$($_.Name):$($_.AllocMB)MB" }) -join ', ')) }
   }
   if(-not $okSize){ Write-Warning "[FAILURE] Total pagefile size below threshold`nTotalAllocMB=$sumAlloc; MinMB=$MinMB" }
 
   if($okSize -and $okSys){
-    Write-Warning ("[PASS] Paging file configured sensibly`n" + ("Auto="+[int]$auto+"; TotalAllocMB=$sumAlloc; Entries="+(($entries | ForEach-Object {"$($_.Name):$($_.AllocMB)MB"}) -join ', ')))
+    Write-Warning ("[PASS] Paging file configured sensibly`nAuto={0}; TotalAllocMB={1}; Entries={2}" -f ([int]$auto), $sumAlloc, (($entries | ForEach-Object { "$($_.Name):$($_.AllocMB)MB" }) -join ', '))
   }
 }
 

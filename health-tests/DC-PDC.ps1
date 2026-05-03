@@ -57,7 +57,7 @@ Uses: Get-ADDomainController, Get-ADDomain, Get-ADForest.
         DNM    = ($for.DomainNamingMaster     | ForEach-Object { $_.ToLower() })
       }
     } catch {
-      Write-Warning (("[FAILURE] Cannot query DC '{0}'.`n" -f $s) + ("The server didn't answer AD queries (-Server {0}). Check network/DNS, ADWS service and firewall. Try: Test-NetConnection {0} -Port 389; Get-Service ADWS -ComputerName {0}; repadmin /showrepl {0}" -f $s))
+      Write-Warning ("[FAILURE] Cannot query DC '{0}'.`nThe server didn't answer AD queries (-Server {0}). Check network/DNS, ADWS service and firewall. Try: Test-NetConnection {0} -Port 389; Get-Service ADWS -ComputerName {0}; repadmin /showrepl {0}" -f $s)
       $ok = $false
     }
   }
@@ -73,35 +73,35 @@ Uses: Get-ADDomainController, Get-ADDomain, Get-ADForest.
     # 1) DC list equality (order-insensitive, case-insensitive)
     $dcJoin = ($v.DCs -join ', ')
     if ($dcJoin -ne $baseDCsJoined) {
-      Write-Warning (("[FAILURE] DC list mismatch on '{0}'.`n" -f $v.Server) + ("Baseline '{0}' sees DCs: [{1}] ; '{2}' sees: [{3}]. Likely replication or DNS SRV inconsistency. Run: repadmin /replsummary ; check _msdcs.{4} SRV records under _ldap._tcp.dc._msdcs and AD-integrated DNS." -f $baseline.Server, $baseDCsJoined, $v.Server, $dcJoin, $domainName))
+      Write-Warning ("[FAILURE] DC list mismatch on '{0}'.`nBaseline '{1}' sees DCs: [{2}] ; '{0}' sees: [{3}]. Likely replication or DNS SRV inconsistency. Run: repadmin /replsummary ; check _msdcs.{4} SRV records under _ldap._tcp.dc._msdcs and AD-integrated DNS." -f $v.Server, $baseline.Server, $baseDCsJoined, $dcJoin, $domainName)
       $ok = $false
     }
 
     # 2) FSMO holders equality
     if ($v.PDC -ne $baseline.PDC) {
-      Write-Warning (("[FAILURE] PDC emulator disagreement on '{0}'.`n" -f $v.Server) + ("Baseline: {0} ; {1} thinks: {2}. If a role transfer occurred, verify replication. Check: (Get-ADDomain -Server {1}).PDCEmulator; run repadmin /showrepl {1} and GPMC target DC." -f $baseline.PDC, $v.Server, $v.PDC))
+      Write-Warning ("[FAILURE] PDC emulator disagreement on '{0}'.`nBaseline: {1} ; {0} thinks: {2}. If a role transfer occurred, verify replication. Check: (Get-ADDomain -Server {0}).PDCEmulator; run repadmin /showrepl {0} and GPMC target DC." -f $v.Server, $baseline.PDC, $v.PDC)
       $ok = $false
     }
     if ($v.RID -ne $baseline.RID) {
-      Write-Warning (("[FAILURE] RID Master disagreement on '{0}'.`n" -f $v.Server) + ("Baseline: {0} ; {1} thinks: {2}. If long-standing, DCs may fail to create new SIDs when pools deplete. Check: (Get-ADDomain -Server {1}).RIDMaster; repadmin /showrepl {1}." -f $baseline.RID, $v.Server, $v.RID))
+      Write-Warning ("[FAILURE] RID Master disagreement on '{0}'.`nBaseline: {1} ; {0} thinks: {2}. If long-standing, DCs may fail to create new SIDs when pools deplete. Check: (Get-ADDomain -Server {0}).RIDMaster; repadmin /showrepl {0}." -f $v.Server, $baseline.RID, $v.RID)
       $ok = $false
     }
     if ($v.Infra -ne $baseline.Infra) {
-      Write-Warning (("[FAILURE] Infrastructure Master disagreement on '{0}'.`n" -f $v.Server) + ("Baseline: {0} ; {1} thinks: {2}. In multi-domain forests this can cause stale cross-domain group memberships. Check: (Get-ADDomain -Server {1}).InfrastructureMaster; repadmin /showrepl {1}." -f $baseline.Infra, $v.Server, $v.Infra))
+      Write-Warning ("[FAILURE] Infrastructure Master disagreement on '{0}'.`nBaseline: {1} ; {0} thinks: {2}. In multi-domain forests this can cause stale cross-domain group memberships. Check: (Get-ADDomain -Server {0}).InfrastructureMaster; repadmin /showrepl {0}." -f $v.Server, $baseline.Infra, $v.Infra)
       $ok = $false
     }
     if ($v.Schema -ne $baseline.Schema) {
-      Write-Warning (("[FAILURE] Schema Master disagreement on '{0}'.`n" -f $v.Server) + ("Baseline: {0} ; {1} thinks: {2}. Schema updates should be halted until replication converges. Check: (Get-ADForest -Server {1}).SchemaMaster; repadmin /showrepl {1}." -f $baseline.Schema, $v.Server, $v.Schema))
+      Write-Warning ("[FAILURE] Schema Master disagreement on '{0}'.`nBaseline: {1} ; {0} thinks: {2}. Schema updates should be halted until replication converges. Check: (Get-ADForest -Server {0}).SchemaMaster; repadmin /showrepl {0}." -f $v.Server, $baseline.Schema, $v.Schema)
       $ok = $false
     }
     if ($v.DNM -ne $baseline.DNM) {
-      Write-Warning (("[FAILURE] Domain Naming Master disagreement on '{0}'.`n" -f $v.Server) + ("Baseline: {0} ; {1} thinks: {2}. Avoid adding/removing domains until resolved. Check: (Get-ADForest -Server {1}).DomainNamingMaster; repadmin /showrepl {1}." -f $baseline.DNM, $v.Server, $v.DNM))
+      Write-Warning ("[FAILURE] Domain Naming Master disagreement on '{0}'.`nBaseline: {1} ; {0} thinks: {2}. Avoid adding/removing domains until resolved. Check: (Get-ADForest -Server {0}).DomainNamingMaster; repadmin /showrepl {0}." -f $v.Server, $baseline.DNM, $v.DNM)
       $ok = $false
     }
   }
 
   if ($ok) {
-    Write-Warning (("[PASS] All DCs agree on DC list and FSMO role holders.`n") + ("Baseline DC: {0} ; DCs: [{1}]. Cross-check is order- and case-insensitive." -f $baseline.Server, $baseDCsJoined))
+    Write-Warning ("[PASS] All DCs agree on DC list and FSMO role holders.`nBaseline DC: {0} ; DCs: [{1}]. Cross-check is order- and case-insensitive." -f $baseline.Server, $baseDCsJoined)
   }
 }
 
@@ -282,11 +282,11 @@ Uses: Get-ADDomainController, Get-ADReplicationPartnerMetadata, Get-ADObject.
 
     if($metaCount -eq 0 -and $enabledCount -eq 0){
       $anyFail = $true
-      Write-Warning ("[FAILURE] No inbound replication detected for $($dc.HostName)`nPartnerMetadata=" + $metaCount + "; EnabledConnectionObjects=" + $enabledCount + "; NTDS=" + $dc.NTDSSettingsObjectDN)
+      Write-Warning ("[FAILURE] No inbound replication detected for {0}`nPartnerMetadata={1}; EnabledConnectionObjects={2}; NTDS={3}" -f $dc.HostName, $metaCount, $enabledCount, $dc.NTDSSettingsObjectDN)
       continue
     }
     if($metaCount -eq 0 -and $enabledCount -gt 0){
-      Write-Warning "[NOTICE] $(("Inbound connection objects exist but partner metadata returned none for " + $dc.HostName + ". Recheck with: repadmin /showrepl " + $dc.HostName))"
+      Write-Warning ("[NOTICE] Inbound connection objects exist but partner metadata returned none for {0}. Recheck with: repadmin /showrepl {0}" -f $dc.HostName)
     }
     if($metaCount -gt 0 -and $enabledCount -eq 0){
       Write-Warning "[NOTICE] Inbound partners reported by $($dc.HostName) but no enabled nTDSConnection objects under NTDS Settings. Possible permission/cache/KCC timing; investigate ISTG/KCC."
@@ -700,7 +700,7 @@ Uses: Get-ADRootDSE, Get-ADDomainController, Get-ADObject.
   }
 
   if($vers.Count -eq 0){
-    Write-Warning "[FAILURE] AD schema version consistency`n$(("No schema versions retrieved. Errors: "+($errs -join ' | ')))"
+    Write-Warning ("[FAILURE] AD schema version consistency`nNo schema versions retrieved. Errors: " + ($errs -join ' | '))
     return
   }
 
@@ -1020,7 +1020,7 @@ Uses: Get-ADObject.
     $owners = @($map[$spn] | Sort-Object -Unique)
     if($owners.Count -gt 1){
       $dupsFound=$true
-      Write-Warning "[FAILURE] Duplicate SPN detected`n$(("$spn -> " + ($owners -join ', ')))"
+      Write-Warning ("[FAILURE] Duplicate SPN detected`n$spn -> " + ($owners -join ', '))
     }
   }
   if(-not $dupsFound){ Write-Warning "[PASS] No duplicate SPNs detected" }

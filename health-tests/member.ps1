@@ -195,14 +195,14 @@ Uses: Test-ComputerSecureChannel.
   if ($compOk) {
     Write-Warning "[PASS] Computer policy update completed successfully (gpupdate)."
   } else {
-    Write-Warning ("[FAILURE] Computer policy update did not report success.`ngpupdate output:`n" + $text)
+    Write-Warning "[FAILURE] Computer policy update did not report success.`ngpupdate output:`n$text"
   }
 
   if (-not $userOk) {
     if ($isSystem) {
-      Write-Warning ("[NOTICE] User policy update did not report success (gpupdate running under SYSTEM/non-interactive).`nThis can be expected when no interactive user is logged on.`nRaw gpupdate output:`n" + $text)
+      Write-Warning "[NOTICE] User policy update did not report success (gpupdate running under SYSTEM/non-interactive).`nThis can be expected when no interactive user is logged on.`nRaw gpupdate output:`n$text"
     } else {
-      Write-Warning ("[FAILURE] User policy update did not report success.`nExpected success for interactive user.`nRaw gpupdate output:`n" + $text)
+      Write-Warning "[FAILURE] User policy update did not report success.`nExpected success for interactive user.`nRaw gpupdate output:`n$text"
     }
   } else {
     Write-Warning "[PASS] User policy update completed successfully (gpupdate)."
