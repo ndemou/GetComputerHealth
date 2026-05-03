@@ -1,17 +1,8 @@
 # TODO
 
-
-## sigstore?
-
-https://docs.sigstore.dev/quickstart/quickstart-cosign/
-
 ## Is the emitter property filled in properly? 
 
 I believe I often (always?) see it empty. Also it's best to rename it to TestName
-
-## Review our test suite for this repo
-
-Review /doc/test-suite-guide.md and improve our test suite if needed.
 
 ## Custom health tests should be directly runnable scripts
 
@@ -21,7 +12,7 @@ A reference to the full path to the script should always appear in the comments 
 
 We should also update `how-to-add-custom-tests.md`.
 
-Since this is a breaking change it requires a) the update of the major version number from 3 to 4 b) a migration script that will relieve users from having to edit all their custom health test scripts. The migration script seems easy: Use `sls` to find the names of the custom health test functions and append a call to them at the end of the script. We can use `Get-TextFileEncoding` from `helpers-text-files.ps1` to make sure we append text using the correct encoding. The migration script should be run by the updater/installer only when the existing version is `3.3.y`.
+Since this is a breaking change it requires a) the update of the major version number from 3 to 4 b) a migration script that will relieve users from having to edit all their custom health test scripts. The migration script seems easy: Use `sls` to find the names of the custom health test functions and append a call to them at the end of the script. We can use `Get-TextFileEncoding` from `helpers-text-files.ps1` to make sure we append text using the correct encoding. The migration script should be run by the updater/installer only when the existing version is `3.x.y`.
 
 ## Implement functionality that will help a user create and review custom health tests
 
@@ -34,6 +25,14 @@ Update our documentation.
 ## Change default installation root to `C:\IT\Get-ComputerHealth` instead of `C:\IT`
 
 However: a) support any other installation directory b) support installations that already reside in `C:\IT`
+
+## sigstore?
+
+https://docs.sigstore.dev/quickstart/quickstart-cosign/
+
+## Review our test suite for this repo
+
+Review /doc/test-suite-guide.md and improve our test suite if needed.
 
 ## Avoid complex string expressions in Write-Warning
 
