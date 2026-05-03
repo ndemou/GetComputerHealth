@@ -16,7 +16,7 @@ Uses: Get-DnsServerScavenging, Get-DnsServerZone, Get-DnsServerZoneAging.
   $comment = "Severity: Medium.`nWhat it means: Server-level scavenging is off, so stale dynamic records never age out.`nRisk: Stale A/PTR clutter, service discovery problems, and opportunities for name re-use confusion. In secure-updates AD zones, outright hijack is harder, but operational pain is real."
 
   $flagged=$false
-  if(-not $sv.ScavengingState){ $flagged=$true; Write-Warning "[WARNING] $("DNS server scavenging is disabled")`n$($comment)" }
+  if(-not $sv.ScavengingState){ $flagged=$true; Write-Warning "[WARNING] DNS server scavenging is disabled`n$comment" }
 
   foreach($z in $zones){
     $ai = $null; try { $ai = Get-DnsServerZoneAging -Name $z.ZoneName -ErrorAction Stop } catch {}
@@ -25,7 +25,7 @@ Uses: Get-DnsServerScavenging, Get-DnsServerZone, Get-DnsServerZoneAging.
 
   if(-not $flagged){
     $on=@($zones | ForEach-Object { $_.ZoneName })
-    Write-Warning "[PASS] $("DNS scavenging configured on server and zones")`n$(("Zones: " + ($on -join ', ')))"
+    Write-Warning "[PASS] DNS scavenging configured on server and zones`n$(("Zones: " + ($on -join ', ')))"
   }
 }
 
@@ -137,11 +137,11 @@ Uses: Get-DnsServerForwarder, Test-Connection.
   $ips=$f.IPAddress
   $bad=$false
   foreach($ip in $ips){
-    if(($ip -eq '127.0.0.1') -or ($ip -eq '::1')){ $bad=$true; Write-Warning "[FAILURE] $("Loopback address is configured as a DNS forwarder")`n$($ip)"; continue }
+    if(($ip -eq '127.0.0.1') -or ($ip -eq '::1')){ $bad=$true; Write-Warning "[FAILURE] Loopback address is configured as a DNS forwarder`n$ip"; continue }
     $ok=(Test-Connection -ComputerName $ip -Count 1 -Quiet)
-    if(-not $ok){ $bad=$true; Write-Warning "[FAILURE] $("DNS forwarder not reachable")`n$($ip)" }
+    if(-not $ok){ $bad=$true; Write-Warning "[FAILURE] DNS forwarder not reachable`n$ip" }
   }
-  if(-not $bad){ Write-Warning "[PASS] $("DNS forwarders sane & reachable")`n$(("Forwarders: " + ($ips -join ', ')))" }
+  if(-not $bad){ Write-Warning "[PASS] DNS forwarders sane & reachable`n$(("Forwarders: " + ($ips -join ', ')))" }
 }
 
 
@@ -220,8 +220,8 @@ Uses: Get-ADDomainController, Resolve-DnsName.
     $hn=$dc.HostName; $ip=$dc.IPv4Address
     if(-not $hn -or -not $ip){ continue }
     $ares=(Resolve-DnsName -Name $hn -Type A -ErrorAction SilentlyContinue).IPAddress
-    if(-not $ares){ $msg="$hn has no A records in DNS"; $bad+=$msg; Write-Warning "[FAILURE] $($msg)"; continue }
-    if($ares -notcontains $ip){ $msg="$hn A record mismatch: AD IP=$ip, DNS IPs="+($ares -join ','); $bad+=$msg; Write-Warning "[FAILURE] $($msg)" }
+    if(-not $ares){ $msg="$hn has no A records in DNS"; $bad+=$msg; Write-Warning "[FAILURE] $msg"; continue }
+    if($ares -notcontains $ip){ $msg="$hn A record mismatch: AD IP=$ip, DNS IPs="+($ares -join ','); $bad+=$msg; Write-Warning "[FAILURE] $msg" }
   }
   if($bad.Count -eq 0){ Write-Warning "[PASS] DC DNS A records match AD IPs for all DCs" }
 }

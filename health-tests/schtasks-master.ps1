@@ -457,8 +457,8 @@ Uses: ConvertFrom-Csv.
     }
     $details = ($lines -join "`r`n")
 
-    if($sev -eq 'Error'){ Write-Warning "[FAILURE] $($msg)`n$($details)"; $passed = $false }
-    elseif($sev -eq 'Warning'){ Write-Warning "[WARNING] $($msg)"; $passed = $false }
+    if($sev -eq 'Error'){ Write-Warning "[FAILURE] $msg`n$details"; $passed = $false }
+    elseif($sev -eq 'Warning'){ Write-Warning "[WARNING] $msg"; $passed = $false }
   }
 
   if ($passed) {

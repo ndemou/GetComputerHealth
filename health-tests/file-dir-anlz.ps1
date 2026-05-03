@@ -41,7 +41,7 @@ Uses: Get-ChildItem.
         }
         catch {}
 
-        Write-Warning "[WARNING] $("Directory $($dir.Path) has more than 10000 child items")`n$($comment)"
+        Write-Warning "[WARNING] Directory $($dir.Path) has more than 10000 child items`n$comment"
     }
 
     if (-not $foundLargeDirectory) {

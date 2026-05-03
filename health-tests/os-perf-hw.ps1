@@ -214,7 +214,7 @@ Uses: Get-DnsDomainControllers, Resolve-DnsName, Test-IsLaptopOrMobile.
       # Syncing from myself
       $cleanSource = $currentTimeSource.ToLowerInvariant() -replace '\.$','' # remove trailing dot if any
       if ($cleanSource -match "^$($env:COMPUTERNAME.ToLowerInvariant())(\.|$)") {
-          Write-Warning "[FAILURE] $("Misconfiguration: syncing from myself.")`n$(($evidences -join "`r`n"))"
+          Write-Warning "[FAILURE] Misconfiguration: syncing from myself.`n$(($evidences -join "`r`n"))"
       }
       # Confusion: NTP from a DC
       if ($timeSyncType -eq 'NTP' -and $isSourceDC) {
@@ -228,16 +228,16 @@ Uses: Get-DnsDomainControllers, Resolve-DnsName, Test-IsLaptopOrMobile.
     if ($isHostPDC) {
         # ---- CHECKS FOR PDCs ---
         if ($timeSyncType -eq 'NT5DS') {
-            Write-Warning "[FAILURE] $("PDC time syncing type is NT5DS, this is only valid if this is a subdomain and you are syncing from the higher domain")`n$($evidenceString)"
+            Write-Warning "[FAILURE] PDC time syncing type is NT5DS, this is only valid if this is a subdomain and you are syncing from the higher domain`n$evidenceString"
         }
         elseif ($timeSyncType -notin 'NTP', 'AllSync') {
-            Write-Warning "[FAILURE] $("PDC time syncing type is '$timeSyncType' instead of 'NTP' or 'AllSync'.")`n$($evidenceString)"
+            Write-Warning "[FAILURE] PDC time syncing type is '$timeSyncType' instead of 'NTP' or 'AllSync'.`n$evidenceString"
         }
         elseif ($isActiveCMOS) {
-            Write-Warning "[FAILURE] $("PDC currently reports 'Local CMOS Clock'.")`n$($evidenceString)"
+            Write-Warning "[FAILURE] PDC currently reports 'Local CMOS Clock'.`n$evidenceString"
         }
         elseif ($isActiveVMIC) {
-            Write-Warning "[FAILURE] $("PDC is currently syncing from hypervisor (Source='$currentTimeSource').")`n$($evidenceString)"
+            Write-Warning "[FAILURE] PDC is currently syncing from hypervisor (Source='$currentTimeSource').`n$evidenceString"
         }
         else {
             if ($vmicEnabled) {
@@ -247,7 +247,7 @@ Uses: Get-DnsDomainControllers, Resolve-DnsName, Test-IsLaptopOrMobile.
                 else {
                     $comment = ""
                 }
-                Write-Warning "[NOTICE] $("VMICTimeProvider is enabled, but not used.")`n$($comment)"
+                Write-Warning "[NOTICE] VMICTimeProvider is enabled, but not used.`n$comment"
             }
             if (Looks-ExternalNtp $currentTimeSource) {
                 Write-Warning "[PASS] PDC emulator time syncing looks correct (Type=$timeSyncType, Source='$currentTimeSource')."
@@ -260,54 +260,54 @@ Uses: Get-DnsDomainControllers, Resolve-DnsName, Test-IsLaptopOrMobile.
     elseif ($isHostDC) {
         # ---- CHECKS FOR DCs (except PDCs) ---
         if ($timeSyncType -ne 'NT5DS') {
-            Write-Warning "[FAILURE] $("DC time syncing type is '$timeSyncType' (expected 'NT5DS').")`n$($evidenceString)"
+            Write-Warning "[FAILURE] DC time syncing type is '$timeSyncType' (expected 'NT5DS').`n$evidenceString"
         }
         elseif ($isActiveVMIC) {
-            Write-Warning "[FAILURE] $("DC is currently syncing from hypervisor (Source='$currentTimeSource').")`n$($evidenceString)"
+            Write-Warning "[FAILURE] DC is currently syncing from hypervisor (Source='$currentTimeSource').`n$evidenceString"
         }
         elseif ($isActiveCMOS) {
-            Write-Warning "[FAILURE] $("DC reports 'Local CMOS Clock'.")`n$($evidenceString)"
+            Write-Warning "[FAILURE] DC reports 'Local CMOS Clock'.`n$evidenceString"
         }
         elseif (Looks-ExternalNtp $currentTimeSource) {
-            Write-Warning "[FAILURE] $("DC appears to be using an external NTP source ('$currentTimeSource') instead of domain hierarchy (NT5DS).")`n$($evidenceString)"
+            Write-Warning "[FAILURE] DC appears to be using an external NTP source ('$currentTimeSource') instead of domain hierarchy (NT5DS).`n$evidenceString"
         }
         elseif ($isSourceDC) {
             Write-Warning "[PASS] DC time syncing is OK (Type=$timeSyncType, Source='$currentTimeSource')."
         }
         else {
-            Write-Warning "[FAILURE] $("DC is not clearly syncing from domain hierarchy (Type=$timeSyncType, Source='$currentTimeSource').")`n$($evidenceString)"
+            Write-Warning "[FAILURE] DC is not clearly syncing from domain hierarchy (Type=$timeSyncType, Source='$currentTimeSource').`n$evidenceString"
         }
     }
     elseif ($isHostDomainJoined) {
         # ---- CHECKS FOR Domain Joined servers except DCs, PDCs ---
         if ($timeSyncType -ne 'NT5DS') {
-            Write-Warning "[FAILURE] $("Domain member time syncing type is '$timeSyncType' instead of 'NT5DS'.")`n$($evidenceString)"
+            Write-Warning "[FAILURE] Domain member time syncing type is '$timeSyncType' instead of 'NT5DS'.`n$evidenceString"
         }
         elseif ($isActiveVMIC) {
-            Write-Warning "[FAILURE] $("Domain member is currently syncing from hypervisor (Source='$currentTimeSource').")`n$($evidenceString)"
+            Write-Warning "[FAILURE] Domain member is currently syncing from hypervisor (Source='$currentTimeSource').`n$evidenceString"
         }
         elseif ($isActiveCMOS) {
             if (Test-IsLaptopOrMobile) {
                 Write-Warning "[WARNING] This domain member (likely a laptop) is not syncing time from domain (Source='Local CMOS Clock')."
             }
             else {
-                Write-Warning "[FAILURE] $("Domain member is not syncing time from domain (Source='Local CMOS Clock').")`n$($evidenceString)"
+                Write-Warning "[FAILURE] Domain member is not syncing time from domain (Source='Local CMOS Clock').`n$evidenceString"
             }
         }
         elseif (Looks-ExternalNtp $currentTimeSource) {
-            Write-Warning "[FAILURE] $("Domain member appears to be using an external NTP source ('$currentTimeSource') instead of domain hierarchy.")`n$($evidenceString)"
+            Write-Warning "[FAILURE] Domain member appears to be using an external NTP source ('$currentTimeSource') instead of domain hierarchy.`n$evidenceString"
         }
         elseif ($isSourceDC) {
             Write-Warning "[PASS] Domain member is syncing via domain hierarchy (Type=$timeSyncType, Source='$currentTimeSource')."
         }
         else {
-            Write-Warning "[FAILURE] $("Domain member is not clearly syncing via domain hierarchy (Type=$timeSyncType, Source='$currentTimeSource').")`n$($evidenceString)"
+            Write-Warning "[FAILURE] Domain member is not clearly syncing via domain hierarchy (Type=$timeSyncType, Source='$currentTimeSource').`n$evidenceString"
         }
     }
     else {
         # ---- CHECKS FOR Standalone PCs ---
         if ($currentTimeSource -eq 'Local CMOS Clock' -or -not $currentTimeSource) {
-            Write-Warning "[FAILURE] $("Standalone machine is not syncing time (Source='$currentTimeSource').")`n$($evidenceString)"
+            Write-Warning "[FAILURE] Standalone machine is not syncing time (Source='$currentTimeSource').`n$evidenceString"
         }
         elseif ($isActiveVMIC) {
             Write-Warning "[PASS] Standalone machine is syncing via Hypervisor/VM Tools."
@@ -514,7 +514,7 @@ Uses: Get-AvailMB, Get-Counter.
   if ($freePcnt -lt 2) { Write-Warning "[FAILURE] Free RAM under 2%`n$freePcnt% free RAM"; return }
   elseif ($freePcnt -lt 5) { Write-Warning "[WARNING] Free RAM between 2 and 5%`n$freePcnt% free RAM"; return }
   elseif ($freePcnt -lt 10) { Write-Warning "[NOTICE] Free RAM between 5 and 10%`n$freePcnt% free RAM"; return }
-  Write-Warning "[PASS] Free RAM at $($freePcnt)%"
+  Write-Warning "[PASS] Free RAM at $freePcnt%"
   return
 }
 
@@ -623,7 +623,7 @@ Uses: Get-Service, Get-SmbShare.
     }
 
     if($report.Count -eq 0){
-      Write-Warning "[PASS] $("Share '{0}' has no broad-principal read or write access; ABE={1}; EncryptData={2}" -f $s.Name,$s.FolderEnumerationMode,$s.EncryptData)"
+      Write-Warning ("[PASS] Share '{0}' has no broad-principal read or write access; ABE={1}; EncryptData={2}" -f $s.Name,$s.FolderEnumerationMode,$s.EncryptData)
     } else {
       foreach($r in $report){
         if($r.Effective -eq 'Full' -or $r.Effective -eq 'Write'){
@@ -937,10 +937,10 @@ Uses: None.
   $ok = $true
 
   if ($abs -ge $FailOffsetSeconds) {
-    Write-Warning "[FAILURE] $("Time offset too high")`n$(("{0} s exceeds {1} s (2-samples)" -f $offsetSec,$FailOffsetSeconds))"
+    Write-Warning "[FAILURE] Time offset too high`n$(("{0} s exceeds {1} s (2-samples)" -f $offsetSec,$FailOffsetSeconds))"
     $ok = $false
   } elseif ($abs -ge $WarnOffsetSeconds) {
-    Write-Warning "[WARNING] $("Time offset rather high")`n$(("{0} s exceeds {1} s (2-samples)" -f $offsetSec,$WarnOffsetSeconds))"
+    Write-Warning "[WARNING] Time offset rather high`n$(("{0} s exceeds {1} s (2-samples)" -f $offsetSec,$WarnOffsetSeconds))"
     $ok = $false
   }
 
@@ -982,7 +982,7 @@ Uses: None.
   }
 
   if(-not $entries){
-    Write-Warning "[FAILURE] $("No pagefile detected")`n$(("AutomaticManagedPagefile="+[int]$auto))"
+    Write-Warning "[FAILURE] No pagefile detected`n$(("AutomaticManagedPagefile="+[int]$auto))"
     return
   }
 

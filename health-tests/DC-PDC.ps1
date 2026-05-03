@@ -691,16 +691,16 @@ Uses: Get-ADRootDSE, Get-ADDomainController, Get-ADObject.
     try{
       $ov=(Get-ADObject -Identity $schemaNC -Server $dc.HostName -Properties objectVersion -ErrorAction Stop).objectVersion
       if($null -eq $ov -or "$ov" -eq ''){
-        $msg="$($dc.HostName): objectVersion missing"; $errs+=$msg; Write-Warning "[FAILURE] $($msg)"; continue
+        $msg="$($dc.HostName): objectVersion missing"; $errs+=$msg; Write-Warning "[FAILURE] $msg"; continue
       }
       $ov=[int]("$ov".Trim()); $vers[$dc.HostName]=$ov
     }catch{
-      $msg="$($dc.HostName): $($_.Exception.Message)"; $errs+=$msg; Write-Warning "[FAILURE] $($msg)"
+      $msg="$($dc.HostName): $($_.Exception.Message)"; $errs+=$msg; Write-Warning "[FAILURE] $msg"
     }
   }
 
   if($vers.Count -eq 0){
-    Write-Warning "[FAILURE] $("AD schema version consistency")`n$(("No schema versions retrieved. Errors: "+($errs -join ' | ')))"
+    Write-Warning "[FAILURE] AD schema version consistency`n$(("No schema versions retrieved. Errors: "+($errs -join ' | ')))"
     return
   }
 
@@ -723,7 +723,7 @@ Uses: Get-ADRootDSE, Get-ADDomainController, Get-ADObject.
   if($pass){
     Write-Warning "[PASS] AD schema version consistent across DCs ($det)"
   } else {
-    Write-Warning "[FAILURE] $("AD schema version consistent across DCs")`n$($det)"
+    Write-Warning "[FAILURE] AD schema version consistent across DCs`n$det"
   }
 }
 
@@ -902,7 +902,7 @@ Uses: Get-ADUser.
   $objs=Get-ADUser -LDAPFilter $filter -Properties PasswordNeverExpires,PasswordLastSet
   $bad=@($objs | Where-Object {$_.PasswordNeverExpires -eq $true})
   if($bad.Count -gt 0){
-    foreach($u in $bad){ Write-Warning "[FAILURE] $("Service account password set to never expire")`n$($u.SamAccountName)" }
+    foreach($u in $bad){ Write-Warning "[FAILURE] Service account password set to never expire`n$($u.SamAccountName)" }
   } else {
     Write-Warning "[PASS] Service accounts have expiring passwords"
   }
@@ -1020,7 +1020,7 @@ Uses: Get-ADObject.
     $owners = @($map[$spn] | Sort-Object -Unique)
     if($owners.Count -gt 1){
       $dupsFound=$true
-      Write-Warning "[FAILURE] $("Duplicate SPN detected")`n$(("$spn -> " + ($owners -join ', ')))"
+      Write-Warning "[FAILURE] Duplicate SPN detected`n$(("$spn -> " + ($owners -join ', ')))"
     }
   }
   if(-not $dupsFound){ Write-Warning "[PASS] No duplicate SPNs detected" }

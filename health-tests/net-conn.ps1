@@ -296,7 +296,7 @@ Uses: Get-NetAdapterBinding.
   $bad=$false
   if($RequireEnabled){
     foreach($r in $rows){
-      if(-not $r.Enabled){ $bad=$true; Write-Warning "[FAILURE] $("IPv6 disabled on adapter")`n$($r.Name)" }
+      if(-not $r.Enabled){ $bad=$true; Write-Warning "[FAILURE] IPv6 disabled on adapter`n$($r.Name)" }
     }
     if(-not $bad){ Write-Warning "[PASS] IPv6 enabled on all adapters" }
   } else {
