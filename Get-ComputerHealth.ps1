@@ -373,7 +373,7 @@ FunctionName, Time, ElapsedMilliseconds, Output, Success, Error, Category, Reaso
     foreach ($item in $result) {
       if ($item -is [System.Management.Automation.WarningRecord]) {
         $record = Convert-WarningLikeObjectToLogRecord -Value $item
-        Log-Msg -Level $record.Level -Msg $record.Msg -Comment $record.Comment
+        Log-Msg -Level $record.Level -Msg $record.Msg -Comment $record.Comment -Emitter $FunctionName
         $cntProperRecord += 1
         if (($item.Message -as [string]) -match '^\s*\[\s*pass\s*\]') { $cntPassRecord += 1 }
       }
@@ -455,7 +455,8 @@ FunctionName, Time, ElapsedMilliseconds, Output, Success, Error, Category, Reaso
     }
 
     Log-Failure "(Program Error) Exception while running '$FunctionName'" `
-      -Comment "details: $baseMsg`n$details`nA Program Error during a test means either that the test failed or that its code has a bug."
+      -Comment "details: $baseMsg`n$details`nA Program Error during a test means either that the test failed or that its code has a bug." `
+      -Emitter $(if ($innerFunc) { $innerFunc } else { $FunctionName })
   }
   finally {
     $sw.Stop()

@@ -351,7 +351,8 @@ function Log-Msg {
   param(
     [Parameter(Mandatory)][ValidateSet('debug', 'pass', 'info', 'notice', 'warning', 'failure')][string]$Level,
     [Parameter(Mandatory)][string]$Msg,
-    [string]$Comment = ""
+    [string]$Comment = "",
+    [string]$Emitter
   )
 
   [string]$SigColor = 'DarkGray'
@@ -403,11 +404,13 @@ function Log-Msg {
 
   # The name of the HealthTest function that emitted this log object
   # (look up the call stack to find a function named HealthTest-* that called us)
-  $logEmitter = $null
-  foreach ($frame in (Get-PSCallStack | Select-Object -Skip 1 -First 5)) {
-    if ($frame.FunctionName -like 'HealthTest-*') {
-      $logEmitter = $frame.FunctionName
-      break
+  $logEmitter = $Emitter
+  if (-not $logEmitter) {
+    foreach ($frame in (Get-PSCallStack | Select-Object -Skip 1 -First 5)) {
+      if ($frame.FunctionName -like 'HealthTest-*') {
+        $logEmitter = $frame.FunctionName
+        break
+      }
     }
   }
 
