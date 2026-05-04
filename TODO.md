@@ -40,22 +40,13 @@ Review /doc/test-suite-guide.md and improve our test suite if needed.
 
 ## Avoid complex string expressions in Write-Warning
 
-This command will show one class of complex string expressions that apears many dozen times:
+You can get an overview of sus write-warning expressions with this command:
 ```
-sls '^ *write-warning.*`n' .\health-tests\* | sls -NotMatch '`n\$[a-z]+"'
+(sls "write-warning" .\health-tests\*).line -replace '^.*write-warning', 'write-warning' -replace ' *} else(if)? {.*' -replace '; if [(]' |sls 'write-warning .{76,}$' | sls '`n([" +]*)?(\$details|\$comment)(.{0,4})$' -NotMatch
 ```
-Most if not all of them should be converted to follow this pattern:
-```
-$details = ...
-Write-Warning "[LEVEL] blah blah`n$details"
-```
-I better check the resulting `git diff` from codex with this ChatGPT prompt: 
-> Do any of the changes in this diff change what will be displayed by write-warning?
 
-After fixing the above, you can get an overview of write-warning expressions with this command -- see if you can spot other complex expressions:
-```
-(sls "write-warning" .\health-tests\*).line -replace '^.*write-warning', 'write-warning' |sls -NotMatch 'write-warning "[^"]+" *($|[;}])|write-warning \(New-WarningMessage' | sort
-```
+After fixing anything it's better to check the resulting `git diff` from codex with this ChatGPT prompt: 
+> Do any of the changes in this diff change what will be displayed by write-warning?
 
 ## Stop using legacy parameter set that adapts Pester 5 syntax to Pester 4 syntax
 
