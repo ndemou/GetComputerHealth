@@ -4,9 +4,9 @@
 
 All `.ps1` files in `C:\IT\config\Custom-HealthTests\` are dot-sourced, and all functions whose names match `HealthTest-*` are executed. These functions should return nothing and should report their result(s) like this:
 ```powershell
-Write-Warning "[PASS] $allGoodDescription"
-Write-Warning "[FAILURE] $issueDescription"
-Write-Warning ("[FAILURE] $issueDescription" + "`n" + $details)
+Write-Warning "[PASS] Description of what's OK"
+Write-Warning "[FAILURE] Description of the issue"
+Write-Warning ("[FAILURE] Description of the issue" + "`n" + $details)
 # Choose between [NOTICE], [WARNING], or [FAILURE] depending on severity
 ````
 
