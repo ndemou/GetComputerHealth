@@ -42,11 +42,13 @@ sls '^ *write-warning.*`n' .\health-tests\* | sls -NotMatch '`n\$[a-z]+"'
 ```
 Most if not all of them should be converted to follow this pattern:
 ```
-$optionalDetails = ...
-Write-Warning "[LEVEL] blah blah`n$optionalDetails"
+$details = ...
+Write-Warning "[LEVEL] blah blah`n$details"
 ```
+I better check the resulting `git diff` from codex with this ChatGPT prompt: 
+> Do any of the changes in this diff change what will be displayed by write-warning?
 
-After fixing the above, you can get an overview of write-warning expressions with:
+After fixing the above, you can get an overview of write-warning expressions with this command -- see if you can spot other complex expressions:
 ```
 (sls "write-warning" .\health-tests\*).line -replace '^.*write-warning', 'write-warning' |sls -NotMatch 'write-warning "[^"]+" *($|[;}])|write-warning \(New-WarningMessage' | sort
 ```
