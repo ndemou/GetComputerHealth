@@ -31,7 +31,7 @@ from the AD DNS name.
     } elseif ($primarySuffix -ieq $DomainName) {
         Write-Warning "[PASS] Primary DNS suffix`n$primarySuffix"
     } else {
-        Write-Warning "[FAILURE] Primary DNS suffix"("Current='{0}' Expected='{1}'" -f $primarySuffix,$DomainName) "Ensure primary DNS suffix equals the AD DNS name (normally set by domain join)."
+        Write-Warning "[FAILURE] Primary DNS suffix: Current='$primarySuffix' Expected='$DomainName'. Ensure primary DNS suffix equals the AD DNS name (normally set by domain join)."
     }
 
     # 2) DNS devolution is enabled (boolean only)
