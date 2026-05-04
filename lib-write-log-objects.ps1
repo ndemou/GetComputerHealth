@@ -500,7 +500,7 @@ function Export-HealthMessagesToExcel {
 
   # export the requested columns
   $Data |
-  Select-Object Computer, Suppressed, Level, Message, Comment, Hash | ForEach-Object {
+  Select-Object Computer, Suppressed, Level, Message, Comment, Hash, Emitter | ForEach-Object {
     $safe_quotes_msg = $_.Message -replace '"', "''"
     if ($_.Suppressed) {
       $command = "" 
@@ -515,6 +515,7 @@ function Export-HealthMessagesToExcel {
       Message              = $_.Message
       Comment              = $_.comment
       Hash                 = $_.Hash
+      Emitter              = $_.Emitter
       CommandToSuppressMsg = $command
     }
   } | Export-Excel -Path $FileName -WorksheetName 'Messages' -AutoSize -BoldTopRow
