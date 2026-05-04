@@ -429,7 +429,7 @@ if ($ExcludeServers) {
 }
 
 if (-not $Computers) {
-  $targets = $env:COMPUTERNAME
+  $targets = @($env:COMPUTERNAME)
 }
 else {
   $targets = $Computers | ForEach-Object { $_ -split '[,\s]+' } | ForEach-Object { $_ -replace '\s' } | Where-Object { $_ }
