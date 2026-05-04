@@ -170,7 +170,7 @@ Describe 'HealthTest-AutoStartServicesRunning' {
     . (Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) 'health-tests\srvc-exe-resolve.ps1')
   }
 
-  It 'emits INFO when an auto-start service is stopped but last exited normally' {
+  It 'emits NOTICE when an auto-start service is stopped but last exited normally' {
     Mock Get-CimInstance {
       @(
         [pscustomobject]@{
@@ -189,7 +189,7 @@ Describe 'HealthTest-AutoStartServicesRunning' {
     HealthTest-AutoStartServicesRunning
 
     Should -Invoke Write-Warning -Times 1 -Exactly -ParameterFilter {
-      $Message -eq "[INFO] Service 'FOO' which is set to automatically start, is not running, but its last execution terminated with ExitCode=0(The operation completed successfully.).`nDisplay name: Foo Service, StartMode=Auto, DelayedAutoStart=False, last ExitCode=0(The operation completed successfully.)."
+      $Message -eq "[NOTICE] Service 'FOO' which is set to automatically start, is not running, but its last execution terminated with ExitCode=0(The operation completed successfully.).`nDisplay name: Foo Service, StartMode=Auto, DelayedAutoStart=False, last ExitCode=0(The operation completed successfully.)."
     }
   }
 

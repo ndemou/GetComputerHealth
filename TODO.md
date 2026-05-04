@@ -1,9 +1,5 @@
 # TODO
 
-## Raise severity to NOTICE for this case of non-running service
-
-For this: "INFO   : Service '<SERVICE_NAME>' which is set to automatically start, is not running, but its last execution terminated with ExitCode=0"
-  
 ## Is the emitter property filled in properly? 
 
 I believe I often (always?) see it empty. Also it's best to rename it to TestName
