@@ -1,8 +1,10 @@
 # TODO
 
-## Is the emitter property filled in properly? 
+## FIX: the emitter property is always empty
 
-I believe I often (always?) see it empty. Also it's best to rename it to TestName
+ - Make sure it is set to the name of the healthtest function.
+ - Rename it to TestName.
+ - Make sure it appears in the exported Excel
 
 ## Custom health tests should be directly runnable scripts
 
