@@ -59,9 +59,10 @@ Uses: Get-ScheduledTask, Get-ScheduledTaskInfo, Get-ScheduledTaskDeepInfo.
                       }
                     }
               } | out-string)
+            $details = "Details about this task:`n" + $details
             if ($i.LastTaskResult -notin $OK_TASK_RESULTS) {
                 $meaning = Convert-TaskResultCode $i.LastTaskResult
-                Write-Warning "[WARNING] Scheduled Task with failures: '$($t.TaskPath)$($t.TaskName)'; Last exit code: $($i.LastTaskResult) ($meaning)`nDetails about this task:`r`n$details"
+                Write-Warning "[WARNING] Scheduled Task with failures: '$($t.TaskPath)$($t.TaskName)'; Last exit code: $($i.LastTaskResult) ($meaning)`n$details"
             }
             if ($i.NumberOfMissedRuns -gt 0) {
                 if ($i.NumberOfMissedRuns -lt 5){
@@ -69,12 +70,15 @@ Uses: Get-ScheduledTask, Get-ScheduledTaskInfo, Get-ScheduledTaskDeepInfo.
                         -or $t.TaskName -like '*Maintenance*' `
                         -or $t.TaskName -in @('Office Serviceability Manager','Resolut Refresh') `
                     ) {
-                        Write-Warning "[info] Scheduled Task with just a few missed runs(<5): '$($t.TaskPath)$($t.TaskName)'`n$($i.NumberOfMissedRuns) runs where missed. Details about this task: $details"
+                        $details = "$($i.NumberOfMissedRuns) runs where missed. $details"
+                        Write-Warning "[info] Scheduled Task with just a few missed runs(<5): '$($t.TaskPath)$($t.TaskName)'`n$details"
                     } else {
-                        Write-Warning "[NOTICE] Scheduled Task with just a few missed runs(<5): '$($t.TaskPath)$($t.TaskName)'`n$($i.NumberOfMissedRuns) runs where missed. Details about this task: $details"
+                        $details = "$($i.NumberOfMissedRuns) runs where missed. $details"
+                        Write-Warning "[NOTICE] Scheduled Task with just a few missed runs(<5): '$($t.TaskPath)$($t.TaskName)'`n$details"
                     }
                 } else {
-                    Write-Warning "[WARNING] Scheduled Task with missed runs: '$($t.TaskPath)$($t.TaskName)'`n$($i.NumberOfMissedRuns) runs where missed. Details about this task: $details"
+                    $details = "$($i.NumberOfMissedRuns) runs where missed. $details"
+                    Write-Warning "[WARNING] Scheduled Task with missed runs: '$($t.TaskPath)$($t.TaskName)'`n$details"
                 }
             }
         }

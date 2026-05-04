@@ -54,8 +54,8 @@ from the AD DNS name.
         $allNics = Get-DnsClient -ErrorAction Stop
     } catch {
         $err = $_
-        $comment = "$($err.Exception.Message)"
-        Write-Warning "[WARNING] Unable to test if DNS registration is OK (RegisterThisConnectionsAddress=True and UseSuffixWhenRegistering=True)`nGet-DnsClient exception:`n$comment"
+        $comment = "Get-DnsClient exception:`n$($err.Exception.Message)"
+        Write-Warning "[WARNING] Unable to test if DNS registration is OK (RegisterThisConnectionsAddress=True and UseSuffixWhenRegistering=True)`n$comment"
         $allNics = @()
     }
     try {
@@ -63,8 +63,8 @@ from the AD DNS name.
                 Where-Object { $_.InterfaceOperationalStatus -eq "Up" -and $_.ConnectionSpecificSuffix -ne "localdomain" }
     } catch {
         $err = $_
-        $comment = "$($err.Exception.Message)"
-        Write-Warning "[WARNING] Unable to test if DNS registration is OK (RegisterThisConnectionsAddress=True and UseSuffixWhenRegistering=True)`nUnable to filter DNS client interfaces based on InterfaceOperationalStatus & ConnectionSpecificSuffix`n$comment"
+        $comment = "Unable to filter DNS client interfaces based on InterfaceOperationalStatus & ConnectionSpecificSuffix`n$($err.Exception.Message)"
+        Write-Warning "[WARNING] Unable to test if DNS registration is OK (RegisterThisConnectionsAddress=True and UseSuffixWhenRegistering=True)`n$comment"
         $nics = @()
     }
 

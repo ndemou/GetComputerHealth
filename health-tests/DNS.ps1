@@ -20,7 +20,11 @@ Uses: Get-DnsServerScavenging, Get-DnsServerZone, Get-DnsServerZoneAging.
 
   foreach($z in $zones){
     $ai = $null; try { $ai = Get-DnsServerZoneAging -Name $z.ZoneName -ErrorAction Stop } catch {}
-    if(-not ($ai -and $ai.AgingEnabled)){ $flagged=$true; Write-Warning "[WARNING] DNS zone aging is disabled`nzone: $($z.ZoneName) `nNote that scavenging must be enabled both at the server level and at the zone`n$comment"}
+    if(-not ($ai -and $ai.AgingEnabled)){ 
+        $flagged=$true
+        $details = "zone: $($z.ZoneName) `nNote that scavenging must be enabled both at the server level and at the zone`n$comment"
+        Write-Warning ("[WARNING] DNS zone aging is disabled" + "`n" + $details)
+    }
   }
 
   if(-not $flagged){
