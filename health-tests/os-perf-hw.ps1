@@ -630,11 +630,12 @@ Uses: Get-Service, Get-SmbShare.
     } else {
       foreach($r in $report){
         if($r.Effective -eq 'Full' -or $r.Effective -eq 'Write'){
-          Write-Warning ("[FAILURE] '{1}' can write share '{0}'('$path')`nRestrict to specific groups; ensure share grants Read or None to broad principals and tighten NTFS. Path: {2}" -f $r.Share, $r.Principal, $r.Path)
+          $details = "Restrict to specific groups; ensure share grants Read or None to broad principals and tighten NTFS. Path: $($r.Path)"
+          Write-Warning ("[FAILURE] '$($r.Principal)' can write share '$($r.Share)'('$($r.Path)')" + "`n" + $details)
           $riskFound = $true
         } elseif($r.Effective -eq 'Read') {
             if ($r.Share -ne 'SYSVOL'){
-                Write-Warning "[WARNING] '$($r.Principal)' can read share '$($r.Share)'('$path')"
+                Write-Warning "[WARNING] '$($r.Principal)' can read share '$($r.Share)'('$($r.Path)')"
             }
         } else {
           Write-Warning ("[PASS] No effective access for {0} on '{1}' (blocked by layer intersection)" -f $r.Principal,$r.Share)
@@ -919,10 +920,12 @@ Uses: None.
   $ok = $true
 
   if ($abs -ge $FailOffsetSeconds) {
-    Write-Warning ("[FAILURE] Time offset too high`n{0} s exceeds {1} s (2-samples)" -f $offsetSec,$FailOffsetSeconds)
+    $details = "$offsetSec s exceeds $FailOffsetSeconds s (2-samples)"
+    Write-Warning ("[FAILURE] Time offset too high" + "`n" + $details)
     $ok = $false
   } elseif ($abs -ge $WarnOffsetSeconds) {
-    Write-Warning ("[WARNING] Time offset rather high`n{0} s exceeds {1} s (2-samples)" -f $offsetSec,$WarnOffsetSeconds)
+    $details = "$offsetSec s exceeds $WarnOffsetSeconds s (2-samples)"
+    Write-Warning ("[WARNING] Time offset rather high" + "`n" + $details)
     $ok = $false
   }
 

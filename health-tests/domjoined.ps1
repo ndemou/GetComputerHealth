@@ -73,19 +73,24 @@ from the AD DNS name.
 
         # 3a) Registration flags must both be True
         if ($n.RegisterThisConnectionsAddress -and $n.UseSuffixWhenRegistering) {
-            Write-Warning ("[PASS] NIC '{0}' DNS registration`nRegisterThisConnectionsAddress=True, UseSuffixWhenRegistering=True" -f $nicName)
+            $details = "RegisterThisConnectionsAddress=True, UseSuffixWhenRegistering=True"
+            Write-Warning ("[PASS] NIC '$nicName' DNS registration" + "`n" + $details)
         } else {
-            Write-Warning ("[FAILURE] NIC '{0}' DNS registration`nRegisterThisConnectionsAddress={1}, UseSuffixWhenRegistering={2}`nEnable both flags on important interfaces." -f $nicName, $n.RegisterThisConnectionsAddress, $n.UseSuffixWhenRegistering)
+            $details = "RegisterThisConnectionsAddress=$($n.RegisterThisConnectionsAddress), UseSuffixWhenRegistering=$($n.UseSuffixWhenRegistering)`nEnable both flags on important interfaces."
+            Write-Warning ("[FAILURE] NIC '$nicName' DNS registration" + "`n" + $details)
         }
 
         # 3b) Connection-specific suffix: must be Empty OR exactly the domain
         $css = $n.ConnectionSpecificSuffix
         if ([string]::IsNullOrWhiteSpace($css)) {
-            Write-Warning ("[PASS] NIC '{0}' Conn.-specific suffix`nEmpty" -f $nicName)
+            $details = "Empty"
+            Write-Warning ("[PASS] NIC '$nicName' Conn.-specific suffix" + "`n" + $details)
         } elseif ($css -ieq $DomainName) {
-            Write-Warning ("[PASS] NIC '{0}' Conn.-specific suffix`nEquals {1}" -f $nicName,$DomainName)
+            $details = "Equals $DomainName"
+            Write-Warning ("[PASS] NIC '$nicName' Conn.-specific suffix" + "`n" + $details)
         } else {
-            Write-Warning ("[FAILURE] NIC '{0}' Conn.-specific suffix`nSet to '{1}'`nLeave blank for single-domain setups unless a specific suffix is required." -f $nicName, $css)
+            $details = "Set to '$css'`nLeave blank for single-domain setups unless a specific suffix is required."
+            Write-Warning ("[FAILURE] NIC '$nicName' Conn.-specific suffix" + "`n" + $details)
         }
     }
 }
