@@ -505,11 +505,15 @@ function Export-HealthMessagesToExcel {
   $Data |
   Select-Object Computer, Suppressed, Level, Message, Comment, Hash, Emitter | ForEach-Object {
     $safe_quotes_msg = $_.Message -replace '"', "''"
-    if ($_.Suppressed) {
+    $commentText = "$($_.level) - $safe_quotes_msg"
+    if ($commentText.Length -gt 400) {
+      $commentText = $commentText.Substring(0, 400)
+    }
+    if ($_.Suppressed -or $_.Level -in @('info', 'debug')) {
       $command = "" 
     }
     else {
-      $command = "Invoke-Command $($_.Computer) {c:\it\bin\Get-ComputerHealth.ps1 -AddWhitelisting -until 2999-12-31 -sig '$($_.hash)' -ComputerName $($_.Computer) -comment ""$($_.level) - $safe_quotes_msg""}"
+      $command = "Invoke-Command $($_.Computer) {c:\it\bin\Get-ComputerHealth.ps1 -AddWhitelisting -until 2999-12-31 -sig '$($_.hash)' -ComputerName $($_.Computer) -comment ""$commentText""}"
     }
     [pscustomobject]@{
       Computer             = $_.Computer
