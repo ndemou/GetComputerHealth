@@ -135,18 +135,19 @@ Thus we also need to adjust the function names accordingly: NonMicrosoftServices
 
 ## New format for Get-ComputerHealth.sigs-to-suppress.txt
 
-Must use this json-like format for the lines of `Get-ComputerHealth.sigs-to-suppress.txt` (all of the text inside `{...}` must be in one line):
+Must use clixml for the configuration/state file of Get-ComputerHealth.
+
 ```
-{'type':'SUPPRESSED_FINDING', 'TestName':'UnexpectedListeningPorts', 'Signature':'bfc162fa', 'Description':'Computer is listening to port 443', 'ts':'2025-11-01 12:42', 'User':'ndemou-admin'}
+{'type':'SUPPRESSED_FINDING', 'TestName':'UnexpectedListeningPorts', 'Signature':'bfc162fa', 'Description':'Computer is listening to port 443', 'ts':'2025-11-01 12:42', 'Until':'2026-05-06', 'User':'ndemou-admin'}
 
 {'type':'POLICY_TEST_WAS_RUN', 'TestName':'InstalledSW', 'ts':'2025-11-01 12:42', 'User':'ndemou-admin'}
 ```
 
-Also rename `Get-ComputerHealth.sigs-to-suppress.txt` to `Get-ComputerHealth.state`
+Also rename it from `Get-ComputerHealth.sigs-to-suppress.txt` to `Get-ComputerHealth.state`
 
 In order to not break existing systems, the updater needs to perform the migration on existing installations:
  - If the new `.state` file does not exist: create it by translating the old `.txt` file
- - After May 206 and before June also delete the `.txt` file if found.
+ - After june 2026 and before July also delete the `.txt` file if found.
 
 ## New feature: "*Required* Findings"
 
