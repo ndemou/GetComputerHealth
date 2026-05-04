@@ -439,7 +439,7 @@ if ('ALL_DOMAIN_SERVERS' -in $targets) {
   $domainServers = (Get-DomainServers | ForEach-Object { $_ -replace '[.].*' -replace '\s' } | Where-Object { $_ -notin $ExcludeServers })
   $targets = ($targets | Where-Object { $_ -ne 'ALL_DOMAIN_SERVERS' }) + $domainServers
 }
-$targets = ($targets | Sort-Object)
+$targets = @($targets | Sort-Object)
 
 write-verbose "Targets: $($targets -join ';')"
 $SmtpSubject = $SmtpSubject -replace 'LIST_OF_COMPUTERS', ($targets -join ',')
@@ -644,7 +644,7 @@ $notable_msgs = @()
 if ($all_messages) {
   # save
   Export-HealthMessagesToExcel -Data $all_messages -FileName "${TEMP_DIR}\all-messages-$($timestamp).xlsx"
-  $notable_msgs = (`
+  $notable_msgs = @(`
       $all_messages `
     | Where-Object { -not($_.Suppressed) -and $_.level -notin @('debug', 'help', 'pass', 'info') } `
     | Sort-Object -Property @{ Expression = { $SortOrder[$_.Level] } }, Computer `
