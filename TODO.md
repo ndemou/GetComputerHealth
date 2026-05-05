@@ -137,7 +137,7 @@ Thus we also need to adjust the function names accordingly: NonMicrosoftServices
 
 Must use clixml for the configuration/state file of Get-ComputerHealth.
 
-```
+```powershell
 $ConfigAndState = @{
     'POLICY_TEST_WAS_RUN' = @{
         'InstalledSW' = [pscustomobject]@{
@@ -170,19 +170,18 @@ $ConfigAndState = @{
     }
 
     'REQUIRED_FINDING' = @{
+       'UnexpectedListeningPorts' = [pscustomobject]@{
         'bfc162fa' = [pscustomobject]@{
-            TestName    = 'UnexpectedListeningPorts'
             Description = 'Listening port 443'
             Ts          = [datetime]'2025-11-01 12:42'
             User        = 'ndemou-admin'
         }
-
-        'e91ac55b' = [pscustomobject]@{
-            TestName    = 'InstalledSW'
-            Description = 'Legacy software 7zip is installed'
-            Ts          = [datetime]'2025-11-01 12:43'
+        '98c134de' = [pscustomobject]@{
+            Description = 'Listening port 443'
+            Ts          = [datetime]'2025-11-01 12:42'
             User        = 'ndemou-admin'
         }
+     }
     }
 }
 ```
@@ -198,14 +197,15 @@ In order to not break existing systems, the updater needs to perform the migrati
 I want a test that verifies a TCP port is indeed open (This is often a very important indicator of "everything's good"). 
 
 Imagine this rule in `Get-ComputerHealth.cfg`:
-```
+```powershel
 'REQUIRED_FINDING' = @{
+       'UnexpectedListeningPorts' = [pscustomobject]@{
         'bfc162fa' = [pscustomobject]@{
-            TestName    = 'UnexpectedListeningPorts'
-            Description = 'Computer is listening to port 443'
+            Description = 'Listening port 443'
             Ts          = [datetime]'2025-11-01 12:42'
             User        = 'ndemou-admin'
         }
+}
 ```
 Rules like this are loaded at the start of the program. When the specified HealthTest function(`UnexpectedListeningPorts`) is executed all the finding signatures it emits are recorded. If they don't include the REQUIRED signature a failure is emitted: `[failure] This finding that must appear in a healthy system did not: Computer is listening to port 443`. If the function is not executed nothing happens.
 
