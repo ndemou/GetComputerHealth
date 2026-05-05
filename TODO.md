@@ -138,12 +138,56 @@ Thus we also need to adjust the function names accordingly: NonMicrosoftServices
 Must use clixml for the configuration/state file of Get-ComputerHealth.
 
 ```
-{'type':'SUPPRESSED_FINDING', 'TestName':'UnexpectedListeningPorts', 'Signature':'bfc162fa', 'Description':'Computer is listening to port 443', 'ts':'2025-11-01 12:42', 'Until':'2026-05-06', 'User':'ndemou-admin'}
+$ConfigAndState = @{
+    'POLICY_TEST_WAS_RUN' = @{
+        'InstalledSW' = [pscustomobject]@{
+            Ts   = [datetime]'2025-11-01 12:42'
+            User = 'ndemou-admin'
+        }
 
-{'type':'POLICY_TEST_WAS_RUN', 'TestName':'InstalledSW', 'ts':'2025-11-01 12:42', 'User':'ndemou-admin'}
+        'UnexpectedListeningPorts' = [pscustomobject]@{
+            Ts   = [datetime]'2025-11-01 12:45'
+            User = 'ndemou-admin'
+        }
+    }
+
+    'SUPPRESSED_FINDING' = @{
+        'bfc162fa' = [pscustomobject]@{
+            TestName    = 'UnexpectedListeningPorts'
+            Description = 'Computer is listening to port 443'
+            Ts          = [datetime]'2025-11-01 12:42'
+            Until       = [datetime]'2026-05-06'
+            User        = 'ndemou-admin'
+        }
+
+        'a7d91c03' = [pscustomobject]@{
+            TestName    = 'InstalledSW'
+            Description = 'Legacy software 7zip is installed'
+            Ts          = [datetime]'2025-11-01 12:44'
+            Until       = [datetime]'2026-06-15'
+            User        = 'ndemou-admin'
+        }
+    }
+
+    'REQUIRED_FINDING' = @{
+        'bfc162fa' = [pscustomobject]@{
+            TestName    = 'UnexpectedListeningPorts'
+            Description = 'Listening port 443'
+            Ts          = [datetime]'2025-11-01 12:42'
+            User        = 'ndemou-admin'
+        }
+
+        'e91ac55b' = [pscustomobject]@{
+            TestName    = 'InstalledSW'
+            Description = 'Legacy software 7zip is installed'
+            Ts          = [datetime]'2025-11-01 12:43'
+            User        = 'ndemou-admin'
+        }
+    }
+}
 ```
 
-Also rename it from `Get-ComputerHealth.sigs-to-suppress.txt` to `Get-ComputerHealth.state`
+Also rename it from `Get-ComputerHealth.sigs-to-suppress.txt` to `Get-ComputerHealth.cfg`
 
 In order to not break existing systems, the updater needs to perform the migration on existing installations:
  - If the new `.state` file does not exist: create it by translating the old `.txt` file
@@ -153,9 +197,15 @@ In order to not break existing systems, the updater needs to perform the migrati
 
 I want a test that verifies a TCP port is indeed open (This is often a very important indicator of "everything's good"). 
 
-Imagine this rule in `Get-ComputerHealth.state`:
+Imagine this rule in `Get-ComputerHealth.cfg`:
 ```
-{'type':'REQUIRED_FINDING', 'TestName':'UnexpectedListeningPorts', 'Signature':'bfc162fa', 'Description':'Listening port 443', 'ts':'2025-11-01 12:42', 'User':'ndemou-admin'}
+'REQUIRED_FINDING' = @{
+        'bfc162fa' = [pscustomobject]@{
+            TestName    = 'UnexpectedListeningPorts'
+            Description = 'Computer is listening to port 443'
+            Ts          = [datetime]'2025-11-01 12:42'
+            User        = 'ndemou-admin'
+        }
 ```
 Rules like this are loaded at the start of the program. When the specified HealthTest function(`UnexpectedListeningPorts`) is executed all the finding signatures it emits are recorded. If they don't include the REQUIRED signature a failure is emitted: `[failure] This finding that must appear in a healthy system did not: Computer is listening to port 443`. If the function is not executed nothing happens.
 
