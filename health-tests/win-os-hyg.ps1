@@ -886,6 +886,88 @@ Uses: Get-WinEvent.
     }
 }
 
+function HealthTest-FailedLoginAttemptsRecent {
+<#
+Description: Checks the Security log for failed login attempts within the last 24 hours.
+AppliesTo: All
+Scope: Computer
+Category: Security & Stability Risks
+Impact: Time(High), CPU(High)
+Uses: Get-WinEvent.
+#>
+    [CmdletBinding()]
+    param([int]$Hours = 24)
+
+    if ($Hours -lt 1) { $Hours = 1 }
+    $cutoff = (Get-Date).AddHours(-$Hours)
+    $queryStopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+    Write-Verbose "Querying Security log for failed logons (Event ID 4625) since $($cutoff.ToString('yyyy-MM-dd HH:mm:ss'))."
+
+    try {
+        $events = @(Get-WinEvent -FilterHashtable @{ LogName = 'Security'; Id = 4625; StartTime = $cutoff } -ErrorAction Stop)
+    } catch {
+        $queryStopwatch.Stop()
+        if ($_.Exception.Message -like 'No events were found that match the specified selection criteria.*') {
+            Write-Verbose "Get-WinEvent returned no matching 4625 events after $($queryStopwatch.ElapsedMilliseconds) ms."
+            Write-Warning "[PASS] No failed login attempts found in the last $Hours hour(s)"
+            return
+        }
+        Write-Verbose "Get-WinEvent failed after $($queryStopwatch.ElapsedMilliseconds) ms: $($_.Exception.Message)"
+        Write-Warning "[WARNING] Failed to query Security log for failed login attempts`n$($_.Exception.Message)"
+        return
+    }
+    $queryStopwatch.Stop()
+    Write-Verbose "Get-WinEvent returned $($events.Count) matching event(s) in $($queryStopwatch.ElapsedMilliseconds) ms."
+
+    if ($events.Count -eq 0) {
+        Write-Verbose "No failed login events remained after query materialization."
+        Write-Warning "[PASS] No failed login attempts found in the last $Hours hour(s)"
+        return
+    }
+
+    $countsByUser = @{}
+    foreach ($event in $events) {
+        $user = $null
+        $domain = $null
+
+        if ($event.Properties.Count -gt 6) {
+            $user = [string]$event.Properties[5].Value
+            $domain = [string]$event.Properties[6].Value
+        }
+
+        if ([string]::IsNullOrWhiteSpace($user) -or $user -eq '-') {
+            $user = '<unknown>'
+        }
+
+        $principal = if (-not [string]::IsNullOrWhiteSpace($domain) -and $domain -ne '-') {
+            "$domain\$user"
+        } else {
+            $user
+        }
+
+        if (-not $countsByUser.ContainsKey($principal)) {
+            $countsByUser[$principal] = 0
+        }
+        $countsByUser[$principal]++
+    }
+    Write-Verbose "Collapsed $($events.Count) event(s) into $($countsByUser.Count) user bucket(s)."
+
+    $sortedEntries = @($countsByUser.GetEnumerator() | Sort-Object { $_.Key })
+    $sortedEntries = @($sortedEntries | Sort-Object { $_.Value } -Descending)
+
+    foreach ($entry in $sortedEntries) {
+        Write-Verbose "User '$($entry.Key)' has $($entry.Value) failed login attempt(s) in the last $Hours hour(s)."
+        $details="$($entry.Value) attempts in the last $Hours hour(s)"
+        $severity = if ($entry.Value -le 3) {
+            Write-Warning "[NOTICE] <=3 failed login attempts for '$($entry.Key)'`n$details"
+        } elseif ($entry.Value -le 6) {
+            Write-Warning "[WARNING] <=6 failed login attempts for '$($entry.Key)'`n$details"
+        } else {
+            Write-Warning "[FAILURE] >=7 failed login attempts for '$($entry.Key)'`n$details"
+        }
+    }
+}
+
 
 function HealthTest-HotfixBaseline{
 <#
