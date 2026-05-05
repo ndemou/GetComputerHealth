@@ -45,77 +45,12 @@ After fixing anything it's better to check the resulting `git diff` from codex w
 ## Stop using legacy parameter set that adapts Pester 5 syntax to Pester 4 syntax
 
 So that we don't get this warning: "You are using Legacy parameter set that adapts Pester 5 syntax to Pester 4 syntax. ..."
-    
-## Find redundant health tests
 
-Do a quick first pass to group health tests in clusters of tests that seem like they might be checking the same stuff.
+## New Policy test that detects Hardware (which means we can also detect changes)
 
-The check each cluster thinking: “which tests are merely different views of the same fact” vs “which tests detect a genuinely different failure mode”. Then combine tests that are merely different views of the same fact.
+## New tests for CPU, GPU, Disks temperature
 
-### First-pass clusters and combine candidates
-
-#### Cluster A: DNS suffix / domain identity
-- `HealthTest-DnsSuffixBaseline`
-- `HealthTest-DnsSuffixMatchesDomain`
-- Recommendation: merge into one canonical suffix check.
-
-#### Cluster B: Defender posture / freshness / scan recency
-- `HealthTest-MalwareProtectionFeatures`
-- `HealthTest-DefenderStatus`
-- `HealthTest-RecentWindowsScan`
-- Recommendation: merge first two as “Defender posture”; keep scan recency separate.
-
-#### Cluster C: Scheduled task health
-- `HealthTest-ScheduledTasks`
-- `HealthTest-SystemScheduledTasks`
-- `HealthTest-ScheduledTasksLastResult`
-- Recommendation: one engine with scoped sections and dedupe by task path/name/reason.
-
-#### Cluster D: AD replication and topology
-- `HealthTest-ADInboundReplicationTopology`
-- `HealthTest-ReplicationLatency`
-- `HealthTest-ADReplicationHealth`
-- `HealthTest-Dcdiag` (partial overlap)
-- Recommendation: combine replication trio; keep `Dcdiag` as independent corroboration.
-
-#### Cluster E: DFSR/SYSVOL
-- `HealthTest-DfsReplicationState`
-- `HealthTest-DfsrBacklog`
-- `HealthTest-SysvolContentConsistency`
-- `HealthTest-SysvolNetlogonAccessible`
-- Recommendation: combine DFSR pair; keep SYSVOL downstream checks separate.
-
-#### Cluster F: DC DNS registration / reachability
-- `HealthTest-ConnectivityToDCs`
-- `HealthTest-RequiredSrvRecords`
-- `HealthTest-DcDnsRegistration`
-- `HealthTest-DcDnsARecords`
-- Recommendation: share one SRV validation helper; keep A-record and connectivity checks separate.
-
-#### Cluster G: Network exposure surface
-- `HealthTest-FirewallEnabled`
-- `HealthTest-UnexpectedListeningPorts`
-- `HealthTest-WinRMListening`
-- `HealthTest-ShareReasonableness`
-- Recommendation: do not merge; distinct failure modes, but add cross-links in output.
-
-### Classes of reasons to combine tests
-
-1. Same canonical fact, different collection method.
-2. Same control objective, duplicated posture checks.
-3. Same subsystem health split into near-identical status slices.
-4. Same entity set segmented only by scope/view.
-5. Shared primitive assertion embedded in multiple higher-level tests.
-6. Alert-level duplication with no extra failure-mode coverage.
-7. Correlated but distinct failure modes (**do not combine**; cross-link instead).
-
-### Most likely same-fact duplicates (priority)
-
-1. `HealthTest-DnsSuffixBaseline` + `HealthTest-DnsSuffixMatchesDomain`
-2. `HealthTest-MalwareProtectionFeatures` + `HealthTest-DefenderStatus`
-3. `HealthTest-DfsReplicationState` + `HealthTest-DfsrBacklog`
-4. `HealthTest-ScheduledTasks` + `HealthTest-ScheduledTasksLastResult` (plus overlap with `HealthTest-SystemScheduledTasks`)
-5. SRV-record portion of `HealthTest-ConnectivityToDCs` + `HealthTest-RequiredSrvRecords`
+Verify we don't allready have any of them
 
 ## For a few functions, 1) add the "Policy" Tag and 2) remove some exceptions
 
@@ -212,6 +147,78 @@ Rules like this are loaded at the start of the program. When the specified Healt
 It's very useful (the default mostly) for ports, installed SW, services and roles.
 
 For now, I expect an admin that wants to use this feature, to manually edit `Get-ComputerHealth.state` and change `SUPPRESSED_FINDING` to `REQUIRED_FINDING`.
+
+## Find redundant health tests
+
+Do a quick first pass to group health tests in clusters of tests that seem like they might be checking the same stuff.
+
+The check each cluster thinking: “which tests are merely different views of the same fact” vs “which tests detect a genuinely different failure mode”. Then combine tests that are merely different views of the same fact.
+
+### First-pass clusters and combine candidates
+
+#### Cluster A: DNS suffix / domain identity
+- `HealthTest-DnsSuffixBaseline`
+- `HealthTest-DnsSuffixMatchesDomain`
+- Recommendation: merge into one canonical suffix check.
+
+#### Cluster B: Defender posture / freshness / scan recency
+- `HealthTest-MalwareProtectionFeatures`
+- `HealthTest-DefenderStatus`
+- `HealthTest-RecentWindowsScan`
+- Recommendation: merge first two as “Defender posture”; keep scan recency separate.
+
+#### Cluster C: Scheduled task health
+- `HealthTest-ScheduledTasks`
+- `HealthTest-SystemScheduledTasks`
+- `HealthTest-ScheduledTasksLastResult`
+- Recommendation: one engine with scoped sections and dedupe by task path/name/reason.
+
+#### Cluster D: AD replication and topology
+- `HealthTest-ADInboundReplicationTopology`
+- `HealthTest-ReplicationLatency`
+- `HealthTest-ADReplicationHealth`
+- `HealthTest-Dcdiag` (partial overlap)
+- Recommendation: combine replication trio; keep `Dcdiag` as independent corroboration.
+
+#### Cluster E: DFSR/SYSVOL
+- `HealthTest-DfsReplicationState`
+- `HealthTest-DfsrBacklog`
+- `HealthTest-SysvolContentConsistency`
+- `HealthTest-SysvolNetlogonAccessible`
+- Recommendation: combine DFSR pair; keep SYSVOL downstream checks separate.
+
+#### Cluster F: DC DNS registration / reachability
+- `HealthTest-ConnectivityToDCs`
+- `HealthTest-RequiredSrvRecords`
+- `HealthTest-DcDnsRegistration`
+- `HealthTest-DcDnsARecords`
+- Recommendation: share one SRV validation helper; keep A-record and connectivity checks separate.
+
+#### Cluster G: Network exposure surface
+- `HealthTest-FirewallEnabled`
+- `HealthTest-UnexpectedListeningPorts`
+- `HealthTest-WinRMListening`
+- `HealthTest-ShareReasonableness`
+- Recommendation: do not merge; distinct failure modes, but add cross-links in output.
+
+### Classes of reasons to combine tests
+
+1. Same canonical fact, different collection method.
+2. Same control objective, duplicated posture checks.
+3. Same subsystem health split into near-identical status slices.
+4. Same entity set segmented only by scope/view.
+5. Shared primitive assertion embedded in multiple higher-level tests.
+6. Alert-level duplication with no extra failure-mode coverage.
+7. Correlated but distinct failure modes (**do not combine**; cross-link instead).
+
+### Most likely same-fact duplicates (priority)
+
+1. `HealthTest-DnsSuffixBaseline` + `HealthTest-DnsSuffixMatchesDomain`
+2. `HealthTest-MalwareProtectionFeatures` + `HealthTest-DefenderStatus`
+3. `HealthTest-DfsReplicationState` + `HealthTest-DfsrBacklog`
+4. `HealthTest-ScheduledTasks` + `HealthTest-ScheduledTasksLastResult` (plus overlap with `HealthTest-SystemScheduledTasks`)
+5. SRV-record portion of `HealthTest-ConnectivityToDCs` + `HealthTest-RequiredSrvRecords`
+
 
 ## Post-processing of long diagnostic output that may have repetitions
 
