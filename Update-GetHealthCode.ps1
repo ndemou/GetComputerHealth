@@ -1246,7 +1246,7 @@ if ($latestReleaseMarker) {
     Write-Verbose "No stored installed release marker is available yet"
   }
 
-  if ((-not $Reinstall) -and $storedReleaseMarker -and (Test-GetComputerHealthMarkerEquivalent -LeftMarker $storedReleaseMarker -RightMarker $latestReleaseMarker)) {
+  if (($SelfRerunCount -eq 0) -and (-not $Reinstall) -and $storedReleaseMarker -and (Test-GetComputerHealthMarkerEquivalent -LeftMarker $storedReleaseMarker -RightMarker $latestReleaseMarker)) {
     $storedVersion = Get-GetComputerHealthVersionFromMarker -Marker $storedReleaseMarker
     $latestVersion = Get-GetComputerHealthVersionFromMarker -Marker $latestReleaseMarker
     if (($storedReleaseMarker -ne $latestReleaseMarker) -and $storedVersion -and $latestVersion -and ($storedVersion -ieq $latestVersion)) {
@@ -1272,7 +1272,7 @@ if ($latestReleaseMarker) {
     Write-Verbose "No stored installed release marker is available yet"
   }
 
-  if ((-not $Reinstall) -and $storedReleaseMarker -and (Test-GetComputerHealthMarkerEquivalent -LeftMarker $storedReleaseMarker -RightMarker $manualUpdateMarker)) {
+  if (($SelfRerunCount -eq 0) -and (-not $Reinstall) -and $storedReleaseMarker -and (Test-GetComputerHealthMarkerEquivalent -LeftMarker $storedReleaseMarker -RightMarker $manualUpdateMarker)) {
     $storedVersion = Get-GetComputerHealthVersionFromMarker -Marker $storedReleaseMarker
     $manualVersion = Get-GetComputerHealthVersionFromMarker -Marker $manualUpdateMarker
     if (($storedReleaseMarker -ne $manualUpdateMarker) -and $storedVersion -and $manualVersion -and ($storedVersion -ieq $manualVersion)) {

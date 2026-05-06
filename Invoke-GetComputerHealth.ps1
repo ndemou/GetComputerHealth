@@ -282,6 +282,14 @@ function Resolve-GetComputerHealthRuntimeRoot {
     return $RootDir
   }
 
+  if ((Split-Path -Leaf $RootDir) -ieq 'Get-ComputerHealth') {
+    $legacyRoot = Split-Path -Parent $RootDir
+    $legacyMainScript = Join-Path (Join-Path $legacyRoot 'bin') 'Get-ComputerHealth.ps1'
+    if (Test-Path -LiteralPath $legacyMainScript -PathType Leaf) {
+      return $legacyRoot
+    }
+  }
+
   $migratedRoot = Join-Path $RootDir 'Get-ComputerHealth'
   $migratedMainScript = Join-Path (Join-Path $migratedRoot 'bin') 'Get-ComputerHealth.ps1'
   if (Test-Path -LiteralPath $migratedMainScript -PathType Leaf) {
@@ -611,16 +619,28 @@ foreach ($target in $targets) {
       try {
         $session = New-PSSession -ComputerName $target
 
-        Invoke-Command -Session $session -ScriptBlock {
+        $remoteExecutionRoot = Invoke-Command -Session $session -ScriptBlock {
           param($RootDir)
-          $remoteBinDir = Join-Path $RootDir 'bin'
-          $remoteTempDir = Join-Path $RootDir 'temp'
+          $resolvedRootDir = $RootDir
+
+          $currentMainScript = Join-Path (Join-Path $resolvedRootDir 'bin') 'Get-ComputerHealth.ps1'
+          if (-not (Test-Path -LiteralPath $currentMainScript -PathType Leaf) -and ((Split-Path -Leaf $resolvedRootDir) -ieq 'Get-ComputerHealth')) {
+            $legacyRoot = Split-Path -Parent $resolvedRootDir
+            $legacyMainScript = Join-Path (Join-Path $legacyRoot 'bin') 'Get-ComputerHealth.ps1'
+            if (Test-Path -LiteralPath $legacyMainScript -PathType Leaf) {
+              $resolvedRootDir = $legacyRoot
+            }
+          }
+
+          $remoteBinDir = Join-Path $resolvedRootDir 'bin'
+          $remoteTempDir = Join-Path $resolvedRootDir 'temp'
           if (-not (Test-Path $remoteBinDir)) { New-Item -Path $remoteBinDir  -ItemType Directory -Force | Out-Null }
           if (-not (Test-Path $remoteTempDir)) { New-Item -Path $remoteTempDir -ItemType Directory -Force | Out-Null }
+          return $resolvedRootDir
         } -ArgumentList $ROOT_DIR
 
         $localUpdaterPath = $UPDATE_SCRIPT_PATH
-        $remoteUpdaterPath = Join-Path (Join-Path $ROOT_DIR 'bin') 'Update-GetHealthCode.ps1'
+        $remoteUpdaterPath = Join-Path (Join-Path $remoteExecutionRoot 'bin') 'Update-GetHealthCode.ps1'
 
         if (-not (Test-Path -LiteralPath $localUpdaterPath)) {
           throw "Local updater file not found: $localUpdaterPath"
@@ -630,21 +650,26 @@ foreach ($target in $targets) {
 
         $remoteZipPath = $null
         if ($PushUpdate -and $localReleaseZip) {
-          $remoteZipPath = Join-Path (Join-Path $ROOT_DIR 'temp') (Split-Path -Path $localReleaseZip -Leaf)
+          $remoteZipPath = Join-Path (Join-Path $remoteExecutionRoot 'temp') (Split-Path -Path $localReleaseZip -Leaf)
           Copy-Item -Path $localReleaseZip -Destination $remoteZipPath -ToSession $session -Force
         }
 
-        $output = Invoke-Command -Session $session -ScriptBlock $healthCheckBlock -ArgumentList $ROOT_DIR, $Hide, $OnlyTheseTests, $ExcludeTests, $WhitelistSigs, $SkipSlowTests, $SkipPolicyTests, $SkipNonEssentialTests, $NoUpdate, $RunWithoutElevation, $IpsOfAllDcs, $PushUpdate, $remoteZipPath, $PassThruArgs
+        $output = Invoke-Command -Session $session -ScriptBlock $healthCheckBlock -ArgumentList $remoteExecutionRoot, $Hide, $OnlyTheseTests, $ExcludeTests, $WhitelistSigs, $SkipSlowTests, $SkipPolicyTests, $SkipNonEssentialTests, $NoUpdate, $RunWithoutElevation, $IpsOfAllDcs, $PushUpdate, $remoteZipPath, $PassThruArgs
       }
       catch {
+        $comment = (($_ | Out-String).Trim())
         $null = Log-failure "Failed running update/health scripts on target $target"
+        Write-Host -ForegroundColor Red ("  FAILURE: Failed running update/health scripts on target {0}" -f $target)
+        if (-not [string]::IsNullOrWhiteSpace($comment)) {
+          Write-Host -ForegroundColor DarkGray ("  #       {0}" -f ($comment -replace "(`r`n|`n|`r)", "`n  #       "))
+        }
         $all_messages += [pscustomobject]@{
           Computer   = $target
           Level      = 'failure'
           Hash       = '00000000'
           Suppressed = $false
           Message    = "Failed running update/health scripts"
-          Comment    = (($_ | Out-String).Trim())
+          Comment    = $comment
           Emitter    = $null
         }
         continue

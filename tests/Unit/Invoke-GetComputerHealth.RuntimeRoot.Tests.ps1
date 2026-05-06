@@ -47,4 +47,19 @@ Describe 'Invoke-GetComputerHealth runtime root resolution' {
       Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
     }
   }
+
+  It 'falls back to the legacy parent root when invoked from Get-ComputerHealth but only the legacy layout exists' {
+    $tempRoot = Join-Path $env:TEMP ('gch-runtime-root-' + [guid]::NewGuid().ToString())
+    $legacyBinDir = Join-Path $tempRoot 'bin'
+    $candidateRoot = Join-Path $tempRoot 'Get-ComputerHealth'
+
+    try {
+      New-Item -ItemType Directory -Path $legacyBinDir, $candidateRoot -Force | Out-Null
+      Set-Content -LiteralPath (Join-Path $legacyBinDir 'Get-ComputerHealth.ps1') -Value '$VERSION="4.0.0"' -NoNewline
+
+      Resolve-GetComputerHealthRuntimeRoot -RootDir $candidateRoot | Should -Be $tempRoot
+    } finally {
+      Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
+    }
+  }
 }
