@@ -821,7 +821,12 @@ $false - No files changed.
 function Get-NormalizedFileSystemPath {
 <#
 .SYNOPSIS
-Normalizes a filesystem path for case-insensitive comparisons.
+Returns a full filesystem path string suitable for path comparison.
+.DESCRIPTION
+Accepts existing and missing paths and removes trailing slashes.
+Use it when Resolve-Path alone would reject paths that do not exist yet.
+.OUTPUTS
+System.String. A full path string without trailing slashes.
 #>
   [CmdletBinding()]
   param([Parameter(Mandatory)][string]$Path)
@@ -839,7 +844,14 @@ Normalizes a filesystem path for case-insensitive comparisons.
 function Get-GetComputerHealthScriptVersion {
 <#
 .SYNOPSIS
-Reads the semantic version from a Get-ComputerHealth.ps1 script file.
+Returns the embedded semantic version from a script file when present.
+.DESCRIPTION
+Returns null when the file is missing or when no supported version
+assignment is found. Writes a warning if the file exists but cannot be
+read.
+.OUTPUTS
+System.String. A version like 4.1.3, or null when no version is
+available.
 #>
   [CmdletBinding()]
   param([Parameter(Mandatory)][string]$ScriptPath)
