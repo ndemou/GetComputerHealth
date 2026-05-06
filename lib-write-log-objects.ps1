@@ -470,12 +470,12 @@ function Log-Msg {
 }
 
 # Convenience functions (e.g. Log-Debug "..." instead of Log-Msg "Debug" "...")
-function Log-Debug { param([Parameter(Mandatory)][string]$Msg, [string]$Comment = "", [switch]$Suppressed) Log-Msg -Level 'debug'   -Msg $Msg -Comment $Comment -Suppressed:$Suppressed }
-function Log-Pass { param([Parameter(Mandatory)][string]$Msg, [string]$Comment = "", [switch]$Suppressed) Log-Msg -Level 'pass'    -Msg $Msg -Comment $Comment -Suppressed:$Suppressed }
-function Log-Info { param([Parameter(Mandatory)][string]$Msg, [string]$Comment = "", [switch]$Suppressed) Log-Msg -Level 'info'    -Msg $Msg -Comment $Comment -Suppressed:$Suppressed }
-function Log-Notice { param([Parameter(Mandatory)][string]$Msg, [string]$Comment = "", [switch]$Suppressed) Log-Msg -Level 'notice'  -Msg $Msg -Comment $Comment -Suppressed:$Suppressed }
-function Log-Warning { param([Parameter(Mandatory)][string]$Msg, [string]$Comment = "", [switch]$Suppressed) Log-Msg -Level 'warning' -Msg $Msg -Comment $Comment -Suppressed:$Suppressed }
-function Log-Failure { param([Parameter(Mandatory)][string]$Msg, [string]$Comment = "", [switch]$Suppressed) Log-Msg -Level 'failure' -Msg $Msg -Comment $Comment -Suppressed:$Suppressed }
+function Log-Debug { param([Parameter(Mandatory)][string]$Msg, [string]$Comment = "", [string]$Emitter, [switch]$Suppressed) Log-Msg -Level 'debug'   -Msg $Msg -Comment $Comment -Emitter $Emitter -Suppressed:$Suppressed }
+function Log-Pass { param([Parameter(Mandatory)][string]$Msg, [string]$Comment = "", [string]$Emitter, [switch]$Suppressed) Log-Msg -Level 'pass'    -Msg $Msg -Comment $Comment -Emitter $Emitter -Suppressed:$Suppressed }
+function Log-Info { param([Parameter(Mandatory)][string]$Msg, [string]$Comment = "", [string]$Emitter, [switch]$Suppressed) Log-Msg -Level 'info'    -Msg $Msg -Comment $Comment -Emitter $Emitter -Suppressed:$Suppressed }
+function Log-Notice { param([Parameter(Mandatory)][string]$Msg, [string]$Comment = "", [string]$Emitter, [switch]$Suppressed) Log-Msg -Level 'notice'  -Msg $Msg -Comment $Comment -Emitter $Emitter -Suppressed:$Suppressed }
+function Log-Warning { param([Parameter(Mandatory)][string]$Msg, [string]$Comment = "", [string]$Emitter, [switch]$Suppressed) Log-Msg -Level 'warning' -Msg $Msg -Comment $Comment -Emitter $Emitter -Suppressed:$Suppressed }
+function Log-Failure { param([Parameter(Mandatory)][string]$Msg, [string]$Comment = "", [string]$Emitter, [switch]$Suppressed) Log-Msg -Level 'failure' -Msg $Msg -Comment $Comment -Emitter $Emitter -Suppressed:$Suppressed }
 
 
 <#
