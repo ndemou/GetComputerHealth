@@ -40,7 +40,7 @@ The `Field: Value` lines follow this exact order (note that some are optional):
    3. `Scope:`. Options are `Computer`, `Domain`, `Forest`
    4. `Category:` primary plus optional secondary category. Options are: `Availability/Server Down Signals`,`Security & Stability Risks`,`Configuration Hygiene & Best Practices`,`Audit/Compliance/Informational`
    5. `Impact:` either "low" if there's low impact on all dimensions, or one or more "<level>(<dimension>)" pairs where <lever> is either "Medium" or "High" and  dimension is one of "CPU","Disk","Network","RAM","Time"
-   6. `Tags:` optional comma-separated values. Supported values: `Essential`, `Policy`.
+   6. `Tags:` optional comma-separated values. Supported values: `Essential`, `Policy`, `Suppressed`.
    7. `Uses:` optional, up to three essential external cmdlets or executables if any.
    8. `FalsePositives:` optional short note only if False Positives are to be expected
 
@@ -53,11 +53,18 @@ Use it to tag health tests. Examples:
 Supported tags:
 - `Essential`: indicates an essential test
 - `Policy`: indicates a policy inventory test (see below)
+- `Suppressed`: indicates an inventory/audit test whose emitted non-debug messages should be treated as suppressed by default (see below)
 
 ### Slow tests
 
 If your test needs more than 3secs to complete, indicate it in the Impact field (`Impact: ... High(Time)`). 
 `-SkipSlowTests` uses that marker.
+
+### Suppressed Inventory Tests
+
+Tests with the `Suppressed` tag are for inventory/audit data that should be returned as structured log objects without distracting operators in normal console output. When the runner processes a suppressed-tagged test, each emitted non-debug test message is marked with `Suppressed = $true` as if its message signature were present in `Get-ComputerHealth.sigs-to-suppress.txt`.
+
+Use `Suppressed` only when every message from the test is expected inventory data rather than an actionable health problem. Operators can still see those messages unless they hide suppressed output with `-Hide S`; automation that uses `-OutputObjects` still receives the log objects.
 
 ### Policy Inventory Tests
 

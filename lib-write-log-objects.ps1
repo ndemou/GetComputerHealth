@@ -352,7 +352,8 @@ function Log-Msg {
     [Parameter(Mandatory)][ValidateSet('debug', 'pass', 'info', 'notice', 'warning', 'failure')][string]$Level,
     [Parameter(Mandatory)][string]$Msg,
     [string]$Comment = "",
-    [string]$Emitter
+    [string]$Emitter,
+    [switch]$Suppressed
   )
 
   [string]$SigColor = 'DarkGray'
@@ -398,7 +399,10 @@ function Log-Msg {
   if ($Level -ne 'debug') { $sig = Get-StringSignature $Msg } else { $sig = '' }
 
   $must_suppress_sig = $false
-  if ($script:cfgSuppressedSignatures -and $sig) {
+  if ($Suppressed -and $sig) {
+    $must_suppress_sig = $true
+  }
+  elseif ($script:cfgSuppressedSignatures -and $sig) {
     $must_suppress_sig = $sig -in $script:cfgSuppressedSignatures
   }
 
@@ -466,12 +470,12 @@ function Log-Msg {
 }
 
 # Convenience functions (e.g. Log-Debug "..." instead of Log-Msg "Debug" "...")
-function Log-Debug { param([Parameter(Mandatory)][string]$Msg, [string]$Comment = "") Log-Msg -Level 'debug'   -Msg $Msg -Comment $Comment }
-function Log-Pass { param([Parameter(Mandatory)][string]$Msg, [string]$Comment = "") Log-Msg -Level 'pass'    -Msg $Msg -Comment $Comment }
-function Log-Info { param([Parameter(Mandatory)][string]$Msg, [string]$Comment = "") Log-Msg -Level 'info'    -Msg $Msg -Comment $Comment }
-function Log-Notice { param([Parameter(Mandatory)][string]$Msg, [string]$Comment = "") Log-Msg -Level 'notice'  -Msg $Msg -Comment $Comment }
-function Log-Warning { param([Parameter(Mandatory)][string]$Msg, [string]$Comment = "") Log-Msg -Level 'warning' -Msg $Msg -Comment $Comment }
-function Log-Failure { param([Parameter(Mandatory)][string]$Msg, [string]$Comment = "") Log-Msg -Level 'failure' -Msg $Msg -Comment $Comment }
+function Log-Debug { param([Parameter(Mandatory)][string]$Msg, [string]$Comment = "", [switch]$Suppressed) Log-Msg -Level 'debug'   -Msg $Msg -Comment $Comment -Suppressed:$Suppressed }
+function Log-Pass { param([Parameter(Mandatory)][string]$Msg, [string]$Comment = "", [switch]$Suppressed) Log-Msg -Level 'pass'    -Msg $Msg -Comment $Comment -Suppressed:$Suppressed }
+function Log-Info { param([Parameter(Mandatory)][string]$Msg, [string]$Comment = "", [switch]$Suppressed) Log-Msg -Level 'info'    -Msg $Msg -Comment $Comment -Suppressed:$Suppressed }
+function Log-Notice { param([Parameter(Mandatory)][string]$Msg, [string]$Comment = "", [switch]$Suppressed) Log-Msg -Level 'notice'  -Msg $Msg -Comment $Comment -Suppressed:$Suppressed }
+function Log-Warning { param([Parameter(Mandatory)][string]$Msg, [string]$Comment = "", [switch]$Suppressed) Log-Msg -Level 'warning' -Msg $Msg -Comment $Comment -Suppressed:$Suppressed }
+function Log-Failure { param([Parameter(Mandatory)][string]$Msg, [string]$Comment = "", [switch]$Suppressed) Log-Msg -Level 'failure' -Msg $Msg -Comment $Comment -Suppressed:$Suppressed }
 
 
 <#
