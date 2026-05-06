@@ -661,7 +661,23 @@ function Get-HealthTestTagsMetadata {
   }
 
   if ($impactLine) {
-    $isSlowTest = [bool]([regex]::IsMatch($impactLine, '(?i)\bHigh\s*\(\s*Time\s*\)'))
+    $impactTerms = @(
+      $impactLine -split '[,;]' |
+      ForEach-Object { $_.Trim() } |
+      Where-Object { $_ }
+    )
+
+    foreach ($impactTerm in $impactTerms) {
+      if ($impactTerm -match '(?i)^(?<Left>[A-Za-z]+)\s*\(\s*(?<Right>[A-Za-z]+)\s*\)$') {
+        $left = $matches['Left'].ToLowerInvariant()
+        $right = $matches['Right'].ToLowerInvariant()
+
+        if ((($left -eq 'high') -and ($right -eq 'time')) -or (($left -eq 'time') -and ($right -eq 'high'))) {
+          $isSlowTest = $true
+          break
+        }
+      }
+    }
   }
 
   [pscustomobject]@{

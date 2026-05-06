@@ -892,7 +892,7 @@ Description: Checks the Security log for failed login attempts within the last 2
 AppliesTo: All
 Scope: Computer
 Category: Security & Stability Risks
-Impact: Time(High), CPU(High)
+Impact: High(Time), High(CPU)
 Uses: Get-WinEvent.
 #>
     [CmdletBinding()]
