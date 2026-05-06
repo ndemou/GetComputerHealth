@@ -498,7 +498,24 @@ foreach ($target in $targets) {
       $PassThruArgs
     )
 
-    $resolvedRootDir = Resolve-GetComputerHealthRuntimeRoot -RootDir $RootDir
+    function Resolve-GetComputerHealthRuntimeRootLocal {
+      param([Parameter(Mandatory)][string]$CandidateRootDir)
+
+      $currentMainScript = Join-Path (Join-Path $CandidateRootDir 'bin') 'Get-ComputerHealth.ps1'
+      if (Test-Path -LiteralPath $currentMainScript -PathType Leaf) {
+        return $CandidateRootDir
+      }
+
+      $migratedRoot = Join-Path $CandidateRootDir 'Get-ComputerHealth'
+      $migratedMainScript = Join-Path (Join-Path $migratedRoot 'bin') 'Get-ComputerHealth.ps1'
+      if (Test-Path -LiteralPath $migratedMainScript -PathType Leaf) {
+        return $migratedRoot
+      }
+
+      return $CandidateRootDir
+    }
+
+    $resolvedRootDir = Resolve-GetComputerHealthRuntimeRootLocal -CandidateRootDir $RootDir
     $binDir = Join-Path $resolvedRootDir 'bin'
     $configDir = Join-Path $resolvedRootDir 'config'
     $updateScriptPath = Join-Path $binDir 'Update-GetHealthCode.ps1'
@@ -528,7 +545,7 @@ foreach ($target in $targets) {
           }
         }
 
-        $resolvedRootDir = Resolve-GetComputerHealthRuntimeRoot -RootDir $RootDir
+        $resolvedRootDir = Resolve-GetComputerHealthRuntimeRootLocal -CandidateRootDir $RootDir
         $binDir = Join-Path $resolvedRootDir 'bin'
         $configDir = Join-Path $resolvedRootDir 'config'
         $getHealthScriptPath = Join-Path $binDir 'Get-ComputerHealth.ps1'
