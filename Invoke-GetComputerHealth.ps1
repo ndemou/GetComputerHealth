@@ -273,6 +273,24 @@ function Get-EmbeddedGetComputerHealthVersion {
   return 'unknown'
 }
 
+function Resolve-GetComputerHealthRuntimeRoot {
+  [CmdletBinding()]
+  param([Parameter(Mandatory)][string]$RootDir)
+
+  $currentMainScript = Join-Path (Join-Path $RootDir 'bin') 'Get-ComputerHealth.ps1'
+  if (Test-Path -LiteralPath $currentMainScript -PathType Leaf) {
+    return $RootDir
+  }
+
+  $migratedRoot = Join-Path $RootDir 'Get-ComputerHealth'
+  $migratedMainScript = Join-Path (Join-Path $migratedRoot 'bin') 'Get-ComputerHealth.ps1'
+  if (Test-Path -LiteralPath $migratedMainScript -PathType Leaf) {
+    return $migratedRoot
+  }
+
+  return $RootDir
+}
+
 function Get-DomainServers {
   [CmdletBinding()]
   param(
@@ -480,8 +498,9 @@ foreach ($target in $targets) {
       $PassThruArgs
     )
 
-    $binDir = Join-Path $RootDir 'bin'
-    $configDir = Join-Path $RootDir 'config'
+    $resolvedRootDir = Resolve-GetComputerHealthRuntimeRoot -RootDir $RootDir
+    $binDir = Join-Path $resolvedRootDir 'bin'
+    $configDir = Join-Path $resolvedRootDir 'config'
     $updateScriptPath = Join-Path $binDir 'Update-GetHealthCode.ps1'
     $getHealthScriptPath = Join-Path $binDir 'Get-ComputerHealth.ps1'
     $logLibPath = Join-Path $binDir 'lib-write-log-objects.ps1'
@@ -508,6 +527,12 @@ foreach ($target in $targets) {
             $records.Add((Log-Failure "PowerShell error while running Update-GetHealthCode.ps1" -Comment $comment)) | Out-Null
           }
         }
+
+        $resolvedRootDir = Resolve-GetComputerHealthRuntimeRoot -RootDir $RootDir
+        $binDir = Join-Path $resolvedRootDir 'bin'
+        $configDir = Join-Path $resolvedRootDir 'config'
+        $getHealthScriptPath = Join-Path $binDir 'Get-ComputerHealth.ps1'
+        $customTestsDir = Join-Path $configDir 'Custom-HealthTests'
       }
       catch {
         $records.Add((Log-Failure "Terminating error while running Update-GetHealthCode.ps1" -Comment (($_ | Out-String).Trim()))) | Out-Null
