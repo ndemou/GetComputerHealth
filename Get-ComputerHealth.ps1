@@ -336,6 +336,7 @@ FunctionName, Time, ElapsedMilliseconds, Output, Success, Error, Category, Reaso
   )
 
   $metaForExclude = Get-HealthTestTagsMetadata -FunctionName $FunctionName
+  $markTestMessagesSuppressed = 'Suppressed' -in $metaForExclude.Tags
   $baseFunctionName = "HealthTest-$($metaForExclude.TestName)"
   if (($ExcludeTests -contains $FunctionName) -or ($ExcludeTests -contains $baseFunctionName) -or ($ExcludeTests -contains $metaForExclude.TestName)) {
     Log-Debug "Skipping test $FunctionName"
@@ -373,7 +374,7 @@ FunctionName, Time, ElapsedMilliseconds, Output, Success, Error, Category, Reaso
     foreach ($item in $result) {
       if ($item -is [System.Management.Automation.WarningRecord]) {
         $record = Convert-WarningLikeObjectToLogRecord -Value $item
-        Log-Msg -Level $record.Level -Msg $record.Msg -Comment $record.Comment -Emitter $FunctionName
+        Log-Msg -Level $record.Level -Msg $record.Msg -Comment $record.Comment -Emitter $FunctionName -Suppressed:$markTestMessagesSuppressed
         $cntProperRecord += 1
         if (($item.Message -as [string]) -match '^\s*\[\s*pass\s*\]') { $cntPassRecord += 1 }
       }
@@ -381,6 +382,9 @@ FunctionName, Time, ElapsedMilliseconds, Output, Success, Error, Category, Reaso
         $legacyLogDetected = $true
         $cntProperRecord += 1
         if ($item.level -eq 'pass') { $cntPassRecord += 1 }
+        if ($markTestMessagesSuppressed -and ([string]$item.level).ToLowerInvariant() -ne 'debug') {
+          $item | Add-Member -NotePropertyName Suppressed -NotePropertyValue $true -Force
+        }
         Write-Output $item
       }
       elseif ($item -is [string]) {
@@ -666,6 +670,7 @@ function Get-HealthTestTagsMetadata {
     Tags                 = @($tags)
     IsSlowTest           = $isSlowTest
     IsPolicyTest         = ('Policy' -in $tags)
+    IsSuppressedTest     = ('Suppressed' -in $tags)
     IsQuickEssentialTest = ('Essential' -in $tags)
   }
 }

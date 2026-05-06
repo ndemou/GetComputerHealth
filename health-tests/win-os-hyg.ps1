@@ -2400,3 +2400,25 @@ Uses: Get-InstalledSW, Get-NormalizedSoftwareName, Get-InstalledSoftwareFindingL
         Write-Warning "[PASS] No installed software entries discovered."
     }
 }
+
+function HealthTest-RunningProcesses {
+<#
+Description: Emits a suppressed inventory notice for each running process.
+AppliesTo: All
+Scope: Computer
+Category: Operational Inventory
+Impact: Low
+Tags: Suppressed
+Uses: Get-Process.
+
+Lists every process currently running on the computer as suppressed NOTICE
+messages. These messages are intended for inventory and auditing workflows, not
+for normal operator attention.
+#>
+  Get-Process | Sort-Object -Property ProcessName, Id | ForEach-Object {
+    $processName = [string]$_.ProcessName
+    if (-not [string]::IsNullOrWhiteSpace($processName)) {
+      Write-Warning "[NOTICE] Process '$processName' is running"
+    }
+  }
+}

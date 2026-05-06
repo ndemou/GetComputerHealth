@@ -91,6 +91,34 @@ The second version is not proper because it varies with a detail that is not ess
 
 > **TIP** This matters because the signature, and therefore the suppression, of an issue depends on the description text remaining stable. Punctuation is discarded and spacing is normalized, but otherwise every character matters.
 
+
+### Optional `Tags:` metadata
+
+Custom tests may include a standard help block immediately inside the function body with a `Tags:` line. The runner currently recognizes these tags:
+
+- `Essential`: the test is included when users run with `-SkipNonEssentialTests` / `-Quick`.
+- `Policy`: the test is a policy inventory baseline test; first-run `[NOTICE]` and `[WARNING]` findings can be auto-suppressed unless `-DontAutosetPolicy` is used.
+- `Suppressed`: every non-debug test message processed by the runner is returned with `Suppressed = $true`, as if the message signature were already listed in `Get-ComputerHealth.sigs-to-suppress.txt`. This is intended for inventory/audit tests whose messages are useful to automation but should be hidden from operators when they use `-Hide S`.
+
+Example:
+
+```powershell
+function HealthTest-InventoryExample {
+<#
+Description: Lists expected inventory data.
+AppliesTo: All
+Scope: Computer
+Category: Audit/Compliance/Informational
+Impact: Low
+Tags: Suppressed
+Uses: Get-Process.
+#>
+    Get-Process | ForEach-Object {
+        Write-Warning "[NOTICE] Process '$($_.ProcessName)' is running"
+    }
+}
+```
+
 ## When to Handle Exceptions
 
 Do not catch an exception just to report it and abort the test. The wrapper that invokes `HealthTest-` functions will catch exceptions, report enough detail to help you debug them, and then continue with the next test.
