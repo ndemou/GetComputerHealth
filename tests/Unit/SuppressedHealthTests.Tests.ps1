@@ -8,7 +8,13 @@ Describe 'Suppressed health tests' {
     $notepad = Start-Process -FilePath 'notepad.exe' -PassThru
     try {
       Start-Sleep -Milliseconds 500
-      $expectedMessage = "Process '$($notepad.ProcessName)' is running"
+      try { $notepad.Refresh() } catch {}
+      $processName = if (-not [string]::IsNullOrWhiteSpace($notepad.ProcessName)) {
+        $notepad.ProcessName
+      } else {
+        (Get-Process -Id $notepad.Id -ErrorAction Stop).ProcessName
+      }
+      $expectedMessage = "Process '$processName' is running"
 
       $records = @(& $script:GetComputerHealthScript `
           -RunWithoutElevation `
@@ -33,7 +39,13 @@ Describe 'Suppressed health tests' {
     $notepad = Start-Process -FilePath 'notepad.exe' -PassThru
     try {
       Start-Sleep -Milliseconds 500
-      $expectedMessage = "Process '$($notepad.ProcessName)' is running"
+      try { $notepad.Refresh() } catch {}
+      $processName = if (-not [string]::IsNullOrWhiteSpace($notepad.ProcessName)) {
+        $notepad.ProcessName
+      } else {
+        (Get-Process -Id $notepad.Id -ErrorAction Stop).ProcessName
+      }
+      $expectedMessage = "Process '$processName' is running"
 
       $output = @(
         & $script:GetComputerHealthScript `
