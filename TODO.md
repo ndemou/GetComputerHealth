@@ -49,6 +49,24 @@ C:\ > $results
 
 ---
 
+## Remove the temporary v3-to-Get-ComputerHealth migration logic in July
+
+Delete the updater functionality that detects a v3 install under `C:\IT\` and migrates it into `C:\IT\Get-ComputerHealth`.
+
+Keep these helpers because they may still be useful outside the temporary migration:
+- `Get-NormalizedFileSystemPath`
+- `Get-GetComputerHealthScriptVersion`
+
+Remove the rest of the migration-specific implementation:
+- the mainline updater block that calls the migration before normal update processing
+- `Test-GetComputerHealthLegacyRootMigrationNeeded`
+- `Invoke-GetComputerHealthMigrationTransfer`
+- `Invoke-GetComputerHealthMigrationPatternTransfer`
+- `Move-GetComputerHealthLegacyInstallLayout`
+
+Also remove the migration-specific unit coverage once the feature is deleted:
+- `tests/Unit/Update-GetHealthCode.LegacyMigration.Tests.ps1`
+
 ## Add CustomTests.ps1 helper script
 
 `CustomTests.ps1 -New "scriptName"` should a) create necessary folders if needed b) create a sample script `scriptName.ps1` and c) output the full path to the script. The sample code must be checking if disk C: has at least 10GB free space. Code must follow the recomendations of the documentation, including enough comments to help a user that has never created a custom health test before modify it for their needs. At the top it should include a link to the relevant documentation (how to add a custom health test).
@@ -56,10 +74,6 @@ C:\ > $results
 `CustomTests.ps1 -List` should return a list of all scripts with custom health tests (file objects).
 
 Update our documentation to suggest this script.
-
-## Migrate existing installation from `C:\IT` to `C:\IT\Get-ComputerHealth`
-
-If the installer/updater is run from `C:\IT\bin` and the version is v3.x.y it should move all files related to this project from c:\IT\ to C:\IT\Get-ComputerHealth
 
 ## sigstore?
 
