@@ -1,5 +1,9 @@
 # TODO
 
+## only the installer should refuse to run outside ./bin directory
+
+Neither Get-ComputerHealth not any other script should do so
+
 ## Consider an example custom health test for processes that need to always run
 
 E.g. to verify an important service is alive
