@@ -16,17 +16,48 @@ Instead of dot-sourcing the custom scripts, discovering the functions with the c
 
 A reference to the full path to the script should always appear in the comments of the message. Something like "(this message was emitted by custom test 'c:\path\to\script.ps1')". 
 
-We should also update `how-to-add-custom-tests.md`.
+### Also update `how-to-add-custom-tests.md`. Besided the obvious changes 
 
-Since this is a breaking change it requires a) the update of the major version number from 3 to 4 b) a migration script that will relieve users from having to edit all their custom health test scripts. The migration script seems easy: Use `sls` to find the names of the custom health test functions and append a call to them at the end of the script. We can use `Get-TextFileEncoding` from `helpers-text-files.ps1` to make sure we append text using the correct encoding. The migration script should be run by the updater/installer only when the existing version is `3.x.y`.
+#### Replace the text of the section "When to Handle Exceptions" with this:
 
-## Implement functionality that will help a user create and review custom health tests
+The wrapper that invokes your scripts will catch and report exceptions in detail. It will then continue with the next script. So, you don't need to catch excpetions if a) you are going to abort execution anyway and b) you are not going to collect any more information than what is included in the exception itself. 
 
-Running `Get-ComputerHealth.ps1 -CreateCustomHealthTest` should create necessary folders and an empty ps1 script and return the path to the file.
+#### Replace the text of the section "How to Test Your Function" with this:
 
-Running `Get-ComputerHealth.ps1 -ListCustomHealthTests` should return a list of scripts with custom health tests (file objects).
+Run them and ignore the `WARNING:` prefix in front of all the output you see. Example:
+```
+C:\ > & C:\IT\config\Custom-HealthTests\my-cooll-test.ps1
+WARNING: [PASS] All is cool!
+```
+ > The WARNING: prefix is a sideeffect of the fact that all messages are output by Write-Warning: [PASS], [NOTICE], and everything else
 
-Update our documentation.
+If you really want nicely colored console output and/or structured results like what you get from `Get-ComputerHealth.ps1` run them like this:
+
+```
+C:\ > $results = HealthTest-LargeDirectories 3>&1 | C:\IT\bin\Get-ComputerHealth.ps1 -PrettifyWriteWarning
+C:\ > $results
+```
+
+### Special considerations due to the fact that this is a breaking change 
+
+Since this is a breaking change it requires 
+ 1. The update of the major version number from 3 to 4
+ 2. A migration script that will relieve users from having to edit all their custom health test scripts. 
+
+Here's a draft of the migration script: 
+
+ - Run only if existing version is `3.x.y` and there's at least one custom test script. 
+ - For every script:
+   - Use `sls` to find the names of the custom health test functions
+   - Append a call to them at the end of the script (Use `Get-TextFileEncoding` from `helpers-text-files.ps1` to make sure we append text using the correct encoding)
+
+## Add CustomTests.ps1 helper script
+
+`CustomTests.ps1 -New "scriptName"` should a) create necessary folders if needed b) create a sample script `scriptName.ps1` and c) output the full path to the script. The sample code must be checking if disk C: has at least 10GB free space. Code must follow the recomendations of the documentation, including enough comments to help a user that has never created a custom health test before modify it for their needs. At the top it should include a link to the relevant documentation (how to add a custom health test).
+
+`CustomTests.ps1 -List` should return a list of all scripts with custom health tests (file objects).
+
+Update our documentation to use this script.
 
 ## Change default installation root to `C:\IT\Get-ComputerHealth` instead of `C:\IT`
 
