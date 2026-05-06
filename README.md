@@ -215,12 +215,14 @@ New-ScheduledTaskForPSScript -ScriptPath "C:\IT\bin\Invoke-GetComputerHealth.ps1
 param([string]$Hide="DIP",[string]$OnlyTheseTests,[switch]$SkipSlowTests,[switch]$SkipPolicyTests,[switch]$NoSendMessage,[switch]$NoUpdate)
 
 $IpsOfAllDcs = @(
-  "10.10.0.10", # dc1
-  "10.10.0.11"  # dc2
+  "10.10.10.1", # dc1
+  "10.10.10.2"  # dc2
 )
 
-# Update local version of GetComputerHealth (if needed)
-& C:\IT\bin\Update-GetHealthCode.ps1
+if (-not $NoUpdate) {
+	# Update local version of GetComputerHealth (if needed)
+	& C:\IT\Get-ComputerHealth\bin\Update-GetHealthCode.ps1
+}
 
 & c:\it\bin\Invoke-GetComputerHealth.ps1 -Computers "ALL_DOMAIN_SERVERS,workstation1,workstation2" -ExcludeServers "server1,server2" -Hide:$Hide -OnlyTheseTests $OnlyTheseTests -SkipSlowTests:$SkipSlowTests -SkipPolicyTests:$SkipPolicyTests -NoSendMessage:$NoSendMessage -NoUpdate:$NoUpdate -PushUpdate -IpsOfAllDcs $IpsOfAllDcs
 ```
