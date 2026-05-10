@@ -2,10 +2,9 @@
 
 **Get-ComputerHealth** is a sufficiently mature, lightweight, and extendable PowerShell framework. It is suitable for a single workstation or server, as well as for a domain with dozens of servers. It produces useful and concise reports, email alerts (with Excel reports), and clean terminal output:
 
-<img width="1086" height="251" alt="Example of the report you receive via email" src="[https://github.com/user-attachments/assets/9da7e7f7-c1ef-4f3e-9d47-d164a96b2d4f](https://github.com/user-attachments/assets/9da7e7f7-c1ef-4f3e-9d47-d164a96b2d4f)" />
+<img width="1086" height="251" alt="Example of the report you receive via email" src="https://github.com/user-attachments/assets/694eb16f-fbc9-420c-b96e-dead56715085" />
 
-<img width="1019" height="889" alt="image" src="https://github.com/user-attachments/assets/507cb17f-ee67-4bff-afb3-7d0a83d24ba1" />
-
+<img width="973" height="597" alt="Example of Terminal Output" src="https://github.com/user-attachments/assets/16e1c940-59ad-4716-bb09-99393d98b62e" />
 
 Installation is quick and simple, and you can easily add your own custom health tests using PowerShell.
 
@@ -13,10 +12,12 @@ You can check all your domain-joined servers from a central point. If you want t
 
 # Status & Is this code for you?
 
-This is a production-ready tool (I have been using it across several domains and multiple servers for many months), **but**:
+This is a **robust production-tested tool** and I have been using it across several domains and multiple servers for many months.
 
- 1. **I may move fast and break things.** There is a small possibility of this because I dislike cleaning up production issues, but I will do it if the rewards are high. Be prepared for occasional manual work (such as suppressing spurious alerts or needing to perform a manual reinstall). 
- 2. **Don't expect official support.** I am happy to help when I can, but my availability is limited. You should be comfortable with PowerShell. On the plus side, in the unlikely event that you need to dive into the code, it is surprisingly small and straightforward: **the core is about 1,000 lines, including comments.** The tests exceed ten thousand lines, but the vast majority are self-contained and small. Any modern AI agent can handle the complexity of the code easily. In fact, the vast majority of the code *was* written by Codex, with myself acting as the architect, lead developer, reviewer, and QC.
+**BUT:**
+
+ 1. **I may opt to move fast and break things.** I will not do it lightly because I'll have to clean up issues at several production sites, but I *will do it* if the rewards worth to me. So be prepared for some occasional manual work (such as suppressing spurious alerts or needing to perform a manual reinstall). 
+ 2. **Don't expect official support.** I am happy to help when I can, but my availability is limited. You should be comfortable with PowerShell. On the plus side, in the unlikely event that you need to dive into the code, it is surprisingly small and straightforward: **the core is about 1,000 lines, including comments.** The tests do exceed ten thousand lines, but most tests are a dozen or two dozen lines and a few are a few hundred lines. So any modern AI agent can easily understand and fix issues in the code. In fact, the vast majority of the code *was* written by Codex, with myself acting as the architect, lead developer, reviewer, and QC.
  3. **I am currently the only user I know of**, so there is a chance I have some blind spots.
  4. **I have not tested it on domains with more than a few dozen servers or with DCs connected via WAN.** It is possible that certain domain-related tests could cause excessive WAN traffic. Test it while observing traffic (and I would be glad if you let me know the results).
 
