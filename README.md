@@ -1,14 +1,10 @@
 # Introduction
 
-**Get-ComputerHealth** is a sufficiently mature, lightweight, and extendable PowerShell framework. It is suitable for a single workstation or server, as well as for a domain with dozens of servers. It produces useful and concise reports, email alerts (with Excel reports), and clean terminal output:
+**Get-ComputerHealth** is a production-ready, lightweight, and extendable PowerShell framework that will scan your server, workstation or fleet of domain servers for more than a hundred health indicators. It produces useful and concise reports, email alerts (with Excel reports), and clean terminal output. You can easily add your own custom health tests using PowerShell. Installation is quick and simple: in a few minutes you can check all your domain servers and receive daily notifications of issues (low RAM, missing updates, disk errors, failed logins) or changes (a newly installed software, a TCP port that started listening, a host that stoped responding to pings or accepting connections).
 
 <img width="1086" height="251" alt="Example of the report you receive via email" src="https://github.com/user-attachments/assets/694eb16f-fbc9-420c-b96e-dead56715085" />
 
 <img width="973" height="597" alt="Example of Terminal Output" src="https://github.com/user-attachments/assets/16e1c940-59ad-4716-bb09-99393d98b62e" />
-
-Installation is quick and simple, and you can easily add your own custom health tests using PowerShell.
-
-You can check all your domain-joined servers from a central point. If you want to also check multiple domain-joined workstations, you simply have to enable PowerShell Remoting for them (e.g., by executing `Enable-PSRemoting -Force` on each workstation or by configuring a GPO). 
 
 # Status & Is this code for you?
 
