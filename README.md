@@ -1,21 +1,22 @@
 # Introduction
 
-**Get-ComputerHealth** is a **production-ready, lightweight, and extendable** PowerShell framework that will scan your server, workstation or fleet of domain servers for **more than a hundred health indicators** (full list below). It produces **useful and concise reports, email alerts (with attached Excel reports), and clean terminal output**. You can easily add your own **custom health tests with plain PowerShell scripts**. **Installation is quick and simple**: in a few minutes you can check all your domain servers and receive daily notifications of issues (low RAM, missing updates, disk errors, failed logins) or changes (a newly installed software, a TCP port that started listening, a host that stoped responding to pings or accepting connections).
+**Get-ComputerHealth** is a **production-ready, lightweight, and extendable** PowerShell framework that will scan your server, workstation or fleet of domain servers for **more than a hundred health indicators** (full list below). It produces **useful and concise reports, email alerts with attached Excel reports**, and **clean terminal output**. You can easily add your own **custom health tests with plain PowerShell scripts**. **Installation is quick and simple**: in a few minutes you can check all your domain servers and receive daily notifications of issues (low RAM, missing updates, disk errors, failed logins) or changes (a newly installed software, a TCP port that started listening, a host that stoped responding to pings or accepting connections).
 
 <img width="1086" height="251" alt="Example of the report you receive via email" src="https://github.com/user-attachments/assets/694eb16f-fbc9-420c-b96e-dead56715085" />
 
 <img width="977" height="598" alt="Example of Terminal Output" src="https://github.com/user-attachments/assets/4925c744-2eaa-428c-939e-ec98e14e38b8" />
 
-# Status & Is this code for you?
+# Status / Is this code for you?
 
 This is a **robust production-tested tool** and I have been using it across several domains and multiple servers for many months.
 
 **BUT:**
 
  1. **I may opt to move fast and break things.** I will not do it lightly because I'll have to clean up issues at several production sites, but I *will do it* if the rewards worth to me. So be prepared for some occasional manual work (such as suppressing spurious alerts or needing to perform a manual reinstall). 
- 2. **Don't expect official support.** I am happy to help when I can, but my availability is limited. You should be comfortable with PowerShell. On the plus side, in the unlikely event that you need to dive into the code, it is surprisingly small and straightforward: **the core is about 1,000 lines, including comments.** The tests do exceed ten thousand lines, but most tests are a dozen or two dozen lines and a few are a few hundred lines. So any modern AI agent can easily understand and fix issues in the code. In fact, the vast majority of the code *was* written by Codex, with myself acting as the architect, lead developer, reviewer, and QC.
- 3. **I am currently the only user I know of**, so there is a chance I have some blind spots.
- 4. **I have not tested it on domains with more than a few dozen servers or with DCs connected via WAN.** It is possible that certain domain-related tests could cause excessive WAN traffic. Test it while observing traffic (and I would be glad if you let me know the results).
+ 2. **Don't expect official support.** I am happy to help when I can, but my availability is limited. You should be comfortable with PowerShell.
+ > On the plus side, in the unlikely event that you need to dive into the code, it is surprisingly small and straightforward: **the core is about 1,000 lines, including comments.** The tests do exceed ten thousand lines, but most tests are a dozen or two dozen lines and a few are a few hundred lines. So any modern AI agent can easily understand and fix issues in the code. In fact, the vast majority of the code *was* written by Codex, with myself acting as the architect, lead developer, reviewer, and QC.
+ 4. **I am currently the only user I know of**, so there is a chance I have some blind spots.
+ 5. **I have not tested it on domains with more than a few dozen servers or with DCs connected via WAN.** It is possible that certain domain-related tests could cause excessive WAN traffic. Test it while observing traffic (and I would be glad if you let me know the results).
 
 # Security
 
