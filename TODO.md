@@ -67,13 +67,15 @@ Remove the rest of the migration-specific implementation:
 Also remove the migration-specific unit coverage once the feature is deleted:
 - `tests/Unit/Update-GetHealthCode.LegacyMigration.Tests.ps1`
 
-## Add CustomTests.ps1 helper script
+## New helper script CustomTests.ps1
 
 `CustomTests.ps1 -New "scriptName"` should a) create necessary folders if needed b) create a sample script `scriptName.ps1` and c) output the full path to the script. The sample code must be checking if disk C: has at least 10GB free space. Code must follow the recomendations of the documentation, including enough comments to help a user that has never created a custom health test before modify it for their needs. At the top it should include a link to the relevant documentation (how to add a custom health test).
 
 `CustomTests.ps1 -List` should return a list of all scripts with custom health tests (file objects).
 
-Update our documentation to suggest this script.
+`CustomTests.ps1 -Invoke [ScriptFilenName.ps1]` should be calling `Get-ComputerHealth.ps1 -Hide ""` with the options needed to invoke the specific custom test.
+
+Update our documentation with the above info.
 
 ## sigstore?
 
