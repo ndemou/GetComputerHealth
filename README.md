@@ -3,6 +3,7 @@
 **Get-ComputerHealth** is a sufficiently mature, lightweight, and extendable PowerShell framework. It is suitable for a single workstation or server, as well as for a domain with dozens of servers. It produces useful and concise reports, email alerts (with Excel reports), and clean terminal output:
 
 <img width="1086" height="251" alt="Example of the report you receive via email" src="[https://github.com/user-attachments/assets/9da7e7f7-c1ef-4f3e-9d47-d164a96b2d4f](https://github.com/user-attachments/assets/9da7e7f7-c1ef-4f3e-9d47-d164a96b2d4f)" />
+
 <img width="1019" height="889" alt="image" src="https://github.com/user-attachments/assets/507cb17f-ee67-4bff-afb3-7d0a83d24ba1" />
 
 
