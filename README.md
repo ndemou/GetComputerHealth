@@ -4,7 +4,7 @@
 
 <img width="1086" height="251" alt="Example of the report you receive via email" src="https://github.com/user-attachments/assets/694eb16f-fbc9-420c-b96e-dead56715085" />
 
-<img width="973" height="597" alt="Example of Terminal Output" src="https://github.com/user-attachments/assets/16e1c940-59ad-4716-bb09-99393d98b62e" />
+<img width="977" height="598" alt="Example of Terminal Output" src="https://github.com/user-attachments/assets/4925c744-2eaa-428c-939e-ec98e14e38b8" />
 
 # Status & Is this code for you?
 
