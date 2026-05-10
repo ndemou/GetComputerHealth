@@ -77,6 +77,10 @@ Also remove the migration-specific unit coverage once the feature is deleted:
 
 Update our documentation with the above info.
 
+## Installer/Updater: Read $REPO_URL from optional config file
+
+If a file ./config/update_origin.txt is found its content is used to set $REPO_URL. Empty lines and lines begining with "#" are ignored, spaces are also trimed. If it's not a valid URL, execution is aborted with an exception.
+
 ## sigstore?
 
 https://docs.sigstore.dev/quickstart/quickstart-cosign/
