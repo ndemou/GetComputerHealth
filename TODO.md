@@ -1,5 +1,9 @@
 # TODO
 
+## Update the bin path on the column with the Invoke-Command of the excel report 
+
+C:\IT\Get-ComputerHealth\bin instead of C:\IT\bin
+
 ## Custom health tests should be directly runnable scripts
 
 Instead of dot-sourcing the custom scripts, discovering the functions with the custom tests and calling them, we should instead just invoking the scripts directly and capturing their warnings stream. Much simpler and cleaner than the current method. 
