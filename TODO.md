@@ -2,7 +2,7 @@
 
 ## Update the bin path on the column with the Invoke-Command of the excel report 
 
-C:\IT\Get-ComputerHealth\bin instead of C:\IT\bin
+C:\IT\Get-ComputerHealth\bin\Get-ComputerHealth.ps1 instead of C:\IT\bin\Get-ComputerHealth.ps1
 
 ## Configuration options for the updater
 
