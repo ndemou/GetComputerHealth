@@ -1,4 +1,4 @@
-Describe 'HealthTest-StaleRdpSessions message formatting' {
+﻿Describe 'HealthTest-StaleRdpSessions message formatting' {
   BeforeAll {
     $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
     . (Join-Path $repoRoot 'health-tests\win-os-hyg.ps1')

@@ -1,4 +1,4 @@
-Describe 'HealthTest-FailedLoginAttemptsRecent' {
+﻿Describe 'HealthTest-FailedLoginAttemptsRecent' {
   BeforeAll {
     . (Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) 'health-tests\win-os-hyg.ps1')
   }

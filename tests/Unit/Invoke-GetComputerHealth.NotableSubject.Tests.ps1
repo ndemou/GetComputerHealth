@@ -1,4 +1,4 @@
-Describe 'Invoke-GetComputerHealth notable subject selection' {
+﻿Describe 'Invoke-GetComputerHealth notable subject selection' {
   BeforeAll {
     $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
     $scriptPath = Join-Path $repoRoot 'Invoke-GetComputerHealth.ps1'

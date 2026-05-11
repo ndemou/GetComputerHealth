@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
 Creates and publishes a new GetComputerHealth GitHub release.
 

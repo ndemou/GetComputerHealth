@@ -1,4 +1,4 @@
-Describe 'Update-GetHealthCode legacy layout migration' {
+﻿Describe 'Update-GetHealthCode legacy layout migration' {
   BeforeAll {
     $script:RepoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
     $script:UpdateScriptPath = Join-Path $script:RepoRoot 'Update-GetHealthCode.ps1'

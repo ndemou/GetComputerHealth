@@ -1,4 +1,4 @@
-write-host -for white "I'm checking all ps1 files in:"
+﻿write-host -for white "I'm checking all ps1 files in:"
 write-host -for cyan "     $((pwd).path)"
 $errors = Invoke-ScriptAnalyzer -Path .\ -Severity Error|?{$_.RuleName -ne 'PSAvoidUsingConvertToSecureStringWithPlainText'}
 if ($errors) {

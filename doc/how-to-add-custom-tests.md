@@ -1,4 +1,4 @@
-# How to Add Custom Tests
+﻿# How to Add Custom Tests
 
 ## TL;DR
 

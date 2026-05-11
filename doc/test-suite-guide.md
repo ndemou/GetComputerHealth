@@ -1,4 +1,4 @@
-# Test Suite Guide
+﻿# Test Suite Guide
 
 This guide explains the test and validation scripts in this repository in simple language.
 

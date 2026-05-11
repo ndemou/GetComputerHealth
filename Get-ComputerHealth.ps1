@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
 Runs a suite of built-in and optional custom "HealthTest-*" checks and reports their findings; can also whitelist/suppress expected messages by signature.
 

@@ -1,4 +1,4 @@
-# Test Improvement Plan
+﻿# Test Improvement Plan
 
 This repo does not need a full testing framework migration right now. The current script-based approach is acceptable, but a few small changes would make it materially better in reliability, maintainability, diagnostics, and day-to-day usage.
 

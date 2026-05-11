@@ -1,4 +1,4 @@
-Describe 'Suppressed health tests' {
+﻿Describe 'Suppressed health tests' {
   BeforeAll {
     $script:RepoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
     $script:GetComputerHealthScript = Join-Path $script:RepoRoot 'Get-ComputerHealth.ps1'

@@ -1,4 +1,4 @@
-$repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+﻿$repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 
 Describe 'Resolve-ExecutablePath' {
   BeforeAll {

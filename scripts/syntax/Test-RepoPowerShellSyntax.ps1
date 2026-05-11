@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
 Parses all repository PowerShell files and reports any syntax errors clearly.
 

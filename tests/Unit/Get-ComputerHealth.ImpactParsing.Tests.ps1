@@ -1,4 +1,4 @@
-Describe 'Get-ComputerHealth impact parsing' {
+﻿Describe 'Get-ComputerHealth impact parsing' {
   BeforeAll {
     $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
     $scriptPath = Join-Path $repoRoot 'Get-ComputerHealth.ps1'

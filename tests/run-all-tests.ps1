@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
   [ValidateSet('All', 'Unit', 'Integration')]
   [string]$Category = 'All',

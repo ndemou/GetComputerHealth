@@ -1,4 +1,4 @@
-## Built in HealthTest- functions
+﻿## Built in HealthTest- functions
 
 ### Behavior Rules
 

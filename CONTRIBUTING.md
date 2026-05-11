@@ -1,4 +1,4 @@
-# Contributing
+﻿# Contributing
 
 This project is intentionally small and script-first. Contributions should preserve that style: direct PowerShell, minimal abstraction, and behavior that is easy to debug on a real Windows machine.
 

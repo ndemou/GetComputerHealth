@@ -1,4 +1,4 @@
-# Tests
+﻿# Tests
 
 The contributor-facing testing documentation now lives in [`CONTRIBUTING.md`](../CONTRIBUTING.md).
 

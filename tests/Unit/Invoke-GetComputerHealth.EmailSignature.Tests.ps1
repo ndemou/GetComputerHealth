@@ -1,4 +1,4 @@
-Describe 'Invoke-GetComputerHealth email signature helpers' {
+﻿Describe 'Invoke-GetComputerHealth email signature helpers' {
   BeforeAll {
     $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
     $scriptPath = Join-Path $repoRoot 'Invoke-GetComputerHealth.ps1'
