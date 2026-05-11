@@ -517,7 +517,7 @@ function Export-HealthMessagesToExcel {
       $command = "" 
     }
     else {
-      $command = "Invoke-Command $($_.Computer) {c:\it\bin\Get-ComputerHealth.ps1 -AddWhitelisting -until 2999-12-31 -sig '$($_.hash)' -ComputerName $($_.Computer) -comment ""$commentText""}"
+      $command = "Invoke-Command $($_.Computer) {c:\it\Get-ComputerHealth\bin\Get-ComputerHealth.ps1 -AddWhitelisting -until 2999-12-31 -sig '$($_.hash)' -ComputerName $($_.Computer) -comment ""$commentText""}"
     }
     [pscustomobject]@{
       Computer             = $_.Computer

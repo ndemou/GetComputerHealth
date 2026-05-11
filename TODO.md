@@ -1,9 +1,5 @@
 # TODO
 
-## Update the bin path on the column with the Invoke-Command of the excel report 
-
-C:\IT\Get-ComputerHealth\bin\Get-ComputerHealth.ps1 instead of C:\IT\bin\Get-ComputerHealth.ps1
-
 ## Configuration options for the updater
 
 Support file `./config/gch.config` which is expected to contain a json dict with multiple key-value pairs. If it doesn't exist it should be created by the installer with the default options.
