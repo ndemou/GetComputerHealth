@@ -401,7 +401,7 @@ function HealthTest-HyperVVMProperties {
 Checks Hyper VVM Properties
 
 .DESCRIPTION
-AppliesTo: Hypervisors
+AppliesTo: HyperV
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time)

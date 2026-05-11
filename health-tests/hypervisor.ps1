@@ -5,7 +5,7 @@ Only for Hyper-V servers
 function HealthTest-HyperVRunningVMs {
 <#
 Description: Lists running Hyper-V virtual machines on the host.
-AppliesTo: Server
+AppliesTo: HyperV
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: low
