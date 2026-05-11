@@ -902,7 +902,6 @@ if (-not $RunWithoutElevation) {
 else {
   $isHostHyperisor = $false
 }
-$isHostInDomainButNotDC = (Get-CimInstance Win32_ComputerSystem).DomainRole -in 1, 3
 $isHostPDC = $false
 $currentDomain = $null
 if ($isHostDC) {
@@ -969,7 +968,6 @@ $Global:GCHDQMTA = [pscustomobject]@{
   isHostDnsServer        = $isHostDnsServer
   isHostDHCPServer       = $isHostDHCPServer
   isHostHyperisor        = $isHostHyperisor
-  isHostInDomainButNotDC = $isHostInDomainButNotDC
   GetCurrentDomain       = $currentDomain
   SkipSlowTests          = $SkipSlowTests
   IpsOfAllDcs            = @($validIpsOfAllDcs)
@@ -991,11 +989,11 @@ $Global:GCHDQMTA = [pscustomobject]@{
 . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\os-perf-hw.ps1")
 . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\win-os-hyg.ps1")
 
-if ($isHostDC -or $isHostPDC) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\DC-PDC.ps1") }
+if ($isHostDC) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\DC-PDC.ps1") }
 if ($isHostDnsServer) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\DNS.ps1") }
 if ($isHostDHCPServer) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\DHCP.ps1") }
 if ($isHostDomainJoined) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\DcOrDomJoined.ps1") }
-if ($isHostInDomainButNotDC) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\DomJoinedButNotDC.ps1") }
+if ($isHostDomainJoined -and -not $isHostDC) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\DomJoinedButNotDC.ps1") }
 if ($isHostMobile) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\mobile.ps1") }
 if ($isHostHyperisor) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\hypervisor.ps1") }
 if ($isHostServer) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\servers.ps1") }

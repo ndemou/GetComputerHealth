@@ -118,7 +118,6 @@ Available properties:
 * `$Global:GCHDQMTA.isHostDnsServer`
 * `$Global:GCHDQMTA.isHostDHCPServer`
 * `$Global:GCHDQMTA.isHostHypervisor`
-* `$Global:GCHDQMTA.isHostInDomainButNotDC`
 * `$Global:GCHDQMTA.DebugSkipSlowTests = $DebugSkipSlowTests`
 * `$Global:GCHDQMTA.GetCurrentDomain = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain()`
 
