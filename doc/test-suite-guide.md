@@ -59,6 +59,7 @@ This is the quick “broader confidence” command.
 
 What it does:
 
+- runs the repo-wide PowerShell syntax pass
 - runs the unit test suite
 - runs a small standalone integration-style test set
 - currently includes the installer packaging/update check
@@ -78,6 +79,8 @@ This runs the broader integration-like checks only.
 
 What it does:
 
+- runs the repo-wide PowerShell syntax pass
+- runs the ScriptAnalyzer wrapper
 - runs machine-coupled validation
 - runs standalone `test-*.ps1` scripts in [`tests`](../tests)
 - runs the real-service executable resolution check
@@ -97,6 +100,8 @@ This is the main “run everything in the normal suite” command.
 
 What it does:
 
+- runs repo-wide syntax validation
+- runs static-analysis validation
 - runs unit-like coverage
 - runs integration-like coverage
 - combines the checks from both categories
@@ -127,9 +132,32 @@ Use it when:
 
 The main runner groups its work into a few buckets.
 
-### 1. Unit runner
+### 1. Repo syntax parser pass
 
-This is the `Resolve-ExecutablePath` test group inside the runner.
+This is the `Repo PowerShell syntax` test group inside the runner.
+
+In practice, it calls [`scripts/syntax/Test-RepoPowerShellSyntax.ps1`](../scripts/syntax/Test-RepoPowerShellSyntax.ps1), which parses repository PowerShell files and reports syntax errors.
+
+Use this group when:
+
+- you changed many `.ps1` files
+- you renamed or moved scripts
+- you want a fast repo-wide parser sanity check
+
+### 2. ScriptAnalyzer wrapper
+
+This is the `ScriptAnalyzer` test group inside the runner.
+
+In practice, it calls [`tests/script-analysis.ps1`](../tests/script-analysis.ps1), which runs `Invoke-ScriptAnalyzer` against the repo and reports errors.
+
+Use this group when:
+
+- you want static-analysis feedback as part of the normal suite
+- you changed script structure or patterns that may trip analyzer rules
+
+### 3. Unit runner
+
+This is the `Pester unit suite` test group inside the runner.
 
 In practice, it calls [`tests/run-unit-tests.ps1`](../tests/run-unit-tests.ps1), which runs the Pester unit tests under [`tests/Unit`](../tests/Unit).
 
@@ -139,7 +167,7 @@ Use this group when:
 - you changed parsing or path-resolution behavior
 - you changed code already covered by the Pester tests
 
-### 2. Real service executable resolution check
+### 4. Real service executable resolution check
 
 This is the `Resolve-ServiceExecutable` group inside [`tests/run-all-tests.ps1`](../tests/run-all-tests.ps1).
 
@@ -161,7 +189,7 @@ Important note:
 - it is skipped on GitHub-hosted runners
 - it is not part of smoke mode
 
-### 3. Standalone script tests
+### 5. Standalone script tests
 
 The runner also executes standalone files named `test-*.ps1` under [`tests`](../tests), excluding helper files.
 
@@ -312,7 +340,7 @@ This is a structure/quality check, not a runtime behavior check.
 
 ## Extra Validation Scripts
 
-These scripts are useful, but they are not the main test-runner entry points.
+These scripts are useful. Both of the scripts below are now included by [`tests/run-all-tests.ps1`](../tests/run-all-tests.ps1) in the full suite, and the syntax pass is also included in smoke mode.
 
 ### [`scripts/syntax/Test-RepoPowerShellSyntax.ps1`](../scripts/syntax/Test-RepoPowerShellSyntax.ps1)
 
@@ -355,8 +383,7 @@ Use it when:
 
 Important note:
 
-- this is more of a developer utility than the main test entry point
-- the repo’s standard recommendation is still to use `run-unit-tests.ps1` and `run-all-tests.ps1` first
+- this adds static-analysis coverage, but it can still be more environment-dependent than the parser-based syntax pass
 
 ## Support Files Used by Tests
 
@@ -421,9 +448,8 @@ If you changed `Get-ComputerHealth.ps1` orchestration or output flow:
 
 If you changed many `.ps1` files or did a broad refactor:
 
-- run `.\scripts\syntax\Test-RepoPowerShellSyntax.ps1`
-- then run `.\tests\run-unit-tests.ps1`
-- then run `.\tests\run-all-tests.ps1 -Smoke`
+- run `.\tests\run-all-tests.ps1 -Smoke`
+- then run `.\tests\run-all-tests.ps1`
 
 If you are preparing a release:
 
@@ -448,11 +474,11 @@ Use this shortcut:
 - `run-all-tests.ps1`
   Full normal test suite.
 
-- `Test-RepoPowerShellSyntax.ps1`
-  Repo-wide syntax safety net for PowerShell files.
+- `run-all-tests.ps1 -Smoke`
+  Includes the repo-wide syntax safety net and the fast broader checks.
 
-- `script-analysis.ps1`
-  Extra static analysis, not the main gate.
+- `run-all-tests.ps1`
+  Includes syntax parsing, ScriptAnalyzer, unit tests, and integration-style checks.
 
 If you are unsure, the safest normal sequence is:
 

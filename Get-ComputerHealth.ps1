@@ -1007,14 +1007,14 @@ $Global:GCHDQMTA = [pscustomobject]@{
 . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\os-perf-hw.ps1")
 . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\win-os-hyg.ps1")
 
-if ($isHostDC) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\DC-PDC.ps1") }
-if ($isHostDnsServer) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\DNS.ps1") }
-if ($isHostDhcpServer) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\DHCP.ps1") }
-if ($IsHostInDomain) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\DcOrDomJoined.ps1") }
-if ($IsHostInDomain -and -not $isHostDC) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\DomJoinedButNotDC.ps1") }
-if ($isHostMobile) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\mobile.ps1") }
-if ($isHostHyperV) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\hypervisor.ps1") }
-if ($isHostServer) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\servers.ps1") }
+if ($isHostDC) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\OnlyIfHostIs-DC.ps1") }
+if ($isHostDnsServer) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\OnlyIfHostIs-DnsServer.ps1") }
+if ($isHostDhcpServer) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\OnlyIfHostIs-DhcpServer.ps1") }
+if ($IsHostInDomain) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\OnlyIfHostIs-InDomain.ps1") }
+if ($IsHostInDomain -and -not $isHostDC) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\OnlyIfHostIs-InDomainButNotDC.ps1") }
+if ($isHostMobile) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\OnlyIfHostIs-Mobile.ps1") }
+if ($isHostHyperV) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\OnlyIfHostIs-HyperV.ps1") }
+if ($isHostServer) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\OnlyIfHostIs-Server.ps1") }
 #|
 #| Dot source health tests
 #+-----------------------------------------------------------

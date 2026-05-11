@@ -77,19 +77,59 @@ function Get-TestSelection {
 
   if ($Smoke) {
     return [pscustomobject]@{
+      RunRepoSyntax = $true
+      RunScriptAnalysis = $false
       RunResolveServiceExecutable = $false
-      RunResolveExecutablePath = $true
+      RunUnitTests = $true
       RunStandaloneScripts = $true
       StandaloneScriptNames = @('test-installer.ps1')
     }
   }
 
   return [pscustomobject]@{
+    RunRepoSyntax = (Should-RunCategory -RequestedCategory $Category -TestCategory 'Unit')
+    RunScriptAnalysis = (Should-RunCategory -RequestedCategory $Category -TestCategory 'Unit')
     RunResolveServiceExecutable = (Should-RunCategory -RequestedCategory $Category -TestCategory 'Integration')
-    RunResolveExecutablePath = (Should-RunCategory -RequestedCategory $Category -TestCategory 'Unit')
+    RunUnitTests = (Should-RunCategory -RequestedCategory $Category -TestCategory 'Unit')
     RunStandaloneScripts = (Should-RunCategory -RequestedCategory $Category -TestCategory 'Integration')
     StandaloneScriptNames = @()
   }
+}
+
+function Test-RepoPowerShellSyntax {
+<#
+.SYNOPSIS
+  Runs the repo-wide PowerShell syntax parser pass.
+.OUTPUTS
+  Boolean - Returns $true if parsing succeeds, otherwise $false.
+#>
+  [CmdletBinding()]
+  param(
+    [switch]$Detailed
+  )
+
+  $syntaxRunner = Join-Path $repoRoot 'scripts\syntax\Test-RepoPowerShellSyntax.ps1'
+  & $syntaxRunner
+
+  return $true
+}
+
+function Test-ScriptAnalysis {
+<#
+.SYNOPSIS
+  Runs the repo static-analysis wrapper.
+.OUTPUTS
+  Boolean - Returns $true if analysis succeeds, otherwise $false.
+#>
+  [CmdletBinding()]
+  param(
+    [switch]$Detailed
+  )
+
+  $analysisRunner = Join-Path $PSScriptRoot 'script-analysis.ps1'
+  & $analysisRunner
+
+  return $true
 }
 
 function Test-ResolveServiceExecutable {
@@ -145,7 +185,7 @@ function Test-ResolveServiceExecutable {
   return $return
 }
 
-function Test-ResolveExecutablePath {
+function Test-UnitSuite {
 <#
 .SYNOPSIS
   Runs the Pester unit test suite.
@@ -234,14 +274,24 @@ if ($MyInvocation.InvocationName -ne '.') {
   $results = @()
   $selection = Get-TestSelection -Category $Category -Smoke:$Smoke
 
+  if ($selection.RunRepoSyntax) {
+    $passed = [bool](Test-RepoPowerShellSyntax -Detailed:$Detailed | Select-Object -Last 1)
+    $results += New-TestGroupResult -Name 'Repo PowerShell syntax' -Category 'Unit' -Passed $passed
+  }
+
+  if ($selection.RunScriptAnalysis) {
+    $passed = [bool](Test-ScriptAnalysis -Detailed:$Detailed | Select-Object -Last 1)
+    $results += New-TestGroupResult -Name 'ScriptAnalyzer' -Category 'Unit' -Passed $passed
+  }
+
   if ($selection.RunResolveServiceExecutable) {
     $passed = [bool](Test-ResolveServiceExecutable -Detailed:$Detailed | Select-Object -Last 1)
     $results += New-TestGroupResult -Name 'Resolve-ServiceExecutable' -Category 'Integration' -Passed $passed
   }
 
-  if ($selection.RunResolveExecutablePath) {
-    $passed = [bool](Test-ResolveExecutablePath -Detailed:$Detailed | Select-Object -Last 1)
-    $results += New-TestGroupResult -Name 'Resolve-ExecutablePath' -Category 'Unit' -Passed $passed
+  if ($selection.RunUnitTests) {
+    $passed = [bool](Test-UnitSuite -Detailed:$Detailed | Select-Object -Last 1)
+    $results += New-TestGroupResult -Name 'Pester unit suite' -Category 'Unit' -Passed $passed
   }
 
   if ($selection.RunStandaloneScripts) {

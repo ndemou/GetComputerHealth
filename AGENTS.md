@@ -12,17 +12,18 @@ Run tests from the repository root in Windows PowerShell (v5).
   This is usually enough for a small pure-unit change.
   Also use it if you add or modify Pester tests.
 
-   For a repo-wide PowerShell syntax pass, run:
+   `.\tests\run-all-tests.ps1 -Smoke` now includes the repo-wide PowerShell syntax pass automatically.
+   You can still run it directly if you only want the parser check:
    ```powershell
    .\scripts\syntax\Test-RepoPowerShellSyntax.ps1
    ```
   It parses all tracked `.ps1` files except generated content under `.git` and `temp`, and caches file timestamps so later runs only re-check changed files.
 
 2. Quick smoke coverage:
-   ```powershell
-   .\tests\run-all-tests.ps1 -Smoke
-   ```
-  Runs a small, fast subset intended for quick validation.
+  ```powershell
+  .\tests\run-all-tests.ps1 -Smoke
+  ```
+  Runs a small, fast subset intended for quick validation, including the repo-wide PowerShell syntax pass.
   Use this at minimum if you touch installer code, service-path resolution, or machine-environment behavior.
 
 3. Broader integration coverage when the change affects machine-coupled behavior:
@@ -32,10 +33,10 @@ Run tests from the repository root in Windows PowerShell (v5).
   Runs machine-coupled checks and standalone test scripts. Use this when changes touch broader runtime behavior, service resolution, installer behavior, or environment-dependent logic.
   
 4. Full repo test pass:
-   ```powershell
-   .\tests\run-all-tests.ps1
-   ```
-  Runs the full combined test selection. `.\tests\run-all-tests.ps1 -Detailed` is the same as the full run, but prints extra detail and artifact locations.
+  ```powershell
+  .\tests\run-all-tests.ps1
+  ```
+  Runs the full combined test selection, including syntax parsing and ScriptAnalyzer. `.\tests\run-all-tests.ps1 -Detailed` is the same as the full run, but prints extra detail and artifact locations.
 
 ## Notes
 

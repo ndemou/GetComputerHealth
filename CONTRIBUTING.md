@@ -52,7 +52,7 @@ The repository uses a mixed testing model:
 ### Test Categories
 
 - Unit-like:
-  Fast deterministic checks with limited machine coupling. Right now this is mainly the `Resolve-ExecutablePath` Pester suite.
+  Fast deterministic checks with limited machine coupling. This includes the repo-wide syntax pass, the ScriptAnalyzer wrapper, and the Pester suite.
 - Integration-like:
   Checks that touch real services, installer behavior, or broader filesystem / machine state.
 
@@ -78,6 +78,8 @@ The repository uses a mixed testing model:
 
 - Shared assertions and path helpers live in [`tests/test-helpers.ps1`](./tests/test-helpers.ps1).
 - Pester unit tests live under [`tests/Unit`](./tests/Unit).
+- `.\tests\run-all-tests.ps1 -Smoke` includes the repo-wide syntax parser.
+- `.\tests\run-all-tests.ps1` includes the syntax parser, ScriptAnalyzer, unit tests, service-resolution checks, and standalone `test-*.ps1` scripts.
 - Failure logs from the runner are written under `tests\artifacts\last-run\`.
 - The test runner excludes `test-helpers.ps1` from discovery.
 
