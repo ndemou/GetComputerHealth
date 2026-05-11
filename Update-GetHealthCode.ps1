@@ -1380,44 +1380,6 @@ if ($PersistReleaseMarker) {
   Set-GetComputerHealthInstalledReleaseMarker -CachePath $LATEST_RELEASE_METADATA_CACHE_PATH -Marker $manualUpdateMarker -FetchedAt $manualUpdateFetchedAt
 }
 
-if ((Get-Date) -le [datetime]'2026-04-30') {
-  Write-Verbose "Executing cleanups of obsolete files"
-
-  $obsoleteFiles = @(
-    (Join-Path $CFG_DIR  'Get-ComputerHealth-latest-release.dat')
-    (Join-Path $DEST_DIR 'lib-helpers-for-health-tests.ps1')
-    (Join-Path $DEST_DIR 'lib-health-tests.ps1')
-    (Join-Path $DEST_DIR 'ht-DC-PDC.ps1')
-    (Join-Path $DEST_DIR 'ht-DNS.ps1')
-    (Join-Path $DEST_DIR 'ht-DHCP.ps1')
-    (Join-Path $DEST_DIR 'ht-syscfg-featdisc.ps1')
-    (Join-Path $DEST_DIR 'ht-srvc-exe-resolve.ps1')
-    (Join-Path $DEST_DIR 'ht-file-dir-anlz.ps1')
-    (Join-Path $DEST_DIR 'ht-schtasks-master.ps1')
-    (Join-Path $DEST_DIR 'ht-net-conn.ps1')
-    (Join-Path $DEST_DIR 'ht-os-perf-hw.ps1')
-    (Join-Path $DEST_DIR 'ht-win-os-hyg.ps1')
-    (Join-Path $DEST_DIR 'ht-hypervisor.ps1')
-    (Join-Path $DEST_DIR 'ht-DomJoined.ps1')
-    (Join-Path $DEST_DIR 'ht-member.ps1')
-    (Join-Path $DEST_DIR 'ht-DcOrDomJoined.ps1')
-    (Join-Path $DEST_DIR 'ht-DomJoinedButNotDC.ps1')
-    (Join-Path $DEST_DIR 'ht-mobile.ps1')
-    (Join-Path $DEST_DIR 'ht-servers.ps1')
-    (Join-Path $DEST_DIR 'ht-AD-GPO-mgmt.ps1')
-    (Join-Path $DEST_DIR 'ht-DNS-DHCP-srvc.ps1')
-    (Join-Path $DEST_DIR 'ht-hyperv-mgmt.ps1')
-    (Join-Path $DEST_DIR 'ht-special.ps1')
-  )
-
-  foreach ($fpath in $obsoleteFiles) {
-    if (Test-Path -LiteralPath $fpath) {
-      Write-Verbose "Removing obsolete file '$fpath'"
-      Remove-Item -LiteralPath $fpath
-    }
-  }
-}
-
 try {
   $backupRetentionCutoff = (Get-Date).AddMonths(-1)
   Write-Verbose "Pruning backup .bak files older than '$backupRetentionCutoff' from '$BAK_DIR'"
