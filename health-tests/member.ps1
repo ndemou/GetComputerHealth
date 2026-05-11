@@ -121,7 +121,7 @@ Uses: Resolve-DnsName.
   if ($intersection.Count -gt 0) {
     Write-Warning "[PASS] Domain DNS name resolves to at least one DC IP.`n$comment"
   } else {
-    Write-Warning "[FAILURE] Domain DNS name does not resolve to any known DC IPv4 address.`n$comment"
+    Write-Warning "[NOTICE] Domain DNS name does not resolve to any known DC IPv4 address.`n$comment"
   }
 }
 
