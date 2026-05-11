@@ -1400,6 +1400,8 @@ if ((Get-Date) -le [datetime]'2026-04-30') {
     (Join-Path $DEST_DIR 'ht-hypervisor.ps1')
     (Join-Path $DEST_DIR 'ht-DomJoined.ps1')
     (Join-Path $DEST_DIR 'ht-member.ps1')
+    (Join-Path $DEST_DIR 'ht-DcOrDomJoined.ps1')
+    (Join-Path $DEST_DIR 'ht-DomJoinedButNotDC.ps1')
     (Join-Path $DEST_DIR 'ht-mobile.ps1')
     (Join-Path $DEST_DIR 'ht-servers.ps1')
     (Join-Path $DEST_DIR 'ht-AD-GPO-mgmt.ps1')

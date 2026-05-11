@@ -1,5 +1,5 @@
 <#
-Tests only for domain joined servers (including DC/PDC)
+Tests for domain joined computers, including DC/PDC
 #>
 
 function HealthTest-DnsSuffixBaseline {
@@ -93,6 +93,92 @@ from the AD DNS name.
             Write-Warning ("[FAILURE] NIC '$nicName' Conn.-specific suffix" + "`n" + $details)
         }
     }
+}
+
+function HealthTest-DnsSuffixMatchesDomain {
+<#
+Description: Checks whether the primary DNS suffix matches the joined AD domain.
+AppliesTo: DomainJoined
+Scope: Computer
+Category: Configuration Hygiene & Best Practices
+Impact: Medium(Network)
+Tags: Essential
+Uses: None.
+#>
+  [CmdletBinding()] param()
+  $cs = Get-CimInstance Win32_ComputerSystem
+  $domain = $cs.Domain
+  $out = ipconfig /all 2>&1
+  $pattern = "DNS Suffix.* $domain`$"
+  if ($out | Select-String -Pattern $pattern) {
+    Write-Warning "[PASS] Domain name appears in DNS suffix`nDomain: $domain"
+  } else {
+    Write-Warning "[FAILURE] Domain name does not appear in DNS suffix`nExpected suffix: $domain"
+  }
+}
+
+function HealthTest-DomainARecordPointsToDcIp {
+<#
+Description: Checks whether the domain A record points to a DC IP.
+AppliesTo: DomainJoined
+Scope: Computer
+Category: Configuration Hygiene & Best Practices
+Impact: Medium(Network)
+Tags: Essential
+Uses: Resolve-DnsName.
+#>
+  $dcIps = @($Global:GCHDQMTA.IpsOfAllDcs)
+
+  $domain = (Get-CimInstance Win32_ComputerSystem).Domain
+  $ares = $null
+  try { $ares = Resolve-DnsName -Name $domain -Type A -ErrorAction Stop } catch {}
+  if (-not $ares) {
+    Write-Warning "[FAILURE] No A records found for domain DNS name.`n$domain"
+    return
+  }
+
+  $aIps = @($ares | Where-Object { $_.IPAddress } | ForEach-Object { $_.IPAddress })
+  $intersection = @()
+  foreach ($ip in $aIps) { if ($dcIps -contains $ip) { $intersection += $ip } }
+
+  $comment = "Domain=$domain; DC IPs=" + ($dcIps -join ', ') + "; Domain A IPs=" + ($aIps -join ', ')
+  if ($intersection.Count -gt 0) {
+    Write-Warning "[PASS] Domain DNS name resolves to at least one DC IP.`n$comment"
+  } else {
+    Write-Warning "[NOTICE] Domain DNS name does not resolve to any known DC IPv4 address.`n$comment"
+  }
+}
+
+function HealthTest-NltestSiteDiscovery {
+<#
+Description: Checks whether site discovery returns a valid AD site for the computer.
+AppliesTo: DomainJoined
+Scope: Computer
+Category: Configuration Hygiene & Best Practices
+Impact: low
+Uses: None.
+#>
+  [CmdletBinding()] param()
+
+  $out  = nltest /dsgetsite 2>&1
+  $exit = $LASTEXITCODE
+  $txt  = ($out | Out-String).Trim()
+
+  if ($exit -eq 0 -and $txt -match 'The command completed successfully') {
+    $lines = $txt -split "`r?`n"
+    $site  = $null
+    foreach ($l in $lines) {
+      if (-not $site -and $l -and $l -notmatch 'The command completed successfully') {
+        $site = $l.Trim()
+        break
+      }
+    }
+    if (-not $site) { $site = '(unknown)' }
+    Write-Warning "[PASS] NLTEST /dsgetsite succeeded.`nSite: $site"
+  } else {
+    $hex = '0x{0:X}' -f ($exit -band 0xFFFFFFFF)
+    Write-Warning "[FAILURE] NLTEST /dsgetsite failed.`nExitCode=$hex; Output=`n$txt"
+  }
 }
 
 function HealthTest-ConnectivityToDCs {

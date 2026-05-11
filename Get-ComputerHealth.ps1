@@ -994,8 +994,8 @@ $Global:GCHDQMTA = [pscustomobject]@{
 if ($isHostDC -or $isHostPDC) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\DC-PDC.ps1") }
 if ($isHostDnsServer) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\DNS.ps1") }
 if ($isHostDHCPServer) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\DHCP.ps1") }
-if ($isHostDomainJoined) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\domjoined.ps1") }
-if ($isHostInDomainButNotDC) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\member.ps1") }
+if ($isHostDomainJoined) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\DcOrDomJoined.ps1") }
+if ($isHostInDomainButNotDC) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\DomJoinedButNotDC.ps1") }
 if ($isHostMobile) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\mobile.ps1") }
 if ($isHostHyperisor) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\hypervisor.ps1") }
 if ($isHostServer) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\servers.ps1") }
