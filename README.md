@@ -331,6 +331,7 @@ Note that if you only want to add a few custom tests, you do not need to modify 
 | GpupdatePolicyApply              | Checks whether the machine secure channel is healthy enough for Group Policy processing |
 | GpWmiFilterNamespacesOnLocalHost | Checks whether Group Policy WMI filter namespaces are accessible on the local host |
 | HotfixBaseline                   | Checks whether all required hotfixes from the baseline are installed |
+| HyperVReplicationHealth         | Checks Hyper-V VM replication health, missing replication, and running replica VMs |
 | HyperVRunningVMs                 | Lists running Hyper-V virtual machines on the host |
 | IisBindings                      | Checks IIS bindings for wildcard or otherwise risky binding configurations |
 | InstalledRolesFeatures           | Checks for installed Windows roles or features that are outside the intended baseline |
