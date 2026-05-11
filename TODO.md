@@ -41,17 +41,22 @@ Here's a draft of the migration script:
    - Use `sls` to find the names of the custom health test functions
    - Append a call to them at the end of the script (Use `Get-TextFileEncoding` from `helpers-text-files.ps1` to make sure we append text using the correct encoding)
 
-**Also update `how-to-add-custom-tests.md`.**
+**Also simplify parameters**
 
-Besided the obvious changes do the following:
-
-**Replace the text of the section "When to Handle Exceptions" with this:**
-
-The wrapper that invokes your scripts will catch and report exceptions in detail. It will then continue with the next script. So, you don't need to catch excpetions if a) you are going to abort execution anyway and b) you are not going to collect any more information than what is included in the exception itself. 
+ - Deprecate the parameter `-IncludeTestsFromFolder` and `-PrettifyWriteWarning`
+ - Make `-OnlyTheseTests` work for custom health tests (if a name ends with `.ps1` we know it's the file name of a custom health test).
 
 ---
 
-**Replace the text of the section "How to Test Your Function" with this**
+**Also update `how-to-add-custom-tests.md`.**
+
+Besides the obvious changes do the following 2 changes:
+
+**Change #1: Replace the text of the section "When to Handle Exceptions" with this:**
+
+The wrapper that invokes your scripts will catch and report exceptions in detail. It will then continue with the next script. So, you don't need to catch excpetions if a) you are going to abort execution anyway and b) you are not going to collect any more information than what is included in the exception itself. 
+
+**Change #2: Replace the text of the section "How to Test Your Function" with this**
 
 Run them and ignore the `WARNING:` prefix in front of all the output you see. Example:
 ```
@@ -60,16 +65,15 @@ WARNING: [PASS] All is cool!
 ```
  > The WARNING: prefix is a sideeffect of the fact that all messages are output by Write-Warning: [PASS], [NOTICE], and everything else
 
-If you really want nicely colored console output and/or structured results like what you get from `Get-ComputerHealth.ps1` run them like this:
+If you want nicely colored console output and/or structured results like what you get from `Get-ComputerHealth.ps1` run them like this:
 
 ```
-C:\ > $results = HealthTest-LargeDirectories 3>&1 | C:\IT\bin\Get-ComputerHealth.ps1 -PrettifyWriteWarning
-C:\ > $results
+C:\ > $r = C:\IT\bin\Get-ComputerHealth.ps1 -OnlyTheseTests "HealthTest-LargeDirectories.ps1"
 ```
 
 ---
 
-## Remove the temporary v3-to-Get-ComputerHealth migration logic in July
+**Also remove the temporary v3-to-Get-ComputerHealth migration logic**
 
 Delete the updater functionality that detects a v3 install under `C:\IT\` and migrates it into `C:\IT\Get-ComputerHealth`.
 
@@ -93,7 +97,7 @@ Also remove the migration-specific unit coverage once the feature is deleted:
 
 `CustomTests.ps1 -List` should return a list of all scripts with custom health tests (file objects).
 
-`CustomTests.ps1 -Invoke [ScriptFilenName.ps1]` should be calling `Get-ComputerHealth.ps1 -Hide ""` with the options needed to invoke the specific custom test.
+`CustomTests.ps1 -Invoke ScriptFilenName.ps1` should be calling `Get-ComputerHealth.ps1 -Hide "" -OnlyTheseTests ScriptFilenName.ps1` with the options needed to invoke the specific custom test.
 
 Update our documentation with the above info.
 
