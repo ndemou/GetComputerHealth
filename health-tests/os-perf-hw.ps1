@@ -134,15 +134,15 @@ Uses: Get-DnsDomainControllers, Resolve-DnsName, Test-IsLaptopOrMobile.
     $domainName = $compSystem.Domain
 
     $isHostDC = ($domainRole -in 4, 5)
-    $isHostDomainJoined = ($domainRole -in 1, 3, 4, 5)
+    $IsHostInDomain = ($domainRole -in 1, 3, 4, 5)
     $isHostPDC = $false
     $dcNameSet = @()
 
-    $msg = "Role Detection: DomainJoined=$isHostDomainJoined, IsDC=$isHostDC (Role ID: $domainRole), Domain=$domainName"
+    $msg = "Role Detection: DomainJoined=$IsHostInDomain, IsDC=$isHostDC (Role ID: $domainRole), Domain=$domainName"
     Write-Verbose $msg
     $evidences += $msg
 
-    if ($isHostDomainJoined -and $domainName) {
+    if ($IsHostInDomain -and $domainName) {
         $dcNameSet = Get-DnsDomainControllers -DomainName $domainName
         $msg = "Found $($dcNameSet.Count) known DC names: $($dcNameSet -join ', ')"
         Write-Verbose $msg
@@ -196,7 +196,7 @@ Uses: Get-DnsDomainControllers, Resolve-DnsName, Test-IsLaptopOrMobile.
 
     # --- Step 5: Only for domain joined except PDC: is source a DC? ---
     $isSourceDC = $null
-    if ($isHostDomainJoined -and (-not $isHostPDC)) {
+    if ($IsHostInDomain -and (-not $isHostPDC)) {
       $isSourceDC = (Is-DCSource $currentTimeSource $dcNameSet $domainName)
       if ($isSourceDC) {
         $msg = "$currentTimeSource is a known DC"
@@ -278,7 +278,7 @@ Uses: Get-DnsDomainControllers, Resolve-DnsName, Test-IsLaptopOrMobile.
             Write-Warning "[FAILURE] DC is not clearly syncing from domain hierarchy (Type=$timeSyncType, Source='$currentTimeSource').`n$evidenceString"
         }
     }
-    elseif ($isHostDomainJoined) {
+    elseif ($IsHostInDomain) {
         # ---- CHECKS FOR Domain Joined servers except DCs, PDCs ---
         if ($timeSyncType -ne 'NT5DS') {
             Write-Warning "[FAILURE] Domain member time syncing type is '$timeSyncType' instead of 'NT5DS'.`n$evidenceString"

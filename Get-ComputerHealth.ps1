@@ -255,8 +255,13 @@ function Test-IsVirtualMachine {
   $cs = Get-CimInstance -ClassName Win32_ComputerSystem -ErrorAction SilentlyContinue
   $csp = Get-CimInstance -ClassName Win32_ComputerSystemProduct -ErrorAction SilentlyContinue
 
-  $man = ($cs.Manufacturer, $csp.Vendor   | Where-Object { $_ }) -join ' '
-  $mod = ($cs.Model, $csp.Name     | Where-Object { $_ }) -join ' '
+  $manufacturer = if ($cs -and $null -ne $cs.PSObject.Properties['Manufacturer']) { $cs.Manufacturer }
+  $vendor = if ($csp -and $null -ne $csp.PSObject.Properties['Vendor']) { $csp.Vendor }
+  $model = if ($cs -and $null -ne $cs.PSObject.Properties['Model']) { $cs.Model }
+  $productName = if ($csp -and $null -ne $csp.PSObject.Properties['Name']) { $csp.Name }
+
+  $man = ($manufacturer, $vendor | Where-Object { $_ }) -join ' '
+  $mod = ($model, $productName | Where-Object { $_ }) -join ' '
   $txt = "$man $mod"
 
   if (-not $txt) { return $false }
@@ -885,22 +890,35 @@ if ($ListAllBuiltInTests) {
 #  4     | Domain controller (non-FSMO)        |
 #  5     | Domain controller (PDC Emulator)    |
 #
-$domainRole = (Get-CimInstance Win32_ComputerSystem).DomainRole
+$computerSystem = $null
+$domainRole = 0
+try {
+  $computerSystem = Get-CimInstance Win32_ComputerSystem -ErrorAction Stop
+  if ($null -ne $computerSystem.PSObject.Properties['DomainRole']) {
+    $domainRole = $computerSystem.DomainRole
+  }
+  else {
+    Log-Warning "Could not determine host domain role from Win32_ComputerSystem; assuming standalone workstation."
+  }
+}
+catch {
+  Log-Warning "Could not query Win32_ComputerSystem domain role; assuming standalone workstation."
+}
 #------------------------------------------
 # What type of system are we running on
 #------------------------------------------
 $isHostVM = Test-IsVirtualMachine
 $isHostMobile = Test-IsLaptopOrMobile
-$isHostDomainJoined = ($domainRole -in 1, 3, 4, 5)
+$IsHostInDomain = ($domainRole -in 1, 3, 4, 5)
 $isHostServer = ($domainRole -in 3, 4, 5)
 $isHostDC = ($domainRole -in 4, 5)
 $isHostDnsServer = $null -ne (Get-Service -Name DNS -ErrorAction SilentlyContinue)
-$isHostDHCPServer = ($isHostServer -and (Get-WindowsFeature DHCP -ErrorAction SilentlyContinue).InstallState -eq 'Installed')
+$isHostDhcpServer = ($isHostServer -and (Get-WindowsFeature DHCP -ErrorAction SilentlyContinue).InstallState -eq 'Installed')
 if (-not $RunWithoutElevation) {
-  $isHostHyperisor = (Get-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V).State -eq 'Enabled'
+  $isHostHyperV = (Get-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V).State -eq 'Enabled'
 }
 else {
-  $isHostHyperisor = $false
+  $isHostHyperV = $false
 }
 $isHostPDC = $false
 $currentDomain = $null
@@ -961,13 +979,13 @@ $validIpsOfAllDcs = @($validIpsList)
 $Global:GCHDQMTA = [pscustomobject]@{
   isHostVM               = $isHostVM
   isHostMobile           = $isHostMobile
-  isHostDomainJoined     = $isHostDomainJoined
+  IsHostInDomain         = $IsHostInDomain
   isHostServer           = $isHostServer
   isHostDC               = $isHostDC
   isHostPDC              = $isHostPDC
   isHostDnsServer        = $isHostDnsServer
-  isHostDHCPServer       = $isHostDHCPServer
-  isHostHyperisor        = $isHostHyperisor
+  isHostDhcpServer       = $isHostDhcpServer
+  isHostHyperV           = $isHostHyperV
   GetCurrentDomain       = $currentDomain
   SkipSlowTests          = $SkipSlowTests
   IpsOfAllDcs            = @($validIpsOfAllDcs)
@@ -991,11 +1009,11 @@ $Global:GCHDQMTA = [pscustomobject]@{
 
 if ($isHostDC) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\DC-PDC.ps1") }
 if ($isHostDnsServer) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\DNS.ps1") }
-if ($isHostDHCPServer) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\DHCP.ps1") }
-if ($isHostDomainJoined) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\DcOrDomJoined.ps1") }
-if ($isHostDomainJoined -and -not $isHostDC) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\DomJoinedButNotDC.ps1") }
+if ($isHostDhcpServer) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\DHCP.ps1") }
+if ($IsHostInDomain) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\DcOrDomJoined.ps1") }
+if ($IsHostInDomain -and -not $isHostDC) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\DomJoinedButNotDC.ps1") }
 if ($isHostMobile) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\mobile.ps1") }
-if ($isHostHyperisor) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\hypervisor.ps1") }
+if ($isHostHyperV) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\hypervisor.ps1") }
 if ($isHostServer) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\servers.ps1") }
 #|
 #| Dot source health tests
@@ -1042,9 +1060,9 @@ if ($AddWhitelisting ) {
 
 if ($DoNothing) { return }
 
-if ($isHostDomainJoined -and $validIpsOfAllDcs.Count -eq 0) {
+if ($IsHostInDomain -and $validIpsOfAllDcs.Count -eq 0) {
   Log-failure "Cannot run many domain-related tests because no valid IPv4 addresses were provided in -IpsOfAllDcs. Marking this host as non-domain for test applicability."
-  $isHostDomainJoined = $false
+  $IsHostInDomain = $false
   $isHostDC = $false
   $isHostPDC = $false
   $currentDomain = $null
@@ -1073,7 +1091,16 @@ Log-Debug "`$global:GCHDQMTA" -Comment "$(($global:GCHDQMTA|Format-List|Out-Stri
 Log-Debug '$allHealthTests' -comment "$(($allHealthTests).name -join ', ')"
 
 Log-info "$((Split-Path $PSCommandPath -Leaf) -replace '.ps1'), ver.$VERSION, Nick Demou, enLogic"
-Log-info "$(Get-Date -format yyyy-MM-dd` HH:mm:ss), Computer: $($env:COMPUTERNAME), S/N: $((Get-CimInstance win32_bios).serialnumber)"
+$biosSerialNumber = 'Unknown'
+try {
+  $bios = Get-CimInstance win32_bios -ErrorAction Stop
+  if ($null -ne $bios.PSObject.Properties['serialnumber'] -and $bios.serialnumber) {
+    $biosSerialNumber = $bios.serialnumber
+  }
+}
+catch {
+}
+Log-info "$(Get-Date -format yyyy-MM-dd` HH:mm:ss), Computer: $($env:COMPUTERNAME), S/N: $biosSerialNumber"
 Log-Debug "-Hide '$Hide'"
 [array]$ExcludeTests = $ExcludeTests |
 ForEach-Object { $_ -split '[,\s]+' } |

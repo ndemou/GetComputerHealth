@@ -111,13 +111,13 @@ Available properties:
 
 * `$Global:GCHDQMTA.isHostVM` (based on heuristics)
 * `$Global:GCHDQMTA.isHostMobile` (based on heuristics)
-* `$Global:GCHDQMTA.isHostDomainJoined`
+* `$Global:GCHDQMTA.IsHostInDomain`
 * `$Global:GCHDQMTA.isHostServer`
 * `$Global:GCHDQMTA.isHostDC`
 * `$Global:GCHDQMTA.isHostPDC`
 * `$Global:GCHDQMTA.isHostDnsServer`
-* `$Global:GCHDQMTA.isHostDHCPServer`
-* `$Global:GCHDQMTA.isHostHypervisor`
+* `$Global:GCHDQMTA.isHostDhcpServer`
+* `$Global:GCHDQMTA.isHostHyperV`
 * `$Global:GCHDQMTA.DebugSkipSlowTests = $DebugSkipSlowTests`
 * `$Global:GCHDQMTA.GetCurrentDomain = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain()`
 

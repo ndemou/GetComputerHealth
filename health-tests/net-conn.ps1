@@ -53,7 +53,7 @@ Uses: Get-NetConnectionProfile, Test-NetConnectivityToNetwork.
   # Phase 3, Check if NLA category(public, private, domain) is proper.
   if (-not $hostFacts.isHostServer) { return } # N/A for workstations
 
-  if ($hostFacts.isHostDomainJoined) {
+  if ($hostFacts.IsHostInDomain) {
     $allowedCategories = @('DomainAuthenticated')
   } else {
     $allowedCategories = @('Private')
