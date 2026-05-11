@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
 Runs a suite of built-in and optional custom "HealthTest-*" checks and reports their findings; can also whitelist/suppress expected messages by signature.
 
@@ -209,7 +209,7 @@ param(
   [switch]$ListAllBuiltInTests
 )
 
-$VERSION="4.2.0"
+$VERSION="4.3.0"
 
 
 $SCRIPT_BIN_DIR = (Resolve-Path -LiteralPath $PSScriptRoot).Path
