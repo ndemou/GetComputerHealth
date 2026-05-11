@@ -6,18 +6,16 @@ C:\IT\Get-ComputerHealth\bin instead of C:\IT\bin
 
 ## Configuration options for the updater
 
-If a file `./config/updates.json` is found it's used to set updating related options. It contains a json dict with multiple key-value pairs. 
+Support file `./config/gch.config` which is expected to contain a json dict with multiple key-value pairs. If it doesn't exist it should be created by the installer with the default options.
 
 - If the key `AutomaticUpdates` is falsy the updater/installer quits with an explanatory warning before performing any action.
 - If the key `RepoUrl` is found it is used as the value of $REPO_URL. If it's not a valid URL, execution is aborted with an exception.
-
-If it doesn't exist the file should be created by the installer with the default options.
 
 Also update this part of our README. Reaplace this:
 > The installer (`Update-GetHealthCode.ps1`) downloads and updates files from this GitHub repository. It may do so *every* time you call `Invoke-GetComputerHealth.ps1`. It is strongly recommended that you clone this repo, audit it, and then change the `$REPO_URL=` line in `Update-GetHealthCode.ps1` to point to your local copy.
 
 With this:
-> By default the installer downloads and updates files from this GitHub repository every time you call any of the `Invoke-*.ps1` scripts. You can disable this by setting `AutomaticUpdates` to false in `./config/updates.json`. You can also point the updater to a clone of this repo that you control and set `RepoUrl` in `./config/updates.json`. 
+> By default the installer downloads and updates files from this GitHub repository every time you call any of the `Invoke-*.ps1` scripts. You can disable this by setting `AutomaticUpdates` to false in `./config/gch.config` or point the updater to a clone of this repo that you control by setting `RepoUrl`. 
 
 
 ## Custom health tests should be directly runnable scripts
