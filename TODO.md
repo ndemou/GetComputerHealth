@@ -1,5 +1,10 @@
 ﻿# TODO
 
+## Add a link to this project at the footer of emails
+
+In "Get-ComputerHealth version 4.3.0, last update 2026-05-11 15:00, domain WORKGROUP", Get-ComputerHealth should be a link to https://github.com/ndemou/GetComputerHealth
+
+
 ## Configuration options for the updater
 
 Support file `./config/gch.config` which is expected to contain a json dict with multiple key-value pairs. If it doesn't exist it should be created by the installer with the default options.
