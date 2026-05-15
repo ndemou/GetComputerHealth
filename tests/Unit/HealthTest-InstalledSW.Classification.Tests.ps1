@@ -48,6 +48,10 @@
     Get-NormalizedSoftwareName -Name '7-Zip 26.00 (x64)' | Should -Be '7-Zip VER'
   }
 
+  It 'normalizes Java update build numbers into VER' {
+    Get-NormalizedSoftwareName -Name 'Java 8 Update 491' | Should -Be 'Java 8 Update VER'
+  }
+
   It 'normalizes v-prefixed versions into VER' {
     foreach ($name in @(
         'test v3'

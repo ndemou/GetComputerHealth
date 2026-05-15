@@ -2295,6 +2295,7 @@ function Get-NormalizedSoftwareName {
         $cleanName = $cleanName -replace '\b(20\d{2}[-./]?\d{2}[-./]?\d{2}|\d{2}[-./]\d{2}[-./]20\d{2})\b', 'DATE'
         $cleanName = $cleanName -replace '(?i)\bv\d+(?:\.\d+)*(?:[a-z]\d+)?\b', 'VER'
         $cleanName = $cleanName -replace '\b\d+(?:\.\d+)+\b', 'VER'
+        $cleanName = $cleanName -replace '(?i)\b(Update)\s+\d+\b', '$1 VER'
         $cleanName = $cleanName -replace '[\(\)\{\}\[\],]', ' '
         $cleanName = $cleanName -replace '\s-\s', ' '
         $cleanName = $cleanName -replace '\s+', ' '
