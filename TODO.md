@@ -4,6 +4,11 @@
 
 In "Get-ComputerHealth version 4.3.0, last update 2026-05-11 15:00, domain WORKGROUP", Get-ComputerHealth should be a link to https://github.com/ndemou/GetComputerHealth
 
+## Save test results to .\data instead of .\temp
+
+Add a migration function at the updater:
+The function should check if the `.\data` folder exists. If not it should create it and move there .\temp\*.xlsx.
+Add a TODO here in order to remove this function after 2026-07-01
 
 ## Configuration options for the updater
 
