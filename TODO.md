@@ -23,6 +23,20 @@ Also update this part of our README. Reaplace this:
 With this:
 > By default the installer downloads and updates files from this GitHub repository every time you call any of the `Invoke-*.ps1` scripts. You can disable this by setting `AutomaticUpdates` to false in `./config/gch.config` or point the updater to a clone of this repo that you control by setting `RepoUrl`. 
 
+## Enhance -AddWhitelisting with reason
+
+Current interface:
+```powershell
+Get-ComputerHealth.ps1 -AddWhitelisting -until 2026-06-15 -ComputerName WEB1 -sig '50636e99' -Comment "failure - TCP port 636(LDAPS) unreachable on dc02.mazars-gr.local"
+```
+New interface (note the change of -Comment to -Message and the extra `-Reason` which is an optional parameter)
+```powershell
+Get-ComputerHealth.ps1 -AddWhitelisting -until 2026-06-15 -ComputerName WEB1 -sig '50636e99' -Message "failure - TCP port 636(LDAPS) unreachable on dc02.mazars-gr.local" -Reason "Networking team will open the traffic soon"
+```
+
+Fix the code that generates the `CommandToSuppressMsg` excel column. Excel should contain a `-Reason "NO_REASON_ENTERED"` so that it's easy for the operator to enter a reason if they want to. 
+
+Also describe this usage scenario in the README: Operator gets an email with notable messages. They open the excel, and observe the findings. If they want to suppress a finding they execute the contents of `CommandToSuppressMsg` column (and optionaly changing the `-Reason` and/or `-until`). 
 
 ## Custom health tests should be directly runnable scripts
 
