@@ -1,9 +1,5 @@
 ﻿# TODO
 
-## Add a link to this project at the footer of emails
-
-In "Get-ComputerHealth version 4.3.0, last update 2026-05-11 15:00, domain WORKGROUP", Get-ComputerHealth should be a link to https://github.com/ndemou/GetComputerHealth
-
 ## Save test results to .\data instead of .\temp
 
 Add a migration function at the updater:
