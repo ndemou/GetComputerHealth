@@ -13,6 +13,7 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
         'Resolve-HealthEmailPreference',
         'Get-HealthSuppressionCommand',
         'Convert-HealthMessagesToHtmlTable',
+        'Convert-HealthMessagesToExcelRows',
         'Get-CachedIpsOfAllDcs',
         'Set-CachedIpsOfAllDcs',
         'Resolve-IpsOfAllDcs',
@@ -62,14 +63,13 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
       }
     )
 
-    $html | Should -Match '<th[^>]*>Level</th>'
-    $html | Should -Match '<th[^>]*>Computer</th>'
+    $html | Should -Match '<th[^>]*>Computer<br>Level</th>'
     $html | Should -Match '<th[^>]*>Message</th>'
     $html | Should -Match 'background-color:#f4ddbf; color:#000'
-    $html | Should -Match '>Warning</td>'
-    $html | Should -Match 'color:#1f5fa8; font-size:11px'
+    $html | Should -Match '<div>SRV1</div><div style=''margin-top:2px''>Warning</div>'
+    $html | Should -Match 'color:#1f5fa8; font-size:10px'
     $html | Should -Match 'Drive C: has only 4% free<br>Investigate temp usage'
-    $html | Should -Match 'color:#00a7c4; font-size:6pt; font-family:"Arial Narrow", Arial, sans-serif'
+    $html | Should -Match 'color:#666; font-size:6pt; font-family:"Arial Narrow", Arial, sans-serif'
     $html | Should -Match ([regex]::Escape('Invoke-Command SRV1 {c:\it\Get-ComputerHealth\bin\Get-ComputerHealth.ps1 -AddWhitelisting -until 2999-12-31 -sig &#39;deadbeef&#39; -ComputerName SRV1 -comment &quot;warning - Disk free space is low&quot;}'))
   }
 
@@ -81,6 +81,35 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
 
     $html | Should -Match 'background-color:#cfe0f5; color:#000'
     $html | Should -Match 'background-color:#f3caca; color:#000'
+  }
+
+  It 'shapes Excel rows in Invoke-GetComputerHealth including suppression commands' {
+    $rows = @(Convert-HealthMessagesToExcelRows -Messages @(
+        [pscustomobject]@{
+          Computer = 'SRV1'
+          Suppressed = $false
+          Level = 'warning'
+          Message = 'Disk free space is low'
+          Comment = 'Drive C: low'
+          Hash = 'deadbeef'
+          Emitter = 'HealthTest-Disks'
+        }
+      ))
+
+    $rows.Count | Should -Be 1
+    $rows[0].Computer | Should -Be 'SRV1'
+    $rows[0].Level | Should -Be 'warning'
+    $rows[0].CommandToSuppressMsg | Should -Be 'Invoke-Command SRV1 {c:\it\Get-ComputerHealth\bin\Get-ComputerHealth.ps1 -AddWhitelisting -until 2999-12-31 -sig ''deadbeef'' -ComputerName SRV1 -comment "warning - Disk free space is low"}'
+  }
+
+  It 'does not generate Excel suppression commands for suppressed or informational rows' {
+    $rows = @(Convert-HealthMessagesToExcelRows -Messages @(
+        [pscustomobject]@{ Computer = 'SRV1'; Suppressed = $true; Level = 'warning'; Message = 'Already suppressed'; Comment = ''; Hash = '11111111'; Emitter = '' },
+        [pscustomobject]@{ Computer = 'SRV2'; Suppressed = $false; Level = 'info'; Message = 'Informational'; Comment = ''; Hash = '22222222'; Emitter = '' }
+      ))
+
+    $rows[0].CommandToSuppressMsg | Should -Be ''
+    $rows[1].CommandToSuppressMsg | Should -Be ''
   }
 
   It 'uses cached IpsOfAllDcs values when the argument is omitted' {

@@ -253,6 +253,8 @@ function Get-HealthEmailSignature {
   return [pscustomobject]@{
     Text = ($locationText + "`r`n" + $signatureText)
     Html = "<div>$encodedLocation</div><div><a href='$encodedProjectUrl'>Get-ComputerHealth</a> version $encodedVersion, last update $encodedLastUpdate</div>"
+    HtmlTop = $encodedLocation
+    HtmlBottom = "<a href='$encodedProjectUrl'>Get-ComputerHealth</a> version $encodedVersion, last update $encodedLastUpdate"
   }
 }
 
@@ -266,7 +268,7 @@ function Add-HealthEmailSignature {
 
   if ($BodyAsHtml) {
     $baseBody = if ([string]::IsNullOrEmpty($Body)) { '' } else { $Body }
-    return ($baseBody + "<div style='margin-top:12px; color:#666; font-family:Segoe UI, Arial, sans-serif; font-size:12px'>$($Signature.Html)</div>")
+    return ($baseBody + "<div style='margin-top:12px; font-family:Segoe UI, Arial, sans-serif'><div style='color:#000; font-size:12px'>$($Signature.HtmlTop)</div><div style='color:#666; font-size:10px'>$($Signature.HtmlBottom)</div></div>")
   }
 
   if ([string]::IsNullOrEmpty($Body)) {
@@ -324,19 +326,20 @@ function Convert-HealthMessagesToHtmlTable {
 
     if (-not [string]::IsNullOrWhiteSpace($comment)) {
       $commentHtml = [System.Net.WebUtility]::HtmlEncode($comment) -replace '(\r\n|\n|\r)', '<br>'
-      $detailsHtml += "<div style='margin-top:4px; color:#1f5fa8; font-size:11px'>$commentHtml</div>"
+      $detailsHtml += "<div style='margin-top:4px; color:#1f5fa8; font-size:10px'>$commentHtml</div>"
     }
 
     if (-not [string]::IsNullOrWhiteSpace($suppressionCommand)) {
-      $detailsHtml += "<div style='margin-top:4px; color:#00a7c4; font-size:6pt; font-family:""Arial Narrow"", Arial, sans-serif'>" + ([System.Net.WebUtility]::HtmlEncode($suppressionCommand)) + "</div>"
+      $detailsHtml += "<div style='margin-top:4px; color:#666; font-size:6pt; font-family:""Arial Narrow"", Arial, sans-serif'>" + ([System.Net.WebUtility]::HtmlEncode($suppressionCommand)) + "</div>"
     }
 
-    "<tr><td style='padding:6px 8px; border:1px solid #d0d7de; vertical-align:top; white-space:nowrap; background-color:$levelBackground; color:#000'>" + ([System.Net.WebUtility]::HtmlEncode($displayLevel)) + "</td><td style='padding:6px 8px; border:1px solid #d0d7de; vertical-align:top; white-space:nowrap'>" + ([System.Net.WebUtility]::HtmlEncode($computer)) + "</td><td style='padding:6px 8px; border:1px solid #d0d7de; vertical-align:top; color:#000'>$detailsHtml</td></tr>"
+    $computerLevelHtml = "<div>" + ([System.Net.WebUtility]::HtmlEncode($computer)) + "</div><div style='margin-top:2px'>" + ([System.Net.WebUtility]::HtmlEncode($displayLevel)) + "</div>"
+    "<tr><td style='padding:6px 8px; border:1px solid #d0d7de; vertical-align:top; white-space:nowrap; background-color:$levelBackground; color:#000'>$computerLevelHtml</td><td style='padding:6px 8px; border:1px solid #d0d7de; vertical-align:top; color:#000'>$detailsHtml</td></tr>"
   }
 
   return @(
     "<table style='border-collapse:collapse; width:100%; font-family:Segoe UI, Arial, sans-serif; font-size:12px'>"
-    "<thead><tr style='background-color:#f6f8fa'><th style='padding:6px 8px; border:1px solid #d0d7de; text-align:left'>Level</th><th style='padding:6px 8px; border:1px solid #d0d7de; text-align:left'>Computer</th><th style='padding:6px 8px; border:1px solid #d0d7de; text-align:left'>Message</th></tr></thead>"
+    "<thead><tr style='background-color:#f6f8fa'><th style='padding:6px 8px; border:1px solid #d0d7de; text-align:left'>Computer<br>Level</th><th style='padding:6px 8px; border:1px solid #d0d7de; text-align:left'>Message</th></tr></thead>"
     "<tbody>"
     ($rows -join '')
     "</tbody></table>"
@@ -425,6 +428,45 @@ function Save-HealthHtmlReport {
   }
 
   Set-Content -LiteralPath $Path -Value $Html -Encoding UTF8
+}
+
+function Convert-HealthMessagesToExcelRows {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)][object[]]$Messages
+  )
+
+  foreach ($message in $Messages) {
+    $level = if ($message.PSObject.Properties['Level']) { [string]$message.Level } else { '' }
+    $suppressed = if ($message.PSObject.Properties['Suppressed']) { [bool]$message.Suppressed } else { $false }
+
+    $commandToSuppressMsg = ''
+    if ((-not $suppressed) -and ($level -notin @('info', 'debug'))) {
+      $commandToSuppressMsg = Get-HealthSuppressionCommand -MessageRecord $message
+    }
+
+    [pscustomobject]@{
+      Computer             = if ($message.PSObject.Properties['Computer']) { [string]$message.Computer } else { '' }
+      Suppressed           = $suppressed
+      Level                = $level
+      Message              = if ($message.PSObject.Properties['Message']) { [string]$message.Message } else { '' }
+      Comment              = if ($message.PSObject.Properties['Comment']) { [string]$message.Comment } else { '' }
+      Hash                 = if ($message.PSObject.Properties['Hash']) { [string]$message.Hash } else { '' }
+      Emitter              = if ($message.PSObject.Properties['Emitter']) { [string]$message.Emitter } else { '' }
+      CommandToSuppressMsg = $commandToSuppressMsg
+    }
+  }
+}
+
+function Export-HealthMessagesReportToExcel {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)][object[]]$Messages,
+    [Parameter(Mandatory)][string]$FileName
+  )
+
+  $rows = @(Convert-HealthMessagesToExcelRows -Messages $Messages)
+  Export-ObjectsToExcel -Data $rows -FileName $FileName -WorksheetName 'Messages'
 }
 
 function Get-HealthNotableSubject {
@@ -912,14 +954,14 @@ $SortOrder = @{'failure' = 1; 'warning' = 2; 'notice' = 3; 'info' = 4; 'pass' = 
 $notable_msgs = @()
 if ($all_messages) {
   # save
-  Export-HealthMessagesToExcel -Data $all_messages -FileName "${TEMP_DIR}\all-messages-$($timestamp).xlsx"
+  Export-HealthMessagesReportToExcel -Messages $all_messages -FileName "${TEMP_DIR}\all-messages-$($timestamp).xlsx"
   $notable_msgs = @(`
       $all_messages `
     | Where-Object { -not($_.Suppressed) -and $_.level -notin @('debug', 'help', 'pass', 'info') } `
     | Sort-Object -Property @{ Expression = { $SortOrder[$_.Level] } }, Computer `
   )
   if ($notable_msgs) {
-    Export-HealthMessagesToExcel -Data $notable_msgs -FileName "${TEMP_DIR}\notable-messages-$($timestamp).xlsx"
+    Export-HealthMessagesReportToExcel -Messages $notable_msgs -FileName "${TEMP_DIR}\notable-messages-$($timestamp).xlsx"
   }
 
   $synopsis = " " + ($notable_msgs | Where-Object { $_.Level } |

@@ -36,6 +36,8 @@
 
       $signature.Text | Should -Be "Domain contoso.local`r`nGet-ComputerHealth version 9.9.9, last update 2026-04-01 07:08, domain contoso.local"
       $signature.Html | Should -Be "<div>Domain contoso.local</div><div><a href='https://github.com/ndemou/GetComputerHealth'>Get-ComputerHealth</a> version 9.9.9, last update 2026-04-01 07:08</div>"
+      $signature.HtmlTop | Should -Be 'Domain contoso.local'
+      $signature.HtmlBottom | Should -Be "<a href='https://github.com/ndemou/GetComputerHealth'>Get-ComputerHealth</a> version 9.9.9, last update 2026-04-01 07:08"
     } finally {
       Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
     }
@@ -64,13 +66,15 @@
     $signature = [pscustomobject]@{
       Text = "Domain contoso.local`r`nGet-ComputerHealth version 1.2.3, last update 2026-01-02 03:04, domain contoso.local"
       Html = "<div>Domain contoso.local</div><div>Get-ComputerHealth version 1.2.3, last update 2026-01-02 03:04</div>"
+      HtmlTop = 'Domain contoso.local'
+      HtmlBottom = 'Get-ComputerHealth version 1.2.3, last update 2026-01-02 03:04'
     }
 
     $plain = Add-HealthEmailSignature -Body 'Relax :-)' -Signature $signature
     $html = Add-HealthEmailSignature -Body '<pre>body</pre>' -BodyAsHtml -Signature $signature
 
     $plain | Should -Be "Relax :-)`r`n`r`nDomain contoso.local`r`nGet-ComputerHealth version 1.2.3, last update 2026-01-02 03:04, domain contoso.local"
-    $html | Should -Be "<pre>body</pre><div style='margin-top:12px; color:#666; font-family:Segoe UI, Arial, sans-serif; font-size:12px'><div>Domain contoso.local</div><div>Get-ComputerHealth version 1.2.3, last update 2026-01-02 03:04</div></div>"
+    $html | Should -Be "<pre>body</pre><div style='margin-top:12px; font-family:Segoe UI, Arial, sans-serif'><div style='color:#000; font-size:12px'>Domain contoso.local</div><div style='color:#666; font-size:10px'>Get-ComputerHealth version 1.2.3, last update 2026-01-02 03:04</div></div>"
   }
 
   It 'renders a project link in the html signature footer' {

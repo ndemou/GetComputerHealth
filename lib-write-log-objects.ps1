@@ -38,8 +38,11 @@ Additional utilities:
   Get-StringSignature "Some text"
       Returns the 8-character signature associated with the message text.
 
+  Export-ObjectsToExcel $Data $FileName
+      Exports objects to Excel (requires ImportExcel module).
+
   Export-HealthMessagesToExcel $Data $FileName
-      Exports Log Objects to Excel (requires ImportExcel module).
+      Backward-compatible wrapper over Export-ObjectsToExcel.
 
 ------------------------------------------------------------------------------
 CONFIGURATION MODEL
@@ -95,9 +98,10 @@ Consumers SHOULD rely on returned objects, not console output, for automation.
 EXCEL EXPORT SUPPORT
 ------------------------------------------------------------------------------
 
-Export-HealthMessagesToExcel exports structured log data and includes a
-prebuilt suppression command for each non-suppressed message. This is
-specific to the Get-ComputerHealth consumer of this library.
+Export-ObjectsToExcel writes provided objects to an Excel worksheet.
+
+Export-HealthMessagesToExcel remains as a backward-compatible wrapper for
+consumers that already shape the rows they want to export.
 
 Requires ImportExcel module.
 
@@ -496,6 +500,18 @@ function Write-BasedOnTestResult {
 }
 
 
+function Export-ObjectsToExcel {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)][array]$Data,
+    [Parameter(Mandatory)][string]$FileName,
+    [string]$WorksheetName = 'Messages'
+  )
+
+  Import-Module ImportExcel -ErrorAction Stop
+  $Data | Export-Excel -Path $FileName -WorksheetName $WorksheetName -AutoSize -BoldTopRow
+}
+
 function Export-HealthMessagesToExcel {
   [CmdletBinding()]
   param(
@@ -503,33 +519,7 @@ function Export-HealthMessagesToExcel {
     [Parameter(Mandatory)][string]$FileName
   )
 
-  Import-Module ImportExcel -ErrorAction Stop
-
-  # export the requested columns
-  $Data |
-  Select-Object Computer, Suppressed, Level, Message, Comment, Hash, Emitter | ForEach-Object {
-    $safe_quotes_msg = $_.Message -replace '"', "''"
-    $commentText = "$($_.level) - $safe_quotes_msg"
-    if ($commentText.Length -gt 400) {
-      $commentText = $commentText.Substring(0, 400)
-    }
-    if ($_.Suppressed -or $_.Level -in @('info', 'debug')) {
-      $command = "" 
-    }
-    else {
-      $command = "Invoke-Command $($_.Computer) {c:\it\Get-ComputerHealth\bin\Get-ComputerHealth.ps1 -AddWhitelisting -until 2999-12-31 -sig '$($_.hash)' -ComputerName $($_.Computer) -comment ""$commentText""}"
-    }
-    [pscustomobject]@{
-      Computer             = $_.Computer
-      Suppressed           = $_.Suppressed
-      Level                = $_.Level
-      Message              = $_.Message
-      Comment              = $_.comment
-      Hash                 = $_.Hash
-      Emitter              = $_.Emitter
-      CommandToSuppressMsg = $command
-    }
-  } | Export-Excel -Path $FileName -WorksheetName 'Messages' -AutoSize -BoldTopRow
+  Export-ObjectsToExcel -Data $Data -FileName $FileName -WorksheetName 'Messages'
 }
 
 
