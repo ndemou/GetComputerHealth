@@ -45,7 +45,7 @@ Or:
 .EXAMPLE
 
     Start-HealthTestVeeamRecentBackupsExist `
-        -ConfigPath 'C:\it\config\HealthTest-RecentBackupsExist.config' `
+        -ConfigPath 'C:\Get-ComputerHealth\config\HealthTest-RecentBackupsExist.config' `
         -MaxAgeHoursForVibVbm 23 `
         -MaxAgeHoursForVBK 480
 

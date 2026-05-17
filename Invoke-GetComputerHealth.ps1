@@ -3,28 +3,28 @@
 Updates and then runs Get-ComputerHealth locally and/or via PowerShell remoting across multiple target computers, exports Excel reports, and emails a summary.
 
 .DESCRIPTION
-Wraps `C:\IT\bin\Get-ComputerHealth.ps1` to support multiple targets (including an AD-derived "all domain servers" set), then collects all returned health messages into Excel workbooks and optionally emails "notable" (non-suppressed, non-pass/info/debug/help) messages.
+Wraps `.\bin\Get-ComputerHealth.ps1` to support multiple targets (including an AD-derived "all domain servers" set), then collects all returned health messages into Excel workbooks and optionally emails "notable" (non-suppressed, non-pass/info/debug/help) messages.
 
 Per target:
-- Runs `C:\IT\bin\Update-GetHealthCode.ps1` then executes `C:\IT\bin\Get-ComputerHealth.ps1` with `-OutputObjects -OutputConsoleMessages`, plus the provided filters and optional custom tests folder (`C:\IT\config\Custom-HealthTests\`).
+- Runs `.\bin\Update-GetHealthCode.ps1` then executes `.\bin\Get-ComputerHealth.ps1` with `-OutputObjects -OutputConsoleMessages`, plus the provided filters and optional custom tests folder (`.\config\Custom-HealthTests\`).
 - For remote targets, checks basic TCP reachability and if reachable, uses `New-PSSession` to run the tests.
 
 After collection:
 - Exports all messages to `${TEMP_DIR}\all-messages-<timestamp>.xlsx`
 - Exports notable messages (if any) to `${TEMP_DIR}\notable-messages-<timestamp>.xlsx`
-- Sends email via `C:\IT\bin\Send-Message.ps1` (with attachment when notable messages exist)
+- Sends email via `.\bin\Send-Message.ps1` (with attachment when notable messages exist)
 
 Other effects:
 - Requires the PowerShell module `ImportExcel` to be already installed (typically by `Update-GetHealthCode.ps1`).
-- Starts a transcript at `C:\IT\log\Invoke-GetHealthDomainComputers-<timestamp>.log`.
+- Starts a transcript at `.\log\Invoke-GetHealthDomainComputers-<timestamp>.log`.
 - Sends email and may attach the notable-messages workbook.
 
 Dependencies & execution context:
-- Requires `C:\IT\bin\lib-write-log-objects.ps1` (dot-sourced) for logging/Excel export helper(s).
+- Requires `.\bin\lib-write-log-objects.ps1` (dot-sourced) for logging/Excel export helper(s).
 - Requires these local scripts to exist and be runnable (locally and on remotes):
-  - `C:\IT\bin\Update-GetHealthCode.ps1`
-  - `C:\IT\bin\Get-ComputerHealth.ps1`
-  - `C:\IT\bin\Send-Message.ps1` and `C:\IT\config\Send-Message.conf`
+  - `.\bin\Update-GetHealthCode.ps1`
+  - `.\bin\Get-ComputerHealth.ps1`
+  - `.\bin\Send-Message.ps1` and `.\config\Send-Message.conf`
 - Remote execution requires WinRM / PowerShell remoting connectivity and permissions sufficient to create sessions and run the above scripts remotely.
 
 .PARAMETER Computers
@@ -51,7 +51,7 @@ Passed through to Get-ComputerHealth as `-OnlyTheseTests` (limits which tests ru
 Passed through to Get-ComputerHealth as `-ExcludeTests` (skips selected tests).
 
 .PARAMETER NoUpdate
-Skips execution of `C:\IT\bin\Update-GetHealthCode.ps1` before running `Get-ComputerHealth.ps1` on each target.
+Skips execution of `.\bin\Update-GetHealthCode.ps1` before running `Get-ComputerHealth.ps1` on each target.
 
 .PARAMETER RunWithoutElevation
 Passes `-RunWithoutElevation` through to `Get-ComputerHealth.ps1` on each target, bypassing its normal elevation guard.
@@ -73,9 +73,9 @@ When targeting remote computers, copies the latest locally cached release zip fr
 
 .NOTES
 - AD enumeration for `ALL_DOMAIN_SERVERS` uses `System.DirectoryServices` (LDAP/GC) and DNS SRV lookup to choose a DC if needed.
-- Remote targets are executed via PowerShell remoting sessions; ensure WinRM is enabled and reachable (5985/5986) and that `C:\IT\bin\` and `C:\IT\config\` content exists on the remote machines as referenced.
+- Remote targets are executed via PowerShell remoting sessions; ensure WinRM is enabled and reachable (5985/5986) and that `.\bin\` and `.\config\` content exists on the remote machines as referenced.
 - Output paths used:
-  - Transcript: `C:\IT\log\Invoke-GetHealthDomainComputers-<timestamp>.log`
+  - Transcript: `.\log\Invoke-GetHealthDomainComputers-<timestamp>.log`
   - Excel: `${TEMP_DIR}\all-messages-<timestamp>.xlsx`, `${TEMP_DIR}\notable-messages-<timestamp>.xlsx`
 #>
 
@@ -443,7 +443,7 @@ $embeddedVersion = Get-EmbeddedGetComputerHealthVersion -ScriptPath $GET_HEALTH_
 $emailSignature = Get-HealthEmailSignature -VersionFilePath $VERSION_FILE_PATH -FallbackVersion $embeddedVersion -FallbackTimestampPath $GET_HEALTH_SCRIPT_PATH
 
 if (-not (Get-Module -ListAvailable -Name ImportExcel)) {
-  throw "Required module 'ImportExcel' is missing. Run C:\IT\bin\Update-GetHealthCode.ps1 to install prerequisites."
+  throw "Required module 'ImportExcel' is missing. Run Update-GetHealthCode.ps1 to install prerequisites."
 }
 
 if ($ExcludeServers) {

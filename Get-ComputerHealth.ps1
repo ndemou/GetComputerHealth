@@ -21,7 +21,7 @@ Idempotency:
 Dependencies & execution context:
 - Requires elevation.
 - Relies on companion scripts: `lib-write-log-objects.ps1` and the modules under `health-tests\*.ps1` dot-sourced below.
-- Uses a suppression config file at `C:\it\config\Get-ComputerHealth.sigs-to-suppress.txt`.
+- Uses a suppression config file at `.\config\Get-ComputerHealth.sigs-to-suppress.txt`.
 
 .PARAMETER RunWithoutElevation
 (Parameter sets: Run, AddWhitelist, List) Bypasses the normal elevation requirement. Default behavior still requires running as Administrator.
@@ -115,7 +115,7 @@ $out | Out-GridView
 .NOTES
 - Elevation is enforced for normal runs and for whitelisting operations.
 - `-RunWithoutElevation` bypasses the elevation guard; some health tests may still fail or produce incomplete results when run non-elevated.
-- Permanent suppression file: `C:\it\config\Get-ComputerHealth.sigs-to-suppress.txt`.
+- Permanent suppression file: `.\config\Get-ComputerHealth.sigs-to-suppress.txt`.
 - Custom tests: scripts may execute arbitrary code on import; files are loaded in temporary module scope and functions named `HealthTest-*` are invoked automatically.
 #>
 
