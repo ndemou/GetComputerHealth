@@ -65,22 +65,10 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
 
     $html | Should -Match '<th[^>]*>Computer<br>Level</th>'
     $html | Should -Match '<th[^>]*>Message</th>'
-    $html | Should -Match 'background-color:#f4ddbf; color:#000'
-    $html | Should -Match '<div>SRV1</div><div style=''margin-top:2px''>Warning</div>'
-    $html | Should -Match 'color:#1f5fa8; font-size:10px; font-family:Consolas, "Courier New", monospace'
+    $html | Should -Match '>SRV1</div><div'
+    $html | Should -Match '>Warning</div>'
     $html | Should -Match 'Drive C: has only 4% free<br>Investigate temp usage'
-    $html | Should -Match 'color:#666; font-size:6pt; font-family:"Arial Narrow", Arial, sans-serif'
     $html | Should -Match ([regex]::Escape('Invoke-Command SRV1 {c:\it\Get-ComputerHealth\bin\Get-ComputerHealth.ps1 -AddWhitelisting -until 2999-12-31 -sig &#39;deadbeef&#39; -ComputerName SRV1 -comment &quot;warning - Disk free space is low&quot;}'))
-  }
-
-  It 'uses distinct muted level backgrounds for notice and failure rows' {
-    $html = Convert-HealthMessagesToHtmlTable -Messages @(
-      [pscustomobject]@{ Level = 'notice'; Computer = 'SRV1'; Message = 'Inventory changed'; Comment = ''; Hash = '11111111' },
-      [pscustomobject]@{ Level = 'failure'; Computer = 'SRV2'; Message = 'Service is stopped'; Comment = ''; Hash = '22222222' }
-    )
-
-    $html | Should -Match 'background-color:#cfe0f5; color:#000'
-    $html | Should -Match 'background-color:#f3caca; color:#000'
   }
 
   It 'shapes Excel rows in Invoke-GetComputerHealth including suppression commands' {

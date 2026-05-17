@@ -333,13 +333,13 @@ function Convert-HealthMessagesToHtmlTable {
       $detailsHtml += "<div style='margin-top:4px; color:#666; font-size:6pt; font-family:""Arial Narrow"", Arial, sans-serif'>" + ([System.Net.WebUtility]::HtmlEncode($suppressionCommand)) + "</div>"
     }
 
-    $computerLevelHtml = "<div>" + ([System.Net.WebUtility]::HtmlEncode($computer)) + "</div><div style='margin-top:2px'>" + ([System.Net.WebUtility]::HtmlEncode($displayLevel)) + "</div>"
-    "<tr><td style='padding:6px 8px; border:1px solid #d0d7de; vertical-align:top; white-space:nowrap; background-color:$levelBackground; color:#000'>$computerLevelHtml</td><td style='padding:6px 8px; border:1px solid #d0d7de; vertical-align:top; color:#000'>$detailsHtml</td></tr>"
+    $computerLevelHtml = "<div style='font-weight:700; color:rgba(0,0,0,0.8)'>" + ([System.Net.WebUtility]::HtmlEncode($computer)) + "</div><div style='margin-top:2px'>" + ([System.Net.WebUtility]::HtmlEncode($displayLevel)) + "</div>"
+    "<tr><td style='padding:6px 8px; border:1px solid rgba(0,0,0,0.5); vertical-align:top; white-space:nowrap; background-color:$levelBackground; color:#000'>$computerLevelHtml</td><td style='padding:6px 8px; border:1px solid rgba(0,0,0,0.5); vertical-align:top; color:#000'>$detailsHtml</td></tr>"
   }
 
   return @(
     "<table style='border-collapse:collapse; width:100%; font-family:Segoe UI, Arial, sans-serif; font-size:12px'>"
-    "<thead><tr style='background-color:#f6f8fa'><th style='padding:6px 8px; border:1px solid #d0d7de; text-align:left'>Computer<br>Level</th><th style='padding:6px 8px; border:1px solid #d0d7de; text-align:left'>Message</th></tr></thead>"
+    "<thead><tr style='background-color:#f6f8fa'><th style='padding:6px 8px; border:1px solid rgba(0,0,0,0.5); text-align:left'>Computer<br>Level</th><th style='padding:6px 8px; border:1px solid rgba(0,0,0,0.5); text-align:left'>Message</th></tr></thead>"
     "<tbody>"
     ($rows -join '')
     "</tbody></table>"
