@@ -34,6 +34,8 @@ Special token `ALL_DOMAIN_SERVERS` expands to all AD computer objects with `oper
 
 .PARAMETER IpsOfAllDcs
 Array of IPv4 addresses for all domain controllers. Passed through to `Get-ComputerHealth.ps1` as `-IpsOfAllDcs`.
+When provided, the value is cached to `.\temp\cache.IpsOfAllDcs.clixml`.
+When omitted, the script reuses the cached value if that file exists.
 
 .PARAMETER ExcludeServers
 One or more hostnames to remove from the `ALL_DOMAIN_SERVERS` expansion.
@@ -58,6 +60,19 @@ Passes `-RunWithoutElevation` through to `Get-ComputerHealth.ps1` on each target
 
 .PARAMETER PushUpdate
 When targeting remote computers, copies the latest locally cached release zip from `${TEMP_DIR}` to each target and runs `Update-GetHealthCode.ps1 -UpdateFromZip <copied-zip>` before tests.
+
+.PARAMETER NoSendReport
+Suppresses email sending regardless of whether the script is running in an interactive or non-interactive context.
+Aliases: `NoSendMessage`, `NoSendMail`.
+
+.PARAMETER SendReport
+Forces email sending regardless of whether the script is running in an interactive or non-interactive context.
+
+.NOTES ON EMAIL DEFAULTS
+- In an interactive session, email sending defaults to off.
+- In a non-interactive session, email sending defaults to on.
+- `-NoSendReport` overrides the default and disables email sending.
+- `-SendReport` overrides the default and enables email sending.
 
 .EXAMPLE
 # Run against the local computer, export Excel, and email if notable messages exist:
@@ -93,7 +108,9 @@ param(
   [switch]$NoUpdate,
   [switch]$RunWithoutElevation,
   [switch]$PushUpdate,
-  [switch]$NoSendMessage,
+  [Alias('NoSendMessage', 'NoSendMail')]
+  [switch]$NoSendReport,
+  [switch]$SendReport,
   [string[]]$IpsOfAllDcs = @(),
   [string[]]$Computers,
   [Parameter(ValueFromRemainingArguments = $true)]
@@ -114,6 +131,9 @@ $GET_HEALTH_SCRIPT_PATH = Join-Path $SCRIPT_BIN_DIR 'Get-ComputerHealth.ps1'
 $SEND_MESSAGE_SCRIPT_PATH = Join-Path $SCRIPT_BIN_DIR 'Send-Message.ps1'
 $LIB_LOG_OBJECTS_PATH = Join-Path $SCRIPT_BIN_DIR 'lib-write-log-objects.ps1'
 $VERSION_FILE_PATH = Join-Path $SCRIPT_BIN_DIR 'VERSION'
+$IPS_OF_ALL_DCS_CACHE_PATH = Join-Path $TEMP_DIR 'cache.IpsOfAllDcs.clixml'
+$LAST_REPORT_HTML_PATH = Join-Path $TEMP_DIR 'last-report.html'
+$PROJECT_URL = 'https://github.com/ndemou/GetComputerHealth'
 
 $SmtpSubject = 'Notable Messages from Get-ComputerHealth of LIST_OF_COMPUTERS'
 $SmtpSubjectAllGood = 'RELAX. No notable Messages from Get-ComputerHealth of LIST_OF_COMPUTERS'
@@ -123,7 +143,7 @@ $SmtpConfig = Join-Path $CONFIG_DIR 'Send-Message.conf'
 #------------------------------------------------------------------------
 
 function Invoke-HealthEmail {
-  # Send the final report via email (except if -NoSendMessage is passed)
+  # Send the final report via email (except if -NoSendReport is passed)
   [CmdletBinding()]
   param(
     [Parameter(Mandatory)][string]$Subject,
@@ -131,10 +151,10 @@ function Invoke-HealthEmail {
     [Parameter(Mandatory)][string]$Body,
     [switch]$BodyAsHtml,
     [string[]]$Attachments,
-    [switch]$NoSendMessage
+    [switch]$NoSendReport
   )
 
-  if ($NoSendMessage) { return }
+  if ($NoSendReport) { return }
 
   if (-not (Test-Path $ConfigFile)) {
     Write-Host -for Yellow "Will not email results because send-message.ps1 is not configured. If you want to configure it run ``Send-Message.ps1 -GenerateConfig '$ConfigFile'``."
@@ -158,12 +178,38 @@ function Invoke-HealthEmail {
   }
 }
 
+function Test-IsNonInteractiveContext {
+  [CmdletBinding()]
+  param(
+    [int]$SessionId = [System.Diagnostics.Process]::GetCurrentProcess().SessionId,
+    [bool]$UserInteractive = [Environment]::UserInteractive
+  )
+
+  return ($SessionId -eq 0 -or (-not $UserInteractive))
+}
+
+function Resolve-HealthEmailPreference {
+  [CmdletBinding()]
+  param(
+    [switch]$NoSendReport,
+    [switch]$SendReport,
+    [switch]$NonInteractiveContext
+  )
+
+  if ($NoSendReport) { return $false }
+  if ($SendReport) { return $true }
+  return [bool]$NonInteractiveContext
+}
+
 function Get-HealthEmailSignature {
   [CmdletBinding()]
   param(
     [Parameter(Mandatory)][string]$VersionFilePath,
     [Parameter(Mandatory)][string]$FallbackVersion,
     [Parameter(Mandatory)][string]$FallbackTimestampPath,
+    [string]$ProjectUrl = 'https://github.com/ndemou/GetComputerHealth',
+    [ValidateSet('Domain', 'Workgroup')]
+    [string]$DomainRole = $(if ($env:USERDNSDOMAIN) { 'Domain' } else { 'Workgroup' }),
     [string]$DomainName = $(if ($env:USERDNSDOMAIN) { $env:USERDNSDOMAIN } elseif ($env:USERDOMAIN) { $env:USERDOMAIN } else { $env:COMPUTERNAME })
   )
 
@@ -197,11 +243,16 @@ function Get-HealthEmailSignature {
   }
 
   $domainText = if ([string]::IsNullOrWhiteSpace($DomainName)) { 'unknown' } else { $DomainName.Trim() }
+  $locationText = "$DomainRole $domainText"
   $signatureText = "Get-ComputerHealth version $version, last update $lastUpdate, domain $domainText"
+  $encodedProjectUrl = [System.Net.WebUtility]::HtmlEncode($ProjectUrl)
+  $encodedVersion = [System.Net.WebUtility]::HtmlEncode([string]$version)
+  $encodedLastUpdate = [System.Net.WebUtility]::HtmlEncode([string]$lastUpdate)
+  $encodedLocation = [System.Net.WebUtility]::HtmlEncode([string]$locationText)
 
   return [pscustomobject]@{
-    Text = $signatureText
-    Html = [System.Net.WebUtility]::HtmlEncode($signatureText)
+    Text = ($locationText + "`r`n" + $signatureText)
+    Html = "<div>$encodedLocation</div><div><a href='$encodedProjectUrl'>Get-ComputerHealth</a> version $encodedVersion, last update $encodedLastUpdate</div>"
   }
 }
 
@@ -215,7 +266,7 @@ function Add-HealthEmailSignature {
 
   if ($BodyAsHtml) {
     $baseBody = if ([string]::IsNullOrEmpty($Body)) { '' } else { $Body }
-    return ($baseBody + "<div style='margin-top:12px; color:#666; font-family:Consolas, ""Courier New"", monospace; font-size:12px'>$($Signature.Html)</div>")
+    return ($baseBody + "<div style='margin-top:12px; color:#666; font-family:Segoe UI, Arial, sans-serif; font-size:12px'>$($Signature.Html)</div>")
   }
 
   if ([string]::IsNullOrEmpty($Body)) {
@@ -223,6 +274,157 @@ function Add-HealthEmailSignature {
   }
 
   return ($Body.TrimEnd() + "`r`n`r`n" + $Signature.Text)
+}
+
+function Get-HealthSuppressionCommand {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)]$MessageRecord
+  )
+
+  $hash = if ($MessageRecord.PSObject.Properties['Hash']) { [string]$MessageRecord.Hash } else { '' }
+  $computer = if ($MessageRecord.PSObject.Properties['Computer']) { [string]$MessageRecord.Computer } else { '' }
+
+  if (($hash -match '^[0-9a-fA-F]{8}$') -and (-not [string]::IsNullOrWhiteSpace($computer))) {
+    $messageText = if ($MessageRecord.PSObject.Properties['Message']) { [string]$MessageRecord.Message } else { '' }
+    $levelText = if ($MessageRecord.PSObject.Properties['Level']) { [string]$MessageRecord.Level } else { '' }
+    $safeMessageText = $messageText -replace '"', "''"
+    $commentText = "$levelText - $safeMessageText"
+    if ($commentText.Length -gt 400) {
+      $commentText = $commentText.Substring(0, 400)
+    }
+    return ("Invoke-Command {0} {{c:\it\Get-ComputerHealth\bin\Get-ComputerHealth.ps1 -AddWhitelisting -until 2999-12-31 -sig '{1}' -ComputerName {0} -comment ""{2}""}}" -f $computer.Trim(), $hash.ToLowerInvariant(), $commentText)
+  }
+
+  return ''
+}
+
+function Convert-HealthMessagesToHtmlTable {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)][object[]]$Messages
+  )
+
+  $rows = foreach ($message in $Messages) {
+    $level = if ($message.PSObject.Properties['Level']) { [string]$message.Level } else { '' }
+    $computer = if ($message.PSObject.Properties['Computer']) { [string]$message.Computer } else { '' }
+    $text = if ($message.PSObject.Properties['Message']) { [string]$message.Message } else { '' }
+    $comment = if ($message.PSObject.Properties['Comment']) { [string]$message.Comment } else { '' }
+    $suppressionCommand = Get-HealthSuppressionCommand -MessageRecord $message
+    $displayLevel = if ([string]::IsNullOrWhiteSpace($level)) { '' } else { $level.Substring(0, 1).ToUpperInvariant() + $level.Substring(1).ToLowerInvariant() }
+    $levelBackground = switch ($level.ToLowerInvariant()) {
+      'failure' { '#f3caca' }
+      'warning' { '#f4ddbf' }
+      'notice' { '#cfe0f5' }
+      default { '#eef1f4' }
+    }
+
+    $messageHtml = [System.Net.WebUtility]::HtmlEncode($text)
+    $detailsHtml = "<div>$messageHtml</div>"
+
+    if (-not [string]::IsNullOrWhiteSpace($comment)) {
+      $commentHtml = [System.Net.WebUtility]::HtmlEncode($comment) -replace '(\r\n|\n|\r)', '<br>'
+      $detailsHtml += "<div style='margin-top:4px; color:#1f5fa8; font-size:11px'>$commentHtml</div>"
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($suppressionCommand)) {
+      $detailsHtml += "<div style='margin-top:4px; color:#00a7c4; font-size:6pt; font-family:""Arial Narrow"", Arial, sans-serif'>" + ([System.Net.WebUtility]::HtmlEncode($suppressionCommand)) + "</div>"
+    }
+
+    "<tr><td style='padding:6px 8px; border:1px solid #d0d7de; vertical-align:top; white-space:nowrap; background-color:$levelBackground; color:#000'>" + ([System.Net.WebUtility]::HtmlEncode($displayLevel)) + "</td><td style='padding:6px 8px; border:1px solid #d0d7de; vertical-align:top; white-space:nowrap'>" + ([System.Net.WebUtility]::HtmlEncode($computer)) + "</td><td style='padding:6px 8px; border:1px solid #d0d7de; vertical-align:top; color:#000'>$detailsHtml</td></tr>"
+  }
+
+  return @(
+    "<table style='border-collapse:collapse; width:100%; font-family:Segoe UI, Arial, sans-serif; font-size:12px'>"
+    "<thead><tr style='background-color:#f6f8fa'><th style='padding:6px 8px; border:1px solid #d0d7de; text-align:left'>Level</th><th style='padding:6px 8px; border:1px solid #d0d7de; text-align:left'>Computer</th><th style='padding:6px 8px; border:1px solid #d0d7de; text-align:left'>Message</th></tr></thead>"
+    "<tbody>"
+    ($rows -join '')
+    "</tbody></table>"
+  ) -join ''
+}
+
+function Get-CachedIpsOfAllDcs {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)][string]$CachePath
+  )
+
+  if (-not (Test-Path -LiteralPath $CachePath -PathType Leaf)) {
+    return @()
+  }
+
+  try {
+    $cachedValue = Import-Clixml -LiteralPath $CachePath -ErrorAction Stop
+    return @(
+      @($cachedValue) |
+        ForEach-Object { [string]$_ } |
+        Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+    )
+  }
+  catch {
+    Write-Verbose "Failed reading cached IpsOfAllDcs from '$CachePath': $($_.Exception.Message)"
+    return @()
+  }
+}
+
+function Set-CachedIpsOfAllDcs {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)][string]$CachePath,
+    [Parameter(Mandatory)][string[]]$IpsOfAllDcs
+  )
+
+  $cacheDir = Split-Path -Parent $CachePath
+  if (-not [string]::IsNullOrWhiteSpace($cacheDir) -and (-not (Test-Path -LiteralPath $cacheDir -PathType Container))) {
+    New-Item -ItemType Directory -Path $cacheDir -Force | Out-Null
+  }
+
+  @($IpsOfAllDcs) | Export-Clixml -LiteralPath $CachePath -Force
+}
+
+function Resolve-IpsOfAllDcs {
+  [CmdletBinding()]
+  param(
+    [string[]]$IpsOfAllDcs = @(),
+    [switch]$WasProvided,
+    [Parameter(Mandatory)][string]$CachePath
+  )
+
+  if ($WasProvided) {
+    $resolvedIps = @(
+      @($IpsOfAllDcs) |
+        ForEach-Object { [string]$_ } |
+        Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+    )
+
+    if ($resolvedIps.Count -gt 0) {
+      Set-CachedIpsOfAllDcs -CachePath $CachePath -IpsOfAllDcs $resolvedIps
+      Write-Verbose "Cached IpsOfAllDcs to '$CachePath'"
+    }
+
+    return $resolvedIps
+  }
+
+  $cachedIps = Get-CachedIpsOfAllDcs -CachePath $CachePath
+  if ($cachedIps.Count -gt 0) {
+    Write-Verbose "Using cached IpsOfAllDcs from '$CachePath'"
+  }
+  return $cachedIps
+}
+
+function Save-HealthHtmlReport {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)][string]$Path,
+    [Parameter(Mandatory)][string]$Html
+  )
+
+  $parentDir = Split-Path -Parent $Path
+  if (-not [string]::IsNullOrWhiteSpace($parentDir) -and (-not (Test-Path -LiteralPath $parentDir -PathType Container))) {
+    New-Item -ItemType Directory -Path $parentDir -Force | Out-Null
+  }
+
+  Set-Content -LiteralPath $Path -Value $Html -Encoding UTF8
 }
 
 function Get-HealthNotableSubject {
@@ -437,10 +639,13 @@ function Get-LatestLocalReleaseZip {
 
 $timestamp = $(get-date -Format 'yyyy-MM-dd_HH.mm')
 if (-not (Test-Path -LiteralPath $LOG_DIR)) { New-Item -ItemType Directory -Path $LOG_DIR -Force | Out-Null }
+if (-not (Test-Path -LiteralPath $TEMP_DIR)) { New-Item -ItemType Directory -Path $TEMP_DIR -Force | Out-Null }
 Start-Transcript (Join-Path $LOG_DIR "Invoke-GetHealthDomainComputers-$timestamp.log")
 . $LIB_LOG_OBJECTS_PATH
 $embeddedVersion = Get-EmbeddedGetComputerHealthVersion -ScriptPath $GET_HEALTH_SCRIPT_PATH
 $emailSignature = Get-HealthEmailSignature -VersionFilePath $VERSION_FILE_PATH -FallbackVersion $embeddedVersion -FallbackTimestampPath $GET_HEALTH_SCRIPT_PATH
+$sendMailByDefault = Resolve-HealthEmailPreference -NoSendReport:$NoSendReport -SendReport:$SendReport -NonInteractiveContext:(Test-IsNonInteractiveContext)
+$IpsOfAllDcs = Resolve-IpsOfAllDcs -IpsOfAllDcs $IpsOfAllDcs -WasProvided:$PSBoundParameters.ContainsKey('IpsOfAllDcs') -CachePath $IPS_OF_ALL_DCS_CACHE_PATH
 
 if (-not (Get-Module -ListAvailable -Name ImportExcel)) {
   throw "Required module 'ImportExcel' is missing. Run Update-GetHealthCode.ps1 to install prerequisites."
@@ -741,31 +946,27 @@ if ($all_messages) {
     Write-host -for gray   ""
     Write-host -for gray   "Emailing notable messages"
 
-    $body = ""
+    $htmlParts = @()
     if ($notable_msgs.count -gt 10) {
-      # too many messages; add a synopsis at the top
-      $body += "Synopsis of messages per level`r`n" + $synopsis + "`r`n"
+      $encodedSynopsis = [System.Net.WebUtility]::HtmlEncode(("Synopsis of messages per level`r`n" + $synopsis).TrimEnd())
+      $htmlParts += "<pre style='font-family:Consolas, ""Courier New"", monospace; white-space:pre-wrap; margin:0 0 12px 0; font-size:12px; line-height:1.35'>$encodedSynopsis</pre>"
     }
-    $body += `
-    ($notable_msgs |
-      Sort-Object -Property @{ Expression = { $SortOrder[$_.Level] } }, Computer |
-      ForEach-Object {
-        "$($_.Computer.PadRight(15)) $($_.Level.PadRight(8)) $($_.Message)"
-      } | Out-String `
+    $htmlParts += Convert-HealthMessagesToHtmlTable -Messages @(
+      $notable_msgs | Sort-Object -Property @{ Expression = { $SortOrder[$_.Level] } }, Computer
     )
-
-    $encoded = [System.Net.WebUtility]::HtmlEncode($body)
-    $html = "<pre style='font-family: Consolas, ""Courier New"", monospace; white-space:pre-wrap; margin:0; font-size:12px; line-height:1.35'>$encoded</pre>"
+    $html = $htmlParts -join ''
 
     $signedHtml = Add-HealthEmailSignature -Body $html -BodyAsHtml -Signature $emailSignature
+    Save-HealthHtmlReport -Path $LAST_REPORT_HTML_PATH -Html $signedHtml
     $smtpNotableSubject = Get-HealthNotableSubject -FallbackSubject $SmtpSubject -NotableMessages $notable_msgs
-    Invoke-HealthEmail -Subject $smtpNotableSubject -Body $signedHtml -BodyAsHtml -Attachments "${TEMP_DIR}\notable-messages-$($timestamp).xlsx" -ConfigFile $SmtpConfig -NoSendMessage:$NoSendMessage
+    Invoke-HealthEmail -Subject $smtpNotableSubject -Body $signedHtml -BodyAsHtml -Attachments "${TEMP_DIR}\notable-messages-$($timestamp).xlsx" -ConfigFile $SmtpConfig -NoSendReport:(-not $sendMailByDefault)
   }
   else {
     Write-host -for green    "GOOD, Nothing notable to record. I have saved less notable messages here:"
     Write-host -for gray     "    ${TEMP_DIR}\all-messages-$($timestamp).xlsx"
-    $signedBody = Add-HealthEmailSignature -Body 'Relax :-)' -Signature $emailSignature
-    Invoke-HealthEmail -Subject $SmtpSubjectAllGood -Body $signedBody -ConfigFile $SmtpConfig -NoSendMessage:$NoSendMessage
+    $signedBody = Add-HealthEmailSignature -Body '<div>Relax :-)</div>' -BodyAsHtml -Signature $emailSignature
+    Save-HealthHtmlReport -Path $LAST_REPORT_HTML_PATH -Html $signedBody
+    Invoke-HealthEmail -Subject $SmtpSubjectAllGood -Body $signedBody -BodyAsHtml -ConfigFile $SmtpConfig -NoSendReport:(-not $sendMailByDefault)
   }
 }
 else {
