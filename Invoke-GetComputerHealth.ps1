@@ -339,7 +339,6 @@ function Convert-HealthMessagesToHtmlTable {
 
   return @(
     "<table style='border-collapse:collapse; width:100%; font-family:Segoe UI, Arial, sans-serif; font-size:12px'>"
-    "<thead><tr style='background-color:#f6f8fa'><th style='padding:6px 8px; border:1px solid rgba(0,0,0,0.5); text-align:left'>Computer<br>Level</th><th style='padding:6px 8px; border:1px solid rgba(0,0,0,0.5); text-align:left'>Message</th></tr></thead>"
     "<tbody>"
     ($rows -join '')
     "</tbody></table>"

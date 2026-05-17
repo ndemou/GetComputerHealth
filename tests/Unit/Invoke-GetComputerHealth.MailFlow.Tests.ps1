@@ -63,8 +63,7 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
       }
     )
 
-    $html | Should -Match '<th[^>]*>Computer<br>Level</th>'
-    $html | Should -Match '<th[^>]*>Message</th>'
+    $html | Should -Not -Match '<thead>'
     $html | Should -Match '>SRV1</div><div'
     $html | Should -Match '>Warning</div>'
     $html | Should -Match 'Drive C: has only 4% free<br>Investigate temp usage'
