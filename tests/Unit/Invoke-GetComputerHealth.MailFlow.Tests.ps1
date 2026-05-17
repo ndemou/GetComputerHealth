@@ -67,7 +67,7 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
     $html | Should -Match '<th[^>]*>Message</th>'
     $html | Should -Match 'background-color:#f4ddbf; color:#000'
     $html | Should -Match '<div>SRV1</div><div style=''margin-top:2px''>Warning</div>'
-    $html | Should -Match 'color:#1f5fa8; font-size:10px'
+    $html | Should -Match 'color:#1f5fa8; font-size:10px; font-family:Consolas, "Courier New", monospace'
     $html | Should -Match 'Drive C: has only 4% free<br>Investigate temp usage'
     $html | Should -Match 'color:#666; font-size:6pt; font-family:"Arial Narrow", Arial, sans-serif'
     $html | Should -Match ([regex]::Escape('Invoke-Command SRV1 {c:\it\Get-ComputerHealth\bin\Get-ComputerHealth.ps1 -AddWhitelisting -until 2999-12-31 -sig &#39;deadbeef&#39; -ComputerName SRV1 -comment &quot;warning - Disk free space is low&quot;}'))

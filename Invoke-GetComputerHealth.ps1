@@ -326,7 +326,7 @@ function Convert-HealthMessagesToHtmlTable {
 
     if (-not [string]::IsNullOrWhiteSpace($comment)) {
       $commentHtml = [System.Net.WebUtility]::HtmlEncode($comment) -replace '(\r\n|\n|\r)', '<br>'
-      $detailsHtml += "<div style='margin-top:4px; color:#1f5fa8; font-size:10px'>$commentHtml</div>"
+      $detailsHtml += "<div style='margin-top:4px; color:#1f5fa8; font-size:10px; font-family:Consolas, ""Courier New"", monospace'>$commentHtml</div>"
     }
 
     if (-not [string]::IsNullOrWhiteSpace($suppressionCommand)) {
