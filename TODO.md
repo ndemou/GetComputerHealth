@@ -1,5 +1,12 @@
 ﻿# TODO
 
+## Ignore replication at Warning state if last Last successful replication was within 10 minutes
+Example:
+```
+Message: replication health for VM 'SRV1(Win 2025)' is at Warning state
+Comment: ReplicationState: Replicating
+Last successful replication time: 05/18/2026 10:43:17
+```
 ## Invoke-GetComputerHealth.ps1 should be deleting transcripts (like `.\log\Invoke-GetHealthDomainComputers-<timestamp>.log`) older than 1 month.
 
 ## Save test results to .\data instead of .\temp
