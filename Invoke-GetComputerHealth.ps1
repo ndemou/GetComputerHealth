@@ -151,13 +151,20 @@ function Invoke-HealthEmail {
     [Parameter(Mandatory)][string]$Body,
     [switch]$BodyAsHtml,
     [string[]]$Attachments,
-    [switch]$NoSendReport
+    [switch]$NoSendReport,
+    [string]$SkipReason
   )
 
-  if ($NoSendReport) { return }
+  if ($NoSendReport) {
+    if ([string]::IsNullOrWhiteSpace($SkipReason)) {
+      $SkipReason = 'Email sending disabled.'
+    }
+    Write-Host -for Yellow ("Will not send email report. Reason: {0}" -f $SkipReason)
+    return
+  }
 
   if (-not (Test-Path $ConfigFile)) {
-    Write-Host -for Yellow "Will not email results because send-message.ps1 is not configured. If you want to configure it run ``Send-Message.ps1 -GenerateConfig '$ConfigFile'``."
+    Write-Host -for Yellow ("Will not send email report. Reason: send-message.ps1 is not configured. If you want to configure it run ``Send-Message.ps1 -GenerateConfig '{0}'``." -f $ConfigFile)
     return
   }
   $mailParams = @{
@@ -167,6 +174,7 @@ function Invoke-HealthEmail {
   }
   if ($BodyAsHtml) { $mailParams['BodyAsHtml'] = $true }
   if ($Attachments -and $Attachments.Count) { $mailParams['Attachments'] = $Attachments }
+  Write-host -for gray   ("Attempting to send email report. Subject: {0}" -f $Subject)
   Write-host -for gray   "Sending email... " -NoNewLine
   try {
     & $SEND_MESSAGE_SCRIPT_PATH @mailParams
@@ -199,6 +207,41 @@ function Resolve-HealthEmailPreference {
   if ($NoSendReport) { return $false }
   if ($SendReport) { return $true }
   return [bool]$NonInteractiveContext
+}
+
+function Get-HealthEmailDecision {
+  [CmdletBinding()]
+  param(
+    [switch]$NoSendReport,
+    [switch]$SendReport,
+    [switch]$NonInteractiveContext
+  )
+
+  if ($NoSendReport) {
+    return [pscustomobject]@{
+      ShouldSend = $false
+      Reason = 'Email sending disabled by -NoSendReport.'
+    }
+  }
+
+  if ($SendReport) {
+    return [pscustomobject]@{
+      ShouldSend = $true
+      Reason = 'Email sending forced by -SendReport.'
+    }
+  }
+
+  if ($NonInteractiveContext) {
+    return [pscustomobject]@{
+      ShouldSend = $true
+      Reason = 'Email sending enabled by default because the script is running in a non-interactive context.'
+    }
+  }
+
+  return [pscustomobject]@{
+    ShouldSend = $false
+    Reason = 'Email sending disabled by default because the script is running in an interactive context.'
+  }
 }
 
 function Get-HealthEmailSignature {
@@ -685,8 +728,10 @@ Start-Transcript (Join-Path $LOG_DIR "Invoke-GetHealthDomainComputers-$timestamp
 . $LIB_LOG_OBJECTS_PATH
 $embeddedVersion = Get-EmbeddedGetComputerHealthVersion -ScriptPath $GET_HEALTH_SCRIPT_PATH
 $emailSignature = Get-HealthEmailSignature -VersionFilePath $VERSION_FILE_PATH -FallbackVersion $embeddedVersion -FallbackTimestampPath $GET_HEALTH_SCRIPT_PATH
-$sendMailByDefault = Resolve-HealthEmailPreference -NoSendReport:$NoSendReport -SendReport:$SendReport -NonInteractiveContext:(Test-IsNonInteractiveContext)
+$emailDecision = Get-HealthEmailDecision -NoSendReport:$NoSendReport -SendReport:$SendReport -NonInteractiveContext:(Test-IsNonInteractiveContext)
+$sendMailByDefault = [bool]$emailDecision.ShouldSend
 $IpsOfAllDcs = Resolve-IpsOfAllDcs -IpsOfAllDcs $IpsOfAllDcs -WasProvided:$PSBoundParameters.ContainsKey('IpsOfAllDcs') -CachePath $IPS_OF_ALL_DCS_CACHE_PATH
+Write-Host -for Gray ("Email report decision: {0}" -f $emailDecision.Reason)
 
 if (-not (Get-Module -ListAvailable -Name ImportExcel)) {
   throw "Required module 'ImportExcel' is missing. Run Update-GetHealthCode.ps1 to install prerequisites."
@@ -985,7 +1030,7 @@ if ($all_messages) {
     Write-host -for gray   '    $data|select -Property Computer,Level,Message # Console review'
 
     Write-host -for gray   ""
-    Write-host -for gray   "Emailing notable messages"
+    Write-host -for gray   "Preparing notable report"
 
     $htmlParts = @()
     if ($notable_msgs.count -gt 10) {
@@ -1000,14 +1045,14 @@ if ($all_messages) {
     $signedHtml = Add-HealthEmailSignature -Body $html -BodyAsHtml -Signature $emailSignature
     Save-HealthHtmlReport -Path $LAST_REPORT_HTML_PATH -Html $signedHtml
     $smtpNotableSubject = Get-HealthNotableSubject -FallbackSubject $SmtpSubject -NotableMessages $notable_msgs
-    Invoke-HealthEmail -Subject $smtpNotableSubject -Body $signedHtml -BodyAsHtml -Attachments "${TEMP_DIR}\notable-messages-$($timestamp).xlsx" -ConfigFile $SmtpConfig -NoSendReport:(-not $sendMailByDefault)
+    Invoke-HealthEmail -Subject $smtpNotableSubject -Body $signedHtml -BodyAsHtml -Attachments "${TEMP_DIR}\notable-messages-$($timestamp).xlsx" -ConfigFile $SmtpConfig -NoSendReport:(-not $sendMailByDefault) -SkipReason $emailDecision.Reason
   }
   else {
     Write-host -for green    "GOOD, Nothing notable to record. I have saved less notable messages here:"
     Write-host -for gray     "    ${TEMP_DIR}\all-messages-$($timestamp).xlsx"
     $signedBody = Add-HealthEmailSignature -Body '<div>Relax :-)</div>' -BodyAsHtml -Signature $emailSignature
     Save-HealthHtmlReport -Path $LAST_REPORT_HTML_PATH -Html $signedBody
-    Invoke-HealthEmail -Subject $SmtpSubjectAllGood -Body $signedBody -BodyAsHtml -ConfigFile $SmtpConfig -NoSendReport:(-not $sendMailByDefault)
+    Invoke-HealthEmail -Subject $SmtpSubjectAllGood -Body $signedBody -BodyAsHtml -ConfigFile $SmtpConfig -NoSendReport:(-not $sendMailByDefault) -SkipReason $emailDecision.Reason
   }
 }
 else {

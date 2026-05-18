@@ -11,6 +11,7 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
     foreach ($functionName in @(
         'Test-IsNonInteractiveContext',
         'Resolve-HealthEmailPreference',
+        'Get-HealthEmailDecision',
         'Get-HealthSuppressionCommand',
         'Convert-HealthMessagesToHtmlTable',
         'Convert-HealthMessagesToExcelRows',
@@ -46,6 +47,30 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
   It 'lets explicit switches override the default send-mail behavior' {
     (Resolve-HealthEmailPreference -SendReport -NonInteractiveContext:$false) | Should -BeTrue
     (Resolve-HealthEmailPreference -NoSendReport -NonInteractiveContext:$true) | Should -BeFalse
+  }
+
+  It 'explains that interactive sessions do not send email by default' {
+    $decision = Get-HealthEmailDecision -NonInteractiveContext:(Test-IsNonInteractiveContext -SessionId 1 -UserInteractive $true)
+
+    $decision.ShouldSend | Should -BeFalse
+    $decision.Reason | Should -Be 'Email sending disabled by default because the script is running in an interactive context.'
+  }
+
+  It 'explains that non-interactive sessions send email by default' {
+    $decision = Get-HealthEmailDecision -NonInteractiveContext:(Test-IsNonInteractiveContext -SessionId 0 -UserInteractive $false)
+
+    $decision.ShouldSend | Should -BeTrue
+    $decision.Reason | Should -Be 'Email sending enabled by default because the script is running in a non-interactive context.'
+  }
+
+  It 'explains explicit email send overrides' {
+    $forcedSend = Get-HealthEmailDecision -SendReport -NonInteractiveContext:$false
+    $forcedSkip = Get-HealthEmailDecision -NoSendReport -NonInteractiveContext:$true
+
+    $forcedSend.ShouldSend | Should -BeTrue
+    $forcedSend.Reason | Should -Be 'Email sending forced by -SendReport.'
+    $forcedSkip.ShouldSend | Should -BeFalse
+    $forcedSkip.Reason | Should -Be 'Email sending disabled by -NoSendReport.'
   }
 
   It 'keeps the legacy NoSendMessage switch as a compatibility alias' {
