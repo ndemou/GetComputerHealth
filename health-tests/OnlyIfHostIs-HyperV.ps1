@@ -33,13 +33,74 @@ Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time)
 Uses: Get-VM, Get-VMReplication.
 #>
-    function Get-ReplicationDetailText {
+    function Get-LastSuccessfulReplicationTime {
         param(
             [Parameter(Mandatory)][object]$Vm,
             [AllowNull()][object]$ReplicationInfo
         )
 
-        $sources = @($ReplicationInfo, $Vm)
+        foreach ($source in @($ReplicationInfo, $Vm)) {
+            if ($null -eq $source) { continue }
+            foreach ($propertyName in @('LastReplicationTime', 'LastSuccessfulReplicationTime', 'LastSuccessfulReplication', 'LastReplicatedTime')) {
+                $prop = $source.PSObject.Properties[$propertyName]
+                if ($prop -and $null -ne $prop.Value -and "$($prop.Value)".Trim() -ne '') {
+                    return $prop.Value
+                }
+            }
+        }
+
+        return $null
+    }
+
+    function ConvertTo-ReplicationDateTime {
+        param(
+            [AllowNull()][object]$Value
+        )
+
+        if ($null -eq $Value -or "$Value".Trim() -eq '') {
+            return $null
+        }
+
+        if ($Value -is [datetime]) {
+            return [datetime]$Value
+        }
+
+        $parsed = [datetime]::MinValue
+        if ([datetime]::TryParse([string]$Value, [System.Globalization.CultureInfo]::CurrentCulture, [System.Globalization.DateTimeStyles]::AssumeLocal, [ref]$parsed)) {
+            return $parsed
+        }
+
+        if ([datetime]::TryParse([string]$Value, [System.Globalization.CultureInfo]::InvariantCulture, [System.Globalization.DateTimeStyles]::AssumeLocal, [ref]$parsed)) {
+            return $parsed
+        }
+
+        return $null
+    }
+
+    function Get-ReplicationWarningLevel {
+        param(
+            [AllowNull()][object]$LastSuccessfulReplicationTime
+        )
+
+        $lastSuccessfulReplicationDate = ConvertTo-ReplicationDateTime -Value $LastSuccessfulReplicationTime
+        if ($null -eq $lastSuccessfulReplicationDate) {
+            return 'FAILURE'
+        }
+
+        $age = (Get-Date) - $lastSuccessfulReplicationDate
+        if ($age.TotalMinutes -le 5) { return 'INFO' }
+        if ($age.TotalMinutes -le 20) { return 'NOTICE' }
+        if ($age.TotalMinutes -le 40) { return 'WARNING' }
+
+        return 'FAILURE'
+    }
+
+    function Get-ReplicationDetailText {
+        param(
+            [Parameter(Mandatory)][object]$Vm,
+            [AllowNull()][object]$LastSuccessfulReplicationTime
+        )
+
         $details = @()
 
         $state = $Vm.PSObject.Properties['ReplicationState']
@@ -47,21 +108,8 @@ Uses: Get-VM, Get-VMReplication.
             $details += "ReplicationState: $($state.Value)"
         }
 
-        $lastSuccessfulReplicationTime = $null
-        foreach ($source in $sources) {
-            if ($null -eq $source) { continue }
-            foreach ($propertyName in @('LastReplicationTime', 'LastSuccessfulReplicationTime', 'LastSuccessfulReplication', 'LastReplicatedTime')) {
-                $prop = $source.PSObject.Properties[$propertyName]
-                if ($prop -and $null -ne $prop.Value -and "$($prop.Value)".Trim() -ne '') {
-                    $lastSuccessfulReplicationTime = $prop.Value
-                    break
-                }
-            }
-            if ($lastSuccessfulReplicationTime) { break }
-        }
-
-        if ($lastSuccessfulReplicationTime) {
-            $details += "Last successful replication time: $lastSuccessfulReplicationTime"
+        if ($LastSuccessfulReplicationTime) {
+            $details += "Last successful replication time: $LastSuccessfulReplicationTime"
         }
 
         if ($details.Count -eq 0) {
@@ -87,12 +135,14 @@ Uses: Get-VM, Get-VMReplication.
             catch {
             }
 
-            $details = Get-ReplicationDetailText -Vm $vm -ReplicationInfo $replicationInfo
+            $lastSuccessfulReplicationTime = Get-LastSuccessfulReplicationTime -Vm $vm -ReplicationInfo $replicationInfo
+            $details = Get-ReplicationDetailText -Vm $vm -LastSuccessfulReplicationTime $lastSuccessfulReplicationTime
             switch -Regex ($replicationHealth) {
                 '^(?i)Normal$' {
                 }
                 '^(?i)Warning$' {
-                    Write-Warning "[WARNING] replication health for VM '$($vm.Name)' is at Warning state`n$details"
+                    $level = Get-ReplicationWarningLevel -LastSuccessfulReplicationTime $lastSuccessfulReplicationTime
+                    Write-Warning "[$level] replication health for VM '$($vm.Name)' is at Warning state`n$details"
                     $hadIssue = $true
                 }
                 '^(?i)Critical$' {
