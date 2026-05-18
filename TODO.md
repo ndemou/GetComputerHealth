@@ -1,12 +1,14 @@
 ﻿# TODO
 
+## Invoke-GetComputerHealth.ps1 should be deleting transcripts (like `.\log\Invoke-GetHealthDomainComputers-<timestamp>.log`) older than 1 month.
+
 ## Save test results to .\data instead of .\temp
 
 Add a migration function at the updater:
 The function should check if the `.\data` folder exists. If not it should create it and move there .\temp\*.xlsx.
 Add a TODO here in order to remove this function after 2026-07-01
 
-## Configuration options for the updater
+## Add configuration options
 
 Support file `./config/gch.config` which is expected to contain a json dict with multiple key-value pairs. If it doesn't exist it should be created by the installer with the default options.
 
@@ -33,6 +35,12 @@ Get-ComputerHealth.ps1 -AddWhitelisting -until 2026-06-15 -ComputerName WEB1 -si
 Fix the code that generates the `CommandToSuppressMsg` excel column. Excel should contain a `-Reason "NO_REASON_ENTERED"` so that it's easy for the operator to enter a reason if they want to. 
 
 Also describe this usage scenario in the README: Operator gets an email with notable messages. They open the excel, and observe the findings. If they want to suppress a finding they execute the contents of `CommandToSuppressMsg` column (and optionaly changing the `-Reason` and/or `-until`). 
+
+It would be really usefull to include the reason of suppression in the findings that are reported to the operator and saved to disk. It will also be usefull if they include the `-Until` date (date until which they are suppressed)
+
+## Nice html reports instead of excel
+
+Should include a table of findings that supports sorting, filtering and hiding columns. The table should include findings (including suppressed ones) from the last 3 months but by default they should be filtered out
 
 ## Custom health tests should be directly runnable scripts
 
