@@ -2,6 +2,7 @@
 Helper functions that create, return, and optionally display structured Log Objects.
 
 Messages are emitted (Write-Output) as PSCustomObjects with the following properties:
+  TimeUtc    : datetime # UTC timestamp when the log object was created
   Computer   : string   # Computer name that generated the message
   Level      : string   # debug, info, pass, notice, warning, failure
   Message    : string   # Primary human-readable message
@@ -423,6 +424,7 @@ function Log-Msg {
   }
 
   $out = [pscustomobject]@{
+    TimeUtc    = [DateTimeOffset]::UtcNow
     Computer   = $env:COMPUTERNAME
     Level      = $Level
     Hash       = $sig
