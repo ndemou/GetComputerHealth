@@ -1,14 +1,5 @@
 ﻿# TODO
 
-## Level for detecting "Replication at Warning state" should be based on "Last successful replication"
-Example:
-```
-Message: replication health for VM 'SRV1(Win 2025)' is at Warning state
-Comment: ReplicationState: Replicating
-Last successful replication time: 05/18/2026 10:43:17
-```
- Should be "[INFO]" if Last successful replication time was within 5min, "[NOTICE]" if within 20, "[WARNING]" if within 40, and "[FAILURE]" for anything more than that (or never)
- 
 ## Invoke-GetComputerHealth.ps1 should be deleting transcripts (like `.\log\Invoke-GetHealthDomainComputers-<timestamp>.log`) older than 1 month.
 
 ## Save test results to .\data instead of .\temp
