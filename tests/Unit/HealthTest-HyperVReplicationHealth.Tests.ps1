@@ -36,33 +36,29 @@
   }
 
   It 'emits <ExpectedLevel> for a Warning replication state last replicated <MinutesAgo> minutes ago' -TestCases @(
-    @{ MinutesAgo = 10; ExpectedLevel = 'NOTICE' }
-    @{ MinutesAgo = 30; ExpectedLevel = 'WARNING' }
-    @{ MinutesAgo = 41; ExpectedLevel = 'FAILURE' }
+    @{ MinutesAgo = 4; ExpectedLevel = 'INFO'; ExpectedMessageCount = 2 }
+    @{ MinutesAgo = 10; ExpectedLevel = 'NOTICE'; ExpectedMessageCount = 1 }
+    @{ MinutesAgo = 30; ExpectedLevel = 'WARNING'; ExpectedMessageCount = 1 }
+    @{ MinutesAgo = 41; ExpectedLevel = 'FAILURE'; ExpectedMessageCount = 1 }
   ) {
     param(
       [int]$MinutesAgo,
-      [string]$ExpectedLevel
+      [string]$ExpectedLevel,
+      [int]$ExpectedMessageCount
     )
 
     $script:lastSuccessfulReplicationTime = $script:now.AddMinutes(-1 * $MinutesAgo)
 
     HealthTest-HyperVReplicationHealth
 
-    $script:warnings | Should -HaveCount 1
+    $script:warnings | Should -HaveCount $ExpectedMessageCount
     $script:warnings[0] | Should -Match "^\[$ExpectedLevel\] replication health for VM 'SRV1\(Win 2025\)' is at Warning state"
     $script:warnings[0] | Should -Match 'ReplicationState: Replicating'
     $script:warnings[0] | Should -Match 'Last successful replication time:'
-  }
 
-  It 'does not treat INFO warning-level replication as an issue and emits PASS summary' {
-    $script:lastSuccessfulReplicationTime = $script:now.AddMinutes(-4)
-
-    HealthTest-HyperVReplicationHealth
-
-    $script:warnings | Should -HaveCount 2
-    $script:warnings[0] | Should -Match "^\[INFO\] replication health for VM 'SRV1\(Win 2025\)' is at Warning state"
-    $script:warnings[1] | Should -Be "[PASS] All Hyper-V VMs have healthy replication and no replica VM is running."
+    if ($ExpectedLevel -eq 'INFO') {
+      $script:warnings[1] | Should -Be "[PASS] All Hyper-V VMs have healthy replication and no replica VM is running."
+    }
   }
 
   It 'parses unambiguous ISO string replication times' {
