@@ -1,6 +1,7 @@
 ﻿[CmdletBinding()]
 param(
-  [switch]$Quiet
+  [switch]$Quiet,
+  [switch]$Detailed
 )
 
 Set-StrictMode -Version Latest
@@ -25,12 +26,43 @@ if ($Quiet) {
   $invokeParams['Quiet'] = $true
 }
 
+if ($Detailed) {
+  $invokeParams['Output'] = 'Detailed'
+}
+
 $result = Invoke-Pester @invokeParams
 if ($null -eq $result) {
   throw "Invoke-Pester did not return a result object."
 }
 
+
 if ($result.FailedCount -gt 0) {
+  $failedTests = @($result.Failed)
+  if ($failedTests.Count -gt 0) {
+    Write-Host "Failed tests:" -ForegroundColor Red
+    $failedTests | ForEach-Object {
+      $name = $_.ExpandedPath
+      if ([string]::IsNullOrWhiteSpace($name)) {
+        $name = $_.Name
+      }
+
+      $err = ''
+      if ($_.ErrorRecord -and $_.ErrorRecord.Exception) {
+        $err = $_.ErrorRecord.Exception.Message
+      }
+      elseif ($_.FailureMessage) {
+        $err = $_.FailureMessage
+      }
+
+      if ([string]::IsNullOrWhiteSpace($err)) {
+        Write-Host " - $name" -ForegroundColor Red
+      }
+      else {
+        Write-Host " - $name`n   $err" -ForegroundColor Red
+      }
+    }
+  }
+
   throw "Pester unit tests failed. Passed: $($result.PassedCount). Failed: $($result.FailedCount)."
 }
 
