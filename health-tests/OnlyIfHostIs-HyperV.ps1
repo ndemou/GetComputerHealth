@@ -33,13 +33,92 @@ Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time)
 Uses: Get-VM, Get-VMReplication.
 #>
-    function Get-ReplicationDetailText {
+    function Get-LastSuccessfulReplicationTime {
         param(
-            [Parameter(Mandatory)][object]$Vm,
             [AllowNull()][object]$ReplicationInfo
         )
 
-        $sources = @($ReplicationInfo, $Vm)
+        if ($null -eq $ReplicationInfo) {
+            return $null
+        }
+
+        foreach ($propertyName in @('LastReplicationTime', 'LastSuccessfulReplicationTime', 'LastSuccessfulReplication', 'LastReplicatedTime')) {
+            $prop = $ReplicationInfo.PSObject.Properties[$propertyName]
+            if ($prop -and $null -ne $prop.Value -and "$($prop.Value)".Trim() -ne '') {
+                return $prop.Value
+            }
+        }
+
+        return $null
+    }
+
+    function ConvertTo-ReplicationDateTime {
+        param(
+            [AllowNull()][object]$Value
+        )
+
+        if ($null -eq $Value -or "$Value".Trim() -eq '') {
+            return $null
+        }
+
+        if ($Value -is [datetime]) {
+            return [datetime]$Value
+        }
+
+        if ($Value -is [datetimeoffset]) {
+            return ([datetimeoffset]$Value).LocalDateTime
+        }
+
+        $text = ([string]$Value).Trim()
+        $parsed = [datetime]::MinValue
+        $styles = [System.Globalization.DateTimeStyles]::AssumeLocal
+        $culture = [System.Globalization.CultureInfo]::InvariantCulture
+
+        # Do not use culture-sensitive free-form parsing here. Values such as
+        # 05/06/2026 are ambiguous across locales, so only parse exact
+        # unambiguous timestamp formats when Hyper-V does not provide a
+        # strongly typed DateTime/DateTimeOffset value.
+        $unambiguousFormats = @(
+            'o',
+            's',
+            'u',
+            'yyyy-MM-dd HH:mm:ss',
+            'yyyy-MM-ddTHH:mm:ss',
+            'yyyy-MM-dd HH:mm:ssK',
+            'yyyy-MM-ddTHH:mm:ssK'
+        )
+
+        if ([datetime]::TryParseExact($text, $unambiguousFormats, $culture, $styles, [ref]$parsed)) {
+            return $parsed
+        }
+
+        return $null
+    }
+
+    function Get-ReplicationWarningLevel {
+        param(
+            [AllowNull()][object]$LastSuccessfulReplicationTime
+        )
+
+        $lastSuccessfulReplicationDate = ConvertTo-ReplicationDateTime -Value $LastSuccessfulReplicationTime
+        if ($null -eq $lastSuccessfulReplicationDate) {
+            return 'FAILURE'
+        }
+
+        $age = (Get-Date) - $lastSuccessfulReplicationDate
+        if ($age.TotalMinutes -le 5) { return 'INFO' }
+        if ($age.TotalMinutes -le 20) { return 'NOTICE' }
+        if ($age.TotalMinutes -le 40) { return 'WARNING' }
+
+        return 'FAILURE'
+    }
+
+    function Get-ReplicationDetailText {
+        param(
+            [Parameter(Mandatory)][object]$Vm,
+            [AllowNull()][object]$LastSuccessfulReplicationTime
+        )
+
         $details = @()
 
         $state = $Vm.PSObject.Properties['ReplicationState']
@@ -47,21 +126,8 @@ Uses: Get-VM, Get-VMReplication.
             $details += "ReplicationState: $($state.Value)"
         }
 
-        $lastSuccessfulReplicationTime = $null
-        foreach ($source in $sources) {
-            if ($null -eq $source) { continue }
-            foreach ($propertyName in @('LastReplicationTime', 'LastSuccessfulReplicationTime', 'LastSuccessfulReplication', 'LastReplicatedTime')) {
-                $prop = $source.PSObject.Properties[$propertyName]
-                if ($prop -and $null -ne $prop.Value -and "$($prop.Value)".Trim() -ne '') {
-                    $lastSuccessfulReplicationTime = $prop.Value
-                    break
-                }
-            }
-            if ($lastSuccessfulReplicationTime) { break }
-        }
-
-        if ($lastSuccessfulReplicationTime) {
-            $details += "Last successful replication time: $lastSuccessfulReplicationTime"
+        if ($LastSuccessfulReplicationTime) {
+            $details += "Last successful replication time: $LastSuccessfulReplicationTime"
         }
 
         if ($details.Count -eq 0) {
@@ -85,15 +151,22 @@ Uses: Get-VM, Get-VMReplication.
                 $replicationInfo = Get-VMReplication -VMName $vm.Name -ErrorAction Stop
             }
             catch {
+                Write-Warning "[FAILURE] Could not query replication details for VM '$($vm.Name)'.`n$($_.Exception.Message)"
+                $hadIssue = $true
+                continue
             }
 
-            $details = Get-ReplicationDetailText -Vm $vm -ReplicationInfo $replicationInfo
+            $lastSuccessfulReplicationTime = Get-LastSuccessfulReplicationTime -ReplicationInfo $replicationInfo
+            $details = Get-ReplicationDetailText -Vm $vm -LastSuccessfulReplicationTime $lastSuccessfulReplicationTime
             switch -Regex ($replicationHealth) {
                 '^(?i)Normal$' {
                 }
                 '^(?i)Warning$' {
-                    Write-Warning "[WARNING] replication health for VM '$($vm.Name)' is at Warning state`n$details"
-                    $hadIssue = $true
+                    $level = Get-ReplicationWarningLevel -LastSuccessfulReplicationTime $lastSuccessfulReplicationTime
+                    Write-Warning "[$level] replication health for VM '$($vm.Name)' is at Warning state`n$details"
+                    if ($level -ne 'INFO') {
+                        $hadIssue = $true
+                    }
                 }
                 '^(?i)Critical$' {
                     Write-Warning "[FAILURE] replication health for VM '$($vm.Name)' is at Critical state`n$details"
