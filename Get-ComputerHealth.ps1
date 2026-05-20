@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
 Runs a suite of built-in and optional custom "HealthTest-*" checks and reports their findings; can also whitelist/suppress expected messages by signature.
 
@@ -10,6 +10,11 @@ Supports:
 - Running only selected tests (`-OnlyTheseTests`) and/or skipping specific tests (`-ExcludeTests`).
 - Loading and running custom tests from `.ps1` files in an isolated module scope (`-IncludeTestsFromFolder`) and invoking any `HealthTest-*` functions they define.
 - Suppressing expected notices/warnings/failures by 8-hex "signature" hashes, either temporarily for the current run (`-WhitelistSigs`) or by appending a permanent suppression entry (`-AddWhitelisting`) to a suppression file.
+
+
+When `-OutputObjects` is used, each emitted log object includes these fields:
+- `TimeUtc` (UTC timestamp for the message; intended for cross-machine sorting/aggregation and Excel export as UTC)
+- `Computer`, `Level`, `Message`, `Hash`, `Suppressed`, `Comment`, `Emitter`
 
 Notable side effects:
 - When `-IncludeTestsFromFolder` is used, custom scripts are loaded in a temporary module scope (top-level code still executes, but does not run in this script's scope/function table).
