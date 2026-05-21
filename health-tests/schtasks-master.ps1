@@ -115,8 +115,8 @@ Uses: Get-ScheduledTask, Get-ScheduledTaskInfo, Get-ScheduledTaskDeepInfo.
   $hadIssue = $false
   $isSystem       = { param($t) $t.Principal.UserId -match '^(NT AUTHORITY\\)?SYSTEM$' }
   $isMicrosoft    = { param($t) ($t.Author -match 'Microsoft') -or ($t.TaskPath -like '\Microsoft\*') }
-  $shouldIgnore   = { param($path) foreach($rx in $Ignore){ if($path -match $rx){ return } } return }
-  $isRequired     = { param($path) foreach($rx in $MustBeEnabled){ if($path -match $rx){ return } } return }
+  $shouldIgnore  = { param($path) foreach($rx in $Ignore){ if($path -match $rx){ return $true } } return $false }
+  $isRequired    = { param($path) foreach($rx in $MustBeEnabled){ if($path -match $rx){ return $true } } return $false }
   $isTriggerEnabled = {
     param($trigger)
     if ($null -eq $trigger) { return $false }
@@ -127,30 +127,36 @@ Uses: Get-ScheduledTask, Get-ScheduledTaskInfo, Get-ScheduledTaskDeepInfo.
     # Some scheduled-task trigger objects do not expose Enabled; treat them as enabled.
     return $true
   }
-
   $tasks = Get-ScheduledTask | Where-Object { & $isSystem $_ }
+
   if(-not $IncludeHidden){ $tasks = $tasks | Where-Object { -not $_.Settings.Hidden } }
   if(-not $IncludeBuiltIn){ $tasks = $tasks | Where-Object { -not (& $isMicrosoft $_) } }
 
   foreach($t in $tasks){
     # Keep the leading "\" so paths look like \Microsoft\Windows\...
-    $path = "$($t.TaskPath.TrimEnd('\'))\$($t.TaskName)"
+    $path = Join-Path -Path $t.TaskPath -ChildPath $t.TaskName
     if(& $shouldIgnore $path){ continue }
-
     try {
-      $info = Get-ScheduledTaskInfo -TaskName $t.TaskName -TaskPath $t.TaskPath -ErrorAction Stop
-    } catch {
-      if ($_.Exception.HResult -eq -2147024894) {
-        Write-Warning "[NOTICE] Task '$path' was deleted while we were examining it."
+        $info = Get-ScheduledTaskInfo -TaskName $t.TaskName -TaskPath $t.TaskPath -ErrorAction Stop
+    } catch [Microsoft.Management.Infrastructure.CimException] when ($_.Exception.HResult -eq -2147024894) {
+        Write-Warning "[NOTICE] Task '$path' was deleted while we were examining it." # 0x80070002
         continue
-      }
-      throw
+    } catch [Microsoft.Management.Infrastructure.CimException] when ($_.Exception.HResult -eq -2147216625) {
+        Write-Warning "[WARNING] Task XML for '$path' is corrupted." # 0x8004130F
+        continue
+    } catch [Microsoft.Management.Infrastructure.CimException] {
+        $hexCode = '0x{0:X8}' -f $_.Exception.HResult
+        Write-Warning "[FAILURE] Task '$path' failed with CIM Error $hexCode ($($_.Exception.Message))"
+        continue
+    } catch {
+        Write-Warning "[FAILURE] Task '$path' encountered an unexpected $($_.Exception.GetType().Name) error: $($_.Exception.Message)"
+        continue
     }
     $enabled = [bool]$t.Settings.Enabled
     $state = $t.State
     $hasEnabledTrigger = ($t.Triggers | Where-Object { & $isTriggerEnabled $_ } | Select-Object -First 1) -ne $null
     $lastRun = $info.LastRunTime
-    if (-not $lastRun) {$lastRun = [datetime]::new(1900, 1, 1)}
+    if (-not $lastRun) {$lastRun = [datetime]::MinValue}
     $lastRes = ('0x{0:X8}' -f ([uint32]$info.LastTaskResult))
 
     # 1) Disabled tasks
