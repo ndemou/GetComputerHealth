@@ -2,6 +2,16 @@
 
 ## Make installation SUPER simple
 
+In order to customize the installation I should be able to call the installer like this:
+```
+& .\install.ps1 -Config @'
+{
+"InstallationDir": "C:\IT\GetComputerHealth",
+"SendAlertsViaEmail": True,
+"SmtpServer": "1.2.3.4"
+}
+'@
+```
 
 ## Invoke-GetComputerHealth.ps1 should be deleting transcripts (like `.\log\Invoke-GetHealthDomainComputers-<timestamp>.log`) older than 1 month.
 
