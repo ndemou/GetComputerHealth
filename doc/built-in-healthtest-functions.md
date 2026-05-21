@@ -7,8 +7,7 @@
 - Report using the expected `Write-Warning` pattern (see [`how-to-add-custom-tests.md`](how-to-add-custom-tests.md)).
 - Be explicit about scope and prerequisites.
   If a test only applies to DCs, domain-joined machines, laptops, and so on, use the special fields in the top-level help block. If they don't cover your situation, short-circuit early.
-- Catch exceptions only when you can recover or downgrade cleanly.
-  Otherwise do nothing; the framework will gracefully handle and report.
+- Catch exceptions only when you can recover or downgrade cleanly, Otherwise you should do nothing because the framework that invokes the functions catches exceptions, reports them, and aborts execution of the rest of the HealthTest code. A typical example where you need to handle exceptions is when you you are iterating over a list making some test on each item and you don't want an exception in one item to cause skipping all others.
 
 ### Function Shape
 
