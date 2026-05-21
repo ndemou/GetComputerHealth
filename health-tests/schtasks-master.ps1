@@ -138,15 +138,19 @@ Uses: Get-ScheduledTask, Get-ScheduledTaskInfo, Get-ScheduledTaskDeepInfo.
     if(& $shouldIgnore $path){ continue }
     try {
         $info = Get-ScheduledTaskInfo -TaskName $t.TaskName -TaskPath $t.TaskPath -ErrorAction Stop
-    } catch [Microsoft.Management.Infrastructure.CimException] when ($_.Exception.HResult -eq -2147024894) {
-        Write-Warning "[NOTICE] Task '$path' was deleted while we were examining it." # 0x80070002
-        continue
-    } catch [Microsoft.Management.Infrastructure.CimException] when ($_.Exception.HResult -eq -2147216625) {
-        Write-Warning "[WARNING] Task XML for '$path' is corrupted." # 0x8004130F
-        continue
     } catch [Microsoft.Management.Infrastructure.CimException] {
-        $hexCode = '0x{0:X8}' -f $_.Exception.HResult
-        Write-Warning "[FAILURE] Task '$path' failed with CIM Error $hexCode ($($_.Exception.Message))"
+        switch ($_.Exception.HResult) {
+            -2147024894 {
+                Write-Warning "[NOTICE] Task '$path' was deleted while we were examining it." # 0x80070002
+            }
+            -2147216625 {
+                Write-Warning "[WARNING] Task XML for '$path' is corrupted." # 0x8004130F
+            }
+            default {
+                $hexCode = '0x{0:X8}' -f $_.Exception.HResult
+                Write-Warning "[FAILURE] Task '$path' failed with CIM Error $hexCode ($($_.Exception.Message))"
+            }
+        }
         continue
     } catch {
         Write-Warning "[FAILURE] Task '$path' encountered an unexpected $($_.Exception.GetType().Name) error: $($_.Exception.Message)"
