@@ -88,8 +88,10 @@ Uses: Get-VM, Get-VMReplication.
             'yyyy-MM-ddTHH:mm:ssK'
         )
 
-        if ([datetime]::TryParseExact($text, $unambiguousFormats, $culture, $styles, [ref]$parsed)) {
-            return $parsed
+        foreach ($format in $unambiguousFormats) {
+            if ([datetime]::TryParseExact($text, $format, $culture, $styles, [ref]$parsed)) {
+                return $parsed
+            }
         }
 
         return $null
