@@ -1,5 +1,7 @@
 ﻿## Built in HealthTest- functions
 
+*(Information for developers only)*
+
 ### Behavior Rules
 
 - Keep side effects at zero.
