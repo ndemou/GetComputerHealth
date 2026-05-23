@@ -1,5 +1,7 @@
 ﻿# Test Suite Guide
 
+*(Information for developers only)*
+
 This guide explains the test and validation scripts in this repository in simple language.
 
 It is written for:
