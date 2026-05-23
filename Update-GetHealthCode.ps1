@@ -935,11 +935,13 @@ $latestRelease = $null
 $latestReleaseMarker = $null
 $manualUpdateMarker = $null
 $manualUpdateFetchedAt = $null
+$versionToInstall = $null
 if (-not $UpdateFromZip) {
   Write-Verbose "$passLabel Resolving latest release metadata (cache TTL $RELEASE_METADATA_CACHE_TTL_MINUTES minutes)"
   try {
     $latestRelease = Get-GetComputerHealthLatestRelease -RepositoryUrl $REPO_URL -CachePath $LATEST_RELEASE_METADATA_CACHE_PATH -CacheTtlMinutes $RELEASE_METADATA_CACHE_TTL_MINUTES -ForceRefresh:$ForceRefreshReleaseMetadata
     $latestReleaseMarker = Convert-GetComputerHealthReleaseToMarker -RepositoryUrl $REPO_URL -Release $latestRelease
+    $versionToInstall = Get-GetComputerHealthVersionFromMarker -Marker $latestReleaseMarker
     Write-Verbose "$passLabel Latest release marker is '$latestReleaseMarker'"
     Write-UpdateEvent "$passLabel Latest release marker is '$latestReleaseMarker'"
   } catch {
@@ -950,11 +952,16 @@ if (-not $UpdateFromZip) {
   $manualUpdateZip = Prepare-ManualUpdateZip -ZipPath $UpdateFromZip -CacheDir $BAK_DIR
   $manualUpdateMarker = [string]$manualUpdateZip.ManualMarker
   $manualUpdateFetchedAt = [string]$manualUpdateZip.ZipLastWriteTimeIso
+  $versionToInstall = Get-GetComputerHealthVersionFromMarker -Marker $manualUpdateMarker
   Write-Verbose "Manual update marker is '$manualUpdateMarker'"
   Write-Verbose "Manual update fetchedAt is '$manualUpdateFetchedAt'"
 }
 
 if ($latestReleaseMarker) {
+  if (-not $versionToInstall) {
+    throw "Could not determine a valid semver-like versionToInstall from latest release marker '$latestReleaseMarker'. Aborting update."
+  }
+
   $storedReleaseMarker = Get-GetComputerHealthInstalledReleaseMarker -CachePath $LATEST_RELEASE_METADATA_CACHE_PATH
 
   if ($storedReleaseMarker) {
@@ -966,7 +973,6 @@ if ($latestReleaseMarker) {
 
   if (($SelfRerunCount -eq 0) -and (-not $Reinstall) -and $storedReleaseMarker -and (Test-GetComputerHealthMarkerEquivalent -LeftMarker $storedReleaseMarker -RightMarker $latestReleaseMarker)) {
     $storedVersion = Get-GetComputerHealthVersionFromMarker -Marker $storedReleaseMarker
-    $versionToInstall = Get-GetComputerHealthVersionFromMarker -Marker $latestReleaseMarker
     if (($storedReleaseMarker -ne $latestReleaseMarker) -and $storedVersion -and $versionToInstall -and ($storedVersion -ieq $versionToInstall)) {
       Write-Verbose "Installed marker came from a different source but matches latest version '$versionToInstall'; skipping update download"
       Write-UpdateEvent "Installed marker came from a different source but matches latest version '$versionToInstall'; skipping update download"
@@ -981,6 +987,10 @@ if ($latestReleaseMarker) {
     Write-Verbose "-Reinstall was specified; re-downloading current latest release"
   }
 } elseif ($manualUpdateMarker) {
+  if (-not $versionToInstall) {
+    throw "Could not determine a valid semver-like versionToInstall from manual update marker '$manualUpdateMarker'. Aborting update."
+  }
+
   $storedReleaseMarker = Get-GetComputerHealthInstalledReleaseMarker -CachePath $LATEST_RELEASE_METADATA_CACHE_PATH
 
   if ($storedReleaseMarker) {
@@ -992,7 +1002,6 @@ if ($latestReleaseMarker) {
 
   if (($SelfRerunCount -eq 0) -and (-not $Reinstall) -and $storedReleaseMarker -and (Test-GetComputerHealthMarkerEquivalent -LeftMarker $storedReleaseMarker -RightMarker $manualUpdateMarker)) {
     $storedVersion = Get-GetComputerHealthVersionFromMarker -Marker $storedReleaseMarker
-    $versionToInstall = Get-GetComputerHealthVersionFromMarker -Marker $manualUpdateMarker
     if (($storedReleaseMarker -ne $manualUpdateMarker) -and $storedVersion -and $versionToInstall -and ($storedVersion -ieq $versionToInstall)) {
       Write-Verbose "Provided zip matches already installed version '$versionToInstall' even though the source marker differs; skipping update"
       Write-UpdateEvent "Provided zip matches already installed version '$versionToInstall' even though the source marker differs; skipping update"
@@ -1003,7 +1012,7 @@ if ($latestReleaseMarker) {
     return
   }
 } else {
-  Write-Verbose "$passLabel No latest release marker is available"
+  throw "$passLabel Could not determine a valid semver-like versionToInstall because no release marker is available. Aborting update."
 }
 
 Write-Verbose "$passLabel Checking for code updates; local files will be backed up before replacement if needed"
