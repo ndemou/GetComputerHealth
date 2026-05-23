@@ -454,6 +454,55 @@ Hashtable with keys: SourceFullPath, ZipLastWriteTimeIso, CachedZipPath, ZipSha2
     Copy-Item -LiteralPath $sourceFullPath -Destination $cachedZipPath -Force -ErrorAction Stop
   }
 
+  if (-not (Get-GetComputerHealthVersionFromMarker -Marker $manualMarker)) {
+    $zipVersion = $null
+    $archive = $null
+    try {
+      Add-Type -AssemblyName System.IO.Compression.FileSystem -ErrorAction SilentlyContinue
+      $archive = [System.IO.Compression.ZipFile]::OpenRead($sourceFullPath)
+      $versionEntry = $archive.Entries |
+        Where-Object { ($_.FullName -replace '\\', '/') -match '(^|/)(VERSION|version)$' } |
+        Select-Object -First 1
+      if ($versionEntry) {
+        $reader = [System.IO.StreamReader]::new($versionEntry.Open())
+        try {
+          $zipVersion = $reader.ReadToEnd().Trim()
+        } finally {
+          $reader.Dispose()
+        }
+      }
+
+      if (-not $zipVersion) {
+        $scriptEntry = $archive.Entries |
+          Where-Object { ($_.FullName -replace '\\', '/') -match '(^|/)Get-ComputerHealth\.ps1$' } |
+          Select-Object -First 1
+        if ($scriptEntry) {
+          $reader = [System.IO.StreamReader]::new($scriptEntry.Open())
+          try {
+            $scriptContent = $reader.ReadToEnd()
+          } finally {
+            $reader.Dispose()
+          }
+
+          $versionMatch = [regex]::Match($scriptContent, '(?m)^\$VERSION\s*=\s*"(?<Version>\d+\.\d+\.\d+)"')
+          if ($versionMatch.Success) {
+            $zipVersion = $versionMatch.Groups['Version'].Value
+          }
+        }
+      }
+    } catch {
+      Write-Verbose "Could not derive version token from manual update zip '$sourceFullPath': $($_.Exception.Message)"
+    } finally {
+      if ($archive) {
+        $archive.Dispose()
+      }
+    }
+
+    if ($zipVersion -match '^\d+\.\d+\.\d+$') {
+      $manualMarker = ("manual-zip|v{0}|{1}" -f $zipVersion, $zipHash)
+    }
+  }
+
   return @{
     SourceFullPath      = $sourceFullPath
     ZipLastWriteTimeIso = $zipLastWriteIso
