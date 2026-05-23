@@ -71,4 +71,6 @@ They must be stored in `Invoke-InstallationMigration.ps1`.
 
 They **must be idempotent and atomic**. (To accomplish atomicity it's best to keep their core functionality as simple as possible and they must track all changes made in detail so that reverting them is possible.)
 
-Thet must  handle all exceptions. At the very least if an exception that can't be ciscumvented/worked-around occurs they should revert any changes they've already done (atomicity) and then throw the original exception. 
+They must  handle all exceptions. At the very least if an exception that can't be ciscumvented/worked-around occurs they should revert any changes they've already done (atomicity) and then throw the original exception. 
+
+Their help block be a human readable list of the actions they perform. All actions except those needed to achieve idempotenty, atomicitiy and error handling should be included.
