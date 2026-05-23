@@ -1,4 +1,8 @@
-﻿## How to check that recent Veeam backups exist in a folder
+# Available Helpers for custom health tests
+
+*(Information for both users & developers)*
+
+## How to check that recent Veeam backups exist in a folder
 
 ### For backups stored in local drives (NOT mapped drives)
 
