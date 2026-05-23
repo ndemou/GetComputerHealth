@@ -1,29 +1,17 @@
 ﻿# TODO
 
-## Make installation SUPER simple
-
-In order to customize the installation I should be able to call the installer like this:
-```
-& .\install.ps1 -Config @'
-{
-"InstallationDir": "C:\IT\GetComputerHealth",
-"SendAlertsViaEmail": True,
-"SmtpServer": "1.2.3.4"
-}
-'@
-```
-
 ## Invoke-GetComputerHealth.ps1 should be deleting transcripts (like `.\log\Invoke-GetHealthDomainComputers-<timestamp>.log`) older than 1 month.
 
 ## Save test results to .\data instead of .\temp
 
 Add a migration function at the updater:
 The function should check if the `.\data` folder exists. If not it should create it and move there .\temp\*.xlsx.
-Add a TODO here in order to remove this function after 2026-07-01
+Add a TODO here and in the help-block of the function in order to remove this function after 2026-07-01.
+
 
 ## Add configuration options
 
-Support file `./config/gch.config` which is expected to contain a json dict with multiple key-value pairs. If it doesn't exist it should be created by the installer with the default options.
+Support file `./config/gch.conf` which is expected to contain a json dict with multiple key-value pairs. If it doesn't exist it should be created by the installer with the default options.
 
 - If the key `AutomaticUpdates` is falsy the updater/installer quits with an explanatory warning before performing any action.
 - If the key `RepoUrl` is found it is used as the value of $REPO_URL. If it's not a valid URL, execution is aborted with an exception.
@@ -32,24 +20,37 @@ Also update this part of our README. Reaplace this:
 > The installer (`Update-GetHealthCode.ps1`) downloads and updates files from this GitHub repository. It may do so *every* time you call `Invoke-GetComputerHealth.ps1`. It is strongly recommended that you clone this repo, audit it, and then change the `$REPO_URL=` line in `Update-GetHealthCode.ps1` to point to your local copy.
 
 With this:
-> By default the installer downloads and updates files from this GitHub repository every time you call any of the `Invoke-*.ps1` scripts. You can disable this by setting `AutomaticUpdates` to false in `./config/gch.config` or point the updater to a clone of this repo that you control by setting `RepoUrl`. 
+> By default the installer downloads and updates files from this GitHub repository every time you call any of the `Invoke-*.ps1` scripts. You can disable this by setting `AutomaticUpdates` to false in `./config/gch.config` or point the updater to a clone of this repo that you control by setting `RepoUrl`.
 
-## Enhance -AddWhitelisting with reason
+## Make installation SUPER simple
 
-Current interface:
-```powershell
-Get-ComputerHealth.ps1 -AddWhitelisting -until 2026-06-15 -ComputerName WEB1 -sig '50636e99' -Comment "failure - TCP port 636(LDAPS) unreachable on dc02.mazars-gr.local"
+In order to customize the installation I should be able to call the installer like this:
 ```
-New interface (note the change of -Comment to -Message and the extra `-Reason` which is an optional parameter)
-```powershell
-Get-ComputerHealth.ps1 -AddWhitelisting -until 2026-06-15 -ComputerName WEB1 -sig '50636e99' -Message "failure - TCP port 636(LDAPS) unreachable on dc02.mazars-gr.local" -Reason "Networking team will open the traffic soon"
+& .\install.ps1 -Config @'
+{
+  "Installtion": {
+      "InstallationDir": "C:\IT\GetComputerHealth",
+      "SendAlertsViaEmail": True
+  },
+  "ConfigFiles": {
+      "Send-Message.conf": {
+        "Server": "smtp.contoso.com",
+        "From": "SERVER01+alerts@contoso.com",
+        "To": "ops@contoso.com;admin@contoso.com"
+    },
+    "gch.conf": {
+        "AutomaticUpdates": "false"
+    }
+  }
+}
+'@
 ```
+Note the `Installtion` branch with options that modify the behaviour of the installer and the `ConfigFiles` branch that  options that can used to directly populate the relevant config files under `.\config`.
 
-Fix the code that generates the `CommandToSuppressMsg` excel column. Excel should contain a `-Reason "NO_REASON_ENTERED"` so that it's easy for the operator to enter a reason if they want to. 
+`& .\install.ps1 -GenerateConfigJson` should generate a template json that can be customized and be passed to `-Config`.
 
-Also describe this usage scenario in the README: Operator gets an email with notable messages. They open the excel, and observe the findings. If they want to suppress a finding they execute the contents of `CommandToSuppressMsg` column (and optionaly changing the `-Reason` and/or `-until`). 
+Update documentation with details about this.
 
-It would be really usefull to include the reason of suppression in the findings that are reported to the operator and saved to disk. It will also be usefull if they include the `-Until` date (date until which they are suppressed)
 
 ## Nice html reports instead of excel
 
@@ -67,9 +68,9 @@ A reference to the full path to the script should always appear in the comments 
 
 Since this is a breaking change it requires 
  1. The update of the major version number from 3 to 4
- 2. A migration script that will relieve users from having to edit all their custom health test scripts. 
+ 2. A migration function that will relieve users from having to edit all their custom health test scripts. 
 
-Here's a draft of the migration script: 
+Here's a draft of the migration function: 
 
  - Run only if existing version is `3.x.y` and there's at least one custom test script. 
  - For every script:
@@ -180,6 +181,23 @@ For these functions: remove any exceptions for findings that are currently ignor
 So after this change all services are to be reported (including Microsoft ones), and all shares (including default ones) and all administrators and all roles.
 Thus we also need to adjust the function names accordingly: NonMicrosoftServices -> Services; NonDefaultShares -> Shares
 
+## Enhance -AddWhitelisting with reason
+
+Current interface:
+```powershell
+Get-ComputerHealth.ps1 -AddWhitelisting -until 2026-06-15 -ComputerName WEB1 -sig '50636e99' -Comment "failure - TCP port 636(LDAPS) unreachable on dc02.mazars-gr.local"
+```
+New interface (note the change of -Comment to -Message and the extra `-Reason` which is an optional parameter)
+```powershell
+Get-ComputerHealth.ps1 -AddWhitelisting -until 2026-06-15 -ComputerName WEB1 -sig '50636e99' -Message "failure - TCP port 636(LDAPS) unreachable on dc02.mazars-gr.local" -Reason "Networking team will open the traffic soon"
+```
+
+Fix the code that generates the `CommandToSuppressMsg` excel column. Excel should contain a `-Reason "NO_REASON_ENTERED"` so that it's easy for the operator to enter a reason if they want to. 
+
+Also describe this usage scenario in the README: Operator gets an email with notable messages. They open the excel, and observe the findings. If they want to suppress a finding they execute the contents of `CommandToSuppressMsg` column (and optionaly changing the `-Reason` and/or `-until`). 
+
+It would be really usefull to include the reason of suppression in the findings that are reported to the operator and saved to disk. It will also be usefull if they include the `-Until` date (date until which they are suppressed)
+
 ## New format for Get-ComputerHealth.sigs-to-suppress.txt
 
 Must use clixml for the configuration/state file of Get-ComputerHealth.
@@ -202,7 +220,7 @@ $ConfigAndState = @{
         'bfc162fa' = [pscustomobject]@{
             TestName    = 'UnexpectedListeningPorts'
             Description = 'Computer is listening to port 443'
-            Reason = 'business need'
+            Reason      = 'business need'
             Ts          = [datetime]'2025-11-01 12:42'
             Until       = [datetime]'2026-05-06'
             User        = 'ndemou-admin'
@@ -211,7 +229,7 @@ $ConfigAndState = @{
         'a7d91c03' = [pscustomobject]@{
             TestName    = 'InstalledSW'
             Description = 'Legacy software 7zip is installed'
-            Reason = 'business need'
+            Reason      = 'business need'
             Ts          = [datetime]'2025-11-01 12:44'
             Until       = [datetime]'2026-06-15'
             User        = 'ndemou-admin'
@@ -235,7 +253,7 @@ $ConfigAndState = @{
 }
 ```
 
-Also rename it from `Get-ComputerHealth.sigs-to-suppress.txt` to `Get-ComputerHealth.cfg`
+Also rename it from `Get-ComputerHealth.sigs-to-suppress.txt` to `Get-ComputerHealth.conf`
 
 In order to not break existing systems, the updater needs to perform the migration on existing installations:
  - If the new `.state` file does not exist: create it by translating the old `.txt` file
@@ -245,7 +263,7 @@ In order to not break existing systems, the updater needs to perform the migrati
 
 I want a test that verifies a TCP port is indeed open (This is often a very important indicator of "everything's good"). 
 
-Imagine this rule in `Get-ComputerHealth.cfg`:
+Imagine this rule in `Get-ComputerHealth.conf`:
 ```powershel
 'REQUIRED_FINDING' = @{
        'UnexpectedListeningPorts' = [pscustomobject]@{
