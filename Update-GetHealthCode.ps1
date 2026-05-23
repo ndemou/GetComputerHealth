@@ -966,10 +966,10 @@ if ($latestReleaseMarker) {
 
   if (($SelfRerunCount -eq 0) -and (-not $Reinstall) -and $storedReleaseMarker -and (Test-GetComputerHealthMarkerEquivalent -LeftMarker $storedReleaseMarker -RightMarker $latestReleaseMarker)) {
     $storedVersion = Get-GetComputerHealthVersionFromMarker -Marker $storedReleaseMarker
-    $latestVersion = Get-GetComputerHealthVersionFromMarker -Marker $latestReleaseMarker
-    if (($storedReleaseMarker -ne $latestReleaseMarker) -and $storedVersion -and $latestVersion -and ($storedVersion -ieq $latestVersion)) {
-      Write-Verbose "Installed marker came from a different source but matches latest version '$latestVersion'; skipping update download"
-      Write-UpdateEvent "Installed marker came from a different source but matches latest version '$latestVersion'; skipping update download"
+    $versionToInstall = Get-GetComputerHealthVersionFromMarker -Marker $latestReleaseMarker
+    if (($storedReleaseMarker -ne $latestReleaseMarker) -and $storedVersion -and $versionToInstall -and ($storedVersion -ieq $versionToInstall)) {
+      Write-Verbose "Installed marker came from a different source but matches latest version '$versionToInstall'; skipping update download"
+      Write-UpdateEvent "Installed marker came from a different source but matches latest version '$versionToInstall'; skipping update download"
     } else {
       Write-Verbose "Latest release already downloaded and -Reinstall was not specified; skipping update download"
       Write-UpdateEvent "Latest release already downloaded and -Reinstall was not specified; skipping update download"
@@ -992,10 +992,10 @@ if ($latestReleaseMarker) {
 
   if (($SelfRerunCount -eq 0) -and (-not $Reinstall) -and $storedReleaseMarker -and (Test-GetComputerHealthMarkerEquivalent -LeftMarker $storedReleaseMarker -RightMarker $manualUpdateMarker)) {
     $storedVersion = Get-GetComputerHealthVersionFromMarker -Marker $storedReleaseMarker
-    $manualVersion = Get-GetComputerHealthVersionFromMarker -Marker $manualUpdateMarker
-    if (($storedReleaseMarker -ne $manualUpdateMarker) -and $storedVersion -and $manualVersion -and ($storedVersion -ieq $manualVersion)) {
-      Write-Verbose "Provided zip matches already installed version '$manualVersion' even though the source marker differs; skipping update"
-      Write-UpdateEvent "Provided zip matches already installed version '$manualVersion' even though the source marker differs; skipping update"
+    $versionToInstall = Get-GetComputerHealthVersionFromMarker -Marker $manualUpdateMarker
+    if (($storedReleaseMarker -ne $manualUpdateMarker) -and $storedVersion -and $versionToInstall -and ($storedVersion -ieq $versionToInstall)) {
+      Write-Verbose "Provided zip matches already installed version '$versionToInstall' even though the source marker differs; skipping update"
+      Write-UpdateEvent "Provided zip matches already installed version '$versionToInstall' even though the source marker differs; skipping update"
     } else {
       Write-Verbose "Provided zip marker already installed and -Reinstall was not specified; skipping update"
       Write-UpdateEvent "Provided zip marker already installed and -Reinstall was not specified; skipping update"
