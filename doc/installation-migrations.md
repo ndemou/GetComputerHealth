@@ -44,7 +44,7 @@ The updater must:
 
 1. acquire a mutex so that two updates (and migrations) can never overlap
 2. detect the source On-Disk Format version from `data\disk-format.state` -- if no such file exists it assumes LastVersionThatChangedDiskFormat = 4 and LastVersionThatWorksWithThisDiskFormat = 4.
-3. determine the target On-Disk Format version from the Code Version being installed
+3. determine the target On-Disk Format version from $versionToInstall (which is based on the marker of the zip's filename, not the `$VERSION=...` line of the Get-ComputerHealth.ps1 file inside the zip)
 4. allow code downgrades that do not require an On-Disk Format downgrade, reject these that do
 5. compute the ordered list of migrations that must run and execute them one by one. For each one:
    1. load the migration manifest
@@ -60,47 +60,22 @@ Failures must leave a logged, resumable state.
 
 **IMPORTANT NOTE**: every On-Disk Format change is accompanied with a bumb in the major Code Version number but not vice versa (it's expected that some new Code Version with bumped major number does not need an On-Disk Format change). 
 
-## Migration Manifest
+## Migration Scripts & Migration Manifest
 
-Migrations are described by a manifest-like list with metadata. The manifest is included in the help-block of the migration script under the "MANIFEST" heading. Each migration entry must define at least:
+Migration scripts are names like `Migrate-Disk-Format-to-version-4.ps1` where obviously 4 is the version of the On-Disk Format that will result if this migration script runs succesfully.
 
-```
-<#
-
-MANIFEST
-  target format version
-  implementation entrypoint
-  preconditions
-  which top folders are touched
-  the updater path to rerun after the migration
-#>
-```
-
-Touched top folders means top-level installation folders such as:
-
-  * `bin`
-  * `config`
-  * `data`
-  * `log`
-  * `temp`
-
-If a migration modifies a folder itself or any file under it, that folder is considered touched.
-
-The manifest must be ordered and explicit enough that the updater can determine exactly which migrations must run for a given source and target On-Disk Format version.
+The updater can determine exactly which migrations must run for a given source and target On-Disk Format version based on this number.
 
 Missing versions are normal. They mean that no On-Disk Format Migration is needed for that version transition.
 
 Migrations are not required to be adjacent. Skipping versions is normal because On-Disk Format is tied to the code's major version number, and not every major version requires a migration.
 
-One migration entry must look like this:
-
-`Migrate-Disk-Format-to-version-4.ps1`:
-
+Migration scripts begin with this mandatory help-block:
 ```powershell
 <#
 .DESCRIPTION
 
-Blah, blah,...
+A short description of what the script does (the changes it performs on the On-Disk Format)
 
 .MANIFEST
 @{
@@ -122,12 +97,17 @@ Blah, blah,...
 }
 ```
 
-Notes:
+So the manifest is the part of the help-block of the script after the ".MANIFEST" heading. 
 
-  * `TargetVersion` also serves as the migration identifier
-  * there is no `SourceVersion`; a migration applies from any source version less than `TargetVersion`, subject to its preconditions
-  * there is no `RequiresRerun`; the updater is always reinvoked after any On-Disk Format migration
-  * `RerunUpdaterPath` tells the invoker which updater path to execute after the migration finishes
+Touched top folders means top-level installation folders such as:
+
+  * `bin`
+  * `config`
+  * `data`
+  * `log`
+  * `temp`
+
+If a migration modifies a folder itself or any file under it, that folder is considered touched.
 
 ## Migration Selection Rules
 
@@ -171,21 +151,9 @@ The updater must acquire the named OS mutex:
 
 `Global\GetComputerHealth-DiskFormatMigration`
 
-before planning or running migrations.
-
-The mutex must protect the entire migration orchestration flow, including:
-
-  * migration selection
-  * backup creation
-  * migration execution
-  * post-migration verification
-  * persistence of the final On-Disk Format version
-
-No two On-Disk Format Migrations may overlap.
-
 The updater must wait up to 5 seconds to acquire the mutex.
 
-If acquiring `Global\GetComputerHealth-DiskFormatMigration` fails because of privilege or session limitations, the updater must throw. It must not silently fall back to a different mutex scope.
+If acquiring `Global\GetComputerHealth-DiskFormatMigration` fails because of privilege or session limitations, the updater must throw. 
 
 ## Post-Migration Verification
 
