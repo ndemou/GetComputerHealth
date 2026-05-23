@@ -1,13 +1,28 @@
 ﻿# TODO
 
+## Remove the temporary v3-to-Get-ComputerHealth migration logic that exists in the updater
+
+Delete the updater functionality that detects a v3 install under `C:\IT\` and migrates it into `C:\IT\Get-ComputerHealth`.
+
+Remove the rest of the migration-specific implementation:
+- the mainline updater block that calls the migration before normal update processing
+- `Test-GetComputerHealthLegacyRootMigrationNeeded`
+- `Invoke-GetComputerHealthMigrationTransfer`
+- `Invoke-GetComputerHealthMigrationPatternTransfer`
+- `Move-GetComputerHealthLegacyInstallLayout`
+
+Also remove the migration-specific unit coverage once the feature is deleted:
+- `tests/Unit/Update-GetHealthCode.LegacyMigration.Tests.ps1`
+
+Move these helpers from it to `Invoke-InstallationMigration.ps1`:
+- `Get-NormalizedFileSystemPath`
+- `Get-GetComputerHealthScriptVersion`
+
 ## Invoke-GetComputerHealth.ps1 should be deleting transcripts (like `.\log\Invoke-GetHealthDomainComputers-<timestamp>.log`) older than 1 month.
 
 ## Save test results to .\data instead of .\temp
 
-Add a migration function at the updater:
-The function should check if the `.\data` folder exists. If not it should create it and move there .\temp\*.xlsx.
-Add a TODO here and in the help-block of the function in order to remove this function after 2026-07-01.
-
+Add an Installation migration function for this purpose. Besides creating the data directory it should also move there existing .\temp\*.xlsx files.
 
 ## Add configuration options
 
@@ -68,19 +83,14 @@ A reference to the full path to the script should always appear in the comments 
 
 Since this is a breaking change it requires 
  1. The update of the major version number from 3 to 4
- 2. A migration function that will relieve users from having to edit all their custom health test scripts. 
-
-Here's a draft of the migration function: 
-
- - Run only if existing version is `3.x.y` and there's at least one custom test script. 
- - For every script:
+ 2. An installation migration function that will relieve users from having to edit all their custom health test scripts.  It will do the following on every custom ps1 script it finds:
    - Use `sls` to find the names of the custom health test functions
    - Append a call to them at the end of the script (Use `Get-TextFileEncoding` from `helpers-text-files.ps1` to make sure we append text using the correct encoding)
 
 **Also simplify parameters**
 
  - Deprecate the parameter `-IncludeTestsFromFolder` and `-PrettifyWriteWarning`
- - Make `-OnlyTheseTests` work for custom health tests (if a name ends with `.ps1` we know it's the file name of a custom health test).
+ - Make `-OnlyTheseTests` work for custom health tests (if a name ends with `.ps1` we know it's the file name of a custom health test). Besides just script file names, it should also accept full file names like "C:\path\to\script.ps1" or ".\script.ps1" to allow easy testing of custom scripts ("." should be assumed to be the cwd from which get-ComputerHealth was invoked).
 
 ---
 
@@ -109,23 +119,7 @@ C:\ > $r = C:\IT\bin\Get-ComputerHealth.ps1 -OnlyTheseTests "HealthTest-LargeDir
 
 ---
 
-**Also remove the temporary v3-to-Get-ComputerHealth migration logic**
 
-Delete the updater functionality that detects a v3 install under `C:\IT\` and migrates it into `C:\IT\Get-ComputerHealth`.
-
-Keep these helpers because they may still be useful outside the temporary migration:
-- `Get-NormalizedFileSystemPath`
-- `Get-GetComputerHealthScriptVersion`
-
-Remove the rest of the migration-specific implementation:
-- the mainline updater block that calls the migration before normal update processing
-- `Test-GetComputerHealthLegacyRootMigrationNeeded`
-- `Invoke-GetComputerHealthMigrationTransfer`
-- `Invoke-GetComputerHealthMigrationPatternTransfer`
-- `Move-GetComputerHealthLegacyInstallLayout`
-
-Also remove the migration-specific unit coverage once the feature is deleted:
-- `tests/Unit/Update-GetHealthCode.LegacyMigration.Tests.ps1`
 
 ## New helper script CustomTests.ps1
 
