@@ -1,5 +1,7 @@
 ﻿# How to Add Custom Tests
 
+*(Information for users)*
+
 ## TL;DR
 
 All `.ps1` files in `C:\IT\config\Custom-HealthTests\` are dot-sourced, and all functions whose names match `HealthTest-*` are executed. These functions should return nothing and should report their result(s) like this:
