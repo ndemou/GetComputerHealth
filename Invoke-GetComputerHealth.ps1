@@ -324,7 +324,8 @@ function Add-HealthEmailSignature {
 function Get-HealthSuppressionCommand {
   [CmdletBinding()]
   param(
-    [Parameter(Mandatory)]$MessageRecord
+    [Parameter(Mandatory)]$MessageRecord,
+    [switch]$WrapInInvokeCommand = $true
   )
 
   $hash = if ($MessageRecord.PSObject.Properties['Hash']) { [string]$MessageRecord.Hash } else { '' }
@@ -338,10 +339,51 @@ function Get-HealthSuppressionCommand {
     if ($commentText.Length -gt 400) {
       $commentText = $commentText.Substring(0, 400)
     }
-    return ("Invoke-Command {0} {{c:\it\Get-ComputerHealth\bin\Get-ComputerHealth.ps1 -AddWhitelisting -until 2999-12-31 -sig '{1}' -ComputerName {0} -comment ""{2}""}}" -f $computer.Trim(), $hash.ToLowerInvariant(), $commentText)
+    $baseCommand = ("c:\it\Get-ComputerHealth\bin\Get-ComputerHealth.ps1 -AddWhitelisting -until 2999-12-31 -sig '{0}' -ComputerName {1} -comment ""{2}""" -f $hash.ToLowerInvariant(), $computer.Trim(), $commentText)
+    if ($WrapInInvokeCommand) {
+      return ("Invoke-Command {0} {{{1}}}" -f $computer.Trim(), $baseCommand)
+    }
+    return $baseCommand
   }
 
   return ''
+}
+
+function Convert-HealthSynopsisToHtml {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)][object[]]$Messages,
+    [hashtable]$SortOrder = @{'failure' = 1; 'warning' = 2; 'notice' = 3; 'info' = 4; 'pass' = 5; 'debug' = 6 }
+  )
+
+  $levelMeta = @{
+    'failure' = @{ Label = 'failures'; Background = '#ff4d4f'; Foreground = '#fff' }
+    'warning' = @{ Label = 'warnings'; Background = '#ffb300'; Foreground = '#111' }
+    'notice'  = @{ Label = 'notice'; Background = '#1e88e5'; Foreground = '#fff' }
+    'info'    = @{ Label = 'info'; Background = '#c7d0d9'; Foreground = '#111' }
+    'pass'    = @{ Label = 'passes'; Background = '#3cb371'; Foreground = '#fff' }
+    'debug'   = @{ Label = 'debug'; Background = '#c7d0d9'; Foreground = '#111' }
+  }
+
+  $parts = @(
+    $Messages |
+      Where-Object { $_.Level } |
+      Group-Object Level -NoElement |
+      Sort-Object -Property @{ Expression = { $SortOrder[$_.Name] } } |
+      ForEach-Object {
+        $levelKey = ([string]$_.Name).ToLowerInvariant()
+        if (-not $levelMeta.ContainsKey($levelKey)) { return }
+        $meta = $levelMeta[$levelKey]
+        $labelHtml = "<span style='display:inline-block; margin:0 4px; padding:1px 6px; border-radius:999px; background-color:$($meta.Background); color:$($meta.Foreground)'>$([System.Net.WebUtility]::HtmlEncode($meta.Label))</span>"
+        "{0} {1}" -f $_.Count, $labelHtml
+      }
+  )
+
+  if ($parts.Count -eq 0) {
+    return ''
+  }
+
+  return "<div style='margin:0 0 12px 0; font-family:Segoe UI, Arial, sans-serif; font-size:12px; color:#000'><span style='font-weight:700'>Synopsis:</span> " + ($parts -join ', ') + ".</div>"
 }
 
 function Convert-HealthMessagesToHtmlTable {
@@ -350,12 +392,14 @@ function Convert-HealthMessagesToHtmlTable {
     [Parameter(Mandatory)][object[]]$Messages
   )
 
+  $wrapSuppressionInInvokeCommand = (@($Messages | Where-Object { $_.Computer } | Select-Object -ExpandProperty Computer -Unique).Count -gt 1)
+
   $rows = foreach ($message in $Messages) {
     $level = if ($message.PSObject.Properties['Level']) { [string]$message.Level } else { '' }
     $computer = if ($message.PSObject.Properties['Computer']) { [string]$message.Computer } else { '' }
     $text = if ($message.PSObject.Properties['Message']) { [string]$message.Message } else { '' }
     $comment = if ($message.PSObject.Properties['Comment']) { [string]$message.Comment } else { '' }
-    $suppressionCommand = Get-HealthSuppressionCommand -MessageRecord $message
+    $suppressionCommand = Get-HealthSuppressionCommand -MessageRecord $message -WrapInInvokeCommand:$wrapSuppressionInInvokeCommand
     $displayLevel = if ([string]::IsNullOrWhiteSpace($level)) { '' } else { $level.Substring(0, 1).ToUpperInvariant() + $level.Substring(1).ToLowerInvariant() }
     $levelBackground = switch ($level.ToLowerInvariant()) {
       'failure' { '#ff4d4f' }
@@ -1067,9 +1111,9 @@ if ($all_messages) {
     Write-host -for gray   "Preparing notable report"
 
     $htmlParts = @()
-    if ($notable_msgs.count -gt 10) {
-      $encodedSynopsis = [System.Net.WebUtility]::HtmlEncode(("Synopsis of messages per level`r`n" + $synopsis).TrimEnd())
-      $htmlParts += "<pre style='font-family:Consolas, ""Courier New"", monospace; white-space:pre-wrap; margin:0 0 12px 0; font-size:12px; line-height:1.35'>$encodedSynopsis</pre>"
+    $htmlSynopsis = Convert-HealthSynopsisToHtml -Messages @($notable_msgs)
+    if (-not [string]::IsNullOrWhiteSpace($htmlSynopsis)) {
+      $htmlParts += $htmlSynopsis
     }
     $htmlParts += Convert-HealthMessagesToHtmlTable -Messages @(
       $notable_msgs | Sort-Object -Property @{ Expression = { $SortOrder[$_.Level] } }, Computer

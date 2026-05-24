@@ -13,6 +13,7 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
         'Resolve-HealthEmailPreference',
         'Get-HealthEmailDecision',
         'Get-HealthSuppressionCommand',
+        'Convert-HealthSynopsisToHtml',
         'Convert-HealthMessagesToHtmlTable',
         'Convert-HealthMessagesToExcelRows',
         'Get-CachedIpsOfAllDcs',
@@ -77,6 +78,26 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
     $script:InvokeGetComputerHealthScriptText | Should -Match '\[Alias\(''NoSendMessage'', ''NoSendMail''\)\]\s*\r?\n\s*\[switch\]\$NoSendReport'
   }
 
+  It 'renders a one-line html synopsis with bright highlighted levels' {
+    $html = Convert-HealthSynopsisToHtml -Messages @(
+      [pscustomobject]@{ Level = 'failure' },
+      [pscustomobject]@{ Level = 'failure' },
+      [pscustomobject]@{ Level = 'failure' },
+      [pscustomobject]@{ Level = 'warning' },
+      [pscustomobject]@{ Level = 'warning' },
+      [pscustomobject]@{ Level = 'notice' }
+    )
+
+    $html | Should -Match 'Synopsis:</span> 3 '
+    $html | Should -Match 'background-color:#ff4d4f; color:#fff'
+    $html | Should -Match 'background-color:#ffb300; color:#111'
+    $html | Should -Match 'background-color:#1e88e5; color:#fff'
+    $html | Should -Match '>failures</span>, 2 '
+    $html | Should -Match '>warnings</span>, 1 '
+    $html | Should -Match '>notice</span>\.'
+    $html | Should -Not -Match '<pre'
+  }
+
   It 'renders notable findings as inline heading blocks with comment and suppression command styling' {
     $html = Convert-HealthMessagesToHtmlTable -Messages @(
       [pscustomobject]@{
@@ -93,7 +114,30 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
     $html | Should -Match 'background-color:#ffb300; color:#111'
     $html | Should -Match '>Warning</span><span style=''margin-left:8px''>Disk free space is low</span>'
     $html | Should -Match 'Drive C: has only 4% free<br>Investigate temp usage'
+    $html | Should -Match ([regex]::Escape('c:\it\Get-ComputerHealth\bin\Get-ComputerHealth.ps1 -AddWhitelisting -until 2999-12-31 -sig &#39;deadbeef&#39; -ComputerName SRV1 -comment &quot;warning - Disk free space is low&quot;'))
+    $html | Should -Not -Match ([regex]::Escape('Invoke-Command SRV1 {'))
+  }
+
+  It 'keeps Invoke-Command wrapping in html when multiple computers are present' {
+    $html = Convert-HealthMessagesToHtmlTable -Messages @(
+      [pscustomobject]@{
+        Level = 'warning'
+        Computer = 'SRV1'
+        Message = 'Disk free space is low'
+        Comment = ''
+        Hash = 'deadbeef'
+      },
+      [pscustomobject]@{
+        Level = 'notice'
+        Computer = 'SRV2'
+        Message = 'A few failed login attempts'
+        Comment = ''
+        Hash = 'feedbead'
+      }
+    )
+
     $html | Should -Match ([regex]::Escape('Invoke-Command SRV1 {c:\it\Get-ComputerHealth\bin\Get-ComputerHealth.ps1 -AddWhitelisting -until 2999-12-31 -sig &#39;deadbeef&#39; -ComputerName SRV1 -comment &quot;warning - Disk free space is low&quot;}'))
+    $html | Should -Match ([regex]::Escape('Invoke-Command SRV2 {c:\it\Get-ComputerHealth\bin\Get-ComputerHealth.ps1 -AddWhitelisting -until 2999-12-31 -sig &#39;feedbead&#39; -ComputerName SRV2 -comment &quot;notice - A few failed login attempts&quot;}'))
   }
 
   It 'shapes Excel rows in Invoke-GetComputerHealth including suppression commands' {
