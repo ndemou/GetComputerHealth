@@ -452,6 +452,49 @@ function Convert-HealthMessagesToHtmlTable {
   ) -join ''
 }
 
+function Get-RelaxHtmlBody {
+  [CmdletBinding()]
+  param()
+
+  return @'
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Relax - Email Safe Version</title>
+    <style>
+        .swing-effect {
+            display: inline-block;
+            transform-origin: top center;
+            animation: pendulum 4s infinite ease-in-out;
+        }
+
+        @keyframes pendulum {
+            0%, 100% { transform: rotate(-8deg); }
+            50% { transform: rotate(8deg); }
+        }
+    </style>
+</head>
+<body style="background-color: #eef2f5; margin: 0; padding: 50px 20px; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+    <table align="center" border="0" cellpadding="0" cellspacing="0" width="220" style="background-color: #ffffff; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; margin: 0 auto;">
+        <tr>
+            <td align="center" valign="middle" height="150" style="padding: 20px;">
+                <div class="swing-effect" style="text-align: center;">
+                    <div style="font-size: 24px; margin-bottom: 10px; font-family: 'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', sans-serif;">
+                    </div>
+                    <div style="font-weight: 300; letter-spacing: 10px; color: #718096; font-size: 28px; margin-left: 10px;">
+                        Relax
+                    </div>
+                </div>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>
+'@
+}
+
 function Get-CachedIpsOfAllDcs {
   [CmdletBinding()]
   param(
@@ -1145,7 +1188,7 @@ if ($all_messages) {
   else {
     Write-host -for green    "GOOD, Nothing notable to record. I have saved less notable messages here:"
     Write-host -for gray     "    ${TEMP_DIR}\all-messages-$($timestamp).xlsx"
-    $signedBody = Add-HealthEmailSignature -Body '<div>Relax :-)</div>' -BodyAsHtml -Signature $emailSignature
+    $signedBody = Add-HealthEmailSignature -Body (Get-RelaxHtmlBody) -BodyAsHtml -Signature $emailSignature
     Save-HealthHtmlReport -Path $LAST_REPORT_HTML_PATH -Html $signedBody
     Invoke-HealthEmail -Subject $SmtpSubjectAllGood -Body $signedBody -BodyAsHtml -ConfigFile $SmtpConfig -NoSendReport:(-not $sendMailByDefault) -SkipReason $emailDecision.Reason
   }

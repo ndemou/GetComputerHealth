@@ -15,6 +15,7 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
         'Get-HealthSuppressionCommand',
         'Convert-HealthSynopsisToHtml',
         'Convert-HealthMessagesToHtmlTable',
+        'Get-RelaxHtmlBody',
         'Convert-HealthMessagesToExcelRows',
         'Get-CachedIpsOfAllDcs',
         'Set-CachedIpsOfAllDcs',
@@ -78,25 +79,28 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
     $script:InvokeGetComputerHealthScriptText | Should -Match '\[Alias\(''NoSendMessage'', ''NoSendMail''\)\]\s*\r?\n\s*\[switch\]\$NoSendReport'
   }
 
-  It 'renders a one-line html synopsis with bright highlighted levels' {
-    $html = Convert-HealthSynopsisToHtml -Messages @(
-      [pscustomobject]@{ Level = 'failure' },
-      [pscustomobject]@{ Level = 'failure' },
-      [pscustomobject]@{ Level = 'failure' },
+    It 'renders a one-line html synopsis with bright highlighted levels' {
+        $html = Convert-HealthSynopsisToHtml -Messages @(
+            [pscustomobject]@{ Level = 'failure' },
+            [pscustomobject]@{ Level = 'failure' },
+            [pscustomobject]@{ Level = 'failure' },
       [pscustomobject]@{ Level = 'warning' },
-      [pscustomobject]@{ Level = 'warning' },
-      [pscustomobject]@{ Level = 'notice' }
-    )
+            [pscustomobject]@{ Level = 'warning' },
+            [pscustomobject]@{ Level = 'notice' }
+        )
 
-    $html | Should -Match 'Synopsis:</span> 3 '
-    $html | Should -Match 'background-color:#ff4d4f; color:#fff'
-    $html | Should -Match 'background-color:#ffb300; color:#111'
-    $html | Should -Match 'background-color:#1e88e5; color:#fff'
-    $html | Should -Match '>failures</span>, 2 '
-    $html | Should -Match '>warnings</span>, 1 '
-    $html | Should -Match '>notice</span>\.'
-    $html | Should -Not -Match '<pre'
-  }
+        $html | Should -Match '^<div style=''margin:0 0 8px 0;'
+        $html | Should -Not -Match 'Synopsis:'
+        $html | Should -Match 'background-color:#ff4d4f; color:#fff'
+        $html | Should -Match 'background-color:#ffb300; color:#111'
+        $html | Should -Match 'background-color:#1e88e5; color:#fff'
+        $html | Should -Match '>3 <span'
+        $html | Should -Match '>failures</span>, 2 '
+        $html | Should -Match '>warnings</span>, 1 '
+        $html | Should -Match '>notice</span>\.'
+        $html | Should -Match "border-top:1px solid #cfcfcf; margin:0 0 12px 0"
+        $html | Should -Not -Match '<pre'
+    }
 
   It 'renders notable findings as inline heading blocks with comment and suppression command styling' {
     $html = Convert-HealthMessagesToHtmlTable -Messages @(
@@ -140,6 +144,18 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
 
     $html | Should -Match ([regex]::Escape('Invoke-Command SRV1 {c:\it\Get-ComputerHealth\bin\Get-ComputerHealth.ps1 -AddWhitelisting -until 2999-12-31 -sig &#39;deadbeef&#39; -ComputerName SRV1 -comment &quot;warning - Disk free space is low&quot;}'))
     $html | Should -Match ([regex]::Escape('Invoke-Command SRV2 {c:\it\Get-ComputerHealth\bin\Get-ComputerHealth.ps1 -AddWhitelisting -until 2999-12-31 -sig &#39;feedbead&#39; -ComputerName SRV2 -comment &quot;notice - A few failed login attempts&quot;}'))
+  }
+
+  It 'renders the Relax html body as the email-safe card layout' {
+    $html = Get-RelaxHtmlBody
+
+    $html | Should -Match '<!DOCTYPE html>'
+    $html | Should -Match '<title>Relax - Email Safe Version</title>'
+    $html | Should -Match 'class="swing-effect"'
+    $html | Should -Match 'background-color: #eef2f5;'
+    $html | Should -Match 'border: 1px solid #e2e8f0;'
+    $html | Should -Match 'letter-spacing: 10px; color: #718096; font-size: 28px;'
+    $html | Should -Match '>\s*Relax\s*<'
   }
 
   It 'shapes Excel rows in Invoke-GetComputerHealth including suppression commands' {
