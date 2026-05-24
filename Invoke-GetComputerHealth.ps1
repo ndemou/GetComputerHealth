@@ -481,8 +481,7 @@ function Get-RelaxHtmlBody {
         <tr>
             <td align="center" valign="middle" height="150" style="padding: 20px;">
                 <div class="swing-effect" style="text-align: center;">
-                    <div style="font-size: 24px; margin-bottom: 10px; font-family: 'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', sans-serif;">
-                    </div>
+                    <div style="font-size: 24px; margin-bottom: 10px; font-family: 'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', sans-serif;">🍃</div>
                     <div style="font-weight: 300; letter-spacing: 10px; color: #718096; font-size: 28px; margin-left: 10px;">
                         Relax
                     </div>

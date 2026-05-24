@@ -148,12 +148,14 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
 
   It 'renders the Relax html body as the email-safe card layout' {
     $html = Get-RelaxHtmlBody
+    $leafEmoji = [char]::ConvertFromUtf32(0x1F343)
 
     $html | Should -Match '<!DOCTYPE html>'
     $html | Should -Match '<title>Relax - Email Safe Version</title>'
     $html | Should -Match 'class="swing-effect"'
     $html | Should -Match 'background-color: #eef2f5;'
     $html | Should -Match 'border: 1px solid #e2e8f0;'
+    $html | Should -Match ([regex]::Escape($leafEmoji))
     $html | Should -Match 'letter-spacing: 10px; color: #718096; font-size: 28px;'
     $html | Should -Match '>\s*Relax\s*<'
   }
