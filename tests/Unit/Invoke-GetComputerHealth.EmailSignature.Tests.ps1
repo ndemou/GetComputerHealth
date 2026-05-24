@@ -32,11 +32,11 @@
       Set-Content -LiteralPath $versionPath -Value '9.9.9' -NoNewline
       (Get-Item -LiteralPath $versionPath).LastWriteTime = [datetime]'2026-04-01 07:08:00'
 
-      $signature = Get-HealthEmailSignature -VersionFilePath $versionPath -FallbackVersion '0.0.0' -FallbackTimestampPath $script:InvokeGetComputerHealthScriptPath -DomainName 'contoso.local' -DomainRole Domain
+      $signature = Get-HealthEmailSignature -VersionFilePath $versionPath -FallbackVersion '0.0.0' -FallbackTimestampPath $script:InvokeGetComputerHealthScriptPath -DomainName 'contoso.local' -DomainRole Domain -SourceComputerName 'RUNNER1' -SourceIpv4Addresses @('10.0.0.10', '10.0.0.20')
 
-      $signature.Text | Should -Be "Domain contoso.local`r`nGet-ComputerHealth version 9.9.9, last update 2026-04-01 07:08, domain contoso.local"
-      $signature.Html | Should -Be "<div>Domain contoso.local</div><div><a href='https://github.com/ndemou/GetComputerHealth'>Get-ComputerHealth</a> version 9.9.9, last update 2026-04-01 07:08</div>"
-      $signature.HtmlTop | Should -Be 'Domain contoso.local'
+      $signature.Text | Should -Be "Tests started from RUNNER1 Domain contoso.local 10.0.0.10, 10.0.0.20`r`nGet-ComputerHealth version 9.9.9, last update 2026-04-01 07:08, domain contoso.local"
+      $signature.Html | Should -Be "<div>Tests started from RUNNER1 Domain contoso.local 10.0.0.10, 10.0.0.20</div><div><a href='https://github.com/ndemou/GetComputerHealth'>Get-ComputerHealth</a> version 9.9.9, last update 2026-04-01 07:08</div>"
+      $signature.HtmlTop | Should -Be 'Tests started from RUNNER1 Domain contoso.local 10.0.0.10, 10.0.0.20'
       $signature.HtmlBottom | Should -Be "<a href='https://github.com/ndemou/GetComputerHealth'>Get-ComputerHealth</a> version 9.9.9, last update 2026-04-01 07:08"
     } finally {
       Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
@@ -53,10 +53,10 @@
       (Get-Item -LiteralPath $fallbackScriptPath).LastWriteTime = [datetime]'2026-02-03 04:05:00'
 
       $embeddedVersion = Get-EmbeddedGetComputerHealthVersion -ScriptPath $fallbackScriptPath
-      $signature = Get-HealthEmailSignature -VersionFilePath (Join-Path $tempRoot 'missing-VERSION') -FallbackVersion $embeddedVersion -FallbackTimestampPath $fallbackScriptPath -DomainName 'contoso.local' -DomainRole Domain
+      $signature = Get-HealthEmailSignature -VersionFilePath (Join-Path $tempRoot 'missing-VERSION') -FallbackVersion $embeddedVersion -FallbackTimestampPath $fallbackScriptPath -DomainName 'contoso.local' -DomainRole Domain -SourceComputerName 'RUNNER1' -SourceIpv4Addresses @('10.0.0.10')
 
       $embeddedVersion | Should -Be '4.5.6'
-      $signature.Text | Should -Be "Domain contoso.local`r`nGet-ComputerHealth version 4.5.6, last update 2026-02-03 04:05, domain contoso.local"
+      $signature.Text | Should -Be "Tests started from RUNNER1 Domain contoso.local 10.0.0.10`r`nGet-ComputerHealth version 4.5.6, last update 2026-02-03 04:05, domain contoso.local"
     } finally {
       Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
     }
@@ -64,28 +64,28 @@
 
   It 'appends the signature to plain text and html bodies' {
     $signature = [pscustomobject]@{
-      Text = "Domain contoso.local`r`nGet-ComputerHealth version 1.2.3, last update 2026-01-02 03:04, domain contoso.local"
-      Html = "<div>Domain contoso.local</div><div>Get-ComputerHealth version 1.2.3, last update 2026-01-02 03:04</div>"
-      HtmlTop = 'Domain contoso.local'
+      Text = "Tests started from RUNNER1 Domain contoso.local 10.0.0.10`r`nGet-ComputerHealth version 1.2.3, last update 2026-01-02 03:04, domain contoso.local"
+      Html = "<div>Tests started from RUNNER1 Domain contoso.local 10.0.0.10</div><div>Get-ComputerHealth version 1.2.3, last update 2026-01-02 03:04</div>"
+      HtmlTop = 'Tests started from RUNNER1 Domain contoso.local 10.0.0.10'
       HtmlBottom = 'Get-ComputerHealth version 1.2.3, last update 2026-01-02 03:04'
     }
 
     $plain = Add-HealthEmailSignature -Body 'Relax :-)' -Signature $signature
     $html = Add-HealthEmailSignature -Body '<pre>body</pre>' -BodyAsHtml -Signature $signature
 
-    $plain | Should -Be "Relax :-)`r`n`r`nDomain contoso.local`r`nGet-ComputerHealth version 1.2.3, last update 2026-01-02 03:04, domain contoso.local"
-    $html | Should -Be "<pre>body</pre><div style='margin-top:12px; font-family:Segoe UI, Arial, sans-serif'><div style='color:#000; font-size:12px'>Domain contoso.local</div><div style='color:#666; font-size:10px'>Get-ComputerHealth version 1.2.3, last update 2026-01-02 03:04</div></div>"
+    $plain | Should -Be "Relax :-)`r`n`r`nTests started from RUNNER1 Domain contoso.local 10.0.0.10`r`nGet-ComputerHealth version 1.2.3, last update 2026-01-02 03:04, domain contoso.local"
+    $html | Should -Be "<pre>body</pre><div style='margin-top:12px; font-family:Segoe UI, Arial, sans-serif'><div style='color:#000; font-size:12px'>Tests started from RUNNER1 Domain contoso.local 10.0.0.10</div><div style='color:#666; font-size:10px'>Get-ComputerHealth version 1.2.3, last update 2026-01-02 03:04</div></div>"
   }
 
   It 'renders a project link in the html signature footer' {
-    $signature = Get-HealthEmailSignature -VersionFilePath $script:InvokeGetComputerHealthScriptPath -FallbackVersion '1.2.3' -FallbackTimestampPath $script:InvokeGetComputerHealthScriptPath -DomainName 'contoso.local' -DomainRole Domain
+    $signature = Get-HealthEmailSignature -VersionFilePath $script:InvokeGetComputerHealthScriptPath -FallbackVersion '1.2.3' -FallbackTimestampPath $script:InvokeGetComputerHealthScriptPath -DomainName 'contoso.local' -DomainRole Domain -SourceComputerName 'RUNNER1' -SourceIpv4Addresses @('10.0.0.10')
 
     $signature.Html | Should -Match "<a href='https://github.com/ndemou/GetComputerHealth'>Get-ComputerHealth</a>"
   }
 
   It 'uses Workgroup in the html signature when the computer is not domain joined' {
-    $signature = Get-HealthEmailSignature -VersionFilePath $script:InvokeGetComputerHealthScriptPath -FallbackVersion '1.2.3' -FallbackTimestampPath $script:InvokeGetComputerHealthScriptPath -DomainName 'WORKGROUP' -DomainRole Workgroup
+    $signature = Get-HealthEmailSignature -VersionFilePath $script:InvokeGetComputerHealthScriptPath -FallbackVersion '1.2.3' -FallbackTimestampPath $script:InvokeGetComputerHealthScriptPath -DomainName 'WORKGROUP' -DomainRole Workgroup -SourceComputerName 'RUNNER1' -SourceIpv4Addresses @('10.0.0.10')
 
-    $signature.Html | Should -Match '<div>Workgroup WORKGROUP</div>'
+    $signature.Html | Should -Match '<div>Tests started from RUNNER1 Workgroup WORKGROUP 10.0.0.10</div>'
   }
 }

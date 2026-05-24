@@ -253,7 +253,19 @@ function Get-HealthEmailSignature {
     [string]$ProjectUrl = 'https://github.com/ndemou/GetComputerHealth',
     [ValidateSet('Domain', 'Workgroup')]
     [string]$DomainRole = $(if ($env:USERDNSDOMAIN) { 'Domain' } else { 'Workgroup' }),
-    [string]$DomainName = $(if ($env:USERDNSDOMAIN) { $env:USERDNSDOMAIN } elseif ($env:USERDOMAIN) { $env:USERDOMAIN } else { $env:COMPUTERNAME })
+    [string]$DomainName = $(if ($env:USERDNSDOMAIN) { $env:USERDNSDOMAIN } elseif ($env:USERDOMAIN) { $env:USERDOMAIN } else { $env:COMPUTERNAME }),
+    [string]$SourceComputerName = $env:COMPUTERNAME,
+    [string[]]$SourceIpv4Addresses = $(
+      try {
+        @(
+          (Get-NetIPAddress | Where-Object { $_.AddressFamily -eq 'IPv4' -and $_.IPAddress -notmatch '^169\.254\.|^127\.' }).IPAddress |
+            Sort-Object
+        )
+      }
+      catch {
+        @()
+      }
+    )
   )
 
   $version = $FallbackVersion
@@ -286,7 +298,12 @@ function Get-HealthEmailSignature {
   }
 
   $domainText = if ([string]::IsNullOrWhiteSpace($DomainName)) { 'unknown' } else { $DomainName.Trim() }
-  $locationText = "$DomainRole $domainText"
+  $sourceComputerText = if ([string]::IsNullOrWhiteSpace($SourceComputerName)) { 'unknown' } else { $SourceComputerName.Trim() }
+  $sourceIpText = @($SourceIpv4Addresses | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) }) -join ', '
+  $locationText = "Tests started from $sourceComputerText $DomainRole $domainText"
+  if (-not [string]::IsNullOrWhiteSpace($sourceIpText)) {
+    $locationText += " $sourceIpText"
+  }
   $signatureText = "Get-ComputerHealth version $version, last update $lastUpdate, domain $domainText"
   $encodedProjectUrl = [System.Net.WebUtility]::HtmlEncode($ProjectUrl)
   $encodedVersion = [System.Net.WebUtility]::HtmlEncode([string]$version)
@@ -383,7 +400,7 @@ function Convert-HealthSynopsisToHtml {
     return ''
   }
 
-  return "<div style='margin:0 0 12px 0; font-family:Segoe UI, Arial, sans-serif; font-size:12px; color:#000'><span style='font-weight:700'>Synopsis:</span> " + ($parts -join ', ') + ".</div>"
+    return "<div style='margin:0 0 8px 0; font-family:Segoe UI, Arial, sans-serif; font-size:12px; color:#000'>" + ($parts -join ', ') + ".</div><div style='border-top:1px solid #cfcfcf; margin:0 0 12px 0'></div>"
 }
 
 function Convert-HealthMessagesToHtmlTable {
