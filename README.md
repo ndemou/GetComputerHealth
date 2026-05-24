@@ -2,6 +2,8 @@
 
 **Get-ComputerHealth** is a **production-ready, lightweight, and extendable** PowerShell framework that will scan your server, workstation or fleet of domain servers for **more than a hundred health indicators** (both issues like low RAM, missing updates, disk errors, failed logins and configuration changes like a newly installed software, a TCP port that started listening, a host that stoped responding to pings or accepting connections, full list below). It produces **useful and concise reports, email alerts with attached Excel reports**, and **clean terminal output**. You can easily add your own **custom health tests with plain PowerShell scripts**. **Installation is quick and simple**: in a few minutes you can check all your domain servers and receive daily notifications for issues and changes.
 
+<img width="729" height="426" alt="image" src="https://github.com/user-attachments/assets/56ed5109-0f71-4f10-a7ba-2b0cf0e36669" />
+
 <img width="1086" height="251" alt="Example of the report you receive via email" src="https://github.com/user-attachments/assets/694eb16f-fbc9-420c-b96e-dead56715085" />
 
 <img width="977" height="598" alt="Example of Terminal Output" src="https://github.com/user-attachments/assets/4925c744-2eaa-428c-939e-ec98e14e38b8" />
