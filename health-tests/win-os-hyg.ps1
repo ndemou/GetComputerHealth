@@ -1672,12 +1672,8 @@ Uses: Get-LiveSessionInfo.
         $detailLines += "State: $($session.State)"
         if ($session.SessionName)      { $detailLines += "SessionName: $($session.SessionName)" }
         if ($session.LogonTime)        { $detailLines += "LogonTime: $($session.LogonTime)" }
-        if ($session.ConnectTime)      { $detailLines += "ConnectTime: $($session.ConnectTime)" }
-        if ($session.DisconnectTime)   { $detailLines += "DisconnectTime: $($session.DisconnectTime)" }
         if ($session.LastInputTime)    { $detailLines += "LastInputTime: $($session.LastInputTime)" }
         if ($session.IdleTime)         { $detailLines += "IdleTime: $($session.IdleTime)" }
-        if ($session.DisconnectedTime) { $detailLines += "DisconnectedTime: $($session.DisconnectedTime)" }
-        if ($session.SessionAge)       { $detailLines += "SessionAge: $($session.SessionAge)" }
         if ($session.ClientName)       { $detailLines += "ClientName: $($session.ClientName)" }
         if ($session.ClientAddress)    { $detailLines += "ClientAddress: $($session.ClientAddress)" }
         if ($session.Protocol)         { $detailLines += "Protocol: $($session.Protocol)" }
