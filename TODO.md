@@ -1,23 +1,5 @@
 ﻿# TODO
 
-## Remove the temporary v3-to-Get-ComputerHealth migration logic that exists in the updater
-
-Delete the updater functionality that detects a v3 install under `C:\IT\` and migrates it into `C:\IT\Get-ComputerHealth`.
-
-Remove the rest of the migration-specific implementation:
-- the mainline updater block that calls the migration before normal update processing
-- `Test-GetComputerHealthLegacyRootMigrationNeeded`
-- `Invoke-GetComputerHealthMigrationTransfer`
-- `Invoke-GetComputerHealthMigrationPatternTransfer`
-- `Move-GetComputerHealthLegacyInstallLayout`
-
-Also remove the migration-specific unit coverage once the feature is deleted:
-- `tests/Unit/Update-GetHealthCode.LegacyMigration.Tests.ps1`
-
-Move these helpers from it to `Invoke-InstallationMigration.ps1`:
-- `Get-NormalizedFileSystemPath`
-- `Get-GetComputerHealthScriptVersion`
-
 ## Invoke-GetComputerHealth.ps1 should be deleting transcripts (like `.\log\Invoke-GetHealthDomainComputers-<timestamp>.log`) older than 1 month.
 
 ## Save test results to .\data instead of .\temp
