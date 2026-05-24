@@ -958,12 +958,12 @@ Uses: Get-WinEvent.
     foreach ($entry in $sortedEntries) {
         Write-Verbose "User '$($entry.Key)' has $($entry.Value) failed login attempt(s) in the last $Hours hour(s)."
         $details="$($entry.Value) attempts in the last $Hours hour(s)"
-        $severity = if ($entry.Value -le 3) {
-            Write-Warning "[NOTICE] <=3 failed login attempts for '$($entry.Key)'`n$details"
-        } elseif ($entry.Value -le 6) {
-            Write-Warning "[WARNING] <=6 failed login attempts for '$($entry.Key)'`n$details"
+        $severity = if ($entry.Value -le 12) {
+            Write-Warning "[NOTICE] A few failed login attempts for '$($entry.Key)'`n$details"
+        } elseif ($entry.Value -le 24) {
+            Write-Warning "[WARNING] Several failed login attempts for '$($entry.Key)'`n$details"
         } else {
-            Write-Warning "[FAILURE] >=7 failed login attempts for '$($entry.Key)'`n$details"
+            Write-Warning "[FAILURE] Excessive failed login attempts for '$($entry.Key)'`n$details"
         }
     }
 }
