@@ -74,7 +74,10 @@ $DEST_DIR = $SCRIPT_BIN_DIR
 $BAK_DIR  = Join-Path $ROOT_DIR 'temp'
 $CFG_DIR  = Join-Path $ROOT_DIR 'config'
 $LOG_DIR  = Join-Path $ROOT_DIR 'log'
-$script:UPDATE_LOG_PATH = Join-Path $LOG_DIR 'Update-GetHealthCode.log'
+$script:UpdateTranscriptStarted = $false
+$script:UpdateTranscriptTempPath = $null
+$script:UpdateTranscriptFinalPath = $null
+$script:UpdateTranscriptTimestamp = (Get-Date)
 $REPO_URL = 'https://github.com/ndemou/GetComputerHealth'
 $REPO_REF = 'main'
 $LATEST_RELEASE_METADATA_CACHE_PATH = Join-Path $CFG_DIR 'Get-ComputerHealth-latest-release-meta.json'
@@ -97,13 +100,81 @@ function Write-UpdateEvent {
 
   if ([string]::IsNullOrWhiteSpace($Message)) { return }
   Write-Host $Message
+}
+
+function Start-UpdateTranscript {
+<#
+.SYNOPSIS
+Starts transcript logging for the updater when possible.
+#>
+  [CmdletBinding()]
+  param()
+
   try {
+    $tempRoot = $env:TEMP
+    if ([string]::IsNullOrWhiteSpace($tempRoot)) {
+      $tempRoot = [System.IO.Path]::GetTempPath()
+    }
+    $script:UpdateTranscriptTempPath = Join-Path $tempRoot ("Update-GetHealthCode-{0}.transcript.log" -f [guid]::NewGuid().ToString())
+
+    Start-Transcript -Path $script:UpdateTranscriptTempPath -Force -ErrorAction Stop | Out-Null
+    $script:UpdateTranscriptStarted = $true
+  } catch {
+    $script:UpdateTranscriptStarted = $false
+    $script:UpdateTranscriptTempPath = $null
+    Write-Warning ("Failed to start transcript log in temp storage: {0}" -f $_.Exception.Message)
+  }
+}
+
+function Stop-UpdateTranscript {
+<#
+.SYNOPSIS
+Stops transcript logging for the updater when it was started.
+#>
+  [CmdletBinding()]
+  param()
+
+  if (-not $script:UpdateTranscriptStarted) {
+    return
+  }
+
+  try {
+    Stop-Transcript | Out-Null
+  } catch {
+    Write-Warning ("Failed to stop transcript log at {0}: {1}" -f $script:UPDATE_LOG_PATH, $_.Exception.Message)
+  } finally {
+    $script:UpdateTranscriptStarted = $false
+  }
+}
+
+function Finalize-UpdateTranscript {
+<#
+.SYNOPSIS
+Moves a completed updater transcript from temp storage into the log folder.
+#>
+  [CmdletBinding()]
+  param()
+
+  if ([string]::IsNullOrWhiteSpace($script:UpdateTranscriptTempPath)) {
+    return
+  }
+
+  try {
+    if (-not (Test-Path -LiteralPath $script:UpdateTranscriptTempPath -PathType Leaf)) {
+      return
+    }
+
     if (-not (Test-Path -LiteralPath $LOG_DIR -PathType Container)) {
       $null = New-Item -ItemType Directory -Path $LOG_DIR -Force
     }
-    Add-Content -LiteralPath $script:UPDATE_LOG_PATH -Value ("{0} {1}" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $Message)
+
+    $timestampText = $script:UpdateTranscriptTimestamp.ToString('yyyy-MM-dd_HH.mm.ss')
+    $script:UpdateTranscriptFinalPath = Join-Path $LOG_DIR ("Update-GetHealthCode-{0}.log" -f $timestampText)
+    Move-Item -LiteralPath $script:UpdateTranscriptTempPath -Destination $script:UpdateTranscriptFinalPath -Force -ErrorAction Stop
   } catch {
-    Write-Verbose ("Failed writing update event log to {0}: {1}" -f $script:UPDATE_LOG_PATH, $_.Exception.Message)
+    Write-Warning ("Failed to finalize transcript log from {0}: {1}" -f $script:UpdateTranscriptTempPath, $_.Exception.Message)
+  } finally {
+    $script:UpdateTranscriptTempPath = $null
   }
 }
 
@@ -956,234 +1027,241 @@ available.
 #
 #  MAIN CODE
 #
-$passNumber = $SelfRerunCount + 1
-$passLabel = "[pass $passNumber/2]"
-
-Write-Verbose "$passLabel Starting Update-GetHealthCode"
-Write-Verbose "$passLabel Parameters: Reinstall=$Reinstall UpdateFromZip='$UpdateFromZip' Version='$Version' ForceRefreshReleaseMetadata=$ForceRefreshReleaseMetadata SelfRerunCount=$SelfRerunCount PersistReleaseMarker='$PersistReleaseMarker'"
-Write-UpdateEvent "$passLabel Parameters: Reinstall=$Reinstall UpdateFromZip='$UpdateFromZip' Version='$Version' ForceRefreshReleaseMetadata=$ForceRefreshReleaseMetadata SelfRerunCount=$SelfRerunCount PersistReleaseMarker='$PersistReleaseMarker'"
-Write-Verbose "Configuration:"
-Write-Verbose "  DEST_DIR                    : $DEST_DIR"
-Write-Verbose "  BAK_DIR                     : $BAK_DIR"
-Write-Verbose "  CFG_DIR                     : $CFG_DIR"
-Write-Verbose "  REPO_URL                    : $REPO_URL"
-Write-Verbose "  REPO_REF                    : $REPO_REF"
-Write-Verbose "  LATEST_RELEASE_METADATA_CACHE_PATH : $LATEST_RELEASE_METADATA_CACHE_PATH"
-Write-Verbose "  RELEASE_METADATA_CACHE_TTL_MINUTES : $RELEASE_METADATA_CACHE_TTL_MINUTES"
-Write-Verbose "  ZIP_CACHE_PATTERN           : $ZIP_CACHE_PATTERN"
-Write-Verbose "  MANUAL_ZIP_CACHE_PATTERN    : $MANUAL_ZIP_CACHE_PATTERN"
-Write-Verbose "  repoSlug                    : $repoSlug"
-
-if (-not (Test-Path $DEST_DIR)) {
-  Write-Verbose "Creating destination directory '$DEST_DIR'"
-  New-Item -ItemType Directory -Path $DEST_DIR | Out-Null
-} else {
-  Write-Verbose "Destination directory already exists: '$DEST_DIR'"
-}
-
-if (-not (Test-Path $BAK_DIR)) {
-  Write-Verbose "Creating backup/cache directory '$BAK_DIR'"
-  New-Item -ItemType Directory -Path $BAK_DIR | Out-Null
-} else {
-  Write-Verbose "Backup/cache directory already exists: '$BAK_DIR'"
-}
-
-if (-not (Test-Path $CFG_DIR)) {
-  Write-Verbose "Creating configuration directory '$CFG_DIR'"
-  New-Item -ItemType Directory -Path $CFG_DIR | Out-Null
-} else {
-  Write-Verbose "Configuration directory already exists: '$CFG_DIR'"
-}
-
-Ensure-PSModuleInstalled -Name ImportExcel
-
-$p = Join-Path $CFG_DIR 'Get-ComputerHealth.sigs-to-suppress.txt'
-if (-not (Test-Path $p)) {
-  Write-Verbose "Creating default suppressions file '$p'"
-  $null = mkdir $CFG_DIR -Force -ErrorAction Ignore
-  "# $($env:COMPUTERNAME)" | Out-File $p -Encoding UTF8
-} else {
-  Write-Verbose "Suppressions file already exists: '$p'"
-}
-
-$latestRelease = $null
-$latestReleaseMarker = $null
-$manualUpdateMarker = $null
-$manualUpdateFetchedAt = $null
-$versionToInstall = $null
-if (-not $UpdateFromZip) {
-  Write-Verbose "$passLabel Resolving latest release metadata (cache TTL $RELEASE_METADATA_CACHE_TTL_MINUTES minutes)"
-  try {
-    $latestRelease = Get-GetComputerHealthLatestRelease -RepositoryUrl $REPO_URL -CachePath $LATEST_RELEASE_METADATA_CACHE_PATH -CacheTtlMinutes $RELEASE_METADATA_CACHE_TTL_MINUTES -ForceRefresh:$ForceRefreshReleaseMetadata
-    $latestReleaseMarker = Convert-GetComputerHealthReleaseToMarker -RepositoryUrl $REPO_URL -Release $latestRelease
-    $versionToInstall = Get-GetComputerHealthVersionFromMarker -Marker $latestReleaseMarker
-    Write-Verbose "$passLabel Latest release marker is '$latestReleaseMarker'"
-    Write-UpdateEvent "$passLabel Latest release marker is '$latestReleaseMarker'"
-  } catch {
-    Write-Warning ("Could not query latest release metadata from {0}: {1}" -f $REPO_URL, $_.Exception.Message)
-  }
-} else {
-  Write-Verbose "-UpdateFromZip specified; skipping latest release marker query"
-  $manualUpdateZip = Prepare-ManualUpdateZip -ZipPath $UpdateFromZip -CacheDir $BAK_DIR -Version $Version
-  $manualUpdateMarker = [string]$manualUpdateZip.ManualMarker
-  $manualUpdateFetchedAt = [string]$manualUpdateZip.ZipLastWriteTimeIso
-  $versionToInstall = Get-GetComputerHealthVersionFromMarker -Marker $manualUpdateMarker
-  Write-Verbose "Manual update marker is '$manualUpdateMarker'"
-  Write-Verbose "Manual update fetchedAt is '$manualUpdateFetchedAt'"
-}
-
-if ($latestReleaseMarker) {
-  if (-not $versionToInstall) {
-    throw "Could not determine a valid semver-like versionToInstall from latest release marker '$latestReleaseMarker'. Aborting update."
-  }
-
-  $storedReleaseMarker = Get-GetComputerHealthInstalledReleaseMarker -CachePath $LATEST_RELEASE_METADATA_CACHE_PATH
-
-  if ($storedReleaseMarker) {
-    Write-Verbose "Stored installed release marker is '$storedReleaseMarker'"
-    Write-UpdateEvent "Stored installed release marker is '$storedReleaseMarker'"
-  } else {
-    Write-Verbose "No stored installed release marker is available yet"
-  }
-
-  if (($SelfRerunCount -eq 0) -and (-not $Reinstall) -and $storedReleaseMarker -and (Test-GetComputerHealthMarkerEquivalent -LeftMarker $storedReleaseMarker -RightMarker $latestReleaseMarker)) {
-    $storedVersion = Get-GetComputerHealthVersionFromMarker -Marker $storedReleaseMarker
-    if (($storedReleaseMarker -ne $latestReleaseMarker) -and $storedVersion -and $versionToInstall -and ($storedVersion -ieq $versionToInstall)) {
-      Write-Verbose "Installed marker came from a different source but matches latest version '$versionToInstall'; skipping update download"
-      Write-UpdateEvent "Installed marker came from a different source but matches latest version '$versionToInstall'; skipping update download"
-    } else {
-      Write-Verbose "Latest release already downloaded and -Reinstall was not specified; skipping update download"
-      Write-UpdateEvent "Latest release already downloaded and -Reinstall was not specified; skipping update download"
-    }
-    return
-  }
-
-  if ($Reinstall -and $storedReleaseMarker -and (Test-GetComputerHealthMarkerEquivalent -LeftMarker $storedReleaseMarker -RightMarker $latestReleaseMarker)) {
-    Write-Verbose "-Reinstall was specified; re-downloading current latest release"
-  }
-} elseif ($manualUpdateMarker) {
-  if (-not $versionToInstall) {
-    throw "Could not determine a valid semver-like versionToInstall from manual update marker '$manualUpdateMarker'. Aborting update."
-  }
-
-  $storedReleaseMarker = Get-GetComputerHealthInstalledReleaseMarker -CachePath $LATEST_RELEASE_METADATA_CACHE_PATH
-
-  if ($storedReleaseMarker) {
-    Write-Verbose "Stored installed release marker is '$storedReleaseMarker'"
-    Write-UpdateEvent "Stored installed release marker is '$storedReleaseMarker'"
-  } else {
-    Write-Verbose "No stored installed release marker is available yet"
-  }
-
-  if (($SelfRerunCount -eq 0) -and (-not $Reinstall) -and $storedReleaseMarker -and (Test-GetComputerHealthMarkerEquivalent -LeftMarker $storedReleaseMarker -RightMarker $manualUpdateMarker)) {
-    $storedVersion = Get-GetComputerHealthVersionFromMarker -Marker $storedReleaseMarker
-    if (($storedReleaseMarker -ne $manualUpdateMarker) -and $storedVersion -and $versionToInstall -and ($storedVersion -ieq $versionToInstall)) {
-      Write-Verbose "Provided zip matches already installed version '$versionToInstall' even though the source marker differs; skipping update"
-      Write-UpdateEvent "Provided zip matches already installed version '$versionToInstall' even though the source marker differs; skipping update"
-    } else {
-      Write-Verbose "Provided zip marker already installed and -Reinstall was not specified; skipping update"
-      Write-UpdateEvent "Provided zip marker already installed and -Reinstall was not specified; skipping update"
-    }
-    return
-  }
-} else {
-  throw "$passLabel Could not determine a valid semver-like versionToInstall because no release marker is available. Aborting update."
-}
-
-Write-Verbose "$passLabel Checking for code updates; local files will be backed up before replacement if needed"
-$tmdDir = New-EmptyTempDirectory -Name "Update-GetHealthCode"
-$releaseRoot = $null
-$preparedZipPath = $null
-
+Start-UpdateTranscript
 try {
-  if ($UpdateFromZip) {
-    Write-Verbose "$passLabel Updating from provided zip '$UpdateFromZip'"
-    Write-UpdateEvent "$passLabel Updating from provided zip '$UpdateFromZip'"
-    $preparedRelease = Expand-ReleaseFromZipFile -ZipPath $UpdateFromZip -TempPath $tmdDir
-    Keep-OnlyLatestReleaseZips -CacheDir $BAK_DIR -Pattern $MANUAL_ZIP_CACHE_PATTERN -KeepCount 4
+  $passNumber = $SelfRerunCount + 1
+  $passLabel = "[pass $passNumber/2]"
+
+  Write-Verbose "$passLabel Starting Update-GetHealthCode"
+  Write-Verbose "$passLabel Parameters: Reinstall=$Reinstall UpdateFromZip='$UpdateFromZip' Version='$Version' ForceRefreshReleaseMetadata=$ForceRefreshReleaseMetadata SelfRerunCount=$SelfRerunCount PersistReleaseMarker='$PersistReleaseMarker'"
+  Write-UpdateEvent "$passLabel Parameters: Reinstall=$Reinstall UpdateFromZip='$UpdateFromZip' Version='$Version' ForceRefreshReleaseMetadata=$ForceRefreshReleaseMetadata SelfRerunCount=$SelfRerunCount PersistReleaseMarker='$PersistReleaseMarker'"
+  Write-Verbose "Configuration:"
+  Write-Verbose "  DEST_DIR                    : $DEST_DIR"
+  Write-Verbose "  BAK_DIR                     : $BAK_DIR"
+  Write-Verbose "  CFG_DIR                     : $CFG_DIR"
+  Write-Verbose "  REPO_URL                    : $REPO_URL"
+  Write-Verbose "  REPO_REF                    : $REPO_REF"
+  Write-Verbose "  LATEST_RELEASE_METADATA_CACHE_PATH : $LATEST_RELEASE_METADATA_CACHE_PATH"
+  Write-Verbose "  RELEASE_METADATA_CACHE_TTL_MINUTES : $RELEASE_METADATA_CACHE_TTL_MINUTES"
+  Write-Verbose "  ZIP_CACHE_PATTERN           : $ZIP_CACHE_PATTERN"
+  Write-Verbose "  MANUAL_ZIP_CACHE_PATTERN    : $MANUAL_ZIP_CACHE_PATTERN"
+  Write-Verbose "  repoSlug                    : $repoSlug"
+
+  if (-not (Test-Path $DEST_DIR)) {
+    Write-Verbose "Creating destination directory '$DEST_DIR'"
+    New-Item -ItemType Directory -Path $DEST_DIR | Out-Null
   } else {
-    Write-Verbose "$passLabel Updating from latest GitHub release"
-    Write-UpdateEvent "$passLabel Updating from latest GitHub release"
-    if (-not $latestRelease) {
-      $latestRelease = Get-GetComputerHealthLatestRelease -RepositoryUrl $REPO_URL -CachePath $LATEST_RELEASE_METADATA_CACHE_PATH -CacheTtlMinutes $RELEASE_METADATA_CACHE_TTL_MINUTES -ForceRefresh:$ForceRefreshReleaseMetadata
-    }
-    $preparedRelease = Expand-GetComputerHealthLatestRelease -RepositoryUrl $REPO_URL -TempPath $tmdDir -ZipCacheDir $BAK_DIR -Release $latestRelease -ForceDownload:$Reinstall
-    Keep-OnlyLatestReleaseZips -CacheDir $BAK_DIR -Pattern $ZIP_CACHE_PATTERN -KeepCount 4
+    Write-Verbose "Destination directory already exists: '$DEST_DIR'"
   }
-  $releaseRoot = $preparedRelease.RootPath
-  $preparedZipPath = $preparedRelease.ZipPath
-  Write-Verbose "$passLabel Release root resolved to '$releaseRoot'"
-  Write-Verbose "$passLabel Prepared zip path is '$preparedZipPath'"
-} catch {
-  throw "Unable to prepare release zip: $($_.Exception.Message)"
-}
 
-$appliedUpdate = $false
-$updated = Replace-FileFromSource -FileName 'Update-GetHealthCode.ps1' -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
-if ($updated) { $appliedUpdate = $true }
+  if (-not (Test-Path $BAK_DIR)) {
+    Write-Verbose "Creating backup/cache directory '$BAK_DIR'"
+    New-Item -ItemType Directory -Path $BAK_DIR | Out-Null
+  } else {
+    Write-Verbose "Backup/cache directory already exists: '$BAK_DIR'"
+  }
 
-if ($updated) {
-  Write-Verbose "$passLabel This script updated itself"
-  $zipName = if ($preparedZipPath) { Split-Path -Path $preparedZipPath -Leaf } else { '<unknown zip>' }
-  Write-UpdateEvent "Applied GetComputerHealth update from zip '$zipName'"
+  if (-not (Test-Path $CFG_DIR)) {
+    Write-Verbose "Creating configuration directory '$CFG_DIR'"
+    New-Item -ItemType Directory -Path $CFG_DIR | Out-Null
+  } else {
+    Write-Verbose "Configuration directory already exists: '$CFG_DIR'"
+  }
+
+  Ensure-PSModuleInstalled -Name ImportExcel
+
+  $p = Join-Path $CFG_DIR 'Get-ComputerHealth.sigs-to-suppress.txt'
+  if (-not (Test-Path $p)) {
+    Write-Verbose "Creating default suppressions file '$p'"
+    $null = mkdir $CFG_DIR -Force -ErrorAction Ignore
+    "# $($env:COMPUTERNAME)" | Out-File $p -Encoding UTF8
+  } else {
+    Write-Verbose "Suppressions file already exists: '$p'"
+  }
+
+  $latestRelease = $null
+  $latestReleaseMarker = $null
+  $manualUpdateMarker = $null
+  $manualUpdateFetchedAt = $null
+  $versionToInstall = $null
+  if (-not $UpdateFromZip) {
+    Write-Verbose "$passLabel Resolving latest release metadata (cache TTL $RELEASE_METADATA_CACHE_TTL_MINUTES minutes)"
+    try {
+      $latestRelease = Get-GetComputerHealthLatestRelease -RepositoryUrl $REPO_URL -CachePath $LATEST_RELEASE_METADATA_CACHE_PATH -CacheTtlMinutes $RELEASE_METADATA_CACHE_TTL_MINUTES -ForceRefresh:$ForceRefreshReleaseMetadata
+      $latestReleaseMarker = Convert-GetComputerHealthReleaseToMarker -RepositoryUrl $REPO_URL -Release $latestRelease
+      $versionToInstall = Get-GetComputerHealthVersionFromMarker -Marker $latestReleaseMarker
+      Write-Verbose "$passLabel Latest release marker is '$latestReleaseMarker'"
+      Write-UpdateEvent "$passLabel Latest release marker is '$latestReleaseMarker'"
+    } catch {
+      Write-Warning ("Could not query latest release metadata from {0}: {1}" -f $REPO_URL, $_.Exception.Message)
+    }
+  } else {
+    Write-Verbose "-UpdateFromZip specified; skipping latest release marker query"
+    $manualUpdateZip = Prepare-ManualUpdateZip -ZipPath $UpdateFromZip -CacheDir $BAK_DIR -Version $Version
+    $manualUpdateMarker = [string]$manualUpdateZip.ManualMarker
+    $manualUpdateFetchedAt = [string]$manualUpdateZip.ZipLastWriteTimeIso
+    $versionToInstall = Get-GetComputerHealthVersionFromMarker -Marker $manualUpdateMarker
+    Write-Verbose "Manual update marker is '$manualUpdateMarker'"
+    Write-Verbose "Manual update fetchedAt is '$manualUpdateFetchedAt'"
+  }
 
   if ($latestReleaseMarker) {
-    Write-Verbose "$passLabel Persisting installed release marker before self-rerun"
+    if (-not $versionToInstall) {
+      throw "Could not determine a valid semver-like versionToInstall from latest release marker '$latestReleaseMarker'. Aborting update."
+    }
+
+    $storedReleaseMarker = Get-GetComputerHealthInstalledReleaseMarker -CachePath $LATEST_RELEASE_METADATA_CACHE_PATH
+
+    if ($storedReleaseMarker) {
+      Write-Verbose "Stored installed release marker is '$storedReleaseMarker'"
+      Write-UpdateEvent "Stored installed release marker is '$storedReleaseMarker'"
+    } else {
+      Write-Verbose "No stored installed release marker is available yet"
+    }
+
+    if (($SelfRerunCount -eq 0) -and (-not $Reinstall) -and $storedReleaseMarker -and (Test-GetComputerHealthMarkerEquivalent -LeftMarker $storedReleaseMarker -RightMarker $latestReleaseMarker)) {
+      $storedVersion = Get-GetComputerHealthVersionFromMarker -Marker $storedReleaseMarker
+      if (($storedReleaseMarker -ne $latestReleaseMarker) -and $storedVersion -and $versionToInstall -and ($storedVersion -ieq $versionToInstall)) {
+        Write-Verbose "Installed marker came from a different source but matches latest version '$versionToInstall'; skipping update download"
+        Write-UpdateEvent "Installed marker came from a different source but matches latest version '$versionToInstall'; skipping update download"
+      } else {
+        Write-Verbose "Latest release already downloaded and -Reinstall was not specified; skipping update download"
+        Write-UpdateEvent "Latest release already downloaded and -Reinstall was not specified; skipping update download"
+      }
+      return
+    }
+
+    if ($Reinstall -and $storedReleaseMarker -and (Test-GetComputerHealthMarkerEquivalent -LeftMarker $storedReleaseMarker -RightMarker $latestReleaseMarker)) {
+      Write-Verbose "-Reinstall was specified; re-downloading current latest release"
+    }
+  } elseif ($manualUpdateMarker) {
+    if (-not $versionToInstall) {
+      throw "Could not determine a valid semver-like versionToInstall from manual update marker '$manualUpdateMarker'. Aborting update."
+    }
+
+    $storedReleaseMarker = Get-GetComputerHealthInstalledReleaseMarker -CachePath $LATEST_RELEASE_METADATA_CACHE_PATH
+
+    if ($storedReleaseMarker) {
+      Write-Verbose "Stored installed release marker is '$storedReleaseMarker'"
+      Write-UpdateEvent "Stored installed release marker is '$storedReleaseMarker'"
+    } else {
+      Write-Verbose "No stored installed release marker is available yet"
+    }
+
+    if (($SelfRerunCount -eq 0) -and (-not $Reinstall) -and $storedReleaseMarker -and (Test-GetComputerHealthMarkerEquivalent -LeftMarker $storedReleaseMarker -RightMarker $manualUpdateMarker)) {
+      $storedVersion = Get-GetComputerHealthVersionFromMarker -Marker $storedReleaseMarker
+      if (($storedReleaseMarker -ne $manualUpdateMarker) -and $storedVersion -and $versionToInstall -and ($storedVersion -ieq $versionToInstall)) {
+        Write-Verbose "Provided zip matches already installed version '$versionToInstall' even though the source marker differs; skipping update"
+        Write-UpdateEvent "Provided zip matches already installed version '$versionToInstall' even though the source marker differs; skipping update"
+      } else {
+        Write-Verbose "Provided zip marker already installed and -Reinstall was not specified; skipping update"
+        Write-UpdateEvent "Provided zip marker already installed and -Reinstall was not specified; skipping update"
+      }
+      return
+    }
+  } else {
+    throw "$passLabel Could not determine a valid semver-like versionToInstall because no release marker is available. Aborting update."
+  }
+
+  Write-Verbose "$passLabel Checking for code updates; local files will be backed up before replacement if needed"
+  $tmdDir = New-EmptyTempDirectory -Name "Update-GetHealthCode"
+  $releaseRoot = $null
+  $preparedZipPath = $null
+
+  try {
+    if ($UpdateFromZip) {
+      Write-Verbose "$passLabel Updating from provided zip '$UpdateFromZip'"
+      Write-UpdateEvent "$passLabel Updating from provided zip '$UpdateFromZip'"
+      $preparedRelease = Expand-ReleaseFromZipFile -ZipPath $UpdateFromZip -TempPath $tmdDir
+      Keep-OnlyLatestReleaseZips -CacheDir $BAK_DIR -Pattern $MANUAL_ZIP_CACHE_PATTERN -KeepCount 4
+    } else {
+      Write-Verbose "$passLabel Updating from latest GitHub release"
+      Write-UpdateEvent "$passLabel Updating from latest GitHub release"
+      if (-not $latestRelease) {
+        $latestRelease = Get-GetComputerHealthLatestRelease -RepositoryUrl $REPO_URL -CachePath $LATEST_RELEASE_METADATA_CACHE_PATH -CacheTtlMinutes $RELEASE_METADATA_CACHE_TTL_MINUTES -ForceRefresh:$ForceRefreshReleaseMetadata
+      }
+      $preparedRelease = Expand-GetComputerHealthLatestRelease -RepositoryUrl $REPO_URL -TempPath $tmdDir -ZipCacheDir $BAK_DIR -Release $latestRelease -ForceDownload:$Reinstall
+      Keep-OnlyLatestReleaseZips -CacheDir $BAK_DIR -Pattern $ZIP_CACHE_PATTERN -KeepCount 4
+    }
+    $releaseRoot = $preparedRelease.RootPath
+    $preparedZipPath = $preparedRelease.ZipPath
+    Write-Verbose "$passLabel Release root resolved to '$releaseRoot'"
+    Write-Verbose "$passLabel Prepared zip path is '$preparedZipPath'"
+  } catch {
+    throw "Unable to prepare release zip: $($_.Exception.Message)"
+  }
+
+  $appliedUpdate = $false
+  $updated = Replace-FileFromSource -FileName 'Update-GetHealthCode.ps1' -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
+  if ($updated) { $appliedUpdate = $true }
+
+  if ($updated) {
+    Write-Verbose "$passLabel This script updated itself"
+    $zipName = if ($preparedZipPath) { Split-Path -Path $preparedZipPath -Leaf } else { '<unknown zip>' }
+    Write-UpdateEvent "Applied GetComputerHealth update from zip '$zipName'"
+
+    if ($latestReleaseMarker) {
+      Write-Verbose "$passLabel Persisting installed release marker before self-rerun"
+      Set-GetComputerHealthInstalledReleaseMarker -CachePath $LATEST_RELEASE_METADATA_CACHE_PATH -Marker $latestReleaseMarker
+    } elseif ($manualUpdateMarker) {
+      Write-Verbose "$passLabel Persisting manual update marker before self-rerun"
+      Set-GetComputerHealthInstalledReleaseMarker -CachePath $LATEST_RELEASE_METADATA_CACHE_PATH -Marker $manualUpdateMarker -FetchedAt $manualUpdateFetchedAt
+    }
+
+    if ($SelfRerunCount -ge 1) {
+      Write-Verbose "$passLabel Self-rerun already performed once; skipping additional rerun"
+      return
+    }
+
+    $rerunPath = Join-Path $DEST_DIR 'Update-GetHealthCode.ps1'
+    $rerunParameters = @{} + $PSBoundParameters
+    $rerunParameters['SelfRerunCount'] = $SelfRerunCount + 1
+    if ($preparedZipPath) {
+      $rerunParameters['UpdateFromZip'] = $preparedZipPath
+    }
+    if ($latestReleaseMarker) {
+      $rerunParameters['PersistReleaseMarker'] = $latestReleaseMarker
+    }
+
+    Write-Verbose "$passLabel Rerunning updated copy '$rerunPath' with one-time self-rerun guard"
+    Stop-UpdateTranscript
+    & $rerunPath @rerunParameters
+    return
+  }
+
+  if (Install-ReleaseFilesFromSource -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR -ExcludeRelativePaths @('Update-GetHealthCode.ps1')) { $appliedUpdate = $true }
+
+  if ($appliedUpdate) {
+    $zipName = if ($preparedZipPath) { Split-Path -Path $preparedZipPath -Leaf } else { '<unknown zip>' }
+    Write-UpdateEvent "Applied GetComputerHealth update from zip '$zipName'"
+  }
+
+  if ($PersistReleaseMarker) {
+    Set-GetComputerHealthInstalledReleaseMarker -CachePath $LATEST_RELEASE_METADATA_CACHE_PATH -Marker $PersistReleaseMarker
+  } elseif ($latestReleaseMarker) {
     Set-GetComputerHealthInstalledReleaseMarker -CachePath $LATEST_RELEASE_METADATA_CACHE_PATH -Marker $latestReleaseMarker
   } elseif ($manualUpdateMarker) {
-    Write-Verbose "$passLabel Persisting manual update marker before self-rerun"
     Set-GetComputerHealthInstalledReleaseMarker -CachePath $LATEST_RELEASE_METADATA_CACHE_PATH -Marker $manualUpdateMarker -FetchedAt $manualUpdateFetchedAt
   }
 
-  if ($SelfRerunCount -ge 1) {
-    Write-Verbose "$passLabel Self-rerun already performed once; skipping additional rerun"
-    return
+  try {
+    $backupRetentionCutoff = (Get-Date).AddMonths(-1)
+    Write-Verbose "Pruning backup .bak files older than '$backupRetentionCutoff' from '$BAK_DIR'"
+
+    $oldBackups = Get-ChildItem -LiteralPath $BAK_DIR -File -Filter '*.bak' -ErrorAction Stop |
+      Where-Object { $_.LastWriteTime -lt $backupRetentionCutoff }
+
+    foreach ($item in $oldBackups) {
+      Write-Verbose "Deleting old backup file '$($item.FullName)'"
+    }
+
+    $oldBackups | Remove-Item -Force -ErrorAction Stop
+  } catch {
+    Write-Warning ("Failed pruning old backups in {0}: {1}" -f $BAK_DIR, $_.Exception.Message)
   }
 
-  $rerunPath = Join-Path $DEST_DIR 'Update-GetHealthCode.ps1'
-  $rerunParameters = @{} + $PSBoundParameters
-  $rerunParameters['SelfRerunCount'] = $SelfRerunCount + 1
-  if ($preparedZipPath) {
-    $rerunParameters['UpdateFromZip'] = $preparedZipPath
-  }
-  if ($latestReleaseMarker) {
-    $rerunParameters['PersistReleaseMarker'] = $latestReleaseMarker
-  }
-
-  Write-Verbose "$passLabel Rerunning updated copy '$rerunPath' with one-time self-rerun guard"
-  & $rerunPath @rerunParameters
-  return
+  Write-Verbose "Update-GetHealthCode completed"
+} finally {
+  Stop-UpdateTranscript
+  Finalize-UpdateTranscript
 }
-
-if (Install-ReleaseFilesFromSource -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR -ExcludeRelativePaths @('Update-GetHealthCode.ps1')) { $appliedUpdate = $true }
-
-if ($appliedUpdate) {
-  $zipName = if ($preparedZipPath) { Split-Path -Path $preparedZipPath -Leaf } else { '<unknown zip>' }
-  Write-UpdateEvent "Applied GetComputerHealth update from zip '$zipName'"
-}
-
-if ($PersistReleaseMarker) {
-  Set-GetComputerHealthInstalledReleaseMarker -CachePath $LATEST_RELEASE_METADATA_CACHE_PATH -Marker $PersistReleaseMarker
-} elseif ($latestReleaseMarker) {
-  Set-GetComputerHealthInstalledReleaseMarker -CachePath $LATEST_RELEASE_METADATA_CACHE_PATH -Marker $latestReleaseMarker
-} elseif ($manualUpdateMarker) {
-  Set-GetComputerHealthInstalledReleaseMarker -CachePath $LATEST_RELEASE_METADATA_CACHE_PATH -Marker $manualUpdateMarker -FetchedAt $manualUpdateFetchedAt
-}
-
-try {
-  $backupRetentionCutoff = (Get-Date).AddMonths(-1)
-  Write-Verbose "Pruning backup .bak files older than '$backupRetentionCutoff' from '$BAK_DIR'"
-
-  $oldBackups = Get-ChildItem -LiteralPath $BAK_DIR -File -Filter '*.bak' -ErrorAction Stop |
-    Where-Object { $_.LastWriteTime -lt $backupRetentionCutoff }
-
-  foreach ($item in $oldBackups) {
-    Write-Verbose "Deleting old backup file '$($item.FullName)'"
-  }
-
-  $oldBackups | Remove-Item -Force -ErrorAction Stop
-} catch {
-  Write-Warning ("Failed pruning old backups in {0}: {1}" -f $BAK_DIR, $_.Exception.Message)
-}
-
-Write-Verbose "Update-GetHealthCode completed"
