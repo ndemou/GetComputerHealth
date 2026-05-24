@@ -1,14 +1,10 @@
 ﻿# TODO
 
-## Finalize and implement On-Disk Format Migration Design Draft
-
-## Replace all references to files containing json in this TODO with .psd1 files
-
-To the extend that it's easy, if we already have files with json content change them to .psd1
-
 ## Cleanups of old log files
 
 Invoke-GetComputerHealth.ps1 should be deleting transcripts (like `.\log\Invoke-GetHealthDomainComputers-<timestamp>.log`) older than 1 month.
+
+## Finalize and implement On-Disk Format Migration Design Draft
 
 ## Save test results to .\data instead of .\temp
 
@@ -16,7 +12,7 @@ Add an Installation migration function for this purpose. Besides creating the da
 
 ## Add configuration options
 
-Support file `./config/gch.conf` which is expected to contain a json dict with multiple key-value pairs. If it doesn't exist it should be created by the installer with the default options.
+Support file `./config/gch.psd1` which is expected to contain a PowerShell data file with multiple key-value pairs. If it doesn't exist it should be created by the installer with the default options.
 
 - If the key `AutomaticUpdates` is falsy the updater/installer quits with an explanatory warning before performing any action.
 - If the key `RepoUrl` is found it is used as the value of $REPO_URL. If it's not a valid URL, execution is aborted with an exception.
@@ -25,34 +21,32 @@ Also update this part of our README. Reaplace this:
 > The installer (`Update-GetHealthCode.ps1`) downloads and updates files from this GitHub repository. It may do so *every* time you call `Invoke-GetComputerHealth.ps1`. It is strongly recommended that you clone this repo, audit it, and then change the `$REPO_URL=` line in `Update-GetHealthCode.ps1` to point to your local copy.
 
 With this:
-> By default the installer downloads and updates files from this GitHub repository every time you call any of the `Invoke-*.ps1` scripts. You can disable this by setting `AutomaticUpdates` to false in `./config/gch.config` or point the updater to a clone of this repo that you control by setting `RepoUrl`.
+> By default the installer downloads and updates files from this GitHub repository every time you call any of the `Invoke-*.ps1` scripts. You can disable this by setting `AutomaticUpdates = $false` in `./config/gch.psd1` or point the updater to a clone of this repo that you control by setting `RepoUrl`.
 
 ## Make installation SUPER simple
 
 In order to customize the installation I should be able to call the installer like this:
-```
-& .\install.ps1 -Config @'
-{
-  "Installtion": {
-      "InstallationDir": "C:\IT\GetComputerHealth",
-      "SendAlertsViaEmail": True
-  },
-  "ConfigFiles": {
-      "Send-Message.conf": {
-        "Server": "smtp.contoso.com",
-        "From": "SERVER01+alerts@contoso.com",
-        "To": "ops@contoso.com;admin@contoso.com"
-    },
-    "gch.conf": {
-        "AutomaticUpdates": "false"
+```powershell
+& .\install.ps1 -Config @{
+    Installtion = @{
+        InstallationDir    = 'C:\IT\GetComputerHealth'
+        SendAlertsViaEmail = $true
     }
-  }
+    ConfigFiles = @{
+        'Send-Message.psd1' = @{
+            Server = 'smtp.contoso.com'
+            From   = 'SERVER01+alerts@contoso.com'
+            To     = 'ops@contoso.com;admin@contoso.com'
+        }
+        'gch.psd1' = @{
+            AutomaticUpdates = $false
+        }
+    }
 }
-'@
 ```
 Note the `Installtion` branch with options that modify the behaviour of the installer and the `ConfigFiles` branch that  options that can used to directly populate the relevant config files under `.\config`.
 
-`& .\install.ps1 -GenerateConfigJson` should generate a template json that can be customized and be passed to `-Config`.
+`& .\install.ps1 -GenerateConfigPsd1` should generate a template PowerShell data file that can be customized and be passed to `-Config`.
 
 Update documentation with details about this.
 
@@ -410,6 +404,8 @@ See also : .\tests\script-analysis.ps1
 - "HealthTest-SchemaVersionConsistency"
 - "HealthTest-TombstoneLifetime"
 - "HealthTest-RecycleBinEnabled"
+
+## MAYBE change any files with JSON content to `.psd1`
 
 ## Health test candidates
 ```
