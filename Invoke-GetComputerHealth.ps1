@@ -358,14 +358,19 @@ function Convert-HealthMessagesToHtmlTable {
     $suppressionCommand = Get-HealthSuppressionCommand -MessageRecord $message
     $displayLevel = if ([string]::IsNullOrWhiteSpace($level)) { '' } else { $level.Substring(0, 1).ToUpperInvariant() + $level.Substring(1).ToLowerInvariant() }
     $levelBackground = switch ($level.ToLowerInvariant()) {
-      'failure' { '#f3caca' }
-      'warning' { '#f4ddbf' }
-      'notice' { '#cfe0f5' }
-      default { '#eef1f4' }
+      'failure' { '#ff4d4f' }
+      'warning' { '#ffb300' }
+      'notice'  { '#1e88e5' }
+      default   { '#c7d0d9' }
+    }
+    $levelForeground = switch ($level.ToLowerInvariant()) {
+      'warning' { '#111' }
+      default   { '#fff' }
     }
 
     $messageHtml = [System.Net.WebUtility]::HtmlEncode($text)
-    $detailsHtml = "<div>$messageHtml</div>"
+    $headerHtml = "<div><span style='font-weight:700; color:rgba(0,0,0,0.8)'>" + ([System.Net.WebUtility]::HtmlEncode($computer)) + "</span><span style='display:inline-block; margin-left:8px; padding:1px 6px; border-radius:999px; background-color:$levelBackground; color:$levelForeground'>" + ([System.Net.WebUtility]::HtmlEncode($displayLevel)) + "</span><span style='margin-left:8px'>$messageHtml</span></div>"
+    $detailsHtml = $headerHtml
 
     if (-not [string]::IsNullOrWhiteSpace($comment)) {
       $commentHtml = [System.Net.WebUtility]::HtmlEncode($comment) -replace '(\r\n|\n|\r)', '<br>'
@@ -376,15 +381,13 @@ function Convert-HealthMessagesToHtmlTable {
       $detailsHtml += "<div style='margin-top:4px; color:#666; font-size:6pt; font-family:""Arial Narrow"", Arial, sans-serif'>" + ([System.Net.WebUtility]::HtmlEncode($suppressionCommand)) + "</div>"
     }
 
-    $computerLevelHtml = "<div style='font-weight:700; color:rgba(0,0,0,0.8)'>" + ([System.Net.WebUtility]::HtmlEncode($computer)) + "</div><div style='margin-top:2px'>" + ([System.Net.WebUtility]::HtmlEncode($displayLevel)) + "</div>"
-    "<tr><td style='padding:6px 8px; border:1px solid rgba(0,0,0,0.5); vertical-align:top; white-space:nowrap; background-color:$levelBackground; color:#000'>$computerLevelHtml</td><td style='padding:6px 8px; border:1px solid rgba(0,0,0,0.5); vertical-align:top; color:#000'>$detailsHtml</td></tr>"
+    "<div style='margin-bottom:8px; padding:6px 8px; border:1px solid rgba(0,0,0,0.5); font-family:Segoe UI, Arial, sans-serif; font-size:12px; color:#000'>$detailsHtml</div>"
   }
 
   return @(
-    "<table style='border-collapse:collapse; width:100%; font-family:Segoe UI, Arial, sans-serif; font-size:12px'>"
-    "<tbody>"
+    "<div style='width:100%; font-family:Segoe UI, Arial, sans-serif; font-size:12px'>"
     ($rows -join '')
-    "</tbody></table>"
+    "</div>"
   ) -join ''
 }
 

@@ -77,7 +77,7 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
     $script:InvokeGetComputerHealthScriptText | Should -Match '\[Alias\(''NoSendMessage'', ''NoSendMail''\)\]\s*\r?\n\s*\[switch\]\$NoSendReport'
   }
 
-  It 'renders notable findings as an html table with comment and suppression command styling' {
+  It 'renders notable findings as inline heading blocks with comment and suppression command styling' {
     $html = Convert-HealthMessagesToHtmlTable -Messages @(
       [pscustomobject]@{
         Level = 'warning'
@@ -88,9 +88,10 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
       }
     )
 
-    $html | Should -Not -Match '<thead>'
-    $html | Should -Match '>SRV1</div><div'
-    $html | Should -Match '>Warning</div>'
+    $html | Should -Not -Match '<table'
+    $html | Should -Match '>SRV1</span>'
+    $html | Should -Match 'background-color:#ffb300; color:#111'
+    $html | Should -Match '>Warning</span><span style=''margin-left:8px''>Disk free space is low</span>'
     $html | Should -Match 'Drive C: has only 4% free<br>Investigate temp usage'
     $html | Should -Match ([regex]::Escape('Invoke-Command SRV1 {c:\it\Get-ComputerHealth\bin\Get-ComputerHealth.ps1 -AddWhitelisting -until 2999-12-31 -sig &#39;deadbeef&#39; -ComputerName SRV1 -comment &quot;warning - Disk free space is low&quot;}'))
   }
