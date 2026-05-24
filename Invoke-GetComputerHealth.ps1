@@ -425,7 +425,7 @@ function Convert-HealthMessagesToHtmlTable {
       $detailsHtml += "<div style='margin-top:4px; color:#666; font-size:6pt; font-family:""Arial Narrow"", Arial, sans-serif'>" + ([System.Net.WebUtility]::HtmlEncode($suppressionCommand)) + "</div>"
     }
 
-    "<div style='margin-bottom:8px; padding:6px 8px; border:1px solid rgba(0,0,0,0.5); font-family:Segoe UI, Arial, sans-serif; font-size:12px; color:#000'>$detailsHtml</div>"
+    "<div style='margin-bottom:10px; font-family:Segoe UI, Arial, sans-serif; font-size:12px; color:#000'>$detailsHtml</div>"
   }
 
   return @(
