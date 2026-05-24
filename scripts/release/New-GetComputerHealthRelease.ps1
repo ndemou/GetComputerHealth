@@ -268,8 +268,14 @@ git push origin main | Out-Host
 Write-Step ("Creating GitHub release {0}" -f $releaseTag)
 gh release create $releaseTag $zipPath --target main --title $releaseTag --generate-notes | Out-Host
 
+$releaseZipUrl = (
+  gh release view $releaseTag --repo $repoSlug --json assets --jq '.assets[0].url'
+).Trim()
+
 Write-Step 'Release completed successfully'
 Write-Host ("Version: {0}" -f $newVersionText)
 Write-Host ("Tag: {0}" -f $releaseTag)
 Write-Host ("Zip: {0}" -f $zipPath)
 Write-Host ("Repo: {0}" -f $repoSlug)
+Write-Host ("ReleaseZipUrl: {0}" -f $releaseZipUrl)
+Write-Host $releaseZipUrl
