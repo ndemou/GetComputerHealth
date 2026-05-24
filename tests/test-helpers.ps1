@@ -67,6 +67,23 @@ function Assert-DirectoryWritable {
   }
 }
 
+function Get-EmbeddedScriptVersion {
+  param(
+    [Parameter(Mandatory)]
+    [string]$ScriptPath
+  )
+
+  Assert-PathExists -Path $ScriptPath -Message "Expected script with embedded version to exist: $ScriptPath"
+
+  $content = Get-Content -LiteralPath $ScriptPath -Raw -ErrorAction Stop
+  $match = [regex]::Match($content, '(?im)^\s*\$VERSION\s*=\s*["''](?<version>\d+\.\d+\.\d+)["'']')
+  if (-not $match.Success) {
+    Fail-Test "Could not find embedded semantic version in script: $ScriptPath"
+  }
+
+  return $match.Groups['version'].Value
+}
+
 function Get-TestPaths {
   param(
     [Parameter(Mandatory)]
@@ -74,17 +91,22 @@ function Get-TestPaths {
     [string]$RunRoot = 'C:\it\temp-gch'
   )
 
+  $mainScriptSource = Join-Path $RepoRoot 'Get-ComputerHealth.ps1'
+  $repoVersion = Get-EmbeddedScriptVersion -ScriptPath $mainScriptSource
+
   [pscustomobject]@{
     RepoRoot = $RepoRoot
+    RepoVersion = $repoVersion
     TestRoot = $RunRoot
     TestsRoot = (Join-Path $RepoRoot 'tests')
     InstallRoot = (Join-Path $RunRoot 'bin')
     ConfigRoot = (Join-Path $RunRoot 'config')
     SuppressionsFile = (Join-Path $RunRoot 'config\Get-ComputerHealth.sigs-to-suppress.txt')
     ReleaseRoot = (Join-Path $RunRoot 'release')
-    ReleaseZipPath = (Join-Path $RunRoot 'GetComputerHealth-under-test.zip')
+    ReleaseZipPath = (Join-Path $RunRoot ("GetComputerHealth-under-test-v{0}.zip" -f $repoVersion))
+    ReleaseZipPathVersionless = (Join-Path $RunRoot 'GetComputerHealth-under-test.zip')
     UpdateScriptSource = (Join-Path $RepoRoot 'Update-GetHealthCode.ps1')
-    MainScriptSource = (Join-Path $RepoRoot 'Get-ComputerHealth.ps1')
+    MainScriptSource = $mainScriptSource
     HelperScript = (Join-Path $RepoRoot 'tests\helpers-files.ps1')
   }
 }

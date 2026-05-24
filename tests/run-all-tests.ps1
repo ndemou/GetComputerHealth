@@ -295,8 +295,23 @@ if ($MyInvocation.InvocationName -ne '.') {
   }
 
   if ($selection.RunStandaloneScripts) {
-    $passed = [bool](Test-StandaloneTestScripts -Detailed:$Detailed -IncludeScriptNames $selection.StandaloneScriptNames | Select-Object -Last 1)
-    $results += New-TestGroupResult -Name 'Standalone scripts' -Category 'Integration' -Passed $passed
+    $previousInstallerEnv = $env:GCH_TEST_INSTALLER_INCLUDE_VERSIONLESS
+    try {
+      if ($Smoke) {
+        Remove-Item Env:\GCH_TEST_INSTALLER_INCLUDE_VERSIONLESS -ErrorAction SilentlyContinue
+      } else {
+        $env:GCH_TEST_INSTALLER_INCLUDE_VERSIONLESS = '1'
+      }
+
+      $passed = [bool](Test-StandaloneTestScripts -Detailed:$Detailed -IncludeScriptNames $selection.StandaloneScriptNames | Select-Object -Last 1)
+      $results += New-TestGroupResult -Name 'Standalone scripts' -Category 'Integration' -Passed $passed
+    } finally {
+      if ($null -eq $previousInstallerEnv) {
+        Remove-Item Env:\GCH_TEST_INSTALLER_INCLUDE_VERSIONLESS -ErrorAction SilentlyContinue
+      } else {
+        $env:GCH_TEST_INSTALLER_INCLUDE_VERSIONLESS = $previousInstallerEnv
+      }
+    }
   }
 
   $failedResults = @($results | Where-Object { -not $_.Passed })

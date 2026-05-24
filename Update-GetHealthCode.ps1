@@ -9,6 +9,31 @@ it re-invokes the updated copy. When replacing a file, backup copies
 are created in the backups directory.
 Will set PSGallery as Trusted.
 
+.PARAMETER Reinstall
+Forces reinstall/update work even when the currently installed release
+marker matches the target release.
+
+.PARAMETER UpdateFromZip
+Updates from the specified local zip file instead of querying the latest
+GitHub release.
+
+.PARAMETER Version
+Explicit semantic version to associate with `-UpdateFromZip` when the zip
+file name does not already embed a version token such as `v4.4.3`.
+Use `X.Y.Z` or `vX.Y.Z`. If both the zip file name and `-Version`
+provide versions, they must match.
+
+.PARAMETER ForceRefreshReleaseMetadata
+This script caches latest-release metadata locally to avoid querying GitHub
+on every run. Use this switch to bypass that cache and fetch fresh release
+metadata before updating.
+
+.PARAMETER SelfRerunCount
+Internal use only. Tracks the one-time self-rerun pass count.
+
+.PARAMETER PersistReleaseMarker
+Internal use only. Carries the resolved release marker across self-rerun.
+
 .OUTPUTS
 None.
 #>
@@ -16,6 +41,7 @@ None.
 param(
   [switch]$Reinstall,
   [string]$UpdateFromZip,
+  [string]$Version,
   [switch]$ForceRefreshReleaseMetadata,
   [Parameter(DontShow=$true)][int]$SelfRerunCount = 0,
   [Parameter(DontShow=$true)][string]$PersistReleaseMarker
@@ -199,6 +225,30 @@ or $null when no version-like token can be identified.
   }
 
   return $null
+}
+
+function ConvertTo-GetComputerHealthVersionToken {
+<#
+.SYNOPSIS
+Normalizes a user-provided version string into the internal vX.Y.Z form.
+.DESCRIPTION
+Accepts versions like 1.2.3 or v1.2.3 and returns v1.2.3.
+Returns null when no value was provided.
+#>
+  [CmdletBinding()]
+  param([AllowNull()][string]$Version)
+
+  if ([string]::IsNullOrWhiteSpace($Version)) {
+    return $null
+  }
+
+  $trimmedVersion = $Version.Trim()
+  $match = [regex]::Match($trimmedVersion, '^(?:v)?(?<Version>\d+\.\d+\.\d+)$', [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+  if (-not $match.Success) {
+    throw "Invalid -Version value '$Version'. Use semantic version format X.Y.Z."
+  }
+
+  return ('v{0}' -f $match.Groups['Version'].Value)
 }
 
 function Test-GetComputerHealthMarkerEquivalent {
@@ -413,7 +463,8 @@ Hashtable with keys: SourceFullPath, ZipLastWriteTimeIso, CachedZipPath, ZipSha2
   [CmdletBinding()]
   param(
     [Parameter(Mandatory)][string]$ZipPath,
-    [Parameter(Mandatory)][string]$CacheDir
+    [Parameter(Mandatory)][string]$CacheDir,
+    [string]$Version
   )
 
   if (-not (Test-Path -LiteralPath $ZipPath -PathType Leaf)) {
@@ -434,6 +485,17 @@ Hashtable with keys: SourceFullPath, ZipLastWriteTimeIso, CachedZipPath, ZipSha2
   $zipTag = [System.IO.Path]::GetFileNameWithoutExtension($zipItem.Name)
   if ([string]::IsNullOrWhiteSpace($zipTag)) { $zipTag = 'manual' }
   $manualMarker = ("manual-zip|{0}|{1}" -f $zipTag, $zipHash)
+  $markerVersionToken = Get-GetComputerHealthVersionFromMarker -Marker $manualMarker
+  $requestedVersionToken = ConvertTo-GetComputerHealthVersionToken -Version $Version
+
+  if (-not $markerVersionToken) {
+    if (-not $requestedVersionToken) {
+      throw "Manual update zip file name must embed a semver tag like 'v1.2.3' unless -Version '1.2.3' is supplied. Zip: $sourceFullPath"
+    }
+    $manualMarker = ("manual-zip|{0}|{1}" -f $requestedVersionToken, $zipHash)
+  } elseif ($requestedVersionToken -and ($requestedVersionToken -ine $markerVersionToken)) {
+    throw "Provided -Version '$Version' does not match the semver '$markerVersionToken' embedded in zip file name '$($zipItem.Name)'."
+  }
 
   $samePath = $false
   if (Test-Path -LiteralPath $cachedZipPath -PathType Leaf) {
@@ -452,55 +514,6 @@ Hashtable with keys: SourceFullPath, ZipLastWriteTimeIso, CachedZipPath, ZipSha2
   } else {
     Write-Verbose "Copying manual update zip to cache '$cachedZipPath'"
     Copy-Item -LiteralPath $sourceFullPath -Destination $cachedZipPath -Force -ErrorAction Stop
-  }
-
-  if (-not (Get-GetComputerHealthVersionFromMarker -Marker $manualMarker)) {
-    $zipVersion = $null
-    $archive = $null
-    try {
-      Add-Type -AssemblyName System.IO.Compression.FileSystem -ErrorAction SilentlyContinue
-      $archive = [System.IO.Compression.ZipFile]::OpenRead($sourceFullPath)
-      $versionEntry = $archive.Entries |
-        Where-Object { ($_.FullName -replace '\\', '/') -match '(^|/)(VERSION|version)$' } |
-        Select-Object -First 1
-      if ($versionEntry) {
-        $reader = [System.IO.StreamReader]::new($versionEntry.Open())
-        try {
-          $zipVersion = $reader.ReadToEnd().Trim()
-        } finally {
-          $reader.Dispose()
-        }
-      }
-
-      if (-not $zipVersion) {
-        $scriptEntry = $archive.Entries |
-          Where-Object { ($_.FullName -replace '\\', '/') -match '(^|/)Get-ComputerHealth\.ps1$' } |
-          Select-Object -First 1
-        if ($scriptEntry) {
-          $reader = [System.IO.StreamReader]::new($scriptEntry.Open())
-          try {
-            $scriptContent = $reader.ReadToEnd()
-          } finally {
-            $reader.Dispose()
-          }
-
-          $versionMatch = [regex]::Match($scriptContent, '(?m)^\$VERSION\s*=\s*"(?<Version>\d+\.\d+\.\d+)"')
-          if ($versionMatch.Success) {
-            $zipVersion = $versionMatch.Groups['Version'].Value
-          }
-        }
-      }
-    } catch {
-      Write-Verbose "Could not derive version token from manual update zip '$sourceFullPath': $($_.Exception.Message)"
-    } finally {
-      if ($archive) {
-        $archive.Dispose()
-      }
-    }
-
-    if ($zipVersion -match '^\d+\.\d+\.\d+$') {
-      $manualMarker = ("manual-zip|v{0}|{1}" -f $zipVersion, $zipHash)
-    }
   }
 
   return @{
@@ -934,8 +947,8 @@ $passNumber = $SelfRerunCount + 1
 $passLabel = "[pass $passNumber/2]"
 
 Write-Verbose "$passLabel Starting Update-GetHealthCode"
-Write-Verbose "$passLabel Parameters: Reinstall=$Reinstall UpdateFromZip='$UpdateFromZip' ForceRefreshReleaseMetadata=$ForceRefreshReleaseMetadata SelfRerunCount=$SelfRerunCount PersistReleaseMarker='$PersistReleaseMarker'"
-Write-UpdateEvent "$passLabel Parameters: Reinstall=$Reinstall UpdateFromZip='$UpdateFromZip' ForceRefreshReleaseMetadata=$ForceRefreshReleaseMetadata SelfRerunCount=$SelfRerunCount PersistReleaseMarker='$PersistReleaseMarker'"
+Write-Verbose "$passLabel Parameters: Reinstall=$Reinstall UpdateFromZip='$UpdateFromZip' Version='$Version' ForceRefreshReleaseMetadata=$ForceRefreshReleaseMetadata SelfRerunCount=$SelfRerunCount PersistReleaseMarker='$PersistReleaseMarker'"
+Write-UpdateEvent "$passLabel Parameters: Reinstall=$Reinstall UpdateFromZip='$UpdateFromZip' Version='$Version' ForceRefreshReleaseMetadata=$ForceRefreshReleaseMetadata SelfRerunCount=$SelfRerunCount PersistReleaseMarker='$PersistReleaseMarker'"
 Write-Verbose "Configuration:"
 Write-Verbose "  DEST_DIR                    : $DEST_DIR"
 Write-Verbose "  BAK_DIR                     : $BAK_DIR"
@@ -998,7 +1011,7 @@ if (-not $UpdateFromZip) {
   }
 } else {
   Write-Verbose "-UpdateFromZip specified; skipping latest release marker query"
-  $manualUpdateZip = Prepare-ManualUpdateZip -ZipPath $UpdateFromZip -CacheDir $BAK_DIR
+  $manualUpdateZip = Prepare-ManualUpdateZip -ZipPath $UpdateFromZip -CacheDir $BAK_DIR -Version $Version
   $manualUpdateMarker = [string]$manualUpdateZip.ManualMarker
   $manualUpdateFetchedAt = [string]$manualUpdateZip.ZipLastWriteTimeIso
   $versionToInstall = Get-GetComputerHealthVersionFromMarker -Marker $manualUpdateMarker
