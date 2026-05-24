@@ -1218,7 +1218,7 @@ try {
     $rerunPath = Join-Path $DEST_DIR 'Update-GetHealthCode.ps1'
     $rerunParameters = @{} + $PSBoundParameters
     $rerunParameters['SelfRerunCount'] = $SelfRerunCount + 1
-    if ($preparedZipPath) {
+    if ($preparedZipPath -and $UpdateFromZip) {
       $rerunParameters['UpdateFromZip'] = $preparedZipPath
     }
     if ($latestReleaseMarker) {
