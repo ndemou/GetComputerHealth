@@ -9,24 +9,29 @@ it re-invokes the updated copy. When replacing a file, backup copies
 are created in the backups directory.
 Will set PSGallery as Trusted.
 
+The updater also tracks a small "release marker" for the currently
+installed code and for the target update source. A release marker is a
+stable identifier for a specific release source, typically derived from
+GitHub release metadata or from a manually supplied zip file name plus
+its content hash. These markers are cached locally and let the updater
+decide whether the requested update is already installed, whether it can
+skip re-downloading or reapplying files, and when `-Reinstall` should
+force the update to run again.
+
 .PARAMETER Reinstall
-Forces reinstall/update work even when the currently installed release
-marker matches the target release.
+Forces reinstall even when installed release matches target release.
 
 .PARAMETER UpdateFromZip
-Updates from the specified local zip file instead of querying the latest
-GitHub release.
+Overides the default which is to fetch the latest GitHub release.
 
 .PARAMETER Version
 Explicit semantic version to associate with `-UpdateFromZip` when the zip
 file name does not already embed a version token such as `v4.4.3`.
-Use `X.Y.Z` or `vX.Y.Z`. If both the zip file name and `-Version`
-provide versions, they must match.
+Use `X.Y.Z` or `vX.Y.Z`. 
 
 .PARAMETER ForceRefreshReleaseMetadata
-This script caches latest-release metadata locally to avoid querying GitHub
-on every run. Use this switch to bypass that cache and fetch fresh release
-metadata before updating.
+Overides the default which is to cache latest-release metadata locally
+for a few minutes (to avoid querying GitHub on every run).
 
 .PARAMETER SelfRerunCount
 Internal use only. Tracks the one-time self-rerun pass count.
@@ -34,8 +39,16 @@ Internal use only. Tracks the one-time self-rerun pass count.
 .PARAMETER PersistReleaseMarker
 Internal use only. Carries the resolved release marker across self-rerun.
 
-.OUTPUTS
-None.
+.EXAMPLE
+.\Update-GetHealthCode.ps1
+
+Checks the locally cached latest-release metadata, refreshes it from
+GitHub when needed, and installs the latest published release when it is
+newer than the currently installed release marker.
+
+.EXAMPLE
+.\Update-GetHealthCode.ps1 -UpdateFromZip C:\Downloads\GetComputerHealth-v4.4.3.zip
+
 #>
 [CmdletBinding()]
 param(
