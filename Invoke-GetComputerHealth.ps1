@@ -717,6 +717,29 @@ function Get-LatestLocalReleaseZip {
   }
 }
 
+function Get-UpdateZipVersionArgument {
+  [CmdletBinding()]
+  param(
+    [string]$ZipPath,
+    [string]$FallbackVersion
+  )
+
+  if ([string]::IsNullOrWhiteSpace($ZipPath)) {
+    return $null
+  }
+
+  $zipLeaf = Split-Path -Path $ZipPath -Leaf
+  if (-not [string]::IsNullOrWhiteSpace($zipLeaf) -and ($zipLeaf -match '(?i)\bv\d+\.\d+\.\d+\b')) {
+    return $null
+  }
+
+  if ([string]::IsNullOrWhiteSpace($FallbackVersion)) {
+    return $null
+  }
+
+  return $FallbackVersion
+}
+
 #------------------------------------------------------------------------
 # MAIN CODE
 #------------------------------------------------------------------------
@@ -760,10 +783,13 @@ $SmtpSubject = $SmtpSubject -replace 'LIST_OF_COMPUTERS', ($targets -join ',')
 $SmtpSubjectAllGood = $SmtpSubjectAllGood -replace 'LIST_OF_COMPUTERS', ($targets -join ',')
 
 $localReleaseZip = $null
+$localReleaseZipVersion = $null
 if ($PushUpdate) {
   $localReleaseZip = Get-LatestLocalReleaseZip
   if (-not $localReleaseZip) {
     Write-Warning "-PushUpdate was requested but no local update zip was found (metadata marker or cached zip in ${TEMP_DIR}). Falling back to normal update behavior."
+  } else {
+    $localReleaseZipVersion = Get-UpdateZipVersionArgument -ZipPath $localReleaseZip -FallbackVersion $embeddedVersion
   }
 }
 
@@ -794,6 +820,7 @@ foreach ($target in $targets) {
       $IpsOfAllDcs,
       $PushUpdate,
       $UpdateZipPath,
+      $UpdateZipVersion,
       $PassThruArgs
     )
 
@@ -831,7 +858,11 @@ foreach ($target in $targets) {
     if (-not $NoUpdate) {
       try {
         $updateOutput = if ($PushUpdate -and $UpdateZipPath) {
-          & $updateScriptPath -UpdateFromZip $UpdateZipPath 2>&1
+          if ([string]::IsNullOrWhiteSpace($UpdateZipVersion)) {
+            & $updateScriptPath -UpdateFromZip $UpdateZipPath 2>&1
+          } else {
+            & $updateScriptPath -UpdateFromZip $UpdateZipPath -Version $UpdateZipVersion 2>&1
+          }
         }
         else {
           & $updateScriptPath 2>&1
@@ -900,7 +931,7 @@ foreach ($target in $targets) {
   }
 
   if ($target -eq $env:COMPUTERNAME) {
-    $output = & $healthCheckBlock $ROOT_DIR $Hide $OnlyTheseTests $ExcludeTests $WhitelistSigs $SkipSlowTests $SkipPolicyTests $SkipNonEssentialTests $NoUpdate $RunWithoutElevation $IpsOfAllDcs $PushUpdate $localReleaseZip $PassThruArgs
+    $output = & $healthCheckBlock $ROOT_DIR $Hide $OnlyTheseTests $ExcludeTests $WhitelistSigs $SkipSlowTests $SkipPolicyTests $SkipNonEssentialTests $NoUpdate $RunWithoutElevation $IpsOfAllDcs $PushUpdate $localReleaseZip $localReleaseZipVersion $PassThruArgs
   }
   else {
     if (Get-TcpPortStateFast $target @(5985, 5986, 80, 443, 88, 135, 389, 636, 445, 3268, 3269) | Where-Object { $_.Open }) {
@@ -945,7 +976,7 @@ foreach ($target in $targets) {
           Copy-Item -Path $localReleaseZip -Destination $remoteZipPath -ToSession $session -Force
         }
 
-        $output = Invoke-Command -Session $session -ScriptBlock $healthCheckBlock -ArgumentList $remoteExecutionRoot, $Hide, $OnlyTheseTests, $ExcludeTests, $WhitelistSigs, $SkipSlowTests, $SkipPolicyTests, $SkipNonEssentialTests, $NoUpdate, $RunWithoutElevation, $IpsOfAllDcs, $PushUpdate, $remoteZipPath, $PassThruArgs
+        $output = Invoke-Command -Session $session -ScriptBlock $healthCheckBlock -ArgumentList $remoteExecutionRoot, $Hide, $OnlyTheseTests, $ExcludeTests, $WhitelistSigs, $SkipSlowTests, $SkipPolicyTests, $SkipNonEssentialTests, $NoUpdate, $RunWithoutElevation, $IpsOfAllDcs, $PushUpdate, $remoteZipPath, $localReleaseZipVersion, $PassThruArgs
       }
       catch {
         $comment = (($_ | Out-String).Trim())
