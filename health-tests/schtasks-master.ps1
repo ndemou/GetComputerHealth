@@ -139,21 +139,57 @@ Uses: Get-ScheduledTask, Get-ScheduledTaskInfo, Get-ScheduledTaskDeepInfo.
     try {
         $info = Get-ScheduledTaskInfo -TaskName $t.TaskName -TaskPath $t.TaskPath -ErrorAction Stop
     } catch [Microsoft.Management.Infrastructure.CimException] {
-        switch ($_.Exception.HResult) {
-            -2147024894 {
-                Write-Warning "[NOTICE] Task '$path' was deleted while we were examining it." # 0x80070002
+        $caughtException = $null
+        $exceptionMessage = 'No exception details were available.'
+        $hexCode = 'unknown'
+
+        if ($null -ne $_) {
+            try { $caughtException = $_.Exception } catch {}
+        }
+        if ($null -ne $caughtException) {
+            try {
+                if (-not [string]::IsNullOrWhiteSpace($caughtException.Message)) {
+                    $exceptionMessage = $caughtException.Message
+                }
+            } catch {}
+            try { $hexCode = '0x{0:X8}' -f ([uint32]$caughtException.HResult) } catch {}
+        }
+
+        switch ($hexCode) {
+            '0x80070002' {
+                Write-Warning "[NOTICE] Task '$path' was deleted while we were examining it."
             }
-            -2147216625 {
-                Write-Warning "[WARNING] Task XML for '$path' is corrupted." # 0x8004130F
+            '0x8004130F' {
+                Write-Warning "[WARNING] Task XML for '$path' is corrupted."
             }
             default {
-                $hexCode = '0x{0:X8}' -f $_.Exception.HResult
-                Write-Warning "[FAILURE] Task '$path' failed with CIM Error $hexCode ($($_.Exception.Message))"
+                Write-Warning "[FAILURE] Task '$path' failed with CIM Error $hexCode ($exceptionMessage)"
             }
         }
         continue
     } catch {
-        Write-Warning "[FAILURE] Task '$path' encountered an unexpected $($_.Exception.GetType().Name) error: $($_.Exception.Message)"
+        $caughtException = $null
+        $exceptionTypeName = 'unknown exception type'
+        $exceptionMessage = 'No exception details were available.'
+
+        if ($null -ne $_) {
+            try { $caughtException = $_.Exception } catch {}
+        }
+        if ($null -ne $caughtException) {
+            try {
+                $typeName = $caughtException.GetType().Name
+                if (-not [string]::IsNullOrWhiteSpace($typeName)) {
+                    $exceptionTypeName = $typeName
+                }
+            } catch {}
+            try {
+                if (-not [string]::IsNullOrWhiteSpace($caughtException.Message)) {
+                    $exceptionMessage = $caughtException.Message
+                }
+            } catch {}
+        }
+
+        Write-Warning "[FAILURE] Task '$path' encountered an unexpected $exceptionTypeName error: $exceptionMessage"
         continue
     }
     $enabled = [bool]$t.Settings.Enabled
