@@ -36,7 +36,8 @@ Uses: Get-ScheduledTask, Get-ScheduledTaskInfo, Get-ScheduledTaskDeepInfo.
         if ($skip) { continue }
 
         $i = Get-ScheduledTaskInfo -TaskName $t.TaskName -TaskPath $t.TaskPath -ErrorAction SilentlyContinue
-        if ($i -and ($i.LastTaskResult -notin $OK_TASK_RESULTS -or $i.NumberOfMissedRuns -gt 0)) {
+        $isDisabled = ($t.State -eq 'Disabled')
+        if ($i -and ($isDisabled -or $i.LastTaskResult -notin $OK_TASK_RESULTS -or $i.NumberOfMissedRuns -gt 0)) {
             $problem_found = $true
             $details=(Get-ScheduledTaskDeepInfo -TaskName $t.TaskName -TaskPath $t.TaskPath |
               Select-Object state,actions,Description,RunAcntUserId,RunLogonType,LastRunTime,NextRunTime | %{
@@ -60,6 +61,10 @@ Uses: Get-ScheduledTask, Get-ScheduledTaskInfo, Get-ScheduledTaskDeepInfo.
                     }
               } | out-string)
             $details = "Details about this task:`n" + $details
+            if ($isDisabled) {
+                Write-Warning "[NOTICE] Scheduled Task is disabled: '$($t.TaskPath)$($t.TaskName)'`n$details"
+                continue
+            }
             if ($i.LastTaskResult -notin $OK_TASK_RESULTS) {
                 $meaning = Convert-TaskResultCode $i.LastTaskResult
                 Write-Warning "[WARNING] Scheduled Task with failures: '$($t.TaskPath)$($t.TaskName)'; Last exit code: $($i.LastTaskResult) ($meaning)`n$details"
