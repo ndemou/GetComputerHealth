@@ -565,7 +565,6 @@ Hashtable with keys: SourceFullPath, ZipLastWriteTimeIso, CachedZipPath, ZipSha2
   $zipLastWriteIso = $zipLastWrite.ToString('o')
   $zipHash = (Get-FileHash -LiteralPath $sourceFullPath -Algorithm SHA256 -ErrorAction Stop).Hash
   $zipLastWriteToken = $zipLastWrite.ToString('yyyyMMdd-HHmmss')
-  $cachedZipPath = Join-Path $CacheDir ("GetComputerHealth-MANUAL-UPDATE-{0}.zip" -f $zipLastWriteToken)
   $zipTag = [System.IO.Path]::GetFileNameWithoutExtension($zipItem.Name)
   if ([string]::IsNullOrWhiteSpace($zipTag)) { $zipTag = 'manual' }
   $manualMarker = ("manual-zip|{0}|{1}" -f $zipTag, $zipHash)
@@ -580,6 +579,9 @@ Hashtable with keys: SourceFullPath, ZipLastWriteTimeIso, CachedZipPath, ZipSha2
   } elseif ($requestedVersionToken -and ($requestedVersionToken -ine $markerVersionToken)) {
     throw "Provided -Version '$Version' does not match the semver '$markerVersionToken' embedded in zip file name '$($zipItem.Name)'."
   }
+
+  $cacheVersionToken = if ($markerVersionToken) { $markerVersionToken } else { $requestedVersionToken }
+  $cachedZipPath = Join-Path $CacheDir ("GetComputerHealth-MANUAL-UPDATE-{0}-{1}.zip" -f $cacheVersionToken, $zipLastWriteToken)
 
   $samePath = $false
   if (Test-Path -LiteralPath $cachedZipPath -PathType Leaf) {
