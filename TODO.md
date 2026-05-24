@@ -2,7 +2,13 @@
 
 ## Finalize and implement On-Disk Format Migration Design Draft
 
-## Invoke-GetComputerHealth.ps1 should be deleting transcripts (like `.\log\Invoke-GetHealthDomainComputers-<timestamp>.log`) older than 1 month.
+## Replace all references to files containing json in this TODO with .psd1 files
+
+To the extend that it's easy, if we already have files with json content change them to .psd1
+
+## Cleanups of old log files
+
+Invoke-GetComputerHealth.ps1 should be deleting transcripts (like `.\log\Invoke-GetHealthDomainComputers-<timestamp>.log`) older than 1 month.
 
 ## Save test results to .\data instead of .\temp
 
