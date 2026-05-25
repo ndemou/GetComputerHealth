@@ -125,7 +125,7 @@ Uses: Get-DnsDomainControllers, Resolve-DnsName, Test-IsLaptopOrMobile.
         catch {
             Write-Verbose "DNS SRV lookup failed: $_"
         }
-        return ($names | Select-Object -Unique)
+        return @($names | Select-Object -Unique)
     }
 
     # --- Step 1: Role Detection ---
@@ -143,7 +143,7 @@ Uses: Get-DnsDomainControllers, Resolve-DnsName, Test-IsLaptopOrMobile.
     $evidences += $msg
 
     if ($IsHostInDomain -and $domainName) {
-        $dcNameSet = Get-DnsDomainControllers -DomainName $domainName
+        $dcNameSet = @(Get-DnsDomainControllers -DomainName $domainName)
         $msg = "Found $($dcNameSet.Count) known DC names: $($dcNameSet -join ', ')"
         Write-Verbose $msg
         $evidences += $msg
