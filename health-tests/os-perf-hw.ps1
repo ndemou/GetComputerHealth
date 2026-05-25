@@ -694,14 +694,14 @@ Uses: Get-Service, Get-SmbShare.
     }
   } catch {}
 
-  $nullPipes = $nullPipes | ForEach-Object { $_.ToString().Trim() } | Where-Object { $_ } | Sort-Object -Unique
+  $nullPipes = @($nullPipes | ForEach-Object { $_.ToString().Trim() } | Where-Object { $_ } | Sort-Object -Unique)
   if ($isHostDC) {
       # these are recomended by Microsoft to be kept in DCs
-      $nullPipes = $nullPipes | ?{$_ -notin @('lsarpc', 'netlogon', 'samr')}
+      $nullPipes = @($nullPipes | ?{$_ -notin @('lsarpc', 'netlogon', 'samr')})
   }
   if (Test-IsRdsLicensingServer) {
       # these are by default present in RDS servers (Terminal Services)
-      $nullPipes = $nullPipes | ?{$_ -notin @('HydraLsPipe','TermServLicensing')}
+      $nullPipes = @($nullPipes | ?{$_ -notin @('HydraLsPipe','TermServLicensing')})
   }
 
   if ($nullPipes -and $nullPipes.Count -gt 0) {

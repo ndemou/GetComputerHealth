@@ -68,11 +68,13 @@ function Get-EmbeddedVersion {
 
 function Get-LatestSemanticTagVersion {
   $tags = @(git tag --list)
-  $versions = foreach ($tag in $tags) {
-    if ($tag -match '^(?:v)?(?<Version>\d+\.\d+\.\d+)$') {
-      [version]$Matches['Version']
+  $versions = @(
+    foreach ($tag in $tags) {
+      if ($tag -match '^(?:v)?(?<Version>\d+\.\d+\.\d+)$') {
+        [version]$Matches['Version']
+      }
     }
-  }
+  )
 
   if (-not $versions -or $versions.Count -eq 0) {
     return [version]'0.0.0'

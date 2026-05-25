@@ -22,13 +22,13 @@ Uses: Get-ADDomainController, Get-ADDomain, Get-ADForest.
     if (-not $Names) { return @() }
     $out = @()
     foreach ($n in $Names) { if ($n) { $out += $n.ToLower() } }
-    $out | Sort-Object -Unique
+    @($out | Sort-Object -Unique)
   }
 
   $ok = $true
 
   if (-not $Servers -or $Servers.Count -eq 0) {
-    try { $Servers = Get-ADDomainController -Filter * | Select-Object -ExpandProperty HostName }
+    try { $Servers = @(Get-ADDomainController -Filter * | Select-Object -ExpandProperty HostName) }
     catch {
       Write-Warning "[FAILURE] Unable to discover domain controllers.`nTry on a domain-joined host with AD PowerShell and DNS working. Command used: Get-ADDomainController -Filter *"
     return
@@ -990,14 +990,14 @@ Uses: Get-ADDomainController.
   [CmdletBinding()] param([switch]$AtLeastOnePerSite=$true)
   $dcs=Get-ADDomainController -Filter *
   if(-not $AtLeastOnePerSite){
-    $has=($dcs | Where-Object {$_.IsGlobalCatalog}).Count -gt 0
+    $has=@($dcs | Where-Object {$_.IsGlobalCatalog}).Count -gt 0
     if($has){ Write-Warning "[PASS] At least one Global Catalog exists in the domain" } else { Write-Warning "[FAILURE] No Global Catalog server detected in the domain" }
     return
   }
   $sites=$dcs | Group-Object Site
   $bad=@()
   foreach($s in $sites){
-    if(($s.Group | Where-Object {$_.IsGlobalCatalog}).Count -eq 0){ $bad+=$s.Name; Write-Warning "[FAILURE] No Global Catalog in site '$($s.Name)'" }
+    if(@($s.Group | Where-Object {$_.IsGlobalCatalog}).Count -eq 0){ $bad+=$s.Name; Write-Warning "[FAILURE] No Global Catalog in site '$($s.Name)'" }
   }
   if($bad.Count -eq 0){ Write-Warning "[PASS] Each AD site has at least one Global Catalog" }
 }
