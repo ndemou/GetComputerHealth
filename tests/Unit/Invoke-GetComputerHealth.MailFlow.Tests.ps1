@@ -206,6 +206,23 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
     }
   }
 
+  It 'uses a single cached IpsOfAllDcs value when the argument is omitted' {
+    $tempRoot = Join-Path $env:TEMP ('gch-ips-cache-' + [guid]::NewGuid().ToString())
+    $cachePath = Join-Path $tempRoot 'cache.IpsOfAllDcs.clixml'
+
+    try {
+      New-Item -ItemType Directory -Path $tempRoot -Force | Out-Null
+      Set-CachedIpsOfAllDcs -CachePath $cachePath -IpsOfAllDcs @('10.0.0.1')
+
+      $resolved = Resolve-IpsOfAllDcs -CachePath $cachePath
+
+      $resolved | Should -Be @('10.0.0.1')
+    }
+    finally {
+      Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
+    }
+  }
+
   It 'caches IpsOfAllDcs when a value is provided' {
     $tempRoot = Join-Path $env:TEMP ('gch-ips-cache-' + [guid]::NewGuid().ToString())
     $cachePath = Join-Path $tempRoot 'cache.IpsOfAllDcs.clixml'

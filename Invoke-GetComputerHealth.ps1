@@ -556,7 +556,7 @@ function Resolve-IpsOfAllDcs {
     return $resolvedIps
   }
 
-  $cachedIps = Get-CachedIpsOfAllDcs -CachePath $CachePath
+  $cachedIps = @(Get-CachedIpsOfAllDcs -CachePath $CachePath)
   if ($cachedIps.Count -gt 0) {
     Write-Verbose "Using cached IpsOfAllDcs from '$CachePath'"
   }
