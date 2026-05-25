@@ -294,6 +294,16 @@ function Get-ScheduledTaskDeepInfo{
     if($tr.PSObject.Properties.Match('CimClass').Count -and $tr.CimClass){return ($tr.CimClass.CimClassName -replace '^MSFT_Task','')}
     ($tr.PSObject.TypeNames|Select-Object -First 1)
   }
+  function _ActionType($a){
+    if($a.PSObject.Properties.Match('ActionType').Count -and $a.ActionType){return $a.ActionType}
+    if($a.PSObject.Properties.Match('CimClass').Count -and $a.CimClass){return ($a.CimClass.CimClassName -replace '^MSFT_Task','')}
+    ($a.PSObject.TypeNames|Select-Object -First 1)
+  }
+  function _ActionProp($a,$name){
+    $prop = $a.PSObject.Properties[$name]
+    if($prop){ return $prop.Value }
+    $null
+  }
 
   $tasks = if($TaskPath){
     Get-ScheduledTask -TaskName $TaskName -TaskPath $TaskPath -ErrorAction SilentlyContinue
@@ -311,10 +321,10 @@ function Get-ScheduledTaskDeepInfo{
     $acts=@()
     foreach($a in $t.Actions){
       $acts+=[pscustomobject]@{
-        Type=$a.ActionType
-        Execute=$a.Execute
-        Arguments=$a.Arguments
-        WorkingDirectory=$a.WorkingDirectory
+        Type=_ActionType $a
+        Execute=_ActionProp $a 'Execute'
+        Arguments=_ActionProp $a 'Arguments'
+        WorkingDirectory=_ActionProp $a 'WorkingDirectory'
       }
     }
 
