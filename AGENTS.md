@@ -1,5 +1,19 @@
 ﻿# AGENTS.md
 
+## Coding
+
+Write code for PowerShell 5.1 only. 
+
+Prefer boring code that a reviewer can easily understand. Bias toward simplicity over compactness, cleverness, speed, or elegance.
+Make all dependencies as clear as possible.
+Avoid splatting unless it makes code substantially clearer.
+Avoid backtick line continuations.
+Avoid calling external shells/tools.
+Avoid using COM objects unless they are obviously read-only.
+Avoid clever pipelines if a loop is easier to audit.
+
+Code outside the installer/updater must not change computer state. Saving useful and temporary files that are not larger than 100MB is OK.
+
 ## Testing
 
 Run tests from the repository root in Windows PowerShell (v5).
