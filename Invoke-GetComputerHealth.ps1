@@ -113,6 +113,8 @@ param(
   [switch]$SendReport,
   [string[]]$IpsOfAllDcs = @(),
   [string[]]$Computers,
+  [Parameter(DontShow = $true)]
+  [switch]$AlreadyReranAfterUpdate,
   [Parameter(ValueFromRemainingArguments = $true)]
   [object[]]$PassThruArgs = @()
 )
@@ -846,6 +848,59 @@ function Get-UpdateZipVersionArgument {
   return $FallbackVersion
 }
 
+function Convert-BoundParametersToInvocationArguments {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)][hashtable]$BoundParameters,
+    [string[]]$Exclude = @()
+  )
+
+  $arguments = @()
+  foreach ($entry in $BoundParameters.GetEnumerator() | Sort-Object -Property Name) {
+    if ($entry.Key -in $Exclude) { continue }
+
+    $value = $entry.Value
+    if ($value -is [System.Management.Automation.SwitchParameter]) {
+      if ($value.IsPresent) { $arguments += "-$($entry.Key)" }
+      continue
+    }
+
+    if ($null -eq $value) { continue }
+
+    $arguments += "-$($entry.Key)"
+    if ($value -is [array]) {
+      $arguments += @($value)
+    }
+    else {
+      $arguments += $value
+    }
+  }
+
+  return $arguments
+}
+
+function Invoke-SelfAfterUpdate {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)][hashtable]$BoundParameters,
+    [object[]]$PassThruArgs = @()
+  )
+
+  $rerunArgs = @(
+    Convert-BoundParametersToInvocationArguments -BoundParameters $BoundParameters -Exclude @('AlreadyReranAfterUpdate', 'PassThruArgs')
+  )
+  $rerunArgs += '-AlreadyReranAfterUpdate'
+  $rerunArgs += @($PassThruArgs)
+
+  $powerShellExe = (Get-Process -Id $PID).Path
+  if ([string]::IsNullOrWhiteSpace($powerShellExe)) {
+    $powerShellExe = 'powershell.exe'
+  }
+
+  & $powerShellExe -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath @rerunArgs
+  exit $LASTEXITCODE
+}
+
 #------------------------------------------------------------------------
 # MAIN CODE
 #------------------------------------------------------------------------
@@ -853,6 +908,30 @@ function Get-UpdateZipVersionArgument {
 $timestamp = $(get-date -Format 'yyyy-MM-dd_HH.mm')
 if (-not (Test-Path -LiteralPath $LOG_DIR)) { New-Item -ItemType Directory -Path $LOG_DIR -Force | Out-Null }
 if (-not (Test-Path -LiteralPath $TEMP_DIR)) { New-Item -ItemType Directory -Path $TEMP_DIR -Force | Out-Null }
+
+$localUpdateAlreadyRan = $false
+if (-not $NoUpdate) {
+  $versionBeforeUpdate = Get-EmbeddedGetComputerHealthVersion -ScriptPath $GET_HEALTH_SCRIPT_PATH
+  try {
+    & $UPDATE_SCRIPT_PATH
+    $localUpdateAlreadyRan = $true
+    $versionAfterUpdate = Get-EmbeddedGetComputerHealthVersion -ScriptPath $GET_HEALTH_SCRIPT_PATH
+
+    if (
+      -not $AlreadyReranAfterUpdate -and
+      -not [string]::IsNullOrWhiteSpace($versionBeforeUpdate) -and
+      -not [string]::IsNullOrWhiteSpace($versionAfterUpdate) -and
+      $versionBeforeUpdate -ne $versionAfterUpdate
+    ) {
+      Write-Host -ForegroundColor Yellow "Get-ComputerHealth was updated from version $versionBeforeUpdate to $versionAfterUpdate. Re-running Invoke-GetComputerHealth.ps1 once."
+      Invoke-SelfAfterUpdate -BoundParameters $PSBoundParameters -PassThruArgs $PassThruArgs
+    }
+  }
+  catch {
+    Write-Warning "Early update check failed: $($_.Exception.Message). Continuing with normal target execution."
+  }
+}
+
 Start-Transcript (Join-Path $LOG_DIR "Invoke-GetHealthDomainComputers-$timestamp.log")
 . $LIB_LOG_OBJECTS_PATH
 $embeddedVersion = Get-EmbeddedGetComputerHealthVersion -ScriptPath $GET_HEALTH_SCRIPT_PATH
@@ -1037,7 +1116,8 @@ foreach ($target in $targets) {
   }
 
   if ($target -eq $env:COMPUTERNAME) {
-    $output = & $healthCheckBlock $ROOT_DIR $Hide $OnlyTheseTests $ExcludeTests $WhitelistSigs $SkipSlowTests $SkipPolicyTests $SkipNonEssentialTests $NoUpdate $RunWithoutElevation $IpsOfAllDcs $PushUpdate $localReleaseZip $localReleaseZipVersion $PassThruArgs
+    $skipTargetUpdate = $NoUpdate -or $localUpdateAlreadyRan
+    $output = & $healthCheckBlock $ROOT_DIR $Hide $OnlyTheseTests $ExcludeTests $WhitelistSigs $SkipSlowTests $SkipPolicyTests $SkipNonEssentialTests $skipTargetUpdate $RunWithoutElevation $IpsOfAllDcs $PushUpdate $localReleaseZip $localReleaseZipVersion $PassThruArgs
   }
   else {
     if (Get-TcpPortStateFast $target @(5985, 5986, 80, 443, 88, 135, 389, 636, 445, 3268, 3269) | Where-Object { $_.Open }) {
