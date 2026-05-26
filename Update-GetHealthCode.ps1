@@ -200,9 +200,13 @@ None.
     return
   }
 
+  Write-Verbose "Ensuring NuGet package provider is available for PowerShellGet"
+  Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force -Scope $Scope -ErrorAction Stop | Out-Null
+  Import-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force -ErrorAction Stop | Out-Null
+
   try {
     Write-Verbose "Installing PowerShell module '$Name' with scope '$Scope'"
-    Install-Module -Name $Name -Scope $Scope -Force -ErrorAction Stop
+    Install-Module -Name $Name -Scope $Scope -Force -Confirm:$false -ErrorAction Stop
     Write-Verbose "Successfully installed PowerShell module '$Name'"
   } catch {
     if ($_.Exception.Message -like "*No repository with the Name 'PSGallery'*") {
@@ -212,7 +216,9 @@ None.
       Write-Verbose "Marking PSGallery as Trusted"
       Set-PSRepository -Name PSGallery -InstallationPolicy Trusted -ErrorAction Stop
       Write-Verbose "Retrying installation of PowerShell module '$Name'"
-      Install-Module -Name $Name -Scope $Scope -Force -ErrorAction Stop
+      Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force -Scope $Scope -ErrorAction Stop | Out-Null
+      Import-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force -ErrorAction Stop | Out-Null
+      Install-Module -Name $Name -Scope $Scope -Force -Confirm:$false -ErrorAction Stop
       Write-Verbose "Successfully installed PowerShell module '$Name' after registering PSGallery"
     } else {
       throw
