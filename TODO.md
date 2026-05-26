@@ -53,7 +53,9 @@ Update documentation with details about this.
 
 ## Nice html reports instead of excel
 
-Should include a table of findings that supports sorting, filtering and hiding columns. The table should include findings (including suppressed ones) from the last 3 months but by default they should be filtered out
+Should include a table of findings that supports sorting, filtering and hiding columns. The table should include findings (including suppressed ones) from the last 3 months but by default they should be filtered out.
+
+As soon as I fix this I can stop installing Nuget and the Import-Excel module and advertise in the README that there are no external depedencies.
 
 ## Custom health tests should be directly runnable scripts
 
