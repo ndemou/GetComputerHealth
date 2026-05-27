@@ -226,29 +226,62 @@ None.
   }
 }
 
+function New-RandomTempDirectoryPath {
+<#
+.SYNOPSIS
+Returns an unused "$TempRoot\<Name>.<N>" path where N is between 0 and 9999.
+.OUTPUTS
+System.String. A currently unused temporary directory path.
+#>
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)][string]$TempRoot,
+    [Parameter(Mandatory)][string]$Name
+  )
+
+  for ($attempt = 0; $attempt -lt 100; $attempt++) {
+    $suffix = Get-Random -Minimum 0 -Maximum 10000
+    $candidate = Join-Path $TempRoot ("{0}.{1}" -f $Name, $suffix)
+    if (-not (Test-Path -LiteralPath $candidate -ErrorAction SilentlyContinue)) {
+      return $candidate
+    }
+  }
+
+  throw "Could not find an available temporary directory matching '$Name.<N>' under '$TempRoot' after 100 attempts."
+}
+
 function New-EmptyTempDirectory {
 <#
 .SYNOPSIS
-Creates a directory at "$env:TEMP\<Name>" and returns its full path.
+Creates a reusable temporary directory and returns its full path.
 .OUTPUTS
 System.String. The full path of the created directory under $env:TEMP.
 #>
   [CmdletBinding()]
   param([string]$Name)
 
-  $tmdDir = Join-Path $env:TEMP $Name
+  $tempRoot = $env:TEMP
+  if ([string]::IsNullOrWhiteSpace($tempRoot)) {
+    $tempRoot = [System.IO.Path]::GetTempPath()
+  }
+
+  $tmdDir = Join-Path $tempRoot $Name
   Write-Verbose "Preparing temporary directory '$tmdDir'"
 
-  if (Test-Path -Path $tmdDir) {
-    if (Test-Path -Path $tmdDir -PathType Container) {
+  if (Test-Path -LiteralPath $tmdDir) {
+    if (Test-Path -LiteralPath $tmdDir -PathType Container) {
       Write-Verbose "Temporary directory already exists; clearing its contents: '$tmdDir'"
-      Get-ChildItem -Path $tmdDir -Recurse -Force | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+      try {
+        Get-ChildItem -LiteralPath $tmdDir -Recurse -Force -ErrorAction Stop |
+          Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+      } catch {
+        Write-Warning ("Could not clear temporary directory '{0}': {1}" -f $tmdDir, $_.Exception.Message)
+        $tmdDir = New-RandomTempDirectoryPath -TempRoot $tempRoot -Name $Name
+        Write-Verbose "Using alternate temporary directory '$tmdDir'"
+      }
     } else {
       Write-Verbose "A file already exists at '$tmdDir'; generating a unique directory name"
-      while (Test-Path -Path $tmdDir) {
-        $suffix = Get-Random -Minimum 100000 -Maximum 1000000
-        $tmdDir = Join-Path $env:TEMP "$Name-$suffix"
-      }
+      $tmdDir = New-RandomTempDirectoryPath -TempRoot $tempRoot -Name $Name
       Write-Verbose "Using alternate temporary directory '$tmdDir'"
     }
   }
