@@ -15,9 +15,8 @@ We need an On-Disk Format migration to accompany this change(see relevant dev do
 In order to customize the installation I should be able to call the installer like this:
 ```powershell
 & .\install.ps1 -Config @{
-    Installtion = @{
-        InstallationDir    = 'C:\IT\GetComputerHealth'
-        SendAlertsViaEmail = $true
+    Options = @{
+        InstallDir = 'C:\IT\GetComputerHealth'
     }
     ConfigFiles = @{
         'Send-Message.psd1' = @{
@@ -27,11 +26,14 @@ In order to customize the installation I should be able to call the installer li
         }
         'gch.psd1' = @{
             AutomaticUpdates = $false
+            SendReports = "Auto" # "Never", "Always", "Auto"
         }
     }
 }
 ```
-Note the `Installtion` branch with options that modify the behaviour of the installer and the `ConfigFiles` branch that  options that can used to directly populate the relevant config files under `.\config`.
+Note these two branches:
+ - Properties of the `Options` branch modify the behaviour of the installer 
+ - Sub-branches of `ConfigFiles` branch will result in the creation of a config file under `.\config` with the name and the contents of the sub-branch. 
 
 `& .\install.ps1 -GenerateConfigPsd1` should generate a template PowerShell data file that can be customized and be passed to `-Config`.
 
