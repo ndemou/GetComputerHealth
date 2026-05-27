@@ -1068,8 +1068,8 @@ function Invoke-SelfAfterUpdate {
     $powerShellExe = 'powershell.exe'
   }
 
-  & $powerShellExe -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath @rerunArgs
-  exit $LASTEXITCODE
+  & $PSCommandPath @rerunArgs
+  return
 }
 
 #------------------------------------------------------------------------
