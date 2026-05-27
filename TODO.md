@@ -1,20 +1,16 @@
 ﻿# TODO
 
-## Implement On-Disk Format Migration Design Draft
-
 ## New gch.psd1 option 'SendReports'
 ```
 SendReports = "Auto" # "Never", "Always", "Auto"
 ```
 The default is "Auto" wich is the current behaviour (send when running in non-interactive session -- e.g. from a scheduled task--, don't send when run from an interactive one -- e.g. from the terminal)
 
-## Save test results to .\data instead of .\temp
+## Send-Message.ps1 should support both a json and and a psd1 configuration file 
 
-Add an On-Disk Format migration function for this purpose(see relevant dev documentation). Besides creating the data directory it should also move there existing .\temp\*.xlsx files.
+Default is to prefer to read and to generate the psd1 configuration file (.\config\Send-Message.psd1).
 
-## Switch Send-Message configuration from json to .psd1
-
-We need an On-Disk Format migration to accompany this change(see relevant dev documentation). The migration will convert the json to psd1 (and delete the original)
+We also want an On-Disk Format migration to accompany this change(see relevant dev documentation). The migration must convert any existing json configuration (.\config\Send-Message.conf) to psd1(.\config\Send-Message.psd1) and then delete .\config\Send-Message.conf. 
 
 ## Make a customized installation SUPER simple
 
