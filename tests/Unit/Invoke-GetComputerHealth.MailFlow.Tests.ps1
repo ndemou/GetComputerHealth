@@ -253,9 +253,9 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
   }
 
   It 'marks suppressed findings as postponed only when expiry is within the configured window' {
-    Get-HealthEffectiveLevel -Level 'warning' -Suppressed:$true -SuppressedUntil ([datetime]'2026-06-01') -PostponedSuppressionWindowDays 150 -Today ([datetime]'2026-05-01') | Should -Be 'postponed'
-    Get-HealthEffectiveLevel -Level 'warning' -Suppressed:$true -SuppressedUntil ([datetime]'2026-12-01') -PostponedSuppressionWindowDays 150 -Today ([datetime]'2026-05-01') | Should -Be 'warning'
-    Get-HealthEffectiveLevel -Level 'warning' -Suppressed:$false -SuppressedUntil ([datetime]'2026-06-01') -PostponedSuppressionWindowDays 150 -Today ([datetime]'2026-05-01') | Should -Be 'warning'
+    Get-HealthEffectiveLevel -Level 'warning' -Suppressed:$true -SuppressedUntil ([datetime]'2026-06-01') -ShowAsPostponedWindowDays 150 -Today ([datetime]'2026-05-01') | Should -Be 'postponed'
+    Get-HealthEffectiveLevel -Level 'warning' -Suppressed:$true -SuppressedUntil ([datetime]'2026-12-01') -ShowAsPostponedWindowDays 150 -Today ([datetime]'2026-05-01') | Should -Be 'warning'
+    Get-HealthEffectiveLevel -Level 'warning' -Suppressed:$false -SuppressedUntil ([datetime]'2026-06-01') -ShowAsPostponedWindowDays 150 -Today ([datetime]'2026-05-01') | Should -Be 'warning'
   }
 
   It 'uses cached IpsOfAllDcs values when the argument is omitted' {

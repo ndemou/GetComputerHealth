@@ -136,7 +136,7 @@ $VERSION_FILE_PATH = Join-Path $SCRIPT_BIN_DIR 'VERSION'
 $IPS_OF_ALL_DCS_CACHE_PATH = Join-Path $TEMP_DIR 'cache.IpsOfAllDcs.clixml'
 $LAST_REPORT_HTML_PATH = Join-Path $TEMP_DIR 'last-report.html'
 $PROJECT_URL = 'https://github.com/ndemou/GetComputerHealth'
-$POSTPONED_SUPPRESSION_WINDOW_DAYS = 150
+$SHOW_AS_POSTPONED_WINDOW_DAYS = 150
 
 $SmtpSubject = 'Notable Messages from Get-ComputerHealth of LIST_OF_COMPUTERS'
 $SmtpSubjectAllGood = 'RELAX. No notable Messages from Get-ComputerHealth of LIST_OF_COMPUTERS'
@@ -666,14 +666,14 @@ function Get-HealthEffectiveLevel {
     [string]$Level,
     [bool]$Suppressed,
     [AllowNull()][object]$SuppressedUntil,
-    [int]$PostponedSuppressionWindowDays,
+    [int]$ShowAsPostponedWindowDays,
     [datetime]$Today = (Get-Date).Date
   )
 
   $realLevel = ([string]$Level).Trim().ToLowerInvariant()
   if ($Suppressed -and ($null -ne $SuppressedUntil)) {
     $suppressedUntilDate = [datetime]$SuppressedUntil
-    $cutoffDate = $Today.Date.AddDays($PostponedSuppressionWindowDays)
+    $cutoffDate = $Today.Date.AddDays($ShowAsPostponedWindowDays)
     if (($Today.Date -le $suppressedUntilDate.Date) -and ($suppressedUntilDate.Date -le $cutoffDate)) {
       return 'postponed'
     }
@@ -1111,7 +1111,7 @@ foreach ($target in $targets) {
       $PushUpdate,
       $UpdateZipPath,
       $UpdateZipVersion,
-      $PostponedSuppressionWindowDays,
+      $ShowAsPostponedWindowDays,
       $PassThruArgs
     )
 
@@ -1188,14 +1188,14 @@ foreach ($target in $targets) {
         [string]$Level,
         [bool]$Suppressed,
         [AllowNull()][object]$SuppressedUntil,
-        [int]$PostponedSuppressionWindowDays,
+        [int]$ShowAsPostponedWindowDays,
         [datetime]$Today = (Get-Date).Date
       )
 
       $realLevel = ([string]$Level).Trim().ToLowerInvariant()
       if ($Suppressed -and ($null -ne $SuppressedUntil)) {
         $suppressedUntilDate = [datetime]$SuppressedUntil
-        $cutoffDate = $Today.Date.AddDays($PostponedSuppressionWindowDays)
+        $cutoffDate = $Today.Date.AddDays($ShowAsPostponedWindowDays)
         if (($Today.Date -le $suppressedUntilDate.Date) -and ($suppressedUntilDate.Date -le $cutoffDate)) {
           return 'postponed'
         }
@@ -1277,7 +1277,7 @@ foreach ($target in $targets) {
           $records.Add([pscustomobject]@{
               Computer   = if ($item.PSObject.Properties['Computer']) { [string]$item.Computer } else { $env:COMPUTERNAME }
               Level      = $level
-              EffectiveLevel = Get-HealthEffectiveLevelLocal -Level $level -Suppressed:$suppressed -SuppressedUntil $suppressedUntil -PostponedSuppressionWindowDays $PostponedSuppressionWindowDays
+              EffectiveLevel = Get-HealthEffectiveLevelLocal -Level $level -Suppressed:$suppressed -SuppressedUntil $suppressedUntil -ShowAsPostponedWindowDays $ShowAsPostponedWindowDays
               Hash       = $hash
               Suppressed = $suppressed
               SuppressedUntil = $suppressedUntil
@@ -1297,7 +1297,7 @@ foreach ($target in $targets) {
 
   if ($target -eq $env:COMPUTERNAME) {
     $skipTargetUpdate = $NoUpdate -or $localUpdateAlreadyRan
-    $output = & $healthCheckBlock $ROOT_DIR $Hide $OnlyTheseTests $ExcludeTests $WhitelistSigs $SkipSlowTests $SkipPolicyTests $SkipNonEssentialTests $skipTargetUpdate $RunWithoutElevation $IpsOfAllDcs $PushUpdate $localReleaseZip $localReleaseZipVersion $POSTPONED_SUPPRESSION_WINDOW_DAYS $PassThruArgs
+    $output = & $healthCheckBlock $ROOT_DIR $Hide $OnlyTheseTests $ExcludeTests $WhitelistSigs $SkipSlowTests $SkipPolicyTests $SkipNonEssentialTests $skipTargetUpdate $RunWithoutElevation $IpsOfAllDcs $PushUpdate $localReleaseZip $localReleaseZipVersion $SHOW_AS_POSTPONED_WINDOW_DAYS $PassThruArgs
   }
   else {
     if (Get-TcpPortStateFast $target @(5985, 5986, 80, 443, 88, 135, 389, 636, 445, 3268, 3269) | Where-Object { $_.Open }) {
@@ -1342,7 +1342,7 @@ foreach ($target in $targets) {
           Copy-Item -Path $localReleaseZip -Destination $remoteZipPath -ToSession $session -Force
         }
 
-        $output = Invoke-Command -Session $session -ScriptBlock $healthCheckBlock -ArgumentList $remoteExecutionRoot, $Hide, $OnlyTheseTests, $ExcludeTests, $WhitelistSigs, $SkipSlowTests, $SkipPolicyTests, $SkipNonEssentialTests, $NoUpdate, $RunWithoutElevation, $IpsOfAllDcs, $PushUpdate, $remoteZipPath, $localReleaseZipVersion, $POSTPONED_SUPPRESSION_WINDOW_DAYS, $PassThruArgs
+        $output = Invoke-Command -Session $session -ScriptBlock $healthCheckBlock -ArgumentList $remoteExecutionRoot, $Hide, $OnlyTheseTests, $ExcludeTests, $WhitelistSigs, $SkipSlowTests, $SkipPolicyTests, $SkipNonEssentialTests, $NoUpdate, $RunWithoutElevation, $IpsOfAllDcs, $PushUpdate, $remoteZipPath, $localReleaseZipVersion, $SHOW_AS_POSTPONED_WINDOW_DAYS, $PassThruArgs
       }
       catch {
         $comment = (($_ | Out-String).Trim())
