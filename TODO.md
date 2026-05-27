@@ -4,6 +4,18 @@
 
 Invoke-GetComputerHealth.ps1 should be deleting transcripts (like `.\log\Invoke-GetHealthDomainComputers-<timestamp>.log`) older than 1 month.
 
+## Cosmetic changes to the html report
+
+At the top of the report we have a summary like this: `2 failures, 9 warnings, 14 notice.`
+
+Replace the commas with a space, remove the dot at the end. Make all words singular (failure, warning).
+
+## Include in the html report suppressed findings that are due to expire in <=15days
+
+For a suppressed finding, if its `-Until` date is within the next 15 days, include it in the html report. IMPORTANT DETAIL: such findings have an effective level "POSTPONED"(green colored) which has the lowest priority and thus appears last in the report. 
+
+So after this change, findings that appear in the report have their "real level" (notice, warning, failure) and their effective level (postponed, notice, warning, failure). It's best to generate the effective level early in the code that collects them.
+
 ## Finalize and implement On-Disk Format Migration Design Draft
 
 ## Save test results to .\data instead of .\temp
