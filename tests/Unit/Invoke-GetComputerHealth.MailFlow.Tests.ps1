@@ -21,7 +21,9 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
         'Set-CachedIpsOfAllDcs',
         'Resolve-IpsOfAllDcs',
         'Save-HealthHtmlReport',
-        'Remove-OldInvokeTranscriptLogs'
+        'Remove-OldInvokeTranscriptLogs',
+        'Get-HealthSuppressionExpiryMap',
+        'Get-HealthEffectiveLevel'
       )) {
       $funcAst = $ast.Find({
           param($node)
@@ -128,6 +130,36 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
     $html | Should -Not -Match ([regex]::Escape('Invoke-Command SRV1 {'))
   }
 
+  It 'renders postponed findings with a green effective level and real level detail' {
+    $html = Convert-HealthMessagesToHtmlTable -Messages @(
+      [pscustomobject]@{
+        Level = 'warning'
+        EffectiveLevel = 'postponed'
+        Computer = 'SRV1'
+        Message = 'Disk free space is low'
+        Comment = ''
+        Hash = 'deadbeef'
+        Suppressed = $true
+        SuppressedUntil = [datetime]'2026-06-01'
+      }
+    )
+
+    $html | Should -Match 'background-color:#2e7d32; color:#fff'
+    $html | Should -Match '>Postponed</span>'
+    $html | Should -Match 'real level: warning'
+  }
+
+  It 'summarizes postponed findings after active notable levels' {
+    $html = Convert-HealthSynopsisToHtml -Messages @(
+      [pscustomobject]@{ Level = 'warning'; EffectiveLevel = 'warning' },
+      [pscustomobject]@{ Level = 'warning'; EffectiveLevel = 'postponed' },
+      [pscustomobject]@{ Level = 'failure'; EffectiveLevel = 'failure' }
+    )
+
+    $html | Should -Match 'background-color:#2e7d32; color:#fff'
+    $html | Should -Match '>failure</span> 1 <span.+>warning</span> 1 <span.+>postponed</span>'
+  }
+
   It 'keeps Invoke-Command wrapping in html when multiple computers are present' {
     $html = Convert-HealthMessagesToHtmlTable -Messages @(
       [pscustomobject]@{
@@ -191,6 +223,39 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
 
     $rows[0].CommandToSuppressMsg | Should -Be ''
     $rows[1].CommandToSuppressMsg | Should -Be ''
+  }
+
+  It 'loads active suppression expiry dates with last applicable entry winning' {
+    $tempRoot = Join-Path $env:TEMP ('gch-suppression-map-' + [guid]::NewGuid().ToString())
+    $path = Join-Path $tempRoot 'Get-ComputerHealth.sigs-to-suppress.txt'
+
+    try {
+      New-Item -ItemType Directory -Path $tempRoot -Force | Out-Null
+      @(
+        '11111111 UNTIL 2026-06-01 # active'
+        '22222222 UNTIL 2026-01-01 # expired'
+        '33333333 # permanent'
+        '44444444 UNTIL 2026-07-01 # first'
+        '44444444 UNTIL 2026-01-01 # later expired removes it'
+      ) | Set-Content -LiteralPath $path -Encoding UTF8
+
+      $map = Get-HealthSuppressionExpiryMap -Path $path -Today ([datetime]'2026-05-01')
+
+      $map.ContainsKey('11111111') | Should -BeTrue
+      $map['11111111'] | Should -Be ([datetime]'2026-06-01')
+      $map.ContainsKey('22222222') | Should -BeFalse
+      $map.ContainsKey('33333333') | Should -BeTrue
+      $map['33333333'] | Should -BeNullOrEmpty
+      $map.ContainsKey('44444444') | Should -BeFalse
+    } finally {
+      Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
+    }
+  }
+
+  It 'marks suppressed findings as postponed only when expiry is within the configured window' {
+    Get-HealthEffectiveLevel -Level 'warning' -Suppressed:$true -SuppressedUntil ([datetime]'2026-06-01') -PostponedSuppressionWindowDays 150 -Today ([datetime]'2026-05-01') | Should -Be 'postponed'
+    Get-HealthEffectiveLevel -Level 'warning' -Suppressed:$true -SuppressedUntil ([datetime]'2026-12-01') -PostponedSuppressionWindowDays 150 -Today ([datetime]'2026-05-01') | Should -Be 'warning'
+    Get-HealthEffectiveLevel -Level 'warning' -Suppressed:$false -SuppressedUntil ([datetime]'2026-06-01') -PostponedSuppressionWindowDays 150 -Today ([datetime]'2026-05-01') | Should -Be 'warning'
   }
 
   It 'uses cached IpsOfAllDcs values when the argument is omitted' {

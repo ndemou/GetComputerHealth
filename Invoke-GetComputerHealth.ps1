@@ -136,6 +136,7 @@ $VERSION_FILE_PATH = Join-Path $SCRIPT_BIN_DIR 'VERSION'
 $IPS_OF_ALL_DCS_CACHE_PATH = Join-Path $TEMP_DIR 'cache.IpsOfAllDcs.clixml'
 $LAST_REPORT_HTML_PATH = Join-Path $TEMP_DIR 'last-report.html'
 $PROJECT_URL = 'https://github.com/ndemou/GetComputerHealth'
+$POSTPONED_SUPPRESSION_WINDOW_DAYS = 150
 
 $SmtpSubject = 'Notable Messages from Get-ComputerHealth of LIST_OF_COMPUTERS'
 $SmtpSubjectAllGood = 'RELAX. No notable Messages from Get-ComputerHealth of LIST_OF_COMPUTERS'
@@ -372,13 +373,14 @@ function Convert-HealthSynopsisToHtml {
   [CmdletBinding()]
   param(
     [Parameter(Mandatory)][object[]]$Messages,
-    [hashtable]$SortOrder = @{'failure' = 1; 'warning' = 2; 'notice' = 3; 'info' = 4; 'pass' = 5; 'debug' = 6 }
+    [hashtable]$SortOrder = @{'failure' = 1; 'warning' = 2; 'notice' = 3; 'postponed' = 4; 'info' = 5; 'pass' = 6; 'debug' = 7 }
   )
 
   $levelMeta = @{
     'failure' = @{ Label = 'failure'; Background = '#ff4d4f'; Foreground = '#fff' }
     'warning' = @{ Label = 'warning'; Background = '#ffb300'; Foreground = '#111' }
     'notice'  = @{ Label = 'notice'; Background = '#1e88e5'; Foreground = '#fff' }
+    'postponed' = @{ Label = 'postponed'; Background = '#2e7d32'; Foreground = '#fff' }
     'info'    = @{ Label = 'info'; Background = '#c7d0d9'; Foreground = '#111' }
     'pass'    = @{ Label = 'passes'; Background = '#3cb371'; Foreground = '#fff' }
     'debug'   = @{ Label = 'debug'; Background = '#c7d0d9'; Foreground = '#111' }
@@ -386,8 +388,8 @@ function Convert-HealthSynopsisToHtml {
 
   $parts = @(
     $Messages |
-      Where-Object { $_.Level } |
-      Group-Object Level -NoElement |
+      Where-Object { if ($_.PSObject.Properties['EffectiveLevel']) { $_.EffectiveLevel } else { $_.Level } } |
+      Group-Object -Property @{ Expression = { if ($_.PSObject.Properties['EffectiveLevel']) { $_.EffectiveLevel } else { $_.Level } } } -NoElement |
       Sort-Object -Property @{ Expression = { $SortOrder[$_.Name] } } |
       ForEach-Object {
         $levelKey = ([string]$_.Name).ToLowerInvariant()
@@ -414,7 +416,8 @@ function Convert-HealthMessagesToHtmlTable {
   $wrapSuppressionInInvokeCommand = (@($Messages | Where-Object { $_.Computer } | Select-Object -ExpandProperty Computer -Unique).Count -gt 1)
 
   $rows = foreach ($message in $Messages) {
-    $level = if ($message.PSObject.Properties['Level']) { [string]$message.Level } else { '' }
+    $realLevel = if ($message.PSObject.Properties['Level']) { [string]$message.Level } else { '' }
+    $level = if ($message.PSObject.Properties['EffectiveLevel']) { [string]$message.EffectiveLevel } else { $realLevel }
     $computer = if ($message.PSObject.Properties['Computer']) { [string]$message.Computer } else { '' }
     $text = if ($message.PSObject.Properties['Message']) { [string]$message.Message } else { '' }
     $comment = if ($message.PSObject.Properties['Comment']) { [string]$message.Comment } else { '' }
@@ -424,6 +427,7 @@ function Convert-HealthMessagesToHtmlTable {
       'failure' { '#ff4d4f' }
       'warning' { '#ffb300' }
       'notice'  { '#1e88e5' }
+      'postponed' { '#2e7d32' }
       default   { '#c7d0d9' }
     }
     $levelForeground = switch ($level.ToLowerInvariant()) {
@@ -438,6 +442,10 @@ function Convert-HealthMessagesToHtmlTable {
     if (-not [string]::IsNullOrWhiteSpace($comment)) {
       $commentHtml = [System.Net.WebUtility]::HtmlEncode($comment) -replace '(\r\n|\n|\r)', '<br>'
       $detailsHtml += "<div style='margin-top:4px; color:#1f5fa8; font-size:10px; font-family:Consolas, ""Courier New"", monospace'>$commentHtml</div>"
+    }
+
+    if (($level -ieq 'postponed') -and (-not [string]::IsNullOrWhiteSpace($realLevel))) {
+      $detailsHtml += "<div style='margin-top:4px; color:#2e7d32; font-size:10px; font-family:Segoe UI, Arial, sans-serif'>real level: " + ([System.Net.WebUtility]::HtmlEncode($realLevel.ToLowerInvariant())) + "</div>"
     }
 
     if (-not [string]::IsNullOrWhiteSpace($suppressionCommand)) {
@@ -610,6 +618,70 @@ function Remove-OldInvokeTranscriptLogs {
   }
 }
 
+function Get-HealthSuppressionExpiryMap {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)][string]$Path,
+    [datetime]$Today = (Get-Date).Date
+  )
+
+  $map = @{}
+  if ([string]::IsNullOrWhiteSpace($Path)) { return $map }
+  if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { return $map }
+
+  $lines = Get-Content -Encoding utf8 -LiteralPath $Path -ErrorAction SilentlyContinue
+  foreach ($line in $lines) {
+    if ($null -eq $line) { continue }
+
+    $line = ($line -replace '\s+#.*$', '').Trim()
+    if ([string]::IsNullOrWhiteSpace($line)) { continue }
+
+    if ($line -match '^\[?([0-9A-Fa-f]{8})\]?(?:\s+until\s+(\d{4}-\d{2}-\d{2}))?$') {
+      $hash8 = $Matches[1].ToLowerInvariant()
+
+      if ($Matches[2]) {
+        try {
+          $expiry = [datetime]::ParseExact($Matches[2], 'yyyy-MM-dd', [Globalization.CultureInfo]::InvariantCulture).Date
+        } catch {
+          continue
+        }
+
+        if ($Today.Date -le $expiry) {
+          $map[$hash8] = $expiry
+        } else {
+          $map.Remove($hash8)
+        }
+      } else {
+        $map[$hash8] = $null
+      }
+    }
+  }
+
+  return $map
+}
+
+function Get-HealthEffectiveLevel {
+  [CmdletBinding()]
+  param(
+    [string]$Level,
+    [bool]$Suppressed,
+    [AllowNull()][object]$SuppressedUntil,
+    [int]$PostponedSuppressionWindowDays,
+    [datetime]$Today = (Get-Date).Date
+  )
+
+  $realLevel = ([string]$Level).Trim().ToLowerInvariant()
+  if ($Suppressed -and ($null -ne $SuppressedUntil)) {
+    $suppressedUntilDate = [datetime]$SuppressedUntil
+    $cutoffDate = $Today.Date.AddDays($PostponedSuppressionWindowDays)
+    if (($Today.Date -le $suppressedUntilDate.Date) -and ($suppressedUntilDate.Date -le $cutoffDate)) {
+      return 'postponed'
+    }
+  }
+
+  return $realLevel
+}
+
 function Convert-HealthMessagesToExcelRows {
   [CmdletBinding()]
   param(
@@ -629,9 +701,11 @@ function Convert-HealthMessagesToExcelRows {
       Computer             = if ($message.PSObject.Properties['Computer']) { [string]$message.Computer } else { '' }
       Suppressed           = $suppressed
       Level                = $level
+      EffectiveLevel       = if ($message.PSObject.Properties['EffectiveLevel']) { [string]$message.EffectiveLevel } else { $level }
       Message              = if ($message.PSObject.Properties['Message']) { [string]$message.Message } else { '' }
       Comment              = if ($message.PSObject.Properties['Comment']) { [string]$message.Comment } else { '' }
       Hash                 = if ($message.PSObject.Properties['Hash']) { [string]$message.Hash } else { '' }
+      SuppressedUntil      = if ($message.PSObject.Properties['SuppressedUntil']) { $message.SuppressedUntil } else { $null }
       Emitter              = if ($message.PSObject.Properties['Emitter']) { [string]$message.Emitter } else { '' }
       CommandToSuppressMsg = $commandToSuppressMsg
     }
@@ -1037,6 +1111,7 @@ foreach ($target in $targets) {
       $PushUpdate,
       $UpdateZipPath,
       $UpdateZipVersion,
+      $PostponedSuppressionWindowDays,
       $PassThruArgs
     )
 
@@ -1064,7 +1139,70 @@ foreach ($target in $targets) {
     $getHealthScriptPath = Join-Path $binDir 'Get-ComputerHealth.ps1'
     $logLibPath = Join-Path $binDir 'lib-write-log-objects.ps1'
     $customTestsDir = Join-Path $configDir 'Custom-HealthTests'
+    $suppressionFilePath = Join-Path $configDir 'Get-ComputerHealth.sigs-to-suppress.txt'
     $records = New-Object System.Collections.Generic.List[object]
+
+    function Get-HealthSuppressionExpiryMapLocal {
+      param(
+        [Parameter(Mandatory)][string]$Path,
+        [datetime]$Today = (Get-Date).Date
+      )
+
+      $map = @{}
+      if ([string]::IsNullOrWhiteSpace($Path)) { return $map }
+      if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { return $map }
+
+      $lines = Get-Content -Encoding utf8 -LiteralPath $Path -ErrorAction SilentlyContinue
+      foreach ($line in $lines) {
+        if ($null -eq $line) { continue }
+
+        $line = ($line -replace '\s+#.*$', '').Trim()
+        if ([string]::IsNullOrWhiteSpace($line)) { continue }
+
+        if ($line -match '^\[?([0-9A-Fa-f]{8})\]?(?:\s+until\s+(\d{4}-\d{2}-\d{2}))?$') {
+          $hash8 = $Matches[1].ToLowerInvariant()
+
+          if ($Matches[2]) {
+            try {
+              $expiry = [datetime]::ParseExact($Matches[2], 'yyyy-MM-dd', [Globalization.CultureInfo]::InvariantCulture).Date
+            } catch {
+              continue
+            }
+
+            if ($Today.Date -le $expiry) {
+              $map[$hash8] = $expiry
+            } else {
+              $map.Remove($hash8)
+            }
+          } else {
+            $map[$hash8] = $null
+          }
+        }
+      }
+
+      return $map
+    }
+
+    function Get-HealthEffectiveLevelLocal {
+      param(
+        [string]$Level,
+        [bool]$Suppressed,
+        [AllowNull()][object]$SuppressedUntil,
+        [int]$PostponedSuppressionWindowDays,
+        [datetime]$Today = (Get-Date).Date
+      )
+
+      $realLevel = ([string]$Level).Trim().ToLowerInvariant()
+      if ($Suppressed -and ($null -ne $SuppressedUntil)) {
+        $suppressedUntilDate = [datetime]$SuppressedUntil
+        $cutoffDate = $Today.Date.AddDays($PostponedSuppressionWindowDays)
+        if (($Today.Date -le $suppressedUntilDate.Date) -and ($suppressedUntilDate.Date -le $cutoffDate)) {
+          return 'postponed'
+        }
+      }
+
+      return $realLevel
+    }
 
     if (-not (Test-Path -LiteralPath $logLibPath)) {
       throw "Logging helper file not found: $logLibPath"
@@ -1096,6 +1234,7 @@ foreach ($target in $targets) {
         $configDir = Join-Path $resolvedRootDir 'config'
         $getHealthScriptPath = Join-Path $binDir 'Get-ComputerHealth.ps1'
         $customTestsDir = Join-Path $configDir 'Custom-HealthTests'
+        $suppressionFilePath = Join-Path $configDir 'Get-ComputerHealth.sigs-to-suppress.txt'
       }
       catch {
         $records.Add((Log-Failure "Terminating error while running Update-GetHealthCode.ps1" -Comment (($_ | Out-String).Trim()))) | Out-Null
@@ -1119,6 +1258,7 @@ foreach ($target in $targets) {
         IpsOfAllDcs            = $IpsOfAllDcs
       }
       $healthOutput = & $getHealthScriptPath @getHealthParams @PassThruArgs 2>&1
+      $suppressionExpiryMap = Get-HealthSuppressionExpiryMapLocal -Path $suppressionFilePath
 
       foreach ($item in @($healthOutput)) {
         if ($item -is [System.Management.Automation.ErrorRecord]) {
@@ -1127,11 +1267,20 @@ foreach ($target in $targets) {
         }
 
         if ($item -and $item.PSObject.Properties['Level'] -and $item.PSObject.Properties['Message']) {
+          $hash = if ($item.PSObject.Properties['Hash']) { [string]$item.Hash } else { '00000000' }
+          $suppressed = if ($item.PSObject.Properties['Suppressed']) { [bool]$item.Suppressed } else { $false }
+          $suppressedUntil = $null
+          if ($suppressed -and $hash -and $suppressionExpiryMap.ContainsKey($hash.ToLowerInvariant())) {
+            $suppressedUntil = $suppressionExpiryMap[$hash.ToLowerInvariant()]
+          }
+          $level = [string]$item.Level
           $records.Add([pscustomobject]@{
               Computer   = if ($item.PSObject.Properties['Computer']) { [string]$item.Computer } else { $env:COMPUTERNAME }
-              Level      = [string]$item.Level
-              Hash       = if ($item.PSObject.Properties['Hash']) { [string]$item.Hash } else { '00000000' }
-              Suppressed = if ($item.PSObject.Properties['Suppressed']) { [bool]$item.Suppressed } else { $false }
+              Level      = $level
+              EffectiveLevel = Get-HealthEffectiveLevelLocal -Level $level -Suppressed:$suppressed -SuppressedUntil $suppressedUntil -PostponedSuppressionWindowDays $PostponedSuppressionWindowDays
+              Hash       = $hash
+              Suppressed = $suppressed
+              SuppressedUntil = $suppressedUntil
               Message    = [string]$item.Message
               Comment    = if ($item.PSObject.Properties['Comment']) { [string]$item.Comment } else { '' }
               Emitter    = if ($item.PSObject.Properties['Emitter']) { $item.Emitter } else { $null }
@@ -1148,7 +1297,7 @@ foreach ($target in $targets) {
 
   if ($target -eq $env:COMPUTERNAME) {
     $skipTargetUpdate = $NoUpdate -or $localUpdateAlreadyRan
-    $output = & $healthCheckBlock $ROOT_DIR $Hide $OnlyTheseTests $ExcludeTests $WhitelistSigs $SkipSlowTests $SkipPolicyTests $SkipNonEssentialTests $skipTargetUpdate $RunWithoutElevation $IpsOfAllDcs $PushUpdate $localReleaseZip $localReleaseZipVersion $PassThruArgs
+    $output = & $healthCheckBlock $ROOT_DIR $Hide $OnlyTheseTests $ExcludeTests $WhitelistSigs $SkipSlowTests $SkipPolicyTests $SkipNonEssentialTests $skipTargetUpdate $RunWithoutElevation $IpsOfAllDcs $PushUpdate $localReleaseZip $localReleaseZipVersion $POSTPONED_SUPPRESSION_WINDOW_DAYS $PassThruArgs
   }
   else {
     if (Get-TcpPortStateFast $target @(5985, 5986, 80, 443, 88, 135, 389, 636, 445, 3268, 3269) | Where-Object { $_.Open }) {
@@ -1193,7 +1342,7 @@ foreach ($target in $targets) {
           Copy-Item -Path $localReleaseZip -Destination $remoteZipPath -ToSession $session -Force
         }
 
-        $output = Invoke-Command -Session $session -ScriptBlock $healthCheckBlock -ArgumentList $remoteExecutionRoot, $Hide, $OnlyTheseTests, $ExcludeTests, $WhitelistSigs, $SkipSlowTests, $SkipPolicyTests, $SkipNonEssentialTests, $NoUpdate, $RunWithoutElevation, $IpsOfAllDcs, $PushUpdate, $remoteZipPath, $localReleaseZipVersion, $PassThruArgs
+        $output = Invoke-Command -Session $session -ScriptBlock $healthCheckBlock -ArgumentList $remoteExecutionRoot, $Hide, $OnlyTheseTests, $ExcludeTests, $WhitelistSigs, $SkipSlowTests, $SkipPolicyTests, $SkipNonEssentialTests, $NoUpdate, $RunWithoutElevation, $IpsOfAllDcs, $PushUpdate, $remoteZipPath, $localReleaseZipVersion, $POSTPONED_SUPPRESSION_WINDOW_DAYS, $PassThruArgs
       }
       catch {
         $comment = (($_ | Out-String).Trim())
@@ -1242,22 +1391,29 @@ foreach ($target in $targets) {
   Write-Progress -Activity "Checking $target" -Completed
 }
 
-$SortOrder = @{'failure' = 1; 'warning' = 2; 'notice' = 3; 'info' = 4; 'pass' = 5; 'debug' = 6 }
+$SortOrder = @{'failure' = 1; 'warning' = 2; 'notice' = 3; 'postponed' = 4; 'info' = 5; 'pass' = 6; 'debug' = 7 }
 $notable_msgs = @()
 if ($all_messages) {
+  foreach ($message in $all_messages) {
+    if ($message -and (-not $message.PSObject.Properties['EffectiveLevel'])) {
+      $level = if ($message.PSObject.Properties['Level']) { [string]$message.Level } else { '' }
+      $message | Add-Member -NotePropertyName EffectiveLevel -NotePropertyValue $level -Force
+    }
+  }
+
   # save
   Export-HealthMessagesReportToExcel -Messages $all_messages -FileName "${TEMP_DIR}\all-messages-$($timestamp).xlsx"
   $notable_msgs = @(`
       $all_messages `
-    | Where-Object { -not($_.Suppressed) -and $_.level -notin @('debug', 'help', 'pass', 'info') } `
-    | Sort-Object -Property @{ Expression = { $SortOrder[$_.Level] } }, Computer `
+    | Where-Object { (-not($_.Suppressed) -and $_.level -notin @('debug', 'help', 'pass', 'info')) -or ($_.EffectiveLevel -eq 'postponed') } `
+    | Sort-Object -Property @{ Expression = { $SortOrder[$_.EffectiveLevel] } }, Computer `
   )
   if ($notable_msgs) {
     Export-HealthMessagesReportToExcel -Messages $notable_msgs -FileName "${TEMP_DIR}\notable-messages-$($timestamp).xlsx"
   }
 
-  $synopsis = " " + ($notable_msgs | Where-Object { $_.Level } |
-    Group-Object Level -NoElement |
+  $synopsis = " " + ($notable_msgs | Where-Object { $_.EffectiveLevel } |
+    Group-Object EffectiveLevel -NoElement |
     Sort-Object -Property @{ Expression = { $SortOrder[$_.Name] } } | ForEach-Object {
       if ($_.Count) {
         "    $($_.Count.ToString().PadRight(5)) $($_.Name)`r`n"
@@ -1286,7 +1442,7 @@ if ($all_messages) {
       $htmlParts += $htmlSynopsis
     }
     $htmlParts += Convert-HealthMessagesToHtmlTable -Messages @(
-      $notable_msgs | Sort-Object -Property @{ Expression = { $SortOrder[$_.Level] } }, Computer
+      $notable_msgs | Sort-Object -Property @{ Expression = { $SortOrder[$_.EffectiveLevel] } }, Computer
     )
     $html = $htmlParts -join ''
 
