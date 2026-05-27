@@ -957,6 +957,9 @@ Uses: Get-WinEvent.
 
     foreach ($entry in $sortedEntries) {
         Write-Verbose "User '$($entry.Key)' has $($entry.Value) failed login attempt(s) in the last $Hours hour(s)."
+        if ($entry.Value -le 2) {
+            continue
+        }
         $details="$($entry.Value) attempts in the last $Hours hour(s)"
         $severity = if ($entry.Value -le 12) {
             Write-Warning "[NOTICE] A few failed login attempts for '$($entry.Key)'`n$details"
