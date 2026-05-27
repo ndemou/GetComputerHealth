@@ -96,9 +96,12 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
         $html | Should -Match 'background-color:#ffb300; color:#111'
         $html | Should -Match 'background-color:#1e88e5; color:#fff'
         $html | Should -Match '>3 <span'
-        $html | Should -Match '>failures</span>, 2 '
-        $html | Should -Match '>warnings</span>, 1 '
-        $html | Should -Match '>notice</span>\.'
+        $html | Should -Match '>failure</span> 2 '
+        $html | Should -Match '>warning</span> 1 '
+        $html | Should -Match '>notice</span></div>'
+        $html | Should -Not -Match '>failure</span>,'
+        $html | Should -Not -Match '>warning</span>,'
+        $html | Should -Not -Match '>notice</span>\.'
         $html | Should -Match "border-top:1px solid #cfcfcf; margin:0 0 12px 0"
         $html | Should -Not -Match '<pre'
     }

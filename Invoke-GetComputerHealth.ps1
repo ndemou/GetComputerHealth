@@ -376,8 +376,8 @@ function Convert-HealthSynopsisToHtml {
   )
 
   $levelMeta = @{
-    'failure' = @{ Label = 'failures'; Background = '#ff4d4f'; Foreground = '#fff' }
-    'warning' = @{ Label = 'warnings'; Background = '#ffb300'; Foreground = '#111' }
+    'failure' = @{ Label = 'failure'; Background = '#ff4d4f'; Foreground = '#fff' }
+    'warning' = @{ Label = 'warning'; Background = '#ffb300'; Foreground = '#111' }
     'notice'  = @{ Label = 'notice'; Background = '#1e88e5'; Foreground = '#fff' }
     'info'    = @{ Label = 'info'; Background = '#c7d0d9'; Foreground = '#111' }
     'pass'    = @{ Label = 'passes'; Background = '#3cb371'; Foreground = '#fff' }
@@ -402,7 +402,7 @@ function Convert-HealthSynopsisToHtml {
     return ''
   }
 
-    return "<div style='margin:0 0 8px 0; font-family:Segoe UI, Arial, sans-serif; font-size:12px; color:#000'>" + ($parts -join ', ') + ".</div><div style='border-top:1px solid #cfcfcf; margin:0 0 12px 0'></div>"
+    return "<div style='margin:0 0 8px 0; font-family:Segoe UI, Arial, sans-serif; font-size:12px; color:#000'>" + ($parts -join ' ') + "</div><div style='border-top:1px solid #cfcfcf; margin:0 0 12px 0'></div>"
 }
 
 function Convert-HealthMessagesToHtmlTable {
