@@ -2,6 +2,12 @@
 
 ## Implement On-Disk Format Migration Design Draft
 
+## New gch.psd1 option 'SendReports'
+```
+SendReports = "Auto" # "Never", "Always", "Auto"
+```
+The default is "Auto" wich is the current behaviour (send when running in non-interactive session -- e.g. from a scheduled task--, don't send when run from an interactive one -- e.g. from the terminal)
+
 ## Save test results to .\data instead of .\temp
 
 Add an On-Disk Format migration function for this purpose(see relevant dev documentation). Besides creating the data directory it should also move there existing .\temp\*.xlsx files.
@@ -10,11 +16,12 @@ Add an On-Disk Format migration function for this purpose(see relevant dev docum
 
 We need an On-Disk Format migration to accompany this change(see relevant dev documentation). The migration will convert the json to psd1 (and delete the original)
 
-## Make installation SUPER simple
+## Make a customized installation SUPER simple
 
-In order to customize the installation I should be able to call the installer like this:
+You just download and execute install.ps1 with some options. E.g.:
 ```powershell
-& .\install.ps1 -Config @{
+iwr -useb "https://raw.githubusercontent.com/ndemou/GetComputerHealth/refs/heads/main/Update-GetHealthCode.ps1" -OutFile ".\Update-GetHealthCode.ps1" 
+& .\Update-GetHealthCode.ps1 -Config @{
     Options = @{
         InstallDir = 'C:\IT\GetComputerHealth'
     }
