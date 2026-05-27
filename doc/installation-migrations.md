@@ -1,7 +1,4 @@
-# On-Disk Format Migration Design Draft
-
-**CAUTION**: This is a WORK IN PROGRESS document.
-
+# On-Disk Format Migrations
 *(Information for developers only)*
 
 ## What is an On-Disk Format Migration
@@ -11,6 +8,8 @@ Sometimes a new version, besides the expected changes of code in `.\bin`, needs 
   * different file or directory names or different directory structure (e.g. moving a subfolder from one place to another)
   * different format for some file(s)
   * or a mixture of the above
+
+Examples: We decide to give a better name to a folder or file. We decide switch the format of a configuration file from plain-text to psd1 or json. 
 
 In that case, we say that the *On-Disk Format* changes, and we invoke an *On-Disk Format Migration* script to perform the change in a controlled and safe manner.
 
