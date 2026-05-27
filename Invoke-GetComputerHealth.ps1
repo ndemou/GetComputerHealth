@@ -136,6 +136,7 @@ $VERSION_FILE_PATH = Join-Path $SCRIPT_BIN_DIR 'VERSION'
 $IPS_OF_ALL_DCS_CACHE_PATH = Join-Path $TEMP_DIR 'cache.IpsOfAllDcs.clixml'
 $LAST_REPORT_HTML_PATH = Join-Path $TEMP_DIR 'last-report.html'
 $PROJECT_URL = 'https://github.com/ndemou/GetComputerHealth'
+$GCH_CONFIG_PATH = Join-Path $CONFIG_DIR 'gch.psd1'
 $SHOW_AS_POSTPONED_WINDOW_DAYS = 150
 
 $SmtpSubject = 'Notable Messages from Get-ComputerHealth of LIST_OF_COMPUTERS'
@@ -618,6 +619,71 @@ function Remove-OldInvokeTranscriptLogs {
   }
 }
 
+function Read-GchConfigFile {
+  [CmdletBinding()]
+  param([Parameter(Mandatory)][string]$Path)
+
+  if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+    return @{}
+  }
+
+  try {
+    $config = Import-PowerShellDataFile -LiteralPath $Path -ErrorAction Stop
+  } catch {
+    throw "Failed reading configuration file '$Path': $($_.Exception.Message)"
+  }
+
+  if ($null -eq $config) {
+    return @{}
+  }
+
+  return $config
+}
+
+function Test-GchConfigKey {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)]$Config,
+    [Parameter(Mandatory)][string]$Key
+  )
+
+  if ($Config -is [hashtable]) {
+    return $Config.ContainsKey($Key)
+  }
+
+  return ($Config.PSObject.Properties[$Key] -ne $null)
+}
+
+function Get-GchConfigValue {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)]$Config,
+    [Parameter(Mandatory)][string]$Key
+  )
+
+  if ($Config -is [hashtable]) {
+    return $Config[$Key]
+  }
+
+  return $Config.$Key
+}
+
+function Resolve-GchConfiguredNonNegativeInteger {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)]$Value,
+    [Parameter(Mandatory)][string]$Key
+  )
+
+  $text = ([string]$Value).Trim()
+  $number = 0
+  if (([string]::IsNullOrWhiteSpace($text)) -or (-not [int]::TryParse($text, [ref]$number)) -or ($number -lt 0)) {
+    throw "Invalid $Key value in gch.psd1: '$Value'. Use an integer greater than or equal to 0."
+  }
+
+  return $number
+}
+
 function Get-HealthSuppressionExpiryMap {
   [CmdletBinding()]
   param(
@@ -1013,6 +1079,11 @@ $timestamp = $(get-date -Format 'yyyy-MM-dd_HH.mm')
 if (-not (Test-Path -LiteralPath $LOG_DIR)) { New-Item -ItemType Directory -Path $LOG_DIR -Force | Out-Null }
 if (-not (Test-Path -LiteralPath $TEMP_DIR)) { New-Item -ItemType Directory -Path $TEMP_DIR -Force | Out-Null }
 Remove-OldInvokeTranscriptLogs -LogDir $LOG_DIR
+
+$gchConfig = Read-GchConfigFile -Path $GCH_CONFIG_PATH
+if (Test-GchConfigKey -Config $gchConfig -Key 'ShowAsPostponedWindowDays') {
+  $SHOW_AS_POSTPONED_WINDOW_DAYS = Resolve-GchConfiguredNonNegativeInteger -Value (Get-GchConfigValue -Config $gchConfig -Key 'ShowAsPostponedWindowDays') -Key 'ShowAsPostponedWindowDays'
+}
 
 $localUpdateAlreadyRan = $false
 if (-not $NoUpdate) {

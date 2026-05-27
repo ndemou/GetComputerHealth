@@ -22,7 +22,7 @@ This is a **robust production-tested tool** and I have been using it across seve
 
 # Security
 
-The installer (`Update-GetHealthCode.ps1`) downloads and updates files from this GitHub repository. It may do so *every* time you call `Invoke-GetComputerHealth.ps1`. It is strongly recommended that you clone this repo, audit it, and then change the `$REPO_URL=` line in `Update-GetHealthCode.ps1` to point to your local copy. 
+By default the installer downloads and updates files from this GitHub repository every time you call any of the `Invoke-*.ps1` scripts. You can disable this by setting `AutomaticUpdates = $false` in `./config/gch.psd1` or point the updater to a clone of this repo that you control by setting `RepoUrl`.
 
 The installer also registers and sets PSGallery as **Trusted** and installs the PowerShell module `ImportExcel`.
 

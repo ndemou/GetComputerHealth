@@ -79,12 +79,14 @@ $script:UpdateTranscriptTempPath = $null
 $script:UpdateTranscriptFinalPath = $null
 $script:UpdateTranscriptTimestamp = (Get-Date)
 $REPO_URL = 'https://github.com/ndemou/GetComputerHealth'
+$SHOW_AS_POSTPONED_WINDOW_DAYS = 150
 $REPO_REF = 'main'
+$GCH_CONFIG_PATH = Join-Path $CFG_DIR 'gch.psd1'
 $LATEST_RELEASE_METADATA_CACHE_PATH = Join-Path $CFG_DIR 'Get-ComputerHealth-latest-release-meta.json'
 $RELEASE_METADATA_CACHE_TTL_MINUTES = 60
 $ZIP_CACHE_PATTERN = 'GetComputerHealth-release-*.zip'
 $MANUAL_ZIP_CACHE_PATTERN = 'GetComputerHealth-MANUAL-UPDATE-*.zip'
-$repoSlug = (($REPO_URL -replace '^https?://github\.com/','') -replace '\.git$','').Trim('/')
+$repoSlug = $null
 #
 #  END OF CONFIG
 #
@@ -100,6 +102,147 @@ function Write-UpdateEvent {
 
   if ([string]::IsNullOrWhiteSpace($Message)) { return }
   Write-Host $Message
+}
+
+function Get-GchDefaultConfigText {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)][string]$RepoUrl,
+    [Parameter(Mandatory)][int]$ShowAsPostponedWindowDays
+  )
+
+  @"
+@{
+    AutomaticUpdates = `$true
+    RepoUrl = '$RepoUrl'
+    ShowAsPostponedWindowDays = $ShowAsPostponedWindowDays
+}
+"@
+}
+
+function Ensure-GchConfigFile {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)][string]$Path,
+    [Parameter(Mandatory)][string]$RepoUrl,
+    [Parameter(Mandatory)][int]$ShowAsPostponedWindowDays
+  )
+
+  if (Test-Path -LiteralPath $Path -PathType Leaf) {
+    return
+  }
+
+  $parentDir = Split-Path -Parent $Path
+  if (-not [string]::IsNullOrWhiteSpace($parentDir) -and (-not (Test-Path -LiteralPath $parentDir -PathType Container))) {
+    $null = New-Item -ItemType Directory -Path $parentDir -Force
+  }
+
+  $text = Get-GchDefaultConfigText -RepoUrl $RepoUrl -ShowAsPostponedWindowDays $ShowAsPostponedWindowDays
+  Set-Content -LiteralPath $Path -Value $text -Encoding UTF8
+}
+
+function Read-GchConfigFile {
+  [CmdletBinding()]
+  param([Parameter(Mandatory)][string]$Path)
+
+  if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+    return @{}
+  }
+
+  try {
+    $config = Import-PowerShellDataFile -LiteralPath $Path -ErrorAction Stop
+  } catch {
+    throw "Failed reading configuration file '$Path': $($_.Exception.Message)"
+  }
+
+  if ($null -eq $config) {
+    return @{}
+  }
+
+  return $config
+}
+
+function Test-GchConfigKey {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)]$Config,
+    [Parameter(Mandatory)][string]$Key
+  )
+
+  if ($Config -is [hashtable]) {
+    return $Config.ContainsKey($Key)
+  }
+
+  return ($Config.PSObject.Properties[$Key] -ne $null)
+}
+
+function Get-GchConfigValue {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)]$Config,
+    [Parameter(Mandatory)][string]$Key
+  )
+
+  if ($Config -is [hashtable]) {
+    return $Config[$Key]
+  }
+
+  return $Config.$Key
+}
+
+function Test-GchFalsyValue {
+  [CmdletBinding()]
+  param([AllowNull()]$Value)
+
+  if ($null -eq $Value) { return $true }
+  if ($Value -is [bool]) { return (-not $Value) }
+  if ($Value -is [int]) { return ($Value -eq 0) }
+  if ($Value -is [string]) {
+    $text = $Value.Trim()
+    if ([string]::IsNullOrWhiteSpace($text)) { return $true }
+    return ($text -in @('0', 'false', 'no', 'off'))
+  }
+
+  return (-not [bool]$Value)
+}
+
+function Resolve-GchConfiguredRepoUrl {
+  [CmdletBinding()]
+  param([Parameter(Mandatory)][string]$RepoUrl)
+
+  $value = $RepoUrl.Trim()
+  $uri = $null
+  if (([string]::IsNullOrWhiteSpace($value)) -or (-not [System.Uri]::TryCreate($value, [System.UriKind]::Absolute, [ref]$uri))) {
+    throw "Invalid RepoUrl value in gch.psd1: '$RepoUrl'. Use a GitHub repository URL such as https://github.com/owner/repo."
+  }
+
+  if (($uri.Scheme -notin @('http', 'https')) -or ($uri.Host -ine 'github.com')) {
+    throw "Invalid RepoUrl value in gch.psd1: '$RepoUrl'. Use a GitHub repository URL such as https://github.com/owner/repo."
+  }
+
+  $parts = @($uri.AbsolutePath.Trim('/') -split '/')
+  if (($parts.Count -lt 2) -or [string]::IsNullOrWhiteSpace($parts[0]) -or [string]::IsNullOrWhiteSpace($parts[1])) {
+    throw "Invalid RepoUrl value in gch.psd1: '$RepoUrl'. Use a GitHub repository URL such as https://github.com/owner/repo."
+  }
+
+  $normalizedPath = ('{0}/{1}' -f $parts[0], (($parts[1] -replace '\.git$', '')))
+  return ('{0}://github.com/{1}' -f $uri.Scheme.ToLowerInvariant(), $normalizedPath)
+}
+
+function Resolve-GchConfiguredNonNegativeInteger {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)]$Value,
+    [Parameter(Mandatory)][string]$Key
+  )
+
+  $text = ([string]$Value).Trim()
+  $number = 0
+  if (([string]::IsNullOrWhiteSpace($text)) -or (-not [int]::TryParse($text, [ref]$number)) -or ($number -lt 0)) {
+    throw "Invalid $Key value in gch.psd1: '$Value'. Use an integer greater than or equal to 0."
+  }
+
+  return $number
 }
 
 function Start-UpdateTranscript {
@@ -1076,18 +1219,6 @@ try {
   Write-Verbose "$passLabel Starting Update-GetHealthCode"
   Write-Verbose "$passLabel Parameters: Reinstall=$Reinstall UpdateFromZip='$UpdateFromZip' Version='$Version' ForceRefreshReleaseMetadata=$ForceRefreshReleaseMetadata SelfRerunCount=$SelfRerunCount PersistReleaseMarker='$PersistReleaseMarker'"
   Write-UpdateEvent "$passLabel Parameters: Reinstall=$Reinstall UpdateFromZip='$UpdateFromZip' Version='$Version' ForceRefreshReleaseMetadata=$ForceRefreshReleaseMetadata SelfRerunCount=$SelfRerunCount PersistReleaseMarker='$PersistReleaseMarker'"
-  Write-Verbose "Configuration:"
-  Write-Verbose "  DEST_DIR                    : $DEST_DIR"
-  Write-Verbose "  BAK_DIR                     : $BAK_DIR"
-  Write-Verbose "  CFG_DIR                     : $CFG_DIR"
-  Write-Verbose "  REPO_URL                    : $REPO_URL"
-  Write-Verbose "  REPO_REF                    : $REPO_REF"
-  Write-Verbose "  LATEST_RELEASE_METADATA_CACHE_PATH : $LATEST_RELEASE_METADATA_CACHE_PATH"
-  Write-Verbose "  RELEASE_METADATA_CACHE_TTL_MINUTES : $RELEASE_METADATA_CACHE_TTL_MINUTES"
-  Write-Verbose "  ZIP_CACHE_PATTERN           : $ZIP_CACHE_PATTERN"
-  Write-Verbose "  MANUAL_ZIP_CACHE_PATTERN    : $MANUAL_ZIP_CACHE_PATTERN"
-  Write-Verbose "  repoSlug                    : $repoSlug"
-
   if (-not (Test-Path $DEST_DIR)) {
     Write-Verbose "Creating destination directory '$DEST_DIR'"
     New-Item -ItemType Directory -Path $DEST_DIR | Out-Null
@@ -1108,6 +1239,34 @@ try {
   } else {
     Write-Verbose "Configuration directory already exists: '$CFG_DIR'"
   }
+
+  Ensure-GchConfigFile -Path $GCH_CONFIG_PATH -RepoUrl $REPO_URL -ShowAsPostponedWindowDays $SHOW_AS_POSTPONED_WINDOW_DAYS
+  $gchConfig = Read-GchConfigFile -Path $GCH_CONFIG_PATH
+  if ((Test-GchConfigKey -Config $gchConfig -Key 'AutomaticUpdates') -and (Test-GchFalsyValue -Value (Get-GchConfigValue -Config $gchConfig -Key 'AutomaticUpdates'))) {
+    Write-Warning "Automatic updates are disabled by '$GCH_CONFIG_PATH'. Update-GetHealthCode.ps1 will not make changes."
+    return
+  }
+  if (Test-GchConfigKey -Config $gchConfig -Key 'RepoUrl') {
+    $REPO_URL = Resolve-GchConfiguredRepoUrl -RepoUrl ([string](Get-GchConfigValue -Config $gchConfig -Key 'RepoUrl'))
+  }
+  if (Test-GchConfigKey -Config $gchConfig -Key 'ShowAsPostponedWindowDays') {
+    $SHOW_AS_POSTPONED_WINDOW_DAYS = Resolve-GchConfiguredNonNegativeInteger -Value (Get-GchConfigValue -Config $gchConfig -Key 'ShowAsPostponedWindowDays') -Key 'ShowAsPostponedWindowDays'
+  }
+  $repoSlug = (($REPO_URL -replace '^https?://github\.com/','') -replace '\.git$','').Trim('/')
+  Write-Verbose "Loaded Get-ComputerHealth configuration from '$GCH_CONFIG_PATH'"
+  Write-Verbose "Configuration:"
+  Write-Verbose "  DEST_DIR                    : $DEST_DIR"
+  Write-Verbose "  BAK_DIR                     : $BAK_DIR"
+  Write-Verbose "  CFG_DIR                     : $CFG_DIR"
+  Write-Verbose "  GCH_CONFIG_PATH             : $GCH_CONFIG_PATH"
+  Write-Verbose "  REPO_URL                    : $REPO_URL"
+  Write-Verbose "  REPO_REF                    : $REPO_REF"
+  Write-Verbose "  SHOW_AS_POSTPONED_WINDOW_DAYS : $SHOW_AS_POSTPONED_WINDOW_DAYS"
+  Write-Verbose "  LATEST_RELEASE_METADATA_CACHE_PATH : $LATEST_RELEASE_METADATA_CACHE_PATH"
+  Write-Verbose "  RELEASE_METADATA_CACHE_TTL_MINUTES : $RELEASE_METADATA_CACHE_TTL_MINUTES"
+  Write-Verbose "  ZIP_CACHE_PATTERN           : $ZIP_CACHE_PATTERN"
+  Write-Verbose "  MANUAL_ZIP_CACHE_PATTERN    : $MANUAL_ZIP_CACHE_PATTERN"
+  Write-Verbose "  repoSlug                    : $repoSlug"
 
   Ensure-PSModuleInstalled -Name ImportExcel
 

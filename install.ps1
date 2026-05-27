@@ -58,6 +58,8 @@ param(
 Set-StrictMode -Version 2
 $ErrorActionPreference = 'Stop'
 [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+$DEFAULT_REPO_URL = 'https://github.com/ndemou/GetComputerHealth'
+$DEFAULT_SHOW_AS_POSTPONED_WINDOW_DAYS = 150
 
 function Ensure-Directory {
   param([Parameter(Mandatory = $true)][string]$Path)
@@ -109,6 +111,140 @@ function Add-TextLineUtf8NoBom {
   $enc = New-Object System.Text.UTF8Encoding($false)
   $text = $Line + [Environment]::NewLine
   [System.IO.File]::AppendAllText($Path, $text, $enc)
+}
+
+function Get-GchDefaultConfigText {
+  param(
+    [Parameter(Mandatory = $true)][string]$RepoUrl,
+    [Parameter(Mandatory = $true)][int]$ShowAsPostponedWindowDays
+  )
+
+  @"
+@{
+    AutomaticUpdates = `$true
+    RepoUrl = '$RepoUrl'
+    ShowAsPostponedWindowDays = $ShowAsPostponedWindowDays
+}
+"@
+}
+
+function Ensure-GchConfigFile {
+  param(
+    [Parameter(Mandatory = $true)][string]$Path,
+    [Parameter(Mandatory = $true)][string]$RepoUrl,
+    [Parameter(Mandatory = $true)][int]$ShowAsPostponedWindowDays
+  )
+
+  if (Test-Path -LiteralPath $Path -PathType Leaf) {
+    return
+  }
+
+  $dir = Split-Path -Parent $Path
+  if ($dir) {
+    Ensure-Directory -Path $dir
+  }
+
+  $text = Get-GchDefaultConfigText -RepoUrl $RepoUrl -ShowAsPostponedWindowDays $ShowAsPostponedWindowDays
+  Write-TextFileUtf8NoBom -Path $Path -Text $text
+}
+
+function Read-GchConfigFile {
+  param([Parameter(Mandatory = $true)][string]$Path)
+
+  if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+    return @{}
+  }
+
+  try {
+    $config = Import-PowerShellDataFile -LiteralPath $Path -ErrorAction Stop
+  }
+  catch {
+    throw "Failed reading configuration file '$Path': $($_.Exception.Message)"
+  }
+
+  if ($null -eq $config) {
+    return @{}
+  }
+
+  return $config
+}
+
+function Test-GchConfigKey {
+  param(
+    [Parameter(Mandatory = $true)]$Config,
+    [Parameter(Mandatory = $true)][string]$Key
+  )
+
+  if ($Config -is [hashtable]) {
+    return $Config.ContainsKey($Key)
+  }
+
+  return ($Config.PSObject.Properties[$Key] -ne $null)
+}
+
+function Get-GchConfigValue {
+  param(
+    [Parameter(Mandatory = $true)]$Config,
+    [Parameter(Mandatory = $true)][string]$Key
+  )
+
+  if ($Config -is [hashtable]) {
+    return $Config[$Key]
+  }
+
+  return $Config.$Key
+}
+
+function Test-GchFalsyValue {
+  param([AllowNull()]$Value)
+
+  if ($null -eq $Value) { return $true }
+  if ($Value -is [bool]) { return (-not $Value) }
+  if ($Value -is [int]) { return ($Value -eq 0) }
+  if ($Value -is [string]) {
+    $text = $Value.Trim()
+    if ([string]::IsNullOrWhiteSpace($text)) { return $true }
+    return ($text -in @('0', 'false', 'no', 'off'))
+  }
+
+  return (-not [bool]$Value)
+}
+
+function Resolve-GchConfiguredRepoUrl {
+  param([Parameter(Mandatory = $true)][string]$RepoUrl)
+
+  $value = $RepoUrl.Trim()
+  $uri = $null
+  if (([string]::IsNullOrWhiteSpace($value)) -or (-not [System.Uri]::TryCreate($value, [System.UriKind]::Absolute, [ref]$uri))) {
+    throw "Invalid RepoUrl value in gch.psd1: '$RepoUrl'. Use a GitHub repository URL such as https://github.com/owner/repo."
+  }
+
+  if (($uri.Scheme -notin @('http', 'https')) -or ($uri.Host -ine 'github.com')) {
+    throw "Invalid RepoUrl value in gch.psd1: '$RepoUrl'. Use a GitHub repository URL such as https://github.com/owner/repo."
+  }
+
+  $parts = @($uri.AbsolutePath.Trim('/') -split '/')
+  if (($parts.Count -lt 2) -or [string]::IsNullOrWhiteSpace($parts[0]) -or [string]::IsNullOrWhiteSpace($parts[1])) {
+    throw "Invalid RepoUrl value in gch.psd1: '$RepoUrl'. Use a GitHub repository URL such as https://github.com/owner/repo."
+  }
+
+  $normalizedPath = ('{0}/{1}' -f $parts[0], (($parts[1] -replace '\.git$', '')))
+  return ('{0}://github.com/{1}' -f $uri.Scheme.ToLowerInvariant(), $normalizedPath)
+}
+
+function Resolve-GchConfiguredNonNegativeInteger {
+  param(
+    [Parameter(Mandatory = $true)]$Value,
+    [Parameter(Mandatory = $true)][string]$Key
+  )
+
+  $text = ([string]$Value).Trim()
+  $number = 0
+  if (([string]::IsNullOrWhiteSpace($text)) -or (-not [int]::TryParse($text, [ref]$number)) -or ($number -lt 0)) {
+    throw "Invalid $Key value in gch.psd1: '$Value'. Use an integer greater than or equal to 0."
+  }
+
+  return $number
 }
 
 function Get-StringSha256Hex {
@@ -428,6 +564,7 @@ function Initialize-Paths {
   Ensure-Directory -Path $script:LogDir
   Ensure-Directory -Path $script:TempDir
   Ensure-Directory -Path $script:ConfigDir
+  $script:GchConfigPath = Join-Path $script:ConfigDir 'gch.psd1'
 
   if ([string]::IsNullOrWhiteSpace($DetailedLogPath)) {
     $script:DetailedLogPath = Join-Path $script:LogDir ('install-gch-detailed-{0}.log' -f (Get-Date -Format 'yyyy-MM-dd-HH.mm.ss'))
@@ -1878,6 +2015,18 @@ $zipPath = $null
 try {
   $targetBin = Get-TargetBinPath
   Initialize-Paths -BinPath $targetBin
+  Ensure-GchConfigFile -Path $script:GchConfigPath -RepoUrl $DEFAULT_REPO_URL -ShowAsPostponedWindowDays $DEFAULT_SHOW_AS_POSTPONED_WINDOW_DAYS
+  $gchConfig = Read-GchConfigFile -Path $script:GchConfigPath
+  if ((-not $InternalStageRun) -and (Test-GchConfigKey -Config $gchConfig -Key 'AutomaticUpdates') -and (Test-GchFalsyValue -Value (Get-GchConfigValue -Config $gchConfig -Key 'AutomaticUpdates'))) {
+    Write-Warning "Automatic updates are disabled by '$script:GchConfigPath'. install.ps1 will not make changes."
+    return
+  }
+  if ((-not $InternalStageRun) -and [string]::IsNullOrWhiteSpace($Source) -and (Test-GchConfigKey -Config $gchConfig -Key 'RepoUrl')) {
+    $Source = Resolve-GchConfiguredRepoUrl -RepoUrl ([string](Get-GchConfigValue -Config $gchConfig -Key 'RepoUrl'))
+  }
+  if (Test-GchConfigKey -Config $gchConfig -Key 'ShowAsPostponedWindowDays') {
+    $null = Resolve-GchConfiguredNonNegativeInteger -Value (Get-GchConfigValue -Config $gchConfig -Key 'ShowAsPostponedWindowDays') -Key 'ShowAsPostponedWindowDays'
+  }
   Remove-StaleInstallerArtifacts -TempDir $script:TempDir -BinPath $targetBin
 
   Write-Log -Message ('Starting install.ps1. InternalStageRun={0}; Bin={1}' -f $InternalStageRun, $targetBin)

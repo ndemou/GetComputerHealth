@@ -22,6 +22,10 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
         'Resolve-IpsOfAllDcs',
         'Save-HealthHtmlReport',
         'Remove-OldInvokeTranscriptLogs',
+        'Read-GchConfigFile',
+        'Test-GchConfigKey',
+        'Get-GchConfigValue',
+        'Resolve-GchConfiguredNonNegativeInteger',
         'Get-HealthSuppressionExpiryMap',
         'Get-HealthEffectiveLevel'
       )) {
@@ -256,6 +260,27 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
     Get-HealthEffectiveLevel -Level 'warning' -Suppressed:$true -SuppressedUntil ([datetime]'2026-06-01') -ShowAsPostponedWindowDays 150 -Today ([datetime]'2026-05-01') | Should -Be 'postponed'
     Get-HealthEffectiveLevel -Level 'warning' -Suppressed:$true -SuppressedUntil ([datetime]'2026-12-01') -ShowAsPostponedWindowDays 150 -Today ([datetime]'2026-05-01') | Should -Be 'warning'
     Get-HealthEffectiveLevel -Level 'warning' -Suppressed:$false -SuppressedUntil ([datetime]'2026-06-01') -ShowAsPostponedWindowDays 150 -Today ([datetime]'2026-05-01') | Should -Be 'warning'
+  }
+
+  It 'loads ShowAsPostponedWindowDays from gch.psd1-compatible data' {
+    $tempRoot = Join-Path $env:TEMP ('gch-config-read-' + [guid]::NewGuid().ToString())
+    $configPath = Join-Path $tempRoot 'gch.psd1'
+
+    try {
+      New-Item -ItemType Directory -Path $tempRoot -Force | Out-Null
+      @'
+@{
+    ShowAsPostponedWindowDays = 30
+}
+'@ | Set-Content -LiteralPath $configPath -Encoding UTF8
+
+      $config = Read-GchConfigFile -Path $configPath
+
+      Test-GchConfigKey -Config $config -Key 'ShowAsPostponedWindowDays' | Should -BeTrue
+      Resolve-GchConfiguredNonNegativeInteger -Value (Get-GchConfigValue -Config $config -Key 'ShowAsPostponedWindowDays') -Key 'ShowAsPostponedWindowDays' | Should -Be 30
+    } finally {
+      Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
+    }
   }
 
   It 'uses cached IpsOfAllDcs values when the argument is omitted' {

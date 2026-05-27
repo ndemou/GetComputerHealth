@@ -13,7 +13,15 @@ Describe 'Update-GetHealthCode temporary directory selection' {
 
     $functionNames = @(
       'New-RandomTempDirectoryPath',
-      'New-EmptyTempDirectory'
+      'New-EmptyTempDirectory',
+      'Get-GchDefaultConfigText',
+      'Ensure-GchConfigFile',
+      'Read-GchConfigFile',
+      'Test-GchConfigKey',
+      'Get-GchConfigValue',
+      'Test-GchFalsyValue',
+      'Resolve-GchConfiguredRepoUrl',
+      'Resolve-GchConfiguredNonNegativeInteger'
     )
 
     foreach ($functionName in $functionNames) {
@@ -77,5 +85,40 @@ Describe 'Update-GetHealthCode temporary directory selection' {
       $env:TEMP = $savedTemp
       Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
     }
+  }
+
+  It 'creates the default gch.psd1 file' {
+    $tempRoot = Join-Path $env:TEMP ('gch-config-test-' + [guid]::NewGuid().ToString())
+    $configPath = Join-Path $tempRoot 'config\gch.psd1'
+
+    try {
+      Ensure-GchConfigFile -Path $configPath -RepoUrl 'https://github.com/ndemou/GetComputerHealth' -ShowAsPostponedWindowDays 150
+      $config = Read-GchConfigFile -Path $configPath
+
+      Test-GchConfigKey -Config $config -Key 'AutomaticUpdates' | Should -BeTrue
+      Get-GchConfigValue -Config $config -Key 'AutomaticUpdates' | Should -BeTrue
+      Get-GchConfigValue -Config $config -Key 'RepoUrl' | Should -Be 'https://github.com/ndemou/GetComputerHealth'
+      Get-GchConfigValue -Config $config -Key 'ShowAsPostponedWindowDays' | Should -Be 150
+      Test-GchFalsyValue -Value (Get-GchConfigValue -Config $config -Key 'AutomaticUpdates') | Should -BeFalse
+    } finally {
+      Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
+    }
+  }
+
+  It 'validates configured repo url and postponed window values' {
+    Resolve-GchConfiguredRepoUrl -RepoUrl 'https://github.com/owner/repo.git' | Should -Be 'https://github.com/owner/repo'
+    Resolve-GchConfiguredNonNegativeInteger -Value '0' -Key 'ShowAsPostponedWindowDays' | Should -Be 0
+    Resolve-GchConfiguredNonNegativeInteger -Value 150 -Key 'ShowAsPostponedWindowDays' | Should -Be 150
+
+    { Resolve-GchConfiguredRepoUrl -RepoUrl 'https://example.com/owner/repo' } | Should -Throw
+    { Resolve-GchConfiguredNonNegativeInteger -Value -1 -Key 'ShowAsPostponedWindowDays' } | Should -Throw
+  }
+
+  It 'treats common disabled AutomaticUpdates values as falsy' {
+    Test-GchFalsyValue -Value $false | Should -BeTrue
+    Test-GchFalsyValue -Value 0 | Should -BeTrue
+    Test-GchFalsyValue -Value 'false' | Should -BeTrue
+    Test-GchFalsyValue -Value 'off' | Should -BeTrue
+    Test-GchFalsyValue -Value $true | Should -BeFalse
   }
 }
