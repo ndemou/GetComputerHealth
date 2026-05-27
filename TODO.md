@@ -1,21 +1,5 @@
 ﻿# TODO
 
-## Cleanups of old log files
-
-Invoke-GetComputerHealth.ps1 should be deleting transcripts (like `.\log\Invoke-GetHealthDomainComputers-<timestamp>.log`) older than 1 month.
-
-## Cosmetic changes to the html report
-
-At the top of the report we have a summary like this: `2 failures, 9 warnings, 14 notice.`
-
-Replace the commas with a space, remove the dot at the end. Make all words singular (failure, warning).
-
-## Include in the html report suppressed findings that are due to expire in <=15days
-
-For a suppressed finding, if its `-Until` date is within the next 15 days, include it in the html report. IMPORTANT DETAIL: such findings have an effective level "POSTPONED"(green colored) which has the lowest priority and thus appears last in the report. 
-
-So after this change, findings that appear in the report have their "real level" (notice, warning, failure) and their effective level (postponed, notice, warning, failure). It's best to generate the effective level early in the code that collects them.
-
 ## Finalize and implement On-Disk Format Migration Design Draft
 
 ## Save test results to .\data instead of .\temp
@@ -28,12 +12,19 @@ Support file `./config/gch.psd1` which is expected to contain a PowerShell data 
 
 - If the key `AutomaticUpdates` is falsy the updater/installer quits with an explanatory warning before performing any action.
 - If the key `RepoUrl` is found it is used as the value of $REPO_URL. If it's not a valid URL, execution is aborted with an exception.
+- If the key `ShowAsPostponedWindowDays` is found it is used as the value of $POSTPONED_SUPPRESSION_WINDOW_DAYS. If it's not a valid number (integer>=0), execution is aborted with an exception. 
 
 Also update this part of our README. Reaplace this:
 > The installer (`Update-GetHealthCode.ps1`) downloads and updates files from this GitHub repository. It may do so *every* time you call `Invoke-GetComputerHealth.ps1`. It is strongly recommended that you clone this repo, audit it, and then change the `$REPO_URL=` line in `Update-GetHealthCode.ps1` to point to your local copy.
 
 With this:
 > By default the installer downloads and updates files from this GitHub repository every time you call any of the `Invoke-*.ps1` scripts. You can disable this by setting `AutomaticUpdates = $false` in `./config/gch.psd1` or point the updater to a clone of this repo that you control by setting `RepoUrl`.
+
+## Rename POSTPONED_SUPPRESSION_WINDOW_DAYS to SHOW_AS_POSTPONED_WINDOW_DAYS
+
+## Switch Send-Message configuration from json to .psd1
+
+We need a filesystem migration to accompany this change because existing installations with json must be migrated to psd1
 
 ## Make installation SUPER simple
 
