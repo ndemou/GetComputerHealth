@@ -30,6 +30,8 @@ iwr -useb "https://raw.githubusercontent.com/ndemou/GetComputerHealth/refs/heads
         'gch.psd1' = @{
             AutomaticUpdates = $false
             SendReports = "Auto" # "Never", "Always", "Auto"
+            ShowAsPostponedWindowDays = 15
+            IpsOfAllDCs = @('10.1.2.3', '10.1.2.4')
         }
     }
 }
