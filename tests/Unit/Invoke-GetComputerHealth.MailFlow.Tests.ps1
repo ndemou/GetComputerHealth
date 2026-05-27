@@ -20,7 +20,8 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
         'Get-CachedIpsOfAllDcs',
         'Set-CachedIpsOfAllDcs',
         'Resolve-IpsOfAllDcs',
-        'Save-HealthHtmlReport'
+        'Save-HealthHtmlReport',
+        'Remove-OldInvokeTranscriptLogs'
       )) {
       $funcAst = $ast.Find({
           param($node)
@@ -251,6 +252,33 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
       (Get-Content -LiteralPath $reportPath -Raw) | Should -Match ([regex]::Escape($html))
     }
     finally {
+      Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
+    }
+  }
+
+  It 'deletes only old Invoke-GetComputerHealth transcript logs' {
+    $tempRoot = Join-Path $env:TEMP ('gch-transcript-cleanup-' + [guid]::NewGuid().ToString())
+    $oldTranscript = Join-Path $tempRoot 'Invoke-GetHealthDomainComputers-2026-01-01_00.00.log'
+    $newTranscript = Join-Path $tempRoot 'Invoke-GetHealthDomainComputers-2026-05-01_00.00.log'
+    $oldOtherLog = Join-Path $tempRoot 'Other-2026-01-01.log'
+    $cutoff = [datetime]'2026-04-01T00:00:00'
+
+    try {
+      New-Item -ItemType Directory -Path $tempRoot -Force | Out-Null
+      Set-Content -LiteralPath $oldTranscript -Value 'old transcript' -NoNewline
+      Set-Content -LiteralPath $newTranscript -Value 'new transcript' -NoNewline
+      Set-Content -LiteralPath $oldOtherLog -Value 'other old log' -NoNewline
+
+      (Get-Item -LiteralPath $oldTranscript).LastWriteTime = [datetime]'2026-02-01T00:00:00'
+      (Get-Item -LiteralPath $newTranscript).LastWriteTime = [datetime]'2026-05-01T00:00:00'
+      (Get-Item -LiteralPath $oldOtherLog).LastWriteTime = [datetime]'2026-02-01T00:00:00'
+
+      Remove-OldInvokeTranscriptLogs -LogDir $tempRoot -CutoffDate $cutoff
+
+      Test-Path -LiteralPath $oldTranscript -PathType Leaf | Should -BeFalse
+      Test-Path -LiteralPath $newTranscript -PathType Leaf | Should -BeTrue
+      Test-Path -LiteralPath $oldOtherLog -PathType Leaf | Should -BeTrue
+    } finally {
       Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
     }
   }

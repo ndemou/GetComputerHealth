@@ -580,6 +580,36 @@ function Save-HealthHtmlReport {
   Set-Content -LiteralPath $Path -Value $Html -Encoding UTF8
 }
 
+function Remove-OldInvokeTranscriptLogs {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)][string]$LogDir,
+    [datetime]$CutoffDate = (Get-Date).AddMonths(-1)
+  )
+
+  if (-not (Test-Path -LiteralPath $LogDir -PathType Container)) {
+    return
+  }
+
+  try {
+    $oldLogs = @(
+      Get-ChildItem -LiteralPath $LogDir -File -Filter 'Invoke-GetHealthDomainComputers-*.log' -ErrorAction Stop |
+        Where-Object { $_.LastWriteTime -lt $CutoffDate }
+    )
+  } catch {
+    Write-Warning ("Failed enumerating old Invoke-GetComputerHealth transcript logs in {0}: {1}" -f $LogDir, $_.Exception.Message)
+    return
+  }
+
+  foreach ($log in $oldLogs) {
+    try {
+      Remove-Item -LiteralPath $log.FullName -Force -ErrorAction Stop
+    } catch {
+      Write-Warning ("Failed deleting old Invoke-GetComputerHealth transcript log '{0}': {1}" -f $log.FullName, $_.Exception.Message)
+    }
+  }
+}
+
 function Convert-HealthMessagesToExcelRows {
   [CmdletBinding()]
   param(
@@ -908,6 +938,7 @@ function Invoke-SelfAfterUpdate {
 $timestamp = $(get-date -Format 'yyyy-MM-dd_HH.mm')
 if (-not (Test-Path -LiteralPath $LOG_DIR)) { New-Item -ItemType Directory -Path $LOG_DIR -Force | Out-Null }
 if (-not (Test-Path -LiteralPath $TEMP_DIR)) { New-Item -ItemType Directory -Path $TEMP_DIR -Force | Out-Null }
+Remove-OldInvokeTranscriptLogs -LogDir $LOG_DIR
 
 $localUpdateAlreadyRan = $false
 if (-not $NoUpdate) {
