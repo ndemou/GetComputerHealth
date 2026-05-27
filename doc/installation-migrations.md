@@ -14,12 +14,12 @@ Sometimes a new version, besides the expected changes of code in `.\bin`, needs 
 
 In that case, we say that the *On-Disk Format* changes, and we invoke an *On-Disk Format Migration* script to perform the change in a controlled and safe manner.
 
-We keep track of the current "version" of the On-Disk Format by recording it in `data\disk-format.state`.
+We keep track of the current "version" of the On-Disk Format by recording it in `data\disk-format.psd1`.
 
 
 ## Versioning Rules
 
-`data\disk-format.state` contains these two numbers (and the comments):
+`data\disk-format.psd1` contains these two numbers (and the comments):
 ```
 @{
   # This is the major version of the last code release that changed the On-Disk Format
@@ -39,7 +39,7 @@ As a result `LatestCompatibleCodeVersion` is expected to be always aligned with 
 
 ## Migration Scripts & Migration Manifest
 
-Migration scripts are kept under `.\bin\migrations` and named like `Migrate-Disk-Format-to-version-V.ps1` where `V` is the On-Disk Format version that will result if this migration script runs succesfully. 
+Migration scripts are ps1 with this path and name `.\bin\disk-format-migrations\migrate-to-version-V.ps1` where `V` is the On-Disk Format version that will result if this migration script runs succesfully. 
 
 Migration scripts are invoked by the updater.
 
@@ -52,10 +52,9 @@ A short description of what the script does (the changes it performs on the On-D
 
 .MANIFEST
 ModifiedTopFolders = temp, config 
-# This is a comma separated list of top folders (spaces are ignored)
+# comma separated list of top folders (spaces are ignored)
 # 'bin' is always modified, so no need to include it
 NewTopFolders = foo
-
 ```
 Modified top folders means top-level installation folders such as `config`, `log`, etc. If a migration MAY modifie a folder itself or any file under it, that folder is considered modified.
 
@@ -77,36 +76,36 @@ The updater is responsible for invoking these scripts that perform On-Disk Forma
 The updater must:
 
 1. acquire a mutex so that two updates (and migrations) can never overlap
-2. detect the source On-Disk Format version from `data\disk-format.state` -- if no such file exists it assumes CurrentDiskFormat = 4 and LatestCompatibleCodeVersion = 4.
+2. detect the source On-Disk Format version from `data\disk-format.psd1` -- if no such file exists it assumes CurrentDiskFormat = 4 and LatestCompatibleCodeVersion = 4.
 3. determine the target On-Disk Format version from the version of the zip file (`$versionToInstall`)
 4. Decide what to do:
   4.1. If the source On-Disk Format version already matches the target On-Disk Format version, no On-Disk Format Migration is needed.
   4.2. If the target On-Disk Format version is lower than the source On-Disk Format version, that is a format downgrade request and must throw.
   4.3. If the Code Version is lower than the currently installed Code Version, but the required On-Disk Format version is unchanged, that code downgrade is allowed. No On-Disk Format Migration is needed.
   4.4. If the Code Version(CV) is higher than the Current On-Disk Format version (FV) then all migration scripts with version(V) such that `FV < V <= CV` must run in ascending order. For each one:
-    4.4.1. load the migration manifest from the script
+    4.4.1. load the migration manifest from the script and set arrays: $ModifiedTopFolders and $NewTopFolders
     4.4.2. create backups for every modified top folder
     4.4.3. run the selected migrations
     4.4.4. If migration script throws or returns an exit code that reveals a failure:
-       4.4.4.1. revert all modified top folders from backups 
-       4.4.4.2. delete any new top folders introduced from the migration
+       4.4.4.1. revert all modified top folders from backups ($ModifiedTopFolders)
+       4.4.4.2. delete any new top folders introduced from the migration ($NewTopFolders)
        4.4.4.3. buble up the exception
     4.4.5. If all seem to have gonne well 
-       4.4.5.1. persist the final On-Disk Format version in `data\disk-format.state`.
+       4.4.5.1. persist the final On-Disk Format version in `data\disk-format.psd1`.
        4.4.5.2. release the mutex
        4.4.5.3. execute the updater that is returned by the last migration script
 
-Migrations are not required to be adjacent (e.g. needing to run migrations 4,6,10 and 11). Skipping versions is normal because On-Disk Format is tied to the code's major version number, and not every major code version requires a migration.
+Migrations are not required to be adjacent. E.g. to go from disk format 3 to 11 you may need to run migrations 4,6,10 and 11(skipping versions 5,7,8,9 is normal because On-Disk Format is tied to the code's major version number, and not every major code version requires a migration).
 
-Backups must be logged. Backups older than 7 days must be deleted. Backups are created in the root installation folder and are named like `config.3-to-4.bak` (a backup of top folder config for a migration from version 3 to version 4). If an existing backup with the same name (i.e. same version transition) is found it is deleted.
+Backups must be logged. Backups older than 7 days must be deleted (updater does the cleanup). Backups are created in the root installation folder and are named like `config.3-to-4.bak` (a backup of top folder config for a migration from version 3 to version 4). If an existing backup with the same name (i.e. same version transition) is found it is deleted.
 
-The updater must acquire the named OS mutex `Global\GetComputerHealth-DiskFormatMigration` with a timeout of 5 sec. 
+The updater must acquire the named OS mutex `Global\GetComputerHealth-DiskFormatMigration` within a reasonable timeout. 
 
-The updater must log(output) at least:
-    1. detected source format
-    2. target format
-    3. backups created
-    4. final persisted format
+The updater must print at least:
+    1. the detected source format
+    2. the target format
+    3. the backups created
+    4. the final persisted format
 
 ## Safety Requirements
 
