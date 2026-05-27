@@ -58,9 +58,37 @@ Update documentation with details about this.
 
 ## Nice html reports instead of excel
 
-Should include a table of findings that supports sorting, filtering and hiding columns. The table should include findings (including suppressed ones) from the last 3 months but by default they should be filtered out.
+Should include a table of findings that supports sorting, filtering based on text and hiding columns. The table should include findings (including suppressed ones) from the last 3 months but by default they should be filtered out. Add a column titled "what to do" at the far left of the table. The value of this column is the only user editable cell: There are 4 options: suppress,postpone,must-fix,not-sure. Not-sure is the default but the user can change it. Have two buttons at the top that filter only "suppress" and "postpone". The general text based filtering should accept a string like "foo -bar" or similar which means `any field must contain the string "foo" but not the string "bar"`.
 
 As soon as I fix this I can stop installing Nuget and the Import-Excel module and advertise in the README that there are no external depedencies.
+
+We also want an On-Disk Format migration to accompany this change(see relevant dev documentation). The migration must convert any existing xlsx file in the .\data folder to an .clixml file. Base the core of the migration script on this code:
+```powershell
+Get-ChildItem -Path $DataFolder -Filter '*.xlsx' -File | ForEach-Object {
+    $xlsx = $_.FullName
+    $clixml = [System.IO.Path]::ChangeExtension($xlsx, '.clixml')
+
+    Write-Host "Converting: $xlsx"
+
+    try {
+        $data = Import-Excel -Path $xlsx
+        $data | Export-Clixml -Path $clixml
+        $check = Import-Clixml -Path $clixml
+        $sourceCount = @($data).Count
+        $targetCount = @($check).Count
+        if ($sourceCount -ne $targetCount) {
+            Write-Warning "Row count mismatch for $($_.Name): XLSX=$sourceCount CLIXML=$targetCount"
+        } else {
+            Write-Host "OK: $($_.Name) -> $([System.IO.Path]::GetFileName($clixml)) ($sourceCount rows)"
+            rm $xlsx
+        }
+    }
+    catch {
+        Write-Warning "FAILED: $xlsx"
+        Write-Warning $_.Exception.Message
+    }
+}
+```
 
 ## Custom health tests should be directly runnable scripts
 
