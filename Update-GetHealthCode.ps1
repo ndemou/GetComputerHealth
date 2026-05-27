@@ -420,8 +420,13 @@ function Remove-OldDiskFormatMigrationBackups {
 
   try {
     $cutoff = (Get-Date).AddDays(-1 * $RetentionDays)
-    $oldBackups = @(Get-ChildItem -LiteralPath $RootDir -Directory -Filter '*.bak' -ErrorAction Stop |
-      Where-Object { $_.LastWriteTime -lt $cutoff })
+    $oldBackups = @()
+    $backupCandidates = @(Get-ChildItem -LiteralPath $RootDir -Directory -Recurse -ErrorAction Stop)
+    foreach ($candidate in $backupCandidates) {
+      if (($candidate.Name -match '^\d+-to-\d+\.bak$') -and ($candidate.LastWriteTime -lt $cutoff)) {
+        $oldBackups += $candidate
+      }
+    }
 
     foreach ($backup in $oldBackups) {
       Write-Verbose "Deleting old disk format migration backup '$($backup.FullName)'"
@@ -452,7 +457,8 @@ function Backup-DiskFormatMigrationFolders {
     }
 
     $sourcePath = Join-Path $RootDir $topFolder
-    $backupPath = Join-Path $RootDir ('{0}.{1}-to-{2}.bak' -f $topFolder, $FromVersion, $ToVersion)
+    $backupPath = Join-Path $sourcePath ('{0}-to-{1}.bak' -f $FromVersion, $ToVersion)
+    $backupLeafName = Split-Path -Leaf $backupPath
 
     if (Test-Path -LiteralPath $backupPath) {
       Write-Verbose "Deleting existing disk format migration backup '$backupPath'"
@@ -461,7 +467,16 @@ function Backup-DiskFormatMigrationFolders {
 
     if (Test-Path -LiteralPath $sourcePath -PathType Container) {
       Write-Verbose "Creating disk format migration backup '$backupPath' from '$sourcePath'"
-      Copy-Item -LiteralPath $sourcePath -Destination $backupPath -Recurse -Force -ErrorAction Stop
+      New-Item -ItemType Directory -Path $backupPath -Force -ErrorAction Stop | Out-Null
+      $sourceChildren = @(Get-ChildItem -LiteralPath $sourcePath -Force -ErrorAction Stop)
+      foreach ($child in $sourceChildren) {
+        if ($child.Name -ieq $backupLeafName) {
+          continue
+        }
+
+        Copy-Item -LiteralPath $child.FullName -Destination $backupPath -Recurse -Force -ErrorAction Stop
+      }
+
       Write-UpdateEvent "Created disk format migration backup '$backupPath'"
       $backups += [pscustomobject]@{
         TopFolder = $topFolder
@@ -489,13 +504,30 @@ function Restore-DiskFormatMigrationFolders {
 
   foreach ($backup in @($Backups)) {
     if ($backup.HadSource) {
-      if (Test-Path -LiteralPath $backup.SourcePath) {
-        Write-Verbose "Removing modified folder '$($backup.SourcePath)' before restore"
-        Remove-Item -LiteralPath $backup.SourcePath -Recurse -Force -ErrorAction Stop
+      if (-not (Test-Path -LiteralPath $backup.BackupPath -PathType Container)) {
+        throw "Cannot restore disk format migration backup because '$($backup.BackupPath)' no longer exists."
+      }
+
+      if (-not (Test-Path -LiteralPath $backup.SourcePath -PathType Container)) {
+        New-Item -ItemType Directory -Path $backup.SourcePath -Force -ErrorAction Stop | Out-Null
+      }
+
+      $backupLeafName = Split-Path -Leaf $backup.BackupPath
+      $sourceChildren = @(Get-ChildItem -LiteralPath $backup.SourcePath -Force -ErrorAction Stop)
+      foreach ($child in $sourceChildren) {
+        if ($child.Name -ieq $backupLeafName) {
+          continue
+        }
+
+        Write-Verbose "Removing modified path '$($child.FullName)' before restore"
+        Remove-Item -LiteralPath $child.FullName -Recurse -Force -ErrorAction Stop
       }
 
       Write-Verbose "Restoring disk format migration backup '$($backup.BackupPath)' to '$($backup.SourcePath)'"
-      Copy-Item -LiteralPath $backup.BackupPath -Destination $backup.SourcePath -Recurse -Force -ErrorAction Stop
+      $backupChildren = @(Get-ChildItem -LiteralPath $backup.BackupPath -Force -ErrorAction Stop)
+      foreach ($child in $backupChildren) {
+        Copy-Item -LiteralPath $child.FullName -Destination $backup.SourcePath -Recurse -Force -ErrorAction Stop
+      }
     } elseif (Test-Path -LiteralPath $backup.SourcePath) {
       Write-Verbose "Deleting folder '$($backup.SourcePath)' because it did not exist before the failed migration"
       Remove-Item -LiteralPath $backup.SourcePath -Recurse -Force -ErrorAction Stop

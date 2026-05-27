@@ -1,7 +1,5 @@
 ﻿# TODO
 
-## Instead of keeping on-disk format migration backups in folders like `c:\it\Get-ComputerHealth\temp.4-to-5.bak` keep them in `c:\it\Get-ComputerHealth\temp\4-to-5.bak`
-
 ## If possible we should not consider "running in a non-interactive context" when inside a remote PS session
 
 See:

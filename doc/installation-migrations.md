@@ -96,7 +96,7 @@ The updater must:
 
 Migrations are not required to be adjacent. E.g. to go from disk format 3 to 11 you may need to run migrations 4,6,10 and 11(skipping versions 5,7,8,9 is normal because On-Disk Format is tied to the code's major version number, and not every major code version requires a migration).
 
-Backups must be logged. Backups older than 7 days must be deleted (updater does the cleanup). Backups are created in the root installation folder and are named like `config.3-to-4.bak` (a backup of top folder config for a migration from version 3 to version 4). If an existing backup with the same name (i.e. same version transition) is found it is deleted.
+Backups must be logged. Backups older than 7 days must be deleted (updater does the cleanup). Backups are created inside the modified top folder and are named like `config\3-to-4.bak` (a backup of the contents of top folder `config` for a migration from version 3 to version 4). If an existing backup with the same name (i.e. same version transition) is found it is deleted.
 
 The updater must acquire the named OS mutex `Global\GetComputerHealth-DiskFormatMigration` within a reasonable timeout. 
 

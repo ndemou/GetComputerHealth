@@ -242,7 +242,7 @@ exit 0
       $result.RanMigrations | Should -BeTrue
       $state.CurrentDiskFormat | Should -Be 5
       $state.LatestCompatibleCodeVersion | Should -Be 5
-      Test-Path -LiteralPath (Join-Path $rootDir 'config.4-to-5.bak') -PathType Container | Should -BeTrue
+      Test-Path -LiteralPath (Join-Path $rootDir 'config\4-to-5.bak') -PathType Container | Should -BeTrue
       Test-Path -LiteralPath (Join-Path $rootDir 'data\created.txt') -PathType Leaf | Should -BeTrue
     } finally {
       Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
