@@ -1,5 +1,18 @@
 ﻿# TODO
 
+## Option IpsOfAllDcs in gch.psd1
+The trick with `cache.IpsOfAllDcs.clixml` is a hack. I should incorporate it into gch.psd1. An on-disk format migration can take care of populating it if the file is found and removing the file. 
+
+Example `gch.psd1`:
+```pwsh
+@{
+    AutomaticUpdates = $false
+    SendReports = "Auto" # "Never", "Always", "Auto"
+    ShowAsPostponedWindowDays = 15
+    IpsOfAllDCs = @('10.1.2.3', '10.1.2.4')
+}
+```
+
 ## If possible we should not consider "running in a non-interactive context" when inside a remote PS session
 
 See:
