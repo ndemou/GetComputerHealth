@@ -101,9 +101,9 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
         $html | Should -Match 'background-color:#ff4d4f; color:#fff'
         $html | Should -Match 'background-color:#ffb300; color:#111'
         $html | Should -Match 'background-color:#1e88e5; color:#fff'
-        $html | Should -Match '>3 <span'
-        $html | Should -Match '>failure</span> 2 '
-        $html | Should -Match '>warning</span> 1 '
+        $html | Should -Match "font-weight:700; font-size:120%'>3</span>"
+        $html | Should -Match '>failure</span>   <span style=''font-weight:700; font-size:120%''>2</span>'
+        $html | Should -Match '>warning</span>   <span style=''font-weight:700; font-size:120%''>1</span>'
         $html | Should -Match '>notice</span></div>'
         $html | Should -Not -Match '>failure</span>,'
         $html | Should -Not -Match '>warning</span>,'
@@ -134,7 +134,7 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
     $html | Should -Not -Match ([regex]::Escape('Invoke-Command SRV1 {'))
   }
 
-  It 'renders postponed findings with a green effective level and real level detail' {
+  It 'renders postponed findings with a green effective level and postponement detail' {
     $html = Convert-HealthMessagesToHtmlTable -Messages @(
       [pscustomobject]@{
         Level = 'warning'
@@ -150,7 +150,8 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
 
     $html | Should -Match 'background-color:#2e7d32; color:#fff'
     $html | Should -Match '>Postponed</span>'
-    $html | Should -Match 'real level: warning'
+    $html | Should -Match 'Postponed until 2026-06-01, real level warning'
+    $html | Should -Not -Match ([regex]::Escape('c:\it\Get-ComputerHealth\bin\Get-ComputerHealth.ps1 -AddWhitelisting'))
   }
 
   It 'summarizes postponed findings after active notable levels' {
@@ -161,7 +162,7 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
     )
 
     $html | Should -Match 'background-color:#2e7d32; color:#fff'
-    $html | Should -Match '>failure</span> 1 <span.+>warning</span> 1 <span.+>postponed</span>'
+    $html | Should -Match "font-weight:700; font-size:120%'>1</span> <span.+>failure</span>   <span style='font-weight:700; font-size:120%'>1</span> <span.+>warning</span>   <span style='font-weight:700; font-size:120%'>1</span> <span.+>postponed</span>"
   }
 
   It 'keeps Invoke-Command wrapping in html when multiple computers are present' {

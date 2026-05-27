@@ -397,8 +397,9 @@ function Convert-HealthSynopsisToHtml {
         $levelKey = ([string]$_.Name).ToLowerInvariant()
         if (-not $levelMeta.ContainsKey($levelKey)) { return }
         $meta = $levelMeta[$levelKey]
-        $labelHtml = "<span style='display:inline-block; margin:0 4px; padding:1px 6px; border-radius:999px; background-color:$($meta.Background); color:$($meta.Foreground)'>$([System.Net.WebUtility]::HtmlEncode($meta.Label))</span>"
-        "{0} {1}" -f $_.Count, $labelHtml
+        $countHtml = "<span style='font-weight:700; font-size:120%'>" + ([System.Net.WebUtility]::HtmlEncode([string]$_.Count)) + "</span>"
+        $labelHtml = "<span style='display:inline-block; margin:0 12px 0 4px; padding:1px 6px; border-radius:999px; background-color:$($meta.Background); color:$($meta.Foreground)'>$([System.Net.WebUtility]::HtmlEncode($meta.Label))</span>"
+        $countHtml + ' ' + $labelHtml
       }
   )
 
@@ -406,7 +407,7 @@ function Convert-HealthSynopsisToHtml {
     return ''
   }
 
-    return "<div style='margin:0 0 8px 0; font-family:Segoe UI, Arial, sans-serif; font-size:12px; color:#000'>" + ($parts -join ' ') + "</div><div style='border-top:1px solid #cfcfcf; margin:0 0 12px 0'></div>"
+    return "<div style='margin:0 0 8px 0; font-family:Segoe UI, Arial, sans-serif; font-size:12px; color:#000'>" + ($parts -join '   ') + "</div><div style='border-top:1px solid #cfcfcf; margin:0 0 12px 0'></div>"
 }
 
 function Convert-HealthMessagesToHtmlTable {
@@ -447,10 +448,18 @@ function Convert-HealthMessagesToHtmlTable {
     }
 
     if (($level -ieq 'postponed') -and (-not [string]::IsNullOrWhiteSpace($realLevel))) {
-      $detailsHtml += "<div style='margin-top:4px; color:#2e7d32; font-size:10px; font-family:Segoe UI, Arial, sans-serif'>real level: " + ([System.Net.WebUtility]::HtmlEncode($realLevel.ToLowerInvariant())) + "</div>"
+      $postponedUntilText = 'unknown date'
+      if ($message.PSObject.Properties['SuppressedUntil']) {
+        $suppressedUntilValue = $message.SuppressedUntil
+        if ($suppressedUntilValue -is [datetime]) {
+          $postponedUntilText = $suppressedUntilValue.ToString('yyyy-MM-dd')
+        }
+      }
+
+      $detailsHtml += "<div style='margin-top:4px; color:#2e7d32; font-size:10px; font-family:Segoe UI, Arial, sans-serif'>Postponed until " + ([System.Net.WebUtility]::HtmlEncode($postponedUntilText)) + ", real level " + ([System.Net.WebUtility]::HtmlEncode($realLevel.ToLowerInvariant())) + "</div>"
     }
 
-    if (-not [string]::IsNullOrWhiteSpace($suppressionCommand)) {
+    if (($level -ine 'postponed') -and (-not [string]::IsNullOrWhiteSpace($suppressionCommand))) {
       $detailsHtml += "<div style='margin-top:4px; color:#666; font-size:6pt; font-family:""Arial Narrow"", Arial, sans-serif'>" + ([System.Net.WebUtility]::HtmlEncode($suppressionCommand)) + "</div>"
     }
 
