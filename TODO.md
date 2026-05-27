@@ -79,7 +79,7 @@ The wrapper that invokes your scripts will catch and report exceptions in detail
 
 Run them and ignore the `WARNING:` prefix in front of all the output you see. Example:
 ```
-C:\ > & C:\IT\config\Custom-HealthTests\my-cooll-test.ps1
+C:\ > & C:\IT\Get-ComputerHealth\config\Custom-HealthTests\my-cooll-test.ps1
 WARNING: [PASS] All is cool!
 ```
  > The WARNING: prefix is a sideeffect of the fact that all messages are output by Write-Warning: [PASS], [NOTICE], and everything else
@@ -87,7 +87,9 @@ WARNING: [PASS] All is cool!
 If you want nicely colored console output and/or structured results like what you get from `Get-ComputerHealth.ps1` run them like this:
 
 ```
-C:\ > $r = C:\IT\bin\Get-ComputerHealth.ps1 -OnlyTheseTests "HealthTest-LargeDirectories.ps1"
+C:\ > $r = C:\IT\Get-ComputerHealth\bin\Get-ComputerHealth.ps1 -OnlyTheseTests "my-cooll-test.ps1"
+# or if the script is not under .\config
+C:\ > $r = C:\IT\Get-ComputerHealth\bin\Get-ComputerHealth.ps1 -OnlyTheseTests "C:\temp\my-cooll-test.ps1"
 ```
 
 ---
