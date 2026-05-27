@@ -1,6 +1,6 @@
 ﻿# TODO
 
-## Finalize and implement On-Disk Format Migration Design Draft
+## Implement On-Disk Format Migration Design Draft
 
 ## Save test results to .\data instead of .\temp
 
