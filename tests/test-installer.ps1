@@ -45,6 +45,11 @@ function Invoke-InstallerScenario {
       $zipPathInUse = $paths.ReleaseZipPathVersionless
     }
 
+    $legacyTempDir = Join-Path $paths.TestRoot 'temp'
+    $legacyWorkbookPath = Join-Path $legacyTempDir 'all-messages-legacy.xlsx'
+    New-Item -ItemType Directory -Path $legacyTempDir -Force | Out-Null
+    Set-Content -LiteralPath $legacyWorkbookPath -Value 'legacy workbook placeholder' -NoNewline
+
     Copy-Item -LiteralPath $paths.UpdateScriptSource -Destination $paths.InstallRoot -Force
 
     $updateParams = @{
@@ -56,6 +61,16 @@ function Invoke-InstallerScenario {
     }
 
     & (Join-Path $paths.InstallRoot 'Update-GetHealthCode.ps1') @updateParams
+
+    $migratedWorkbookPath = Join-Path $paths.TestRoot 'data\all-messages-legacy.xlsx'
+    Assert-PathExists -Path $migratedWorkbookPath -Message "Expected disk format migration to move legacy workbook to data: $migratedWorkbookPath"
+    Assert-True -Condition (-not (Test-Path -LiteralPath $legacyWorkbookPath)) -Message "Expected disk format migration to remove legacy workbook from temp: $legacyWorkbookPath"
+
+    $diskFormatStatePath = Join-Path $paths.TestRoot 'data\disk-format.psd1'
+    Assert-PathExists -Path $diskFormatStatePath -Message "Expected disk format state file to exist: $diskFormatStatePath"
+    $diskFormatState = Import-PowerShellDataFile -LiteralPath $diskFormatStatePath -ErrorAction Stop
+    Assert-True -Condition ([int]$diskFormatState.CurrentDiskFormat -ge 5) -Message "Expected CurrentDiskFormat to be at least 5."
+    Assert-True -Condition ([int]$diskFormatState.LatestCompatibleCodeVersion -ge 5) -Message "Expected LatestCompatibleCodeVersion to be at least 5."
   } finally {
     foreach ($zipPath in @($paths.ReleaseZipPath, $paths.ReleaseZipPathVersionless)) {
       if ($zipPath -and (Test-Path -LiteralPath $zipPath)) {

@@ -245,6 +245,476 @@ function Resolve-GchConfiguredNonNegativeInteger {
   return $number
 }
 
+function Get-DiskFormatStateText {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)][int]$CurrentDiskFormat,
+    [Parameter(Mandatory)][int]$LatestCompatibleCodeVersion
+  )
+
+  @"
+@{
+  # This is the major version of the last code release that changed the On-Disk Format
+  CurrentDiskFormat = $CurrentDiskFormat
+  # This is the major version of the latest code that works fine with the above On-Disk Format
+  LatestCompatibleCodeVersion = $LatestCompatibleCodeVersion
+}
+"@
+}
+
+function Read-DiskFormatState {
+  [CmdletBinding()]
+  param([Parameter(Mandatory)][string]$Path)
+
+  if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+    return @{
+      CurrentDiskFormat = 4
+      LatestCompatibleCodeVersion = 4
+    }
+  }
+
+  try {
+    $state = Import-PowerShellDataFile -LiteralPath $Path -ErrorAction Stop
+  } catch {
+    throw "Failed reading disk format state file '$Path': $($_.Exception.Message)"
+  }
+
+  if ($null -eq $state) {
+    throw "Disk format state file '$Path' did not contain a PowerShell data hash."
+  }
+
+  $current = Resolve-GchConfiguredNonNegativeInteger -Value $state.CurrentDiskFormat -Key 'CurrentDiskFormat'
+  $latestCompatible = Resolve-GchConfiguredNonNegativeInteger -Value $state.LatestCompatibleCodeVersion -Key 'LatestCompatibleCodeVersion'
+
+  return @{
+    CurrentDiskFormat = $current
+    LatestCompatibleCodeVersion = $latestCompatible
+  }
+}
+
+function Write-DiskFormatState {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)][string]$Path,
+    [Parameter(Mandatory)][int]$CurrentDiskFormat,
+    [Parameter(Mandatory)][int]$LatestCompatibleCodeVersion
+  )
+
+  $parentDir = Split-Path -Parent $Path
+  if (-not [string]::IsNullOrWhiteSpace($parentDir) -and (-not (Test-Path -LiteralPath $parentDir -PathType Container))) {
+    $null = New-Item -ItemType Directory -Path $parentDir -Force
+  }
+
+  $text = Get-DiskFormatStateText -CurrentDiskFormat $CurrentDiskFormat -LatestCompatibleCodeVersion $LatestCompatibleCodeVersion
+  Set-Content -LiteralPath $Path -Value $text -Encoding UTF8
+}
+
+function Get-GetComputerHealthMajorVersion {
+  [CmdletBinding()]
+  param([Parameter(Mandatory)][string]$Version)
+
+  $match = [regex]::Match($Version.Trim(), '^(?:v)?(?<Major>\d+)\.\d+\.\d+$', [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+  if (-not $match.Success) {
+    throw "Invalid GetComputerHealth version '$Version'. Use semantic version format X.Y.Z."
+  }
+
+  return [int]$match.Groups['Major'].Value
+}
+
+function ConvertTo-DiskFormatManifestList {
+  [CmdletBinding()]
+  param([AllowNull()][string]$Value)
+
+  $items = @()
+  if ([string]::IsNullOrWhiteSpace($Value)) {
+    return $items
+  }
+
+  foreach ($item in ($Value -split ',')) {
+    $trimmed = $item.Trim()
+    if (-not [string]::IsNullOrWhiteSpace($trimmed)) {
+      $items += $trimmed
+    }
+  }
+
+  return $items
+}
+
+function Read-DiskFormatMigrationManifest {
+  [CmdletBinding()]
+  param([Parameter(Mandatory)][string]$ScriptPath)
+
+  $text = Get-Content -LiteralPath $ScriptPath -Raw -ErrorAction Stop
+  $manifestMatch = [regex]::Match($text, '(?is)\.MANIFEST\s*(?<Body>.*?)(?:\r?\n\s*\.[A-Z][A-Z0-9_-]*|\r?\n\s*#>)')
+  if (-not $manifestMatch.Success) {
+    throw "Migration script '$ScriptPath' is missing a .MANIFEST block."
+  }
+
+  $modifiedTopFolders = @()
+  $newTopFolders = @()
+  $lines = $manifestMatch.Groups['Body'].Value -split "`r?`n"
+  foreach ($line in $lines) {
+    $cleanLine = ([string]$line).Trim()
+    if ([string]::IsNullOrWhiteSpace($cleanLine) -or $cleanLine.StartsWith('#')) {
+      continue
+    }
+
+    $keyValueMatch = [regex]::Match($cleanLine, '^(?<Key>[A-Za-z][A-Za-z0-9_]*)\s*=\s*(?<Value>.*)$')
+    if (-not $keyValueMatch.Success) {
+      continue
+    }
+
+    $key = $keyValueMatch.Groups['Key'].Value
+    $value = $keyValueMatch.Groups['Value'].Value
+    if ($key -ieq 'ModifiedTopFolders') {
+      $modifiedTopFolders = ConvertTo-DiskFormatManifestList -Value $value
+    } elseif ($key -ieq 'NewTopFolders') {
+      $newTopFolders = ConvertTo-DiskFormatManifestList -Value $value
+    }
+  }
+
+  return @{
+    ModifiedTopFolders = @($modifiedTopFolders)
+    NewTopFolders = @($newTopFolders)
+  }
+}
+
+function Get-DiskFormatMigrationScripts {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)][string]$MigrationDir,
+    [Parameter(Mandatory)][int]$SourceDiskFormat,
+    [Parameter(Mandatory)][int]$TargetCodeVersion
+  )
+
+  if (-not (Test-Path -LiteralPath $MigrationDir -PathType Container)) {
+    return @()
+  }
+
+  $results = @()
+  $files = @(Get-ChildItem -LiteralPath $MigrationDir -File -Filter 'migrate-to-version-*.ps1' -ErrorAction Stop)
+  foreach ($file in $files) {
+    $match = [regex]::Match($file.Name, '^migrate-to-version-(?<Version>\d+)\.ps1$', [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+    if (-not $match.Success) {
+      continue
+    }
+
+    $migrationVersion = [int]$match.Groups['Version'].Value
+    if (($migrationVersion -gt $SourceDiskFormat) -and ($migrationVersion -le $TargetCodeVersion)) {
+      $results += [pscustomobject]@{
+        Version = $migrationVersion
+        Path = $file.FullName
+      }
+    }
+  }
+
+  return @($results | Sort-Object -Property Version)
+}
+
+function Remove-OldDiskFormatMigrationBackups {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)][string]$RootDir,
+    [int]$RetentionDays = 7
+  )
+
+  try {
+    $cutoff = (Get-Date).AddDays(-1 * $RetentionDays)
+    $oldBackups = @(Get-ChildItem -LiteralPath $RootDir -Directory -Filter '*.bak' -ErrorAction Stop |
+      Where-Object { $_.LastWriteTime -lt $cutoff })
+
+    foreach ($backup in $oldBackups) {
+      Write-Verbose "Deleting old disk format migration backup '$($backup.FullName)'"
+      Remove-Item -LiteralPath $backup.FullName -Recurse -Force -ErrorAction Stop
+    }
+  } catch {
+    Write-Warning ("Failed pruning old disk format migration backups in {0}: {1}" -f $RootDir, $_.Exception.Message)
+  }
+}
+
+function Backup-DiskFormatMigrationFolders {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)][string]$RootDir,
+    [Parameter(Mandatory)][string[]]$TopFolders,
+    [Parameter(Mandatory)][int]$FromVersion,
+    [Parameter(Mandatory)][int]$ToVersion
+  )
+
+  $backups = @()
+  foreach ($topFolder in $TopFolders) {
+    if ([string]::IsNullOrWhiteSpace($topFolder)) {
+      continue
+    }
+
+    if ($topFolder.IndexOfAny([System.IO.Path]::GetInvalidFileNameChars()) -ge 0) {
+      throw "Invalid top folder name in migration manifest: '$topFolder'"
+    }
+
+    $sourcePath = Join-Path $RootDir $topFolder
+    $backupPath = Join-Path $RootDir ('{0}.{1}-to-{2}.bak' -f $topFolder, $FromVersion, $ToVersion)
+
+    if (Test-Path -LiteralPath $backupPath) {
+      Write-Verbose "Deleting existing disk format migration backup '$backupPath'"
+      Remove-Item -LiteralPath $backupPath -Recurse -Force -ErrorAction Stop
+    }
+
+    if (Test-Path -LiteralPath $sourcePath -PathType Container) {
+      Write-Verbose "Creating disk format migration backup '$backupPath' from '$sourcePath'"
+      Copy-Item -LiteralPath $sourcePath -Destination $backupPath -Recurse -Force -ErrorAction Stop
+      Write-UpdateEvent "Created disk format migration backup '$backupPath'"
+      $backups += [pscustomobject]@{
+        TopFolder = $topFolder
+        SourcePath = $sourcePath
+        BackupPath = $backupPath
+        HadSource = $true
+      }
+    } else {
+      Write-Verbose "Top folder '$sourcePath' does not exist; no migration backup needed"
+      $backups += [pscustomobject]@{
+        TopFolder = $topFolder
+        SourcePath = $sourcePath
+        BackupPath = $backupPath
+        HadSource = $false
+      }
+    }
+  }
+
+  return @($backups)
+}
+
+function Restore-DiskFormatMigrationFolders {
+  [CmdletBinding()]
+  param([Parameter(Mandatory)]$Backups)
+
+  foreach ($backup in @($Backups)) {
+    if ($backup.HadSource) {
+      if (Test-Path -LiteralPath $backup.SourcePath) {
+        Write-Verbose "Removing modified folder '$($backup.SourcePath)' before restore"
+        Remove-Item -LiteralPath $backup.SourcePath -Recurse -Force -ErrorAction Stop
+      }
+
+      Write-Verbose "Restoring disk format migration backup '$($backup.BackupPath)' to '$($backup.SourcePath)'"
+      Copy-Item -LiteralPath $backup.BackupPath -Destination $backup.SourcePath -Recurse -Force -ErrorAction Stop
+    } elseif (Test-Path -LiteralPath $backup.SourcePath) {
+      Write-Verbose "Deleting folder '$($backup.SourcePath)' because it did not exist before the failed migration"
+      Remove-Item -LiteralPath $backup.SourcePath -Recurse -Force -ErrorAction Stop
+    }
+  }
+}
+
+function Remove-DiskFormatMigrationNewFolders {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)][string]$RootDir,
+    [Parameter(Mandatory)][string[]]$TopFolders,
+    [string[]]$ExistingTopFolders = @()
+  )
+
+  $existing = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+  foreach ($topFolder in $ExistingTopFolders) {
+    if (-not [string]::IsNullOrWhiteSpace($topFolder)) {
+      $null = $existing.Add($topFolder)
+    }
+  }
+
+  foreach ($topFolder in $TopFolders) {
+    if ([string]::IsNullOrWhiteSpace($topFolder)) {
+      continue
+    }
+
+    if ($existing.Contains($topFolder)) {
+      Write-Verbose "Leaving existing folder '$topFolder' in place after failed migration"
+      continue
+    }
+
+    $path = Join-Path $RootDir $topFolder
+    if (Test-Path -LiteralPath $path) {
+      Write-Verbose "Deleting new folder introduced by failed migration: '$path'"
+      Remove-Item -LiteralPath $path -Recurse -Force -ErrorAction Stop
+    }
+  }
+}
+
+function Invoke-DiskFormatMigrationScript {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)][string]$ScriptPath,
+    [Parameter(Mandatory)][string]$WorkingDirectory
+  )
+
+  $powerShellExe = Join-Path $PSHOME 'powershell.exe'
+  if (-not (Test-Path -LiteralPath $powerShellExe -PathType Leaf)) {
+    $powerShellExe = 'powershell.exe'
+  }
+
+  $startInfo = New-Object System.Diagnostics.ProcessStartInfo
+  $startInfo.FileName = $powerShellExe
+  $startInfo.Arguments = ('-NoProfile -ExecutionPolicy Bypass -File "{0}"' -f ($ScriptPath -replace '"', '\"'))
+  $startInfo.UseShellExecute = $false
+  $startInfo.RedirectStandardOutput = $true
+  $startInfo.RedirectStandardError = $true
+  $startInfo.CreateNoWindow = $true
+  $startInfo.WorkingDirectory = $WorkingDirectory
+
+  $process = New-Object System.Diagnostics.Process
+  $process.StartInfo = $startInfo
+  $null = $process.Start()
+  $stdout = $process.StandardOutput.ReadToEnd()
+  $stderr = $process.StandardError.ReadToEnd()
+  $process.WaitForExit()
+
+  if (-not [string]::IsNullOrWhiteSpace($stdout)) {
+    Write-Host $stdout.TrimEnd()
+  }
+  if (-not [string]::IsNullOrWhiteSpace($stderr)) {
+    Write-Warning $stderr.TrimEnd()
+  }
+
+  $stdoutLines = @()
+  if (-not [string]::IsNullOrWhiteSpace($stdout)) {
+    $stdoutLines = @($stdout -split "`r?`n")
+  }
+
+  $lastStdoutLine = ''
+  for ($i = $stdoutLines.Count - 1; $i -ge 0; $i--) {
+    $candidate = ([string]$stdoutLines[$i]).Trim()
+    if (-not [string]::IsNullOrWhiteSpace($candidate)) {
+      $lastStdoutLine = $candidate
+      break
+    }
+  }
+
+  $updaterPath = $null
+  if ($lastStdoutLine -match '^PATH_TO_UPDATER=(?<Path>.+)$') {
+    $updaterPath = $matches['Path']
+  }
+
+  return [pscustomobject]@{
+    ExitCode = [int]$process.ExitCode
+    LastStdoutLine = $lastStdoutLine
+    UpdaterPath = $updaterPath
+  }
+}
+
+function Invoke-DiskFormatMigrations {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)][string]$RootDir,
+    [Parameter(Mandatory)][string]$ReleaseRoot,
+    [Parameter(Mandatory)][string]$TargetCodeVersion
+  )
+
+  $targetCodeMajor = Get-GetComputerHealthMajorVersion -Version $TargetCodeVersion
+  $dataDir = Join-Path $RootDir 'data'
+  $statePath = Join-Path $dataDir 'disk-format.psd1'
+  $state = Read-DiskFormatState -Path $statePath
+  $sourceDiskFormat = [int]$state.CurrentDiskFormat
+
+  Write-UpdateEvent "Detected source disk format: $sourceDiskFormat"
+  Write-UpdateEvent "Target code major version: $targetCodeMajor"
+  Write-Verbose "Detected source disk format: $sourceDiskFormat"
+  Write-Verbose "Target code major version: $targetCodeMajor"
+
+  if ($targetCodeMajor -lt $sourceDiskFormat) {
+    throw "Format downgrade is not supported. Source disk format is $sourceDiskFormat but target code major version is $targetCodeMajor."
+  }
+
+  $mutex = New-Object System.Threading.Mutex($false, 'Global\GetComputerHealth-DiskFormatMigration')
+  $hasMutex = $false
+  try {
+    try {
+      $hasMutex = $mutex.WaitOne([TimeSpan]::FromSeconds(60))
+    } catch [System.Threading.AbandonedMutexException] {
+      $hasMutex = $true
+      Write-Warning 'Recovered an abandoned disk format migration mutex.'
+    }
+
+    if (-not $hasMutex) {
+      throw 'Another GetComputerHealth disk format migration is already running.'
+    }
+
+    Remove-OldDiskFormatMigrationBackups -RootDir $RootDir -RetentionDays 7
+
+    $migrationDir = Join-Path $ReleaseRoot 'disk-format-migrations'
+    $migrations = @(Get-DiskFormatMigrationScripts -MigrationDir $migrationDir -SourceDiskFormat $sourceDiskFormat -TargetCodeVersion $targetCodeMajor)
+    $currentDiskFormat = $sourceDiskFormat
+    $lastUpdaterPath = $null
+
+    if ($migrations.Count -eq 0) {
+      Write-Verbose "No disk format migration scripts found for versions greater than $sourceDiskFormat and less than or equal to $targetCodeMajor"
+      Write-UpdateEvent "No disk format migration is needed."
+      if ([int]$state.LatestCompatibleCodeVersion -ne $targetCodeMajor) {
+        Write-DiskFormatState -Path $statePath -CurrentDiskFormat $currentDiskFormat -LatestCompatibleCodeVersion $targetCodeMajor
+        Write-UpdateEvent "Persisted disk format: CurrentDiskFormat=$currentDiskFormat LatestCompatibleCodeVersion=$targetCodeMajor"
+      }
+      return [pscustomobject]@{
+        CurrentDiskFormat = $currentDiskFormat
+        LatestCompatibleCodeVersion = $targetCodeMajor
+        UpdaterPath = $null
+        RanMigrations = $false
+      }
+    }
+
+    foreach ($migration in $migrations) {
+      $manifest = Read-DiskFormatMigrationManifest -ScriptPath $migration.Path
+      $modifiedTopFolders = @($manifest.ModifiedTopFolders)
+      $newTopFolders = @($manifest.NewTopFolders)
+
+      Write-UpdateEvent ("Running disk format migration {0} from '{1}'" -f $migration.Version, $migration.Path)
+      $backups = @()
+      $existingNewTopFolders = @()
+      foreach ($topFolder in $newTopFolders) {
+        if ([string]::IsNullOrWhiteSpace($topFolder)) {
+          continue
+        }
+
+        if (Test-Path -LiteralPath (Join-Path $RootDir $topFolder)) {
+          $existingNewTopFolders += $topFolder
+        }
+      }
+
+      try {
+        $backups = @(Backup-DiskFormatMigrationFolders -RootDir $RootDir -TopFolders $modifiedTopFolders -FromVersion $currentDiskFormat -ToVersion $migration.Version)
+        $result = Invoke-DiskFormatMigrationScript -ScriptPath $migration.Path -WorkingDirectory $RootDir
+
+        if ($result.ExitCode -eq 0) {
+          if ([string]::IsNullOrWhiteSpace($result.UpdaterPath)) {
+            throw "Migration '$($migration.Path)' succeeded but did not emit PATH_TO_UPDATER as the last stdout line."
+          }
+          $lastUpdaterPath = $result.UpdaterPath
+          $currentDiskFormat = [int]$migration.Version
+        } elseif (($result.ExitCode -eq 1) -and ($result.LastStdoutLine -eq 'No migration is needed')) {
+          Write-Verbose "Migration '$($migration.Path)' reported that no action was needed"
+          $currentDiskFormat = [int]$migration.Version
+        } else {
+          throw "Migration '$($migration.Path)' failed with exit code $($result.ExitCode)."
+        }
+      } catch {
+        Write-Warning ("Disk format migration {0} failed; attempting restore: {1}" -f $migration.Version, $_.Exception.Message)
+        Restore-DiskFormatMigrationFolders -Backups $backups
+        Remove-DiskFormatMigrationNewFolders -RootDir $RootDir -TopFolders $newTopFolders -ExistingTopFolders $existingNewTopFolders
+        throw
+      }
+    }
+
+    Write-DiskFormatState -Path $statePath -CurrentDiskFormat $currentDiskFormat -LatestCompatibleCodeVersion $targetCodeMajor
+    Write-UpdateEvent "Persisted disk format: CurrentDiskFormat=$currentDiskFormat LatestCompatibleCodeVersion=$targetCodeMajor"
+
+    return [pscustomobject]@{
+      CurrentDiskFormat = $currentDiskFormat
+      LatestCompatibleCodeVersion = $targetCodeMajor
+      UpdaterPath = $lastUpdaterPath
+      RanMigrations = $true
+    }
+  } finally {
+    if ($hasMutex) {
+      $mutex.ReleaseMutex()
+    }
+    $mutex.Dispose()
+  }
+}
+
 function Start-UpdateTranscript {
 <#
 .SYNOPSIS
@@ -1392,6 +1862,22 @@ try {
   }
 
   $appliedUpdate = $false
+  $diskFormatMigration = Invoke-DiskFormatMigrations -RootDir $ROOT_DIR -ReleaseRoot $releaseRoot -TargetCodeVersion $versionToInstall
+  if ($diskFormatMigration.RanMigrations -and (-not [string]::IsNullOrWhiteSpace($diskFormatMigration.UpdaterPath))) {
+    $currentUpdaterPath = Get-NormalizedFileSystemPath -Path $PSCommandPath
+    $migrationUpdaterPath = Get-NormalizedFileSystemPath -Path ([string]$diskFormatMigration.UpdaterPath)
+    if ($migrationUpdaterPath -ine $currentUpdaterPath) {
+      if (-not (Test-Path -LiteralPath $migrationUpdaterPath -PathType Leaf)) {
+        throw "Disk format migration returned updater path '$migrationUpdaterPath', but that file does not exist."
+      }
+
+      Write-Verbose "$passLabel Running updater returned by disk format migration: '$migrationUpdaterPath'"
+      Stop-UpdateTranscript
+      & $migrationUpdaterPath @PSBoundParameters
+      return
+    }
+  }
+
   $updated = Replace-FileFromSource -FileName 'Update-GetHealthCode.ps1' -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
   if ($updated) { $appliedUpdate = $true }
 

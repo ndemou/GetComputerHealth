@@ -10,8 +10,8 @@ Per target:
 - For remote targets, checks basic TCP reachability and if reachable, uses `New-PSSession` to run the tests.
 
 After collection:
-- Exports all messages to `${TEMP_DIR}\all-messages-<timestamp>.xlsx`
-- Exports notable messages (if any) to `${TEMP_DIR}\notable-messages-<timestamp>.xlsx`
+- Exports all messages to `${DATA_DIR}\all-messages-<timestamp>.xlsx`
+- Exports notable messages (if any) to `${DATA_DIR}\notable-messages-<timestamp>.xlsx`
 - Sends email via `.\bin\Send-Message.ps1` (with attachment when notable messages exist)
 
 Other effects:
@@ -91,7 +91,7 @@ Forces email sending regardless of whether the script is running in an interacti
 - Remote targets are executed via PowerShell remoting sessions; ensure WinRM is enabled and reachable (5985/5986) and that `.\bin\` and `.\config\` content exists on the remote machines as referenced.
 - Output paths used:
   - Transcript: `.\log\Invoke-GetHealthDomainComputers-<timestamp>.log`
-  - Excel: `${TEMP_DIR}\all-messages-<timestamp>.xlsx`, `${TEMP_DIR}\notable-messages-<timestamp>.xlsx`
+  - Excel: `${DATA_DIR}\all-messages-<timestamp>.xlsx`, `${DATA_DIR}\notable-messages-<timestamp>.xlsx`
 #>
 
 param(
@@ -127,6 +127,7 @@ $SCRIPT_BIN_DIR = (Resolve-Path -LiteralPath $PSScriptRoot).Path
 $ROOT_DIR = Split-Path -Parent $SCRIPT_BIN_DIR
 $CONFIG_DIR = Join-Path $ROOT_DIR 'config'
 $TEMP_DIR = Join-Path $ROOT_DIR 'temp'
+$DATA_DIR = Join-Path $ROOT_DIR 'data'
 $LOG_DIR = Join-Path $ROOT_DIR 'log'
 $UPDATE_SCRIPT_PATH = Join-Path $SCRIPT_BIN_DIR 'Update-GetHealthCode.ps1'
 $GET_HEALTH_SCRIPT_PATH = Join-Path $SCRIPT_BIN_DIR 'Get-ComputerHealth.ps1'
@@ -1078,6 +1079,7 @@ function Invoke-SelfAfterUpdate {
 $timestamp = $(get-date -Format 'yyyy-MM-dd_HH.mm')
 if (-not (Test-Path -LiteralPath $LOG_DIR)) { New-Item -ItemType Directory -Path $LOG_DIR -Force | Out-Null }
 if (-not (Test-Path -LiteralPath $TEMP_DIR)) { New-Item -ItemType Directory -Path $TEMP_DIR -Force | Out-Null }
+if (-not (Test-Path -LiteralPath $DATA_DIR)) { New-Item -ItemType Directory -Path $DATA_DIR -Force | Out-Null }
 Remove-OldInvokeTranscriptLogs -LogDir $LOG_DIR
 
 $gchConfig = Read-GchConfigFile -Path $GCH_CONFIG_PATH
@@ -1473,14 +1475,16 @@ if ($all_messages) {
   }
 
   # save
-  Export-HealthMessagesReportToExcel -Messages $all_messages -FileName "${TEMP_DIR}\all-messages-$($timestamp).xlsx"
+  $allMessagesXlsxPath = Join-Path $DATA_DIR "all-messages-$($timestamp).xlsx"
+  $notableMessagesXlsxPath = Join-Path $DATA_DIR "notable-messages-$($timestamp).xlsx"
+  Export-HealthMessagesReportToExcel -Messages $all_messages -FileName $allMessagesXlsxPath
   $notable_msgs = @(`
       $all_messages `
     | Where-Object { (-not($_.Suppressed) -and $_.level -notin @('debug', 'help', 'pass', 'info')) -or ($_.EffectiveLevel -eq 'postponed') } `
     | Sort-Object -Property @{ Expression = { $SortOrder[$_.EffectiveLevel] } }, Computer `
   )
   if ($notable_msgs) {
-    Export-HealthMessagesReportToExcel -Messages $notable_msgs -FileName "${TEMP_DIR}\notable-messages-$($timestamp).xlsx"
+    Export-HealthMessagesReportToExcel -Messages $notable_msgs -FileName $notableMessagesXlsxPath
   }
 
   $synopsis = " " + ($notable_msgs | Where-Object { $_.EffectiveLevel } |
@@ -1497,10 +1501,10 @@ if ($all_messages) {
   write-host ""
   if ($notable_msgs) {
     Write-host -for yellow "Found notable messages. I have saved them in these files:"
-    Write-host -for yellow "    ${TEMP_DIR}\notable-messages-$($timestamp).xlsx"
-    Write-host -for gray   "    ${TEMP_DIR}\all-messages-$($timestamp).xlsx"
+    Write-host -for yellow "    $notableMessagesXlsxPath"
+    Write-host -for gray   "    $allMessagesXlsxPath"
     Write-host -for gray   "Open them on Excel or if you prefer PowerShell load them like this:"
-    Write-host -for gray   "    `$data = Import-Excel ${TEMP_DIR}\notable-messages-$($timestamp).xlsx"
+    Write-host -for gray   "    `$data = Import-Excel $notableMessagesXlsxPath"
     Write-host -for gray   '    $data|ogv # GUI review'
     Write-host -for gray   '    $data|select -Property Computer,Level,Message # Console review'
 
@@ -1520,11 +1524,11 @@ if ($all_messages) {
     $signedHtml = Add-HealthEmailSignature -Body $html -BodyAsHtml -Signature $emailSignature
     Save-HealthHtmlReport -Path $LAST_REPORT_HTML_PATH -Html $signedHtml
     $smtpNotableSubject = Get-HealthNotableSubject -FallbackSubject $SmtpSubject -NotableMessages $notable_msgs
-    Invoke-HealthEmail -Subject $smtpNotableSubject -Body $signedHtml -BodyAsHtml -Attachments "${TEMP_DIR}\notable-messages-$($timestamp).xlsx" -ConfigFile $SmtpConfig -NoSendReport:(-not $sendMailByDefault) -SkipReason $emailDecision.Reason
+    Invoke-HealthEmail -Subject $smtpNotableSubject -Body $signedHtml -BodyAsHtml -Attachments $notableMessagesXlsxPath -ConfigFile $SmtpConfig -NoSendReport:(-not $sendMailByDefault) -SkipReason $emailDecision.Reason
   }
   else {
     Write-host -for green    "GOOD, Nothing notable to record. I have saved less notable messages here:"
-    Write-host -for gray     "    ${TEMP_DIR}\all-messages-$($timestamp).xlsx"
+    Write-host -for gray     "    $allMessagesXlsxPath"
     $signedBody = Add-HealthEmailSignature -Body (Get-RelaxHtmlBody) -BodyAsHtml -Signature $emailSignature
     Save-HealthHtmlReport -Path $LAST_REPORT_HTML_PATH -Html $signedBody
     Invoke-HealthEmail -Subject $SmtpSubjectAllGood -Body $signedBody -BodyAsHtml -ConfigFile $SmtpConfig -NoSendReport:(-not $sendMailByDefault) -SkipReason $emailDecision.Reason

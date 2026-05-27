@@ -7,7 +7,6 @@ SendReports = "Auto" # "Never", "Always", "Auto"
 The default is "Auto" wich is the current behaviour (send when running in non-interactive session -- e.g. from a scheduled task--, don't send when run from an interactive one -- e.g. from the terminal)
 
 ## Send-Message.ps1 should support both a json and and a psd1 configuration file 
-
 Default is to prefer to read and to generate the psd1 configuration file (.\config\Send-Message.psd1).
 
 We also want an On-Disk Format migration to accompany this change(see relevant dev documentation). The migration must convert any existing json configuration (.\config\Send-Message.conf) to psd1(.\config\Send-Message.psd1) and then delete .\config\Send-Message.conf. 
