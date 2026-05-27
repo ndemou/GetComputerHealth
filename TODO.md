@@ -4,7 +4,7 @@
 
 ## Save test results to .\data instead of .\temp
 
-Add an Installation migration function for this purpose. Besides creating the data directory it should also move there existing .\temp\*.xlsx files.
+Add an On-Disk Format migration function for this purpose. Besides creating the data directory it should also move there existing .\temp\*.xlsx files.
 
 ## Add configuration options
 
@@ -24,7 +24,7 @@ With this:
 
 ## Switch Send-Message configuration from json to .psd1
 
-We need a filesystem migration to accompany this change because existing installations with json must be migrated to psd1
+We need an On-Disk Format migration to accompany this change. The migration will convert the json to psd1 (and delete the original)
 
 ## Make installation SUPER simple
 
@@ -72,7 +72,7 @@ A reference to the full path to the script should always appear in the comments 
 
 Since this is a breaking change it requires 
  1. The update of the major version number from 3 to 4
- 2. An installation migration function that will relieve users from having to edit all their custom health test scripts.  It will do the following on every custom ps1 script it finds:
+ 2. An On-Disk Format Migration. The migration will do the following on every custom ps1 script it finds:
    - Use `sls` to find the names of the custom health test functions
    - Append a call to them at the end of the script (Use `Get-TextFileEncoding` from `helpers-text-files.ps1` to make sure we append text using the correct encoding)
 
@@ -238,9 +238,8 @@ $ConfigAndState = @{
 
 Also rename it from `Get-ComputerHealth.sigs-to-suppress.txt` to `Get-ComputerHealth.conf`
 
-In order to not break existing systems, the updater needs to perform the migration on existing installations:
- - If the new `.state` file does not exist: create it by translating the old `.txt` file
- - After june 2026 and before July also delete the `.txt` file if found.
+In order to not break existing systems, we need an On-Disk Format migration:
+ - If the new `.state` file does not exist: create it by translating the old `.txt` file (and deleting it)
 
 ## New feature: "*Required* Findings"
 
