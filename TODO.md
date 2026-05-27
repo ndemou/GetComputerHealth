@@ -6,22 +6,6 @@
 
 Add an On-Disk Format migration function for this purpose. Besides creating the data directory it should also move there existing .\temp\*.xlsx files.
 
-## Add configuration options
-
-Support file `./config/gch.psd1` which is expected to contain a PowerShell data file with multiple key-value pairs. If it doesn't exist it should be created by the installer with the default options.
-
-- If the key `AutomaticUpdates` is falsy the updater/installer quits with an explanatory warning before performing any action.
-- If the key `RepoUrl` is found it is used as the value of $REPO_URL. If it's not a valid URL, execution is aborted with an exception.
-- If the key `ShowAsPostponedWindowDays` is found it is used as the value of $POSTPONED_SUPPRESSION_WINDOW_DAYS. If it's not a valid number (integer>=0), execution is aborted with an exception. 
-
-Also update this part of our README. Reaplace this:
-> The installer (`Update-GetHealthCode.ps1`) downloads and updates files from this GitHub repository. It may do so *every* time you call `Invoke-GetComputerHealth.ps1`. It is strongly recommended that you clone this repo, audit it, and then change the `$REPO_URL=` line in `Update-GetHealthCode.ps1` to point to your local copy.
-
-With this:
-> By default the installer downloads and updates files from this GitHub repository every time you call any of the `Invoke-*.ps1` scripts. You can disable this by setting `AutomaticUpdates = $false` in `./config/gch.psd1` or point the updater to a clone of this repo that you control by setting `RepoUrl`.
-
-## Rename POSTPONED_SUPPRESSION_WINDOW_DAYS to SHOW_AS_POSTPONED_WINDOW_DAYS
-
 ## Switch Send-Message configuration from json to .psd1
 
 We need an On-Disk Format migration to accompany this change. The migration will convert the json to psd1 (and delete the original)
