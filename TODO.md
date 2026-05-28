@@ -12,10 +12,19 @@ Example `gch.psd1`:
     IpsOfAllDCs = @('10.1.2.3', '10.1.2.4')
 }
 ```
+## [EASY] Report the email decision just before the point where an email is to be send or not
 
-## If possible we should not consider "running in a non-interactive context" when inside a remote PS session
+Currently `Invoke-GetComputerHealth.ps1` reports this:
+```
+Email report decision: Email sending enabled by default because the script is running in a non-interactive context.
+```
+Almost as soon as it starts
 
-See:
+## Fix detection of interactive context
+
+When inside a remote PS session Invoke-GetComputerHealth.ps1 reports "running in a non-interactive context". It should detect that it's indeed an interactive shell session.
+
+Example of current situation:
 ```
 PS C:\it\Get-ComputerHealth\bin> Enter-PSSession dc01
 
