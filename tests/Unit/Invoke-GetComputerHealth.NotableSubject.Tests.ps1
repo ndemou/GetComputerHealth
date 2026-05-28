@@ -47,6 +47,23 @@
     $subject | Should -Be 'Failure(s) from Get-ComputerHealth of SRV1'
   }
 
+  It 'uses effective level instead of real level when a failure is postponed' {
+    $subject = Get-HealthNotableSubject -FallbackSubject 'Notable Messages from Get-ComputerHealth of SRV1' -NotableMessages @(
+      [pscustomobject]@{ Level = 'failure'; EffectiveLevel = 'postponed' }
+    )
+
+    $subject | Should -Be 'RELAX. No notable Messages from Get-ComputerHealth of SRV1'
+  }
+
+  It 'uses the highest effective level when postponed and warning both exist' {
+    $subject = Get-HealthNotableSubject -FallbackSubject 'Notable Messages from Get-ComputerHealth of SRV1' -NotableMessages @(
+      [pscustomobject]@{ Level = 'failure'; EffectiveLevel = 'postponed' },
+      [pscustomobject]@{ Level = 'warning'; EffectiveLevel = 'warning' }
+    )
+
+    $subject | Should -Be 'Warning(s) from Get-ComputerHealth of SRV1'
+  }
+
   It 'keeps fallback subject when only non-notable levels are present' {
     $subject = Get-HealthNotableSubject -FallbackSubject 'Notable Messages from Get-ComputerHealth of SRV1' -NotableMessages @(
       [pscustomobject]@{ Level = 'info' },

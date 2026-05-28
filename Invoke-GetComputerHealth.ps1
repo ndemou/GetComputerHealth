@@ -807,16 +807,24 @@ function Get-HealthNotableSubject {
   )
 
   $levelToSubjectPrefix = @{
-    'failure' = 'Failure(s)'
-    'warning' = 'Warning(s)'
-    'notice'  = 'Notice(s)'
+    'failure'   = 'Failure(s)'
+    'warning'   = 'Warning(s)'
+    'notice'    = 'Notice(s)'
+    'postponed' = 'RELAX. No notable Messages'
   }
-  $priority = @('failure', 'warning', 'notice')
+  $priority = @('failure', 'warning', 'notice', 'postponed')
 
   $levelsInRun = @(
     $NotableMessages |
-      Where-Object { $_ -and $_.PSObject.Properties['Level'] } |
-      ForEach-Object { ([string]$_.Level).Trim().ToLowerInvariant() } |
+      Where-Object { $_ } |
+      ForEach-Object {
+        if ($_.PSObject.Properties['EffectiveLevel']) {
+          ([string]$_.EffectiveLevel).Trim().ToLowerInvariant()
+        }
+        elseif ($_.PSObject.Properties['Level']) {
+          ([string]$_.Level).Trim().ToLowerInvariant()
+        }
+      } |
       Where-Object { $levelToSubjectPrefix.ContainsKey($_) } |
       Select-Object -Unique
   )
