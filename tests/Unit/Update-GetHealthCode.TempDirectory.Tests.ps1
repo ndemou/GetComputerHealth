@@ -13,6 +13,13 @@ Describe 'Update-GetHealthCode temporary directory selection' {
 
     $functionNames = @(
       'Write-UpdateEvent',
+      'ConvertTo-GchHashtable',
+      'Get-GchInstallConfigTemplateText',
+      'Write-GchInstallConfigTemplate',
+      'Get-GchInstallOption',
+      'ConvertTo-GchPsd1Literal',
+      'ConvertTo-GchPsd1Text',
+      'Write-GchConfigFilesFromInstallConfig',
       'New-RandomTempDirectoryPath',
       'New-EmptyTempDirectory',
       'Get-GchDefaultConfigText',
@@ -97,6 +104,70 @@ Describe 'Update-GetHealthCode temporary directory selection' {
       Test-Path -LiteralPath $expectedPath -PathType Container | Should -BeTrue
     } finally {
       $env:TEMP = $savedTemp
+      Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
+    }
+  }
+
+  It 'writes customized installer config files as PowerShell data files' {
+    $tempRoot = Join-Path $env:TEMP ('gch-install-config-test-' + [guid]::NewGuid().ToString())
+    $installConfig = @{
+      Options = @{
+        InstallDir = 'C:\IT\GetComputerHealth'
+      }
+      ConfigFiles = @{
+        'gch.psd1' = @{
+          AutomaticUpdates = $false
+          SendReports = 'Auto'
+          IpsOfAllDCs = @('10.1.2.3', '10.1.2.4')
+        }
+        'Send-Message.psd1' = @{
+          Server = 'smtp.contoso.com'
+          From = 'SERVER01+alerts@contoso.com'
+          To = 'ops@contoso.com;admin@contoso.com'
+        }
+      }
+    }
+
+    try {
+      Get-GchInstallOption -InstallConfig $installConfig -Name 'InstallDir' | Should -Be 'C:\IT\GetComputerHealth'
+      Write-GchConfigFilesFromInstallConfig -InstallConfig $installConfig -ConfigDirectory $tempRoot
+
+      $gchConfig = Import-PowerShellDataFile -LiteralPath (Join-Path $tempRoot 'gch.psd1')
+      $messageConfig = Import-PowerShellDataFile -LiteralPath (Join-Path $tempRoot 'Send-Message.psd1')
+
+      $gchConfig.AutomaticUpdates | Should -BeFalse
+      $gchConfig.SendReports | Should -Be 'Auto'
+      $gchConfig.IpsOfAllDCs | Should -Be @('10.1.2.3', '10.1.2.4')
+      $messageConfig.Server | Should -Be 'smtp.contoso.com'
+    } finally {
+      Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
+    }
+  }
+
+  It 'rejects unsafe customized installer config file names' {
+    $installConfig = @{
+      ConfigFiles = @{
+        '..\gch.psd1' = @{
+          AutomaticUpdates = $true
+        }
+      }
+    }
+
+    { Write-GchConfigFilesFromInstallConfig -InstallConfig $installConfig -ConfigDirectory $env:TEMP } | Should -Throw
+  }
+
+  It 'generates an installer configuration template that can be imported' {
+    $tempRoot = Join-Path $env:TEMP ('gch-install-template-test-' + [guid]::NewGuid().ToString())
+    $templatePath = Join-Path $tempRoot 'GetComputerHealth.install.psd1'
+
+    try {
+      $writtenPath = Write-GchInstallConfigTemplate -Path $templatePath
+      $templateConfig = ConvertTo-GchHashtable -Value $writtenPath
+
+      Test-Path -LiteralPath $writtenPath -PathType Leaf | Should -BeTrue
+      Get-GchInstallOption -InstallConfig $templateConfig -Name 'InstallDir' | Should -Be 'C:\IT\GetComputerHealth'
+      Test-GchConfigKey -Config (Get-GchConfigValue -Config $templateConfig -Key 'ConfigFiles') -Key 'gch.psd1' | Should -BeTrue
+    } finally {
       Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
     }
   }
