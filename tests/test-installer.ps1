@@ -12,7 +12,8 @@ function Invoke-InstallerScenario {
     [Parameter(Mandatory)]
     [string]$ScenarioName,
     [switch]$UseVersionlessZip,
-    [switch]$PassVersionArgument
+    [switch]$PassVersionArgument,
+    [switch]$RunUpdaterFromRepoWithConfig
   )
 
   Write-Host ("Running installer scenario: {0}" -f $ScenarioName) -ForegroundColor Cyan
@@ -50,8 +51,6 @@ function Invoke-InstallerScenario {
     New-Item -ItemType Directory -Path $legacyTempDir -Force | Out-Null
     Set-Content -LiteralPath $legacyWorkbookPath -Value 'legacy workbook placeholder' -NoNewline
 
-    Copy-Item -LiteralPath $paths.UpdateScriptSource -Destination $paths.InstallRoot -Force
-
     $updateParams = @{
       Reinstall = $true
       UpdateFromZip = $zipPathInUse
@@ -60,7 +59,17 @@ function Invoke-InstallerScenario {
       $updateParams['Version'] = $paths.RepoVersion
     }
 
-    & (Join-Path $paths.InstallRoot 'Update-GetHealthCode.ps1') @updateParams
+    if ($RunUpdaterFromRepoWithConfig) {
+      $updateParams['Config'] = @{
+        Options = @{
+          InstallDir = $paths.TestRoot
+        }
+      }
+      & $paths.UpdateScriptSource @updateParams
+    } else {
+      Copy-Item -LiteralPath $paths.UpdateScriptSource -Destination $paths.InstallRoot -Force
+      & (Join-Path $paths.InstallRoot 'Update-GetHealthCode.ps1') @updateParams
+    }
 
     $migratedWorkbookPath = Join-Path $paths.TestRoot 'data\all-messages-legacy.xlsx'
     Assert-PathExists -Path $migratedWorkbookPath -Message "Expected disk format migration to move legacy workbook to data: $migratedWorkbookPath"
@@ -82,6 +91,7 @@ function Invoke-InstallerScenario {
 }
 
 Invoke-InstallerScenario -ScenarioName 'versioned-zip-name'
+Invoke-InstallerScenario -ScenarioName 'versioned-zip-name-with-configured-install-dir' -RunUpdaterFromRepoWithConfig
 
 if ($IncludeVersionlessZipScenario) {
   Invoke-InstallerScenario -ScenarioName 'versionless-zip-name-with-Version' -UseVersionlessZip -PassVersionArgument

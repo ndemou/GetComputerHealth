@@ -2285,14 +2285,19 @@ try {
     $currentUpdaterPath = Get-NormalizedFileSystemPath -Path $PSCommandPath
     $migrationUpdaterPath = Get-NormalizedFileSystemPath -Path ([string]$diskFormatMigration.UpdaterPath)
     if ($migrationUpdaterPath -ine $currentUpdaterPath) {
+      $expectedDestinationUpdaterPath = Get-NormalizedFileSystemPath -Path (Join-Path $DEST_DIR 'Update-GetHealthCode.ps1')
       if (-not (Test-Path -LiteralPath $migrationUpdaterPath -PathType Leaf)) {
-        throw "Disk format migration returned updater path '$migrationUpdaterPath', but that file does not exist."
+        if ($migrationUpdaterPath -ieq $expectedDestinationUpdaterPath) {
+          Write-Verbose "$passLabel Disk format migration returned destination updater path '$migrationUpdaterPath' before that file was staged; continuing with normal update flow."
+        } else {
+          throw "Disk format migration returned updater path '$migrationUpdaterPath', but that file does not exist."
+        }
+      } else {
+        Write-Verbose "$passLabel Running updater returned by disk format migration: '$migrationUpdaterPath'"
+        Stop-UpdateTranscript
+        & $migrationUpdaterPath @PSBoundParameters
+        return
       }
-
-      Write-Verbose "$passLabel Running updater returned by disk format migration: '$migrationUpdaterPath'"
-      Stop-UpdateTranscript
-      & $migrationUpdaterPath @PSBoundParameters
-      return
     }
   }
 
