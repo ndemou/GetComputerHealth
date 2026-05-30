@@ -8,7 +8,7 @@ Executes many health-test functions (named `HealthTest-*`) and emits their resul
 Supports:
 - Listing available built-in tests (`-ListAllBuiltInTests`).
 - Running only selected tests (`-OnlyTheseTests`) and/or skipping specific tests (`-ExcludeTests`).
-- Loading and running custom tests from `.ps1` files in an isolated module scope (`-IncludeTestsFromFolder`) and invoking any `HealthTest-*` functions they define.
+- Running custom tests by executing `.ps1` files directly. `-IncludeTestsFromFolder` remains as a deprecated compatibility parameter that selects which custom scripts to run.
 - Suppressing expected notices/warnings/failures by 8-hex "signature" hashes, either temporarily for the current run (`-WhitelistSigs`) or by appending a permanent suppression entry (`-AddWhitelisting`) to a suppression file.
 
 
@@ -17,7 +17,7 @@ When `-OutputObjects` is used, each emitted log object includes these fields:
 - `Computer`, `Level`, `Message`, `Hash`, `Suppressed`, `Comment`, `Emitter`
 
 Notable side effects:
-- When `-IncludeTestsFromFolder` is used, custom scripts are loaded in a temporary module scope (top-level code still executes, but does not run in this script's scope/function table).
+- When custom tests are selected, the `.ps1` files are executed directly.
 - The health tests themselves may perform read/write operations depending on their implementation (this script invokes them; it does not enforce read-only behavior).
 
 Idempotency:
@@ -52,13 +52,13 @@ Default: empty (show all). Typical value: `DIP`
 (Parameter set: Run) One or more 8-hex signatures to suppress for this run only (merged into the loaded suppression set).
 
 .PARAMETER OnlyTheseTests
-(Parameter set: Run) One or more function names to execute (treated as a list; values may be space/comma separated). When provided, only these tests are invoked.
+(Parameter set: Run) One or more built-in function names and/or custom `.ps1` script names/paths to execute (treated as a list; values may be space/comma separated). When provided, only these tests are invoked.
 
 .PARAMETER ExcludeTests
 (Parameter set: Run) One or more function names to skip (treated as a list; values may be space/comma separated).
 
 .PARAMETER IncludeTestsFromFolder
-(Parameter set: Run) Path to a folder containing `.ps1` files (or a single `.ps1` path). Files are loaded in an isolated module scope; any functions named `HealthTest-*` discovered are invoked.
+(Parameter set: Run) Deprecated compatibility parameter. Path to a folder containing custom `.ps1` scripts (or a single `.ps1` path). Matching files are executed directly.
 
 .PARAMETER SkipSlowTests
 (Parameter set: Run) Skips health tests that have high time impact (`Impact: ... High(Time)` in their help block).
@@ -121,7 +121,7 @@ $out | Out-GridView
 - Elevation is enforced for normal runs and for whitelisting operations.
 - `-RunWithoutElevation` bypasses the elevation guard; some health tests may still fail or produce incomplete results when run non-elevated.
 - Permanent suppression file: `.\config\Get-ComputerHealth.sigs-to-suppress.txt`.
-- Custom tests: scripts may execute arbitrary code on import; files are loaded in temporary module scope and functions named `HealthTest-*` are invoked automatically.
+- Custom tests: scripts may execute arbitrary code when run.
 #>
 
 [CmdletBinding(DefaultParameterSetName = 'Run')]
@@ -227,6 +227,7 @@ $CONFIG_DIR = Join-Path $ROOT_DIR 'config'
 
 $script:Config = [pscustomobject]@{
   SuppressSignaturesPath = Join-Path $CONFIG_DIR 'Get-ComputerHealth.sigs-to-suppress.txt'
+  DefaultCustomTestsPath = Join-Path $CONFIG_DIR 'Custom-HealthTests'
 }
 
 #------------------------------------------
@@ -481,6 +482,238 @@ FunctionName, Time, ElapsedMilliseconds, Output, Success, Error, Category, Reaso
   Log-debug "Done with test $FunctionName in $([int]$sw.ElapsedMilliseconds) ms"
 }
 
+function Get-CustomTestScriptReferenceComment {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)][string]$ScriptPath
+  )
+
+  "(see custom test '$ScriptPath')"
+}
+
+function Add-CustomTestScriptReferenceComment {
+  [CmdletBinding()]
+  param(
+    [AllowEmptyString()][string]$Comment = '',
+    [Parameter(Mandatory)][string]$ScriptPath
+  )
+
+  $reference = Get-CustomTestScriptReferenceComment -ScriptPath $ScriptPath
+  $trimmedComment = [string]$Comment
+  if ([string]::IsNullOrWhiteSpace($trimmedComment)) {
+    return $reference
+  }
+
+  $trimmedComment = $trimmedComment.Trim()
+  if ($trimmedComment -match [regex]::Escape($reference)) {
+    return $trimmedComment
+  }
+
+  return ($trimmedComment + "`n" + $reference)
+}
+
+function Get-CustomHealthTestFilesFromPath {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)][string]$Path
+  )
+
+  $resolved = $null
+  try {
+    $resolved = (Resolve-Path -LiteralPath $Path -ErrorAction Stop).Path
+  }
+  catch {
+    Log-Debug "Path '$Path' was not found while resolving custom health tests."
+    return @()
+  }
+
+  if (Test-Path -LiteralPath $resolved -PathType Container) {
+    return @(Get-ChildItem -LiteralPath $resolved -Filter *.ps1 -File -ErrorAction SilentlyContinue | Sort-Object FullName)
+  }
+
+  if ((Test-Path -LiteralPath $resolved -PathType Leaf) -and ($resolved -like '*.ps1')) {
+    return @((Get-Item -LiteralPath $resolved -ErrorAction SilentlyContinue))
+  }
+
+  Log-Debug "Path '$Path' was ignored because it is neither a folder nor a .ps1 script."
+  return @()
+}
+
+function Resolve-CustomHealthTestScriptSelection {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)][string]$Selection,
+    [string]$CustomTestsPath
+  )
+
+  if ([string]::IsNullOrWhiteSpace($Selection)) {
+    return $null
+  }
+
+  $trimmedSelection = $Selection.Trim()
+  if ($trimmedSelection -notlike '*.ps1') {
+    return $null
+  }
+
+  if (($trimmedSelection -match '^[.][\\/]') -or
+      ($trimmedSelection -match '^[.][.][\\/]') -or
+      ($trimmedSelection -match '[\\/]') -or
+      [System.IO.Path]::IsPathRooted($trimmedSelection)) {
+    $resolvedBySelection = Resolve-Path -LiteralPath $trimmedSelection -ErrorAction SilentlyContinue
+    if ($resolvedBySelection -and (Test-Path -LiteralPath $resolvedBySelection.Path -PathType Leaf)) {
+      return (Get-Item -LiteralPath $resolvedBySelection.Path -ErrorAction SilentlyContinue)
+    }
+    return $null
+  }
+
+  $candidateRoots = @()
+  if (-not [string]::IsNullOrWhiteSpace($CustomTestsPath)) {
+    $candidateRoots += $CustomTestsPath
+  }
+  if ($script:Config.DefaultCustomTestsPath -and ($script:Config.DefaultCustomTestsPath -notin $candidateRoots)) {
+    $candidateRoots += $script:Config.DefaultCustomTestsPath
+  }
+
+  foreach ($candidateRoot in $candidateRoots) {
+    $files = @(Get-CustomHealthTestFilesFromPath -Path $candidateRoot)
+    $match = $files | Where-Object { $_.Name -ieq $trimmedSelection } | Select-Object -First 1
+    if ($match) {
+      return $match
+    }
+  }
+
+  return $null
+}
+
+function Invoke-CustomHealthTestScript {
+  [CmdletBinding()]
+  [OutputType([pscustomobject])]
+  param(
+    [Parameter(Mandatory)][ValidateNotNullOrEmpty()][string]$ScriptPath
+  )
+
+  if (($ExcludeTests -contains $ScriptPath) -or
+      ($ExcludeTests -contains (Split-Path -Leaf $ScriptPath))) {
+    Log-Debug "Skipping custom test $ScriptPath"
+    return
+  }
+
+  Write-Progress -Activity "Starting custom test $ScriptPath"
+  Log-Debug "Starting custom test $ScriptPath"
+  $oldEap = $ErrorActionPreference
+  $sw = [System.Diagnostics.Stopwatch]::StartNew()
+  try {
+    $cntProperRecord = 0
+    $cntImproperRecord = 0
+    $cntPassRecord = 0
+    $legacyLogDetected = $false
+    $ErrorActionPreference = 'Stop'
+
+    $result = & {
+      $WarningPreference = 'Continue'
+      & $ScriptPath 3>&1
+    }
+
+    foreach ($item in $result) {
+      if ($item -is [System.Management.Automation.WarningRecord]) {
+        $record = Convert-WarningLikeObjectToLogRecord -Value $item
+        $comment = Add-CustomTestScriptReferenceComment -Comment $record.Comment -ScriptPath $ScriptPath
+        Log-Msg -Level $record.Level -Msg $record.Msg -Comment $comment -Emitter $ScriptPath
+        $cntProperRecord += 1
+        if (($item.Message -as [string]) -match '^\s*\[\s*pass\s*\]') { $cntPassRecord += 1 }
+      }
+      elseif ($item -and $item.PSObject.Properties['Hash'] -and $null -ne $item.PSObject.Properties['Message'] -and $item.PSObject.Properties['level']) {
+        $legacyLogDetected = $true
+        $cntProperRecord += 1
+        if ($item.level -eq 'pass') { $cntPassRecord += 1 }
+        $existingComment = ''
+        if ($item.PSObject.Properties['Comment']) {
+          $existingComment = [string]$item.Comment
+        }
+        $item | Add-Member -NotePropertyName Comment -NotePropertyValue (Add-CustomTestScriptReferenceComment -Comment $existingComment -ScriptPath $ScriptPath) -Force
+        $item | Add-Member -NotePropertyName Emitter -NotePropertyValue $ScriptPath -Force
+        Write-Output $item
+      }
+      elseif ($item -is [string]) {
+        $parts = Convert-TextToLogRecord $item
+        $cntImproperRecord += 1
+        Log-Debug $parts.Message -Comment $parts.Comment -Emitter $ScriptPath
+      }
+      else {
+        $cntImproperRecord += 1
+        $objType = $item.GetType().FullName
+        $objText = ($item | Out-String).Trim()
+        if ([string]::IsNullOrWhiteSpace($objText)) { $objText = '<empty object serialization>' }
+        Log-Debug "Converted output object of type $objType" -Comment $objText -Emitter $ScriptPath
+      }
+    }
+
+    if ($legacyLogDetected) {
+      $legacyComment = Add-CustomTestScriptReferenceComment -ScriptPath $ScriptPath
+      Log-Notice "Consider modernizing the code in custom test script '$ScriptPath' to use Write-Warning instead of Log-Pass/Log-Failure/..." -Comment $legacyComment -Emitter $ScriptPath
+    }
+
+    if ($cntProperRecord -eq 0 -and $cntImproperRecord -eq 0) {
+      $comment = Add-CustomTestScriptReferenceComment -ScriptPath $ScriptPath
+      Log-Notice "Custom test script '$ScriptPath' returned no output (this is due to a programmer's mistake; the test may or may not have passed)" -Comment $comment -Emitter $ScriptPath
+    }
+  }
+  catch {
+    $err = $_
+    $inv = $err.InvocationInfo
+    $innerFunc = $null
+    $innerFile = $null
+    $innerLine = $null
+    $innerCode = $null
+
+    $frames = ($err.ScriptStackTrace -split "`r?`n") |
+    Where-Object { $_ -match ':\s*line\s+\d+' }
+
+    $frame = $frames | Where-Object { $_ -notmatch '\bInvoke-CustomHealthTestScript\b' } | Select-Object -First 1
+    if (-not $frame) { $frame = $frames | Select-Object -First 1 }
+
+    if ($frame -and $frame -match '^(?:at\s+)?([^,]+),\s*(.+?):\s*line\s+(\d+)\s*$') {
+      $innerFunc = $matches[1].Trim()
+      $innerFile = $matches[2].Trim()
+      $innerLine = [int]$matches[3]
+
+      try {
+        if ($innerFile -and (Test-Path -LiteralPath $innerFile)) {
+          $innerCode = (Get-Content -LiteralPath $innerFile -TotalCount $innerLine)[-1]
+        }
+      }
+      catch {
+        Log-Debug "Program Error: Failed to fetch the actual source line" -Emitter $ScriptPath
+      }
+    }
+
+    $baseMsg = Get-LeftString $err.Exception.GetBaseException().Message 500
+    $outerLine = $inv.ScriptLineNumber
+    $outerCode = $inv.Line
+    $locationDetails =
+    if ($innerLine) {
+      "Throw site: $ScriptPath" +
+      ($(if ($innerFunc) { "`nFunction: $innerFunc" } else { "" })) +
+      ($(if ($innerFile) { "`nFile: $innerFile" } else { "" })) +
+      "`nLine: $innerLine" +
+      ($(if ($innerCode) { "`n  #       Code: $innerCode" } else { "" }))
+    }
+    else {
+      "Throw site unknown from stack; fallback to caller:`n  #       Line #$($outerLine): $outerCode"
+    }
+
+    $comment = "details: $baseMsg`n$locationDetails`n$(Add-CustomTestScriptReferenceComment -ScriptPath $ScriptPath)`nA Program Error during a test means either that the test failed or that its code has a bug."
+    Log-Failure "(Program Error) Exception while running custom test script '$ScriptPath'" -Comment $comment -Emitter $ScriptPath
+  }
+  finally {
+    $sw.Stop()
+    $ErrorActionPreference = $oldEap
+    Write-Progress -Activity "Starting custom test $ScriptPath" -Completed
+  }
+
+  Log-Debug "Done with custom test $ScriptPath in $([int]$sw.ElapsedMilliseconds) ms" -Emitter $ScriptPath
+}
+
 function Get-HealthTest($allHealthTests) {
   <#
 .SYNOPSIS
@@ -511,100 +744,14 @@ function Invoke-HealthTestsFromFolder {
   [CmdletBinding()]
   param([Parameter(Mandatory = $true, Position = 0)][string]$FolderPath)
 
-  $resolved = $null
-  try { $resolved = (Resolve-Path -LiteralPath $FolderPath -ErrorAction Stop).Path }
-  catch {
-    Log-debug "Path -IncludeTestsFromFolder $FolderPath was not found"
-    return
+  $files = @(Get-CustomHealthTestFilesFromPath -Path $FolderPath)
+  if (-not $files) { return }
+
+  foreach ($file in $files) {
+    Invoke-CustomHealthTestScript -ScriptPath $file.FullName
   }
 
-  if (-not (Test-Path -LiteralPath $resolved -PathType Container)) {
-    if ($resolved -like "*.ps1") {
-      $files = @($resolved)
-    }
-    else {
-      Log-debug "Path -IncludeTestsFromFolder $FolderPath was ignored because it's neither a folder nor a ps1 script"
-      return
-    }
-  }
-  else {
-    $files = @(Get-ChildItem -LiteralPath $resolved -Filter *.ps1 -File -ErrorAction SilentlyContinue)
-  }
-
-  $fileImported = $false
-  foreach ($f in $files) {
-    Log-debug "Found script $($f.name) in custom tests folder $resolved"
-    $m = $null
-    try {
-      $m = New-Module -ArgumentList $f.FullName -ScriptBlock {
-        param($Path)
-        . $Path
-      }
-
-      $customHealthTests = @(& $m {
-          Get-Command -CommandType Function -Name 'HealthTest-*' -Module $ExecutionContext.SessionState.Module -ErrorAction SilentlyContinue
-        })
-      $legacyCustomHealthTests = @(& $m {
-          Get-Command -CommandType Function -Name 'CustomHealthTest-*' -Module $ExecutionContext.SessionState.Module -ErrorAction SilentlyContinue
-        })
-
-      $allCustomTests = @($customHealthTests) + @($legacyCustomHealthTests) | Group-Object -Property Name | ForEach-Object { $_.Group[0] }
-
-      if (-not $allCustomTests) {
-        Log-debug "No HealthTest-* or CustomHealthTest-* functions found in $($f.FullName)"
-        continue
-      }
-
-      if ($legacyCustomHealthTests.Count -gt 0) {
-        Log-Notice "$($f.Name) uses legacy CustomHealthTest-* prefix. Please rename to HealthTest-*"
-      }
-
-      $fileImported = $true
-
-      foreach ($fn in $allCustomTests) {
-        $existing = Get-Item -Path ("Function:\{0}" -f $fn.Name) -ErrorAction SilentlyContinue
-        try {
-          Set-Item -Path ("Function:\{0}" -f $fn.Name) -Value $fn.ScriptBlock -Force
-          Invoke-HealthTestWithPolicyAutoset $fn.Name
-        }
-        finally {
-          if ($existing) {
-            Set-Item -Path ("Function:\{0}" -f $fn.Name) -Value $existing.ScriptBlock -Force
-          }
-          else {
-            Remove-Item -Path ("Function:\{0}" -f $fn.Name) -ErrorAction SilentlyContinue
-          }
-        }
-      }
-    }
-    catch {
-      $errorRecord = $_
-      $rootException = $errorRecord.Exception
-      while ($rootException.InnerException) {
-        $rootException = $rootException.InnerException
-      }
-
-      $importErrorDetails = @(
-        "Primary error: $($errorRecord.Exception.Message)"
-        "Root cause: $($rootException.Message)"
-        "ErrorId: $($errorRecord.FullyQualifiedErrorId)"
-        "Category: $($errorRecord.CategoryInfo)"
-        "Script: $($f.FullName)"
-        "--- Full error record ---"
-        ($errorRecord | Out-String).Trim()
-      ) -join [Environment]::NewLine
-
-      Log-failure "Custom test import failed for $($f.FullName)" -Comment $importErrorDetails
-    }
-    finally {
-      if ($m) {
-        Remove-Module -ModuleInfo $m -Force -ErrorAction SilentlyContinue
-      }
-    }
-  }
-  if (!$fileImported) { return }
-
-  log-info "Invoke-HealthTestsFromFolder imported at least one file with HealthTest-* functions."
+  Log-Info "Ran $($files.Count) custom health test script(s) from '$FolderPath'."
 }
 
 function Write-UsageHelp {
@@ -1135,6 +1282,8 @@ if ($OnlyTheseTests) {
   $loadedTestsByName = @{}
   $loadedTestsByBaseName = @{}
   $loadedTestsByShortName = @{}
+  $selectedBuiltInTests = New-Object System.Collections.Generic.List[string]
+  $selectedCustomScripts = New-Object System.Collections.Generic.List[string]
   $allHealthTests | ForEach-Object {
     $loadedTestsByName[$_.Name] = $_.Name
     $meta = Get-HealthTestTagsMetadata -FunctionName $_.Name
@@ -1148,25 +1297,53 @@ if ($OnlyTheseTests) {
   }
 
   foreach ($item in $OnlyTheseTests) {
+    $customScript = Resolve-CustomHealthTestScriptSelection -Selection $item -CustomTestsPath $IncludeTestsFromFolder
+    if ($customScript) {
+      if ($customScript.FullName -notin $selectedCustomScripts) {
+        $selectedCustomScripts.Add($customScript.FullName) | Out-Null
+      }
+      continue
+    }
+
     if ($item -match $valid_cmdlet_name_regex) {
       $testName = $item.Trim()
       if ($loadedTestsByName.ContainsKey($testName)) {
-        Invoke-HealthTestWithPolicyAutoset $loadedTestsByName[$testName]
+        if ($loadedTestsByName[$testName] -notin $selectedBuiltInTests) {
+          $selectedBuiltInTests.Add($loadedTestsByName[$testName]) | Out-Null
+        }
       }
       elseif ($loadedTestsByBaseName.ContainsKey($testName)) {
-        Invoke-HealthTestWithPolicyAutoset $loadedTestsByBaseName[$testName]
+        if ($loadedTestsByBaseName[$testName] -notin $selectedBuiltInTests) {
+          $selectedBuiltInTests.Add($loadedTestsByBaseName[$testName]) | Out-Null
+        }
       }
       elseif ($loadedTestsByShortName.ContainsKey($testName)) {
-        Invoke-HealthTestWithPolicyAutoset $loadedTestsByShortName[$testName]
+        if ($loadedTestsByShortName[$testName] -notin $selectedBuiltInTests) {
+          $selectedBuiltInTests.Add($loadedTestsByShortName[$testName]) | Out-Null
+        }
       }
       else {
         Log-Notice "Skipping unavailable test '$testName' (not loaded/applicable on this host)."
       }
     }
     else {
-      Log-Warning "Input '$item' is not a valid cmdlet name."
+      if ($item -like '*.ps1') {
+        Log-Notice "Skipping unavailable custom test script '$item'."
+      }
+      else {
+        Log-Warning "Input '$item' is not a valid cmdlet name."
+      }
     }
   }
+
+  foreach ($functionName in $selectedBuiltInTests) {
+    Invoke-HealthTestWithPolicyAutoset $functionName
+  }
+
+  foreach ($scriptPath in $selectedCustomScripts) {
+    Invoke-CustomHealthTestScript -ScriptPath $scriptPath
+  }
+
   return
 }
 else {

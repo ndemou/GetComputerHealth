@@ -48,7 +48,10 @@ function Invoke-InstallerScenario {
 
     $legacyTempDir = Join-Path $paths.TestRoot 'temp'
     $legacyWorkbookPath = Join-Path $legacyTempDir 'all-messages-legacy.xlsx'
+    $legacyCustomTestsDir = Join-Path $paths.TestRoot 'config\Custom-HealthTests'
+    $legacyCustomScriptPath = Join-Path $legacyCustomTestsDir 'legacy-custom-test.ps1'
     New-Item -ItemType Directory -Path $legacyTempDir -Force | Out-Null
+    New-Item -ItemType Directory -Path $legacyCustomTestsDir -Force | Out-Null
     Import-Module ImportExcel -ErrorAction Stop
     @(
       [pscustomobject]@{
@@ -57,6 +60,11 @@ function Invoke-InstallerScenario {
         Message = 'legacy workbook placeholder'
       }
     ) | Export-Excel -Path $legacyWorkbookPath -WorksheetName 'Messages' -AutoSize
+    @'
+function HealthTest-LegacyCustomScript {
+    Write-Warning "[PASS] Legacy custom script worked"
+}
+'@ | Set-Content -LiteralPath $legacyCustomScriptPath -Encoding ASCII
 
     $updateParams = @{
       Reinstall = $true
@@ -82,12 +90,14 @@ function Invoke-InstallerScenario {
     Assert-PathExists -Path $migratedReportPath -Message "Expected disk format migration to convert legacy workbook to clixml: $migratedReportPath"
     Assert-True -Condition (-not (Test-Path -LiteralPath $legacyWorkbookPath)) -Message "Expected disk format migration to remove legacy workbook from temp: $legacyWorkbookPath"
     Assert-True -Condition (-not (Test-Path -LiteralPath (Join-Path $paths.TestRoot 'data\all-messages-legacy.xlsx'))) -Message "Expected disk format migration to remove legacy workbook from data."
+    $migratedCustomScriptContent = Get-Content -LiteralPath $legacyCustomScriptPath -Raw -ErrorAction Stop
+    Assert-True -Condition ($migratedCustomScriptContent -match '(?m)^\s*HealthTest-LegacyCustomScript\s*$') -Message "Expected disk format migration to append a direct invocation to legacy custom script: $legacyCustomScriptPath"
 
     $diskFormatStatePath = Join-Path $paths.TestRoot 'data\disk-format.psd1'
     Assert-PathExists -Path $diskFormatStatePath -Message "Expected disk format state file to exist: $diskFormatStatePath"
     $diskFormatState = Import-PowerShellDataFile -LiteralPath $diskFormatStatePath -ErrorAction Stop
-    Assert-True -Condition ([int]$diskFormatState.CurrentDiskFormat -ge 6) -Message "Expected CurrentDiskFormat to be at least 6."
-    Assert-True -Condition ([int]$diskFormatState.LatestCompatibleCodeVersion -ge 6) -Message "Expected LatestCompatibleCodeVersion to be at least 6."
+    Assert-True -Condition ([int]$diskFormatState.CurrentDiskFormat -ge 7) -Message "Expected CurrentDiskFormat to be at least 7."
+    Assert-True -Condition ([int]$diskFormatState.LatestCompatibleCodeVersion -ge 7) -Message "Expected LatestCompatibleCodeVersion to be at least 7."
   } finally {
     foreach ($zipPath in @($paths.ReleaseZipPath, $paths.ReleaseZipPathVersionless)) {
       if ($zipPath -and (Test-Path -LiteralPath $zipPath)) {

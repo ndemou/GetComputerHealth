@@ -4,7 +4,7 @@
 
 ## TL;DR
 
-All `.ps1` files in `C:\IT\config\Custom-HealthTests\` are dot-sourced, and all functions whose names match `HealthTest-*` are executed. These functions should return nothing and should report their result(s) like this:
+All `.ps1` files in `C:\IT\config\Custom-HealthTests\` are executed directly. Your script should report its result(s) like this:
 ```powershell
 Write-Warning "[PASS] Description of what's OK"
 Write-Warning "[FAILURE] Description of the issue"
@@ -18,19 +18,19 @@ To add a custom test:
 
 1. Create the folder `C:\IT\config\Custom-HealthTests\` on the target computer.
 2. Create one or more `.ps1` scripts in that folder (for example, `"tests-for-$env:COMPUTERNAME.ps1"`).
-3. In your script, define one or more functions named `HealthTest-<SOME_DESCRIPTIVE_NAME>`.
-4. Dot-source the script and run the function manually to test it.
+3. Put the test logic in the script and make the script emit `Write-Warning` messages for its findings.
+4. Run the script directly to test it.
 
 ## More details and examples
 
  - You may define helper functions or dot-source other .ps1 files.
- - You may define more than one HealthTest-... function.
- - You must not place executable code outside functions.
+ - You may define more than one helper function if that makes the script easier to understand.
+ - The script itself should be directly runnable, so the top level of the file must eventually execute the test.
 
 ### Pattern 1, “Was an issue found”
 
 ```powershell
-function HealthTest-IsFooLessThanLimit {
+function Test-IsFooLessThanLimit {
     # ...
     # Code that sets $issueFound if Foo > $limit
     # ...
@@ -43,12 +43,14 @@ function HealthTest-IsFooLessThanLimit {
         Write-Warning "[PASS] Foo is within the limit (Foo<=$limit)"
     }
 }
+
+Test-IsFooLessThanLimit
 ```
 
 ### Pattern 2, “Enumeration of findings/issues”
 
 ```powershell
-function HealthTest-LargeDirectories {
+function Test-LargeDirectories {
     $issueFound = $false
     foreach ($dir in Find-LargeDirectory -Path 'C:\' -Threshold 10000) {
         $issueFound = $true
@@ -60,6 +62,8 @@ function HealthTest-LargeDirectories {
         Write-Warning "[PASS] No directories found with more than 10000 items"
     }
 }
+
+Test-LargeDirectories
 ```
 
 ## More on the reporting style
@@ -95,9 +99,7 @@ The second version is not proper because it varies with a detail that is not ess
 
 ## When to Handle Exceptions
 
-Do not catch an exception just to report it and abort the test. The wrapper that invokes `HealthTest-` functions will catch exceptions, report enough detail to help you debug them, and then continue with the next test.
-
-Catch exceptions only when you want to achieve some other goal, such as working around a known issue or collecting optional information.
+The wrapper that invokes your scripts will catch and report exceptions in detail. It will then continue with the next script. So, you don't need to catch excpetions if a) you are going to abort execution anyway and b) you are not going to collect any more information than what is included in the exception itself.
 
 ## Optional Features You Might Find Useful
 
@@ -143,16 +145,19 @@ Finally, write the code for the requested test and give your human step-by-step 
 
 When possible, prefer copy-paste-ready PowerShell commands.
 
-## How to Test Your Function
+## How to Test Your Script
 
 ```powershell
-. C:\IT\bin\Get-ComputerHealth.ps1 -DoNothing # only needed if your function reads `$Global:GCHDQMTA`
-. "C:\IT\config\Custom-HealthTests\tests-for-$env:COMPUTERNAME.ps1" # <-- your script
-HealthTest-LargeDirectories # <-- your function
+& C:\IT\Get-ComputerHealth\config\Custom-HealthTests\my-cooll-test.ps1
+# WARNING: [PASS] All is cool!
 ```
 
-The above gives acceptable but crude output. If you want both nicely colored console output and structured results:
+> The `WARNING:` prefix is a sideeffect of the fact that all messages are output by Write-Warning: `[PASS]`, `[NOTICE]`, and everything else
+
+If you want nicely colored console output and/or structured results like what you get from `Get-ComputerHealth.ps1` run them like this:
 
 ```powershell
-$results = HealthTest-LargeDirectories 3>&1 | C:\IT\bin\Get-ComputerHealth.ps1 -PrettifyWriteWarning
+$r = C:\IT\Get-ComputerHealth\bin\Get-ComputerHealth.ps1 -OnlyTheseTests "my-cooll-test.ps1"
+# or if the script is not under .\config
+$r = C:\IT\Get-ComputerHealth\bin\Get-ComputerHealth.ps1 -OnlyTheseTests "C:\temp\my-cooll-test.ps1"
 ```
