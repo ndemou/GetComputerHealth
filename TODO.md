@@ -24,39 +24,6 @@ Default is to prefer to read and to generate the psd1 configuration file (.\conf
 
 We also want an On-Disk Format migration to accompany this change(see relevant dev documentation). The migration must convert any existing json configuration (.\config\Send-Message.conf) to psd1(.\config\Send-Message.psd1) and then delete .\config\Send-Message.conf. 
 
-## Make a customized installation SUPER simple
-
-You just download and execute install.ps1 with some options. E.g.:
-```powershell
-iwr -useb "https://raw.githubusercontent.com/ndemou/GetComputerHealth/refs/heads/main/Update-GetHealthCode.ps1" -OutFile ".\Update-GetHealthCode.ps1" 
-& .\Update-GetHealthCode.ps1 -Config @{
-    Options = @{
-        InstallDir = 'C:\IT\GetComputerHealth'
-    }
-    ConfigFiles = @{
-        'Send-Message.psd1' = @{
-            Server = 'smtp.contoso.com'
-            From   = 'SERVER01+alerts@contoso.com'
-            To     = 'ops@contoso.com;admin@contoso.com'
-        }
-        'gch.psd1' = @{
-            AutomaticUpdates = $false
-            SendReports = "Auto" # "Never", "Always", "Auto"
-            ShowAsPostponedWindowDays = 15
-            IpsOfAllDCs = @('10.1.2.3', '10.1.2.4')
-        }
-    }
-}
-```
-Note these two branches:
- - Properties of the `Options` branch modify the behaviour of the installer 
- - Sub-branches of `ConfigFiles` branch will result in the creation of a config file under `.\config` with the name and the contents of the sub-branch. 
-
-`& .\install.ps1 -GenerateConfigPsd1` should generate a template PowerShell data file that can be customized and be passed to `-Config`.
-
-Update documentation with details about this.
-
-
 ## Nice html reports instead of excel
 
 Should include a table of findings that supports sorting, filtering based on text and hiding columns. The table should include findings (including suppressed ones) from the last 3 months but by default they should be filtered out. Add a column titled "what to do" at the far left of the table. The value of this column is the only user editable cell: There are 4 options: suppress,postpone,must-fix,not-sure. Not-sure is the default but the user can change it. Have two buttons at the top that filter only "suppress" and "postpone". The general text based filtering should accept a string like "foo -bar" or similar which means `any field must contain the string "foo" but not the string "bar"`.
