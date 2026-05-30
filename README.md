@@ -38,6 +38,42 @@ Besides installation, this code *should not change the state of the system in an
 
 **To centrally scan workstations**, you must be able to manage them with Remote PowerShell (running `Enter-PSSession WorkstationName` or `Invoke-Command WorkstationName` should work). Domain-joined servers are usually centrally managed with zero configuration.
 
+## Super-simple customized installation
+
+For a customized install, download only `Update-GetHealthCode.ps1` and run it with `-Config`. The top-level `Options` branch changes installer behavior. Each child under the top-level `ConfigFiles` branch writes one `.psd1` file under the installation `config` folder.
+
+```powershell
+iwr -useb "https://raw.githubusercontent.com/ndemou/GetComputerHealth/refs/heads/main/Update-GetHealthCode.ps1" -OutFile ".\Update-GetHealthCode.ps1"
+& .\Update-GetHealthCode.ps1 -Config @{
+    Options = @{
+        InstallDir = 'C:\IT\GetComputerHealth'
+    }
+    ConfigFiles = @{
+        'Send-Message.psd1' = @{
+            Server = 'smtp.contoso.com'
+            From   = 'SERVER01+alerts@contoso.com'
+            To     = 'ops@contoso.com;admin@contoso.com'
+        }
+        'gch.psd1' = @{
+            AutomaticUpdates = $false
+            SendReports = 'Auto' # 'Never', 'Always', 'Auto'
+            ShowAsPostponedWindowDays = 15
+            IpsOfAllDCs = @('10.1.2.3', '10.1.2.4')
+        }
+    }
+}
+```
+
+In the example above, the updater installs scripts under `C:\IT\GetComputerHealth\bin`, creates `C:\IT\GetComputerHealth\config`, and writes `Send-Message.psd1` and `gch.psd1` into that config folder before continuing the install. Config file names must be simple `.psd1` file names, not full paths.
+
+To start from a file instead of an inline hashtable, generate a template, customize it, then pass the file path to `-Config`:
+
+```powershell
+& .\Update-GetHealthCode.ps1 -GenerateConfigPsd1
+notepad .\GetComputerHealth.install.psd1
+& .\Update-GetHealthCode.ps1 -Config .\GetComputerHealth.install.psd1
+```
+
 ## OPTION 1: Installation Plus a Quick Run
 
 * **Security Note:** Each time you run `Invoke-GetComputerHealth`, it will call `Update-GetHealthCode.ps1` and fetch code from this repository.
