@@ -71,6 +71,7 @@ Forces email sending regardless of whether the script is running in an interacti
 .NOTES ON EMAIL DEFAULTS
 - In an interactive session, email sending defaults to off.
 - In a non-interactive session, email sending defaults to on.
+- When you run this script after `Enter-PSSession`, the remote PowerShell host can look non-interactive to the script even though you are typing at an interactive prompt. This behavior is expected; use `-NoSendReport` in that case if you do not want the default email report.
 - `-NoSendReport` overrides the default and disables email sending.
 - `-SendReport` overrides the default and enables email sending.
 
