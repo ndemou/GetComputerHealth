@@ -25,7 +25,7 @@
     }
   }
 
-  It 'emits no finding when a user has one or two failed login attempts' {
+  It 'emits PASS when only one or two failed login attempts exist per user' {
     Mock Get-WinEvent {
       $events = @()
       1..2 | ForEach-Object {
@@ -41,7 +41,9 @@
 
     HealthTest-FailedLoginAttemptsRecent
 
-    Should -Invoke Write-Warning -Times 0 -Exactly
+    Should -Invoke Write-Warning -Times 1 -Exactly -ParameterFilter {
+      $Message -eq "[PASS] No notable failed login attempts found in the last 24 hour(s)"
+    }
   }
 
   It 'emits NOTICE when a user has between three and twelve failed login attempts' {

@@ -1054,11 +1054,13 @@ Uses: Get-WinEvent.
     $sortedEntries = @($countsByUser.GetEnumerator() | Sort-Object { $_.Key })
     $sortedEntries = @($sortedEntries | Sort-Object { $_.Value } -Descending)
 
+    $notableFindings = 0
     foreach ($entry in $sortedEntries) {
         Write-Verbose "User '$($entry.Key)' has $($entry.Value) failed login attempt(s) in the last $Hours hour(s)."
         if ($entry.Value -le 2) {
             continue
         }
+        $notableFindings++
         $details="$($entry.Value) attempts in the last $Hours hour(s)"
         $severity = if ($entry.Value -le 12) {
             Write-Warning "[NOTICE] A few failed login attempts for '$($entry.Key)'`n$details"
@@ -1067,6 +1069,10 @@ Uses: Get-WinEvent.
         } else {
             Write-Warning "[FAILURE] Excessive failed login attempts for '$($entry.Key)'`n$details"
         }
+    }
+
+    if ($notableFindings -eq 0) {
+        Write-Warning "[PASS] No notable failed login attempts found in the last $Hours hour(s)"
     }
 }
 
