@@ -26,11 +26,18 @@ We also want an On-Disk Format migration to accompany this change(see relevant d
 
 ## Nice html reports instead of excel
 
-Should include a table of findings that supports sorting, filtering based on text and hiding columns. The table should include findings (including suppressed ones) from the last 3 months but by default they should be filtered out. Add a column titled "what to do" at the far left of the table. The value of this column is the only user editable cell: There are 4 options: suppress,postpone,must-fix,not-sure. Not-sure is the default but the user can change it. Have two buttons at the top that filter only "suppress" and "postpone". The general text based filtering should accept a string like "foo -bar" or similar which means `any field must contain the string "foo" but not the string "bar"`.
+We must generate a second html report similar in appearance to the one we send as the body of the email. We must attach this instead the excel. Instead of generating the excel file, generate a .clickxml file with the same data.
 
-As soon as I fix this I can stop installing Nuget and the Import-Excel module and advertise in the README that there are no external depedencies.
+This new attched html report has some extra functionality: 
+  - Supports sorting based on computer name, level or message.
+  - Supports filtering based on the text of computer name, level, message or comment. The general text based filtering should accept a string like "foo -bar" or similar which means `any field must contain the string "foo" but not the string "bar"`.  
+  - Supports hiding any of these: computer name, level, comment, the -AddWhitelist command.
+  - Has an extra field titled "not-sure" and formated as a button between the level and the message. The value of this field is user editable: There are 4 options that cycle when you click it: suppress, postpone, must-fix, not-sure. Not-sure is the default. There are also 4 buttons (suppress, postpone, must-fix, not-sure) at the top of the report that when clicked they filter to keeps only the coresponding findings.
 
-We also want an On-Disk Format migration to accompany this change(see relevant dev documentation). The migration must convert any existing xlsx file in the .\data folder to an .clixml file. Base the core of the migration script on this code:
+Stop installing Nuget and the Import-Excel module.
+Advertise in the README that there are no external depedencies.
+
+We also want an On-Disk Format migration to accompany this change(see relevant dev documentation). The migration must convert any existing xlsx file in the .\data folder to .clixml files. Base the core of the migration script on this code:
 ```powershell
 Get-ChildItem -Path $DataFolder -Filter '*.xlsx' -File | ForEach-Object {
     $xlsx = $_.FullName
@@ -120,13 +127,6 @@ C:\ > $r = C:\IT\Get-ComputerHealth\bin\Get-ComputerHealth.ps1 -OnlyTheseTests "
 
 Update our documentation with the above info.
 
-## sigstore?
-
-https://docs.sigstore.dev/quickstart/quickstart-cosign/
-
-## Review our test suite for this repo
-
-Review /doc/test-suite-guide.md and improve our test suite if needed.
 
 ## Avoid complex string expressions in Write-Warning
 
@@ -147,6 +147,16 @@ So that we don't get this warning: "You are using Legacy parameter set that adap
 ## New tests for CPU, GPU, Disks temperature
 
 Verify we don't allready have any of them
+
+-----------------------------------------
+
+## sigstore?
+
+https://docs.sigstore.dev/quickstart/quickstart-cosign/
+
+## Review our test suite for this repo
+
+Review /doc/test-suite-guide.md and improve our test suite if needed.
 
 ## For a few functions, 1) add the "Policy" Tag and 2) remove some exceptions
 
