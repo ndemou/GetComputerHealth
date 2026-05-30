@@ -1,26 +1,25 @@
 ﻿<#
 .SYNOPSIS
-Updates and then runs Get-ComputerHealth locally and/or via PowerShell remoting across multiple target computers, exports Excel reports, and emails a summary.
+Updates and then runs Get-ComputerHealth locally and/or via PowerShell remoting across multiple target computers, exports CLIXML plus HTML reports, and emails a summary.
 
 .DESCRIPTION
-Wraps `.\bin\Get-ComputerHealth.ps1` to support multiple targets (including an AD-derived "all domain servers" set), then collects all returned health messages into Excel workbooks and optionally emails "notable" (non-suppressed, non-pass/info/debug/help) messages.
+Wraps `.\bin\Get-ComputerHealth.ps1` to support multiple targets (including an AD-derived "all domain servers" set), then collects all returned health messages into CLIXML data files and optionally emails "notable" (non-suppressed, non-pass/info/debug/help) messages with an attached interactive HTML report.
 
 Per target:
 - Runs `.\bin\Update-GetHealthCode.ps1` then executes `.\bin\Get-ComputerHealth.ps1` with `-OutputObjects -OutputConsoleMessages`, plus the provided filters and optional custom tests folder (`.\config\Custom-HealthTests\`).
 - For remote targets, checks basic TCP reachability and if reachable, uses `New-PSSession` to run the tests.
 
 After collection:
-- Exports all messages to `${DATA_DIR}\all-messages-<timestamp>.xlsx`
-- Exports notable messages (if any) to `${DATA_DIR}\notable-messages-<timestamp>.xlsx`
-- Sends email via `.\bin\Send-Message.ps1` (with attachment when notable messages exist)
+- Exports all messages to `${DATA_DIR}\all-messages-<timestamp>.clixml`
+- Exports notable messages (if any) to `${DATA_DIR}\notable-messages-<timestamp>.clixml`
+- Generates an interactive HTML report for notable messages and attaches it to email when notable messages exist
 
 Other effects:
-- Requires the PowerShell module `ImportExcel` to be already installed (typically by `Update-GetHealthCode.ps1`).
 - Starts a transcript at `.\log\Invoke-GetHealthDomainComputers-<timestamp>.log`.
-- Sends email and may attach the notable-messages workbook.
+- Sends email and may attach the notable-messages HTML report.
 
 Dependencies & execution context:
-- Requires `.\bin\lib-write-log-objects.ps1` (dot-sourced) for logging/Excel export helper(s).
+- Requires `.\bin\lib-write-log-objects.ps1` (dot-sourced) for logging/report export helper(s).
 - Requires these local scripts to exist and be runnable (locally and on remotes):
   - `.\bin\Update-GetHealthCode.ps1`
   - `.\bin\Get-ComputerHealth.ps1`
@@ -76,7 +75,7 @@ Forces email sending regardless of whether the script is running in an interacti
 - `-SendReport` overrides the default and enables email sending.
 
 .EXAMPLE
-# Run against the local computer, export Excel, and email if notable messages exist:
+# Run against the local computer, export report data, and email if notable messages exist:
 .\Invoke-GetComputerHealth.ps1
 
 .EXAMPLE
@@ -92,7 +91,8 @@ Forces email sending regardless of whether the script is running in an interacti
 - Remote targets are executed via PowerShell remoting sessions; ensure WinRM is enabled and reachable (5985/5986) and that `.\bin\` and `.\config\` content exists on the remote machines as referenced.
 - Output paths used:
   - Transcript: `.\log\Invoke-GetHealthDomainComputers-<timestamp>.log`
-  - Excel: `${DATA_DIR}\all-messages-<timestamp>.xlsx`, `${DATA_DIR}\notable-messages-<timestamp>.xlsx`
+- Data: `${DATA_DIR}\all-messages-<timestamp>.clixml`, `${DATA_DIR}\notable-messages-<timestamp>.clixml`
+- HTML: `${DATA_DIR}\notable-messages-<timestamp>.html`
 #>
 
 param(
@@ -763,7 +763,7 @@ function Get-HealthEffectiveLevel {
   return $realLevel
 }
 
-function Convert-HealthMessagesToExcelRows {
+function Convert-HealthMessagesToReportRows {
   [CmdletBinding()]
   param(
     [Parameter(Mandatory)][object[]]$Messages
@@ -779,29 +779,478 @@ function Convert-HealthMessagesToExcelRows {
     }
 
     [pscustomobject]@{
+      TimeUtc              = if ($message.PSObject.Properties['TimeUtc'] -and $message.TimeUtc) { ([datetime]$message.TimeUtc).ToUniversalTime().ToString('o') } else { '' }
       Computer             = if ($message.PSObject.Properties['Computer']) { [string]$message.Computer } else { '' }
       Suppressed           = $suppressed
       Level                = $level
       EffectiveLevel       = if ($message.PSObject.Properties['EffectiveLevel']) { [string]$message.EffectiveLevel } else { $level }
+      WhatToDo             = 'not-sure'
       Message              = if ($message.PSObject.Properties['Message']) { [string]$message.Message } else { '' }
       Comment              = if ($message.PSObject.Properties['Comment']) { [string]$message.Comment } else { '' }
       Hash                 = if ($message.PSObject.Properties['Hash']) { [string]$message.Hash } else { '' }
-      SuppressedUntil      = if ($message.PSObject.Properties['SuppressedUntil']) { $message.SuppressedUntil } else { $null }
+      SuppressedUntil      = if ($message.PSObject.Properties['SuppressedUntil'] -and $message.SuppressedUntil) { ([datetime]$message.SuppressedUntil).ToString('yyyy-MM-dd') } else { '' }
       Emitter              = if ($message.PSObject.Properties['Emitter']) { [string]$message.Emitter } else { '' }
-      CommandToSuppressMsg = $commandToSuppressMsg
+      AddWhitelistCommand  = $commandToSuppressMsg
     }
   }
 }
 
-function Export-HealthMessagesReportToExcel {
+function Export-HealthMessagesReportData {
   [CmdletBinding()]
   param(
     [Parameter(Mandatory)][object[]]$Messages,
     [Parameter(Mandatory)][string]$FileName
   )
 
-  $rows = @(Convert-HealthMessagesToExcelRows -Messages $Messages)
-  Export-ObjectsToExcel -Data $rows -FileName $FileName -WorksheetName 'Messages'
+  $rows = @(Convert-HealthMessagesToReportRows -Messages $Messages)
+  $rows | Export-Clixml -LiteralPath $FileName
+}
+
+function Import-HealthMessagesReportData {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)][string]$DataDir,
+    [datetime]$CutoffDate = (Get-Date).AddMonths(-3),
+    [string]$Pattern = 'all-messages-*.clixml'
+  )
+
+  if (-not (Test-Path -LiteralPath $DataDir -PathType Container)) {
+    return @()
+  }
+
+  $items = @(Get-ChildItem -LiteralPath $DataDir -File -Filter $Pattern -ErrorAction SilentlyContinue |
+      Where-Object { $_.LastWriteTime -ge $CutoffDate } |
+      Sort-Object -Property LastWriteTime)
+
+  $rows = New-Object System.Collections.ArrayList
+  foreach ($item in $items) {
+    try {
+      $imported = Import-Clixml -LiteralPath $item.FullName -ErrorAction Stop
+      foreach ($row in @($imported)) {
+        if ($row) {
+          [void]$rows.Add($row)
+        }
+      }
+    }
+    catch {
+      Write-Warning ("Failed loading report data from '{0}': {1}" -f $item.FullName, $_.Exception.Message)
+    }
+  }
+
+  return @($rows)
+}
+
+function Get-HealthInteractiveHtmlReport {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)][object[]]$Rows,
+    [string]$Title = 'Get-ComputerHealth Findings Report'
+  )
+
+  $safeTitle = [System.Net.WebUtility]::HtmlEncode($Title)
+  $jsonRows = @($Rows) | ConvertTo-Json -Depth 6 -Compress
+  $jsonRows = $jsonRows -replace '</script>', '<\/script>'
+
+  return @"
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>$safeTitle</title>
+  <style>
+    :root {
+      --bg: #f5f7f4;
+      --panel: #ffffff;
+      --ink: #182022;
+      --muted: #617076;
+      --line: #d7dfdc;
+      --accent: #1f5fa8;
+      --failure: #ff4d4f;
+      --warning: #ffb300;
+      --notice: #1e88e5;
+      --postponed: #2e7d32;
+      --pass: #3cb371;
+      --debug: #9aa7ad;
+      --mustfix: #b42318;
+      --suppress: #475467;
+      --postpone: #2e7d32;
+      --notsure: #8a6f00;
+    }
+    body {
+      margin: 0;
+      font-family: Segoe UI, Arial, sans-serif;
+      background: linear-gradient(180deg, #f8faf8 0%, #edf3ef 100%);
+      color: var(--ink);
+    }
+    .shell {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+    .hero {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 20px 22px;
+      box-shadow: 0 8px 30px rgba(24,32,34,0.06);
+      margin-bottom: 16px;
+    }
+    h1 {
+      margin: 0 0 8px 0;
+      font-size: 28px;
+    }
+    .sub {
+      color: var(--muted);
+      font-size: 14px;
+    }
+    .controls, .column-controls, .summary {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      margin-top: 14px;
+    }
+    .controls input[type=text], .controls select {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 9px 12px;
+      font-size: 14px;
+      background: #fff;
+      color: var(--ink);
+    }
+    .controls input[type=text] {
+      min-width: 360px;
+      flex: 1 1 360px;
+    }
+    button, .pill {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 8px 12px;
+      background: #fff;
+      color: var(--ink);
+      cursor: pointer;
+      font-size: 13px;
+    }
+    button.active-filter {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+    .summary .pill {
+      cursor: default;
+    }
+    .table-wrap {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      box-shadow: 0 8px 30px rgba(24,32,34,0.06);
+      overflow: hidden;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+    thead th {
+      background: #f0f4f2;
+      text-align: left;
+      font-size: 12px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--muted);
+      border-bottom: 1px solid var(--line);
+      padding: 12px 10px;
+    }
+    tbody td {
+      padding: 10px;
+      border-bottom: 1px solid #edf1ef;
+      vertical-align: top;
+      font-size: 13px;
+      overflow-wrap: anywhere;
+    }
+    tbody tr:hover {
+      background: #f9fbfa;
+    }
+    .level-badge, .what-badge {
+      display: inline-block;
+      border-radius: 999px;
+      padding: 3px 8px;
+      font-weight: 700;
+      font-size: 12px;
+    }
+    .level-failure { background: var(--failure); color: #fff; }
+    .level-warning { background: var(--warning); color: #111; }
+    .level-notice { background: var(--notice); color: #fff; }
+    .level-postponed { background: var(--postponed); color: #fff; }
+    .level-pass { background: var(--pass); color: #fff; }
+    .level-debug, .level-info { background: var(--debug); color: #fff; }
+    .what-suppress { background: var(--suppress); color: #fff; }
+    .what-postpone { background: var(--postpone); color: #fff; }
+    .what-must-fix { background: var(--mustfix); color: #fff; }
+    .what-not-sure { background: var(--notsure); color: #fff; }
+    .cmd {
+      color: #41515a;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 12px;
+      white-space: pre-wrap;
+    }
+    .hidden-column {
+      display: none;
+    }
+    .muted {
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="hero">
+      <h1>$safeTitle</h1>
+      <div class="sub">Interactive findings report from the last 3 months of stored CLIXML data. Suppressed findings are loaded but hidden by default.</div>
+      <div class="controls">
+        <input id="textFilter" type="text" placeholder="Filter text. Example: foo -bar">
+        <select id="sortField">
+          <option value="Computer">Sort by computer</option>
+          <option value="EffectiveLevel">Sort by level</option>
+          <option value="Message">Sort by message</option>
+        </select>
+        <button id="sortDirection" type="button">Ascending</button>
+        <label><input id="hideSuppressed" type="checkbox" checked> Hide suppressed</label>
+      </div>
+      <div class="controls">
+        <button type="button" class="what-filter active-filter" data-filter="">All actions</button>
+        <button type="button" class="what-filter" data-filter="suppress">Suppress</button>
+        <button type="button" class="what-filter" data-filter="postpone">Postpone</button>
+        <button type="button" class="what-filter" data-filter="must-fix">Must-fix</button>
+        <button type="button" class="what-filter" data-filter="not-sure">Not-sure</button>
+      </div>
+      <div class="column-controls">
+        <label><input class="column-toggle" type="checkbox" data-column="computer" checked> Computer</label>
+        <label><input class="column-toggle" type="checkbox" data-column="level" checked> Level</label>
+        <label><input class="column-toggle" type="checkbox" data-column="comment" checked> Comment</label>
+        <label><input class="column-toggle" type="checkbox" data-column="command" checked> AddWhitelist command</label>
+      </div>
+      <div class="summary" id="summary"></div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th class="col-computer">Computer</th>
+            <th class="col-level">Level</th>
+            <th>What to do</th>
+            <th>Message</th>
+            <th class="col-comment">Comment</th>
+            <th class="col-command">AddWhitelist command</th>
+          </tr>
+        </thead>
+        <tbody id="reportRows"></tbody>
+      </table>
+    </div>
+  </div>
+  <script>
+    (function () {
+      var storageKey = 'gch-report-actions-v1';
+      var rows = $jsonRows;
+      if (!Array.isArray(rows)) {
+        rows = rows ? [rows] : [];
+      }
+      var levelOrder = { failure: 1, warning: 2, notice: 3, postponed: 4, info: 5, pass: 6, debug: 7 };
+      var actionState = {};
+      try {
+        var saved = window.localStorage.getItem(storageKey);
+        if (saved) {
+          actionState = JSON.parse(saved) || {};
+        }
+      } catch (error) {
+        actionState = {};
+      }
+
+      function keyForRow(row) {
+        return [row.Hash || '', row.Computer || '', row.Message || '', row.TimeUtc || ''].join('|');
+      }
+
+      function saveState() {
+        try {
+          window.localStorage.setItem(storageKey, JSON.stringify(actionState));
+        } catch (error) {
+        }
+      }
+
+      function htmlEncode(value) {
+        return String(value || '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+      }
+
+      function actionClass(value) {
+        return 'what-' + String(value || 'not-sure').replace(/[^a-z-]/g, '');
+      }
+
+      function levelClass(value) {
+        return 'level-' + String(value || 'info').toLowerCase().replace(/[^a-z-]/g, '');
+      }
+
+      function normalizeAction(row) {
+        var key = keyForRow(row);
+        if (actionState[key]) {
+          row.WhatToDo = actionState[key];
+        } else if (!row.WhatToDo) {
+          row.WhatToDo = 'not-sure';
+        }
+      }
+
+      function rotateAction(current) {
+        var values = ['suppress', 'postpone', 'must-fix', 'not-sure'];
+        var index = values.indexOf(current);
+        if (index < 0) { index = values.length - 1; }
+        return values[(index + 1) % values.length];
+      }
+
+      function tokenize(text) {
+        return String(text || '').toLowerCase().split(/\s+/).filter(Boolean);
+      }
+
+      function rowSearchText(row) {
+        return [
+          row.Computer || '',
+          row.EffectiveLevel || row.Level || '',
+          row.Message || '',
+          row.Comment || ''
+        ].join(' ').toLowerCase();
+      }
+
+      function currentWhatFilter() {
+        var active = document.querySelector('.what-filter.active-filter');
+        return active ? active.getAttribute('data-filter') : '';
+      }
+
+      function compareRows(left, right, field, ascending) {
+        var a = left[field] || '';
+        var b = right[field] || '';
+        if (field === 'EffectiveLevel') {
+          a = levelOrder[String(a).toLowerCase()] || 999;
+          b = levelOrder[String(b).toLowerCase()] || 999;
+        } else {
+          a = String(a).toLowerCase();
+          b = String(b).toLowerCase();
+        }
+        if (a === b) { return 0; }
+        var result = a > b ? 1 : -1;
+        return ascending ? result : result * -1;
+      }
+
+      function render() {
+        var filterText = document.getElementById('textFilter').value;
+        var tokens = tokenize(filterText);
+        var hideSuppressed = document.getElementById('hideSuppressed').checked;
+        var sortField = document.getElementById('sortField').value;
+        var ascending = document.getElementById('sortDirection').getAttribute('data-direction') !== 'desc';
+        var whatFilter = currentWhatFilter();
+        var body = document.getElementById('reportRows');
+        var filtered = rows.filter(function (row) {
+          normalizeAction(row);
+          if (hideSuppressed && (String(row.Suppressed).toLowerCase() === 'true')) {
+            return false;
+          }
+          if (whatFilter && row.WhatToDo !== whatFilter) {
+            return false;
+          }
+          var haystack = rowSearchText(row);
+          for (var i = 0; i < tokens.length; i++) {
+            var token = tokens[i];
+            if (token.charAt(0) === '-') {
+              if (token.length > 1 && haystack.indexOf(token.substring(1)) !== -1) {
+                return false;
+              }
+            } else if (haystack.indexOf(token) === -1) {
+              return false;
+            }
+          }
+          return true;
+        });
+
+        filtered.sort(function (left, right) {
+          return compareRows(left, right, sortField, ascending);
+        });
+
+        body.innerHTML = filtered.map(function (row, index) {
+          var key = htmlEncode(keyForRow(row));
+          var commentHtml = htmlEncode(row.Comment || '').replace(/\r?\n/g, '<br>');
+          var commandHtml = htmlEncode(row.AddWhitelistCommand || '').replace(/\r?\n/g, '<br>');
+          return ''
+            + '<tr>'
+            + '<td class="col-computer">' + htmlEncode(row.Computer || '') + '</td>'
+            + '<td class="col-level"><span class="level-badge ' + levelClass((row.EffectiveLevel || row.Level || '').toLowerCase()) + '">' + htmlEncode(row.EffectiveLevel || row.Level || '') + '</span></td>'
+            + '<td><button type="button" class="what-badge ' + actionClass(row.WhatToDo) + '" data-row-key="' + key + '" data-index="' + index + '">' + htmlEncode(row.WhatToDo) + '</button></td>'
+            + '<td>' + htmlEncode(row.Message || '') + '</td>'
+            + '<td class="col-comment">' + commentHtml + '</td>'
+            + '<td class="col-command cmd">' + commandHtml + '</td>'
+            + '</tr>';
+        }).join('');
+
+        document.querySelectorAll('.what-badge').forEach(function (button) {
+          button.addEventListener('click', function () {
+            var matchingRow = filtered[parseInt(button.getAttribute('data-index'), 10)];
+            if (!matchingRow) {
+              return;
+            }
+            matchingRow.WhatToDo = rotateAction(matchingRow.WhatToDo);
+            actionState[keyForRow(matchingRow)] = matchingRow.WhatToDo;
+            saveState();
+            render();
+          });
+        });
+
+        document.getElementById('summary').innerHTML = ''
+          + '<span class="pill">Visible findings: ' + filtered.length + '</span>'
+          + '<span class="pill">Loaded findings: ' + rows.length + '</span>'
+          + '<span class="pill">Suppressed hidden by default: ' + (hideSuppressed ? 'yes' : 'no') + '</span>';
+
+        document.querySelectorAll('.column-toggle').forEach(function (checkbox) {
+          var columnClass = '.col-' + checkbox.getAttribute('data-column');
+          document.querySelectorAll(columnClass).forEach(function (cell) {
+            cell.classList.toggle('hidden-column', !checkbox.checked);
+          });
+        });
+      }
+
+      document.querySelectorAll('.what-filter').forEach(function (button) {
+        button.addEventListener('click', function () {
+          document.querySelectorAll('.what-filter').forEach(function (item) {
+            item.classList.remove('active-filter');
+          });
+          button.classList.add('active-filter');
+          render();
+        });
+      });
+
+      document.getElementById('sortDirection').setAttribute('data-direction', 'asc');
+      document.getElementById('sortDirection').addEventListener('click', function () {
+        var current = this.getAttribute('data-direction');
+        var next = current === 'asc' ? 'desc' : 'asc';
+        this.setAttribute('data-direction', next);
+        this.textContent = next === 'asc' ? 'Ascending' : 'Descending';
+        render();
+      });
+
+      document.getElementById('textFilter').addEventListener('input', render);
+      document.getElementById('sortField').addEventListener('change', render);
+      document.getElementById('hideSuppressed').addEventListener('change', render);
+      document.querySelectorAll('.column-toggle').forEach(function (checkbox) {
+        checkbox.addEventListener('change', render);
+      });
+
+      render();
+    }());
+  </script>
+</body>
+</html>
+"@
 }
 
 function Get-HealthNotableSubject {
@@ -1140,10 +1589,6 @@ $emailDecision = Get-HealthEmailDecision -NoSendReport:$NoSendReport -SendReport
 $sendMailByDefault = [bool]$emailDecision.ShouldSend
 $IpsOfAllDcs = Resolve-IpsOfAllDcs -IpsOfAllDcs $IpsOfAllDcs -WasProvided:$PSBoundParameters.ContainsKey('IpsOfAllDcs') -CachePath $IPS_OF_ALL_DCS_CACHE_PATH
 
-if (-not (Get-Module -ListAvailable -Name ImportExcel)) {
-  throw "Required module 'ImportExcel' is missing. Run Update-GetHealthCode.ps1 to install prerequisites."
-}
-
 if ($ExcludeServers) {
   $ExcludeServers = $ExcludeServers | ForEach-Object { $_ -split '[,\s]+' } | Where-Object { $_ }
   write-verbose "`$ExcludeServers: $($ExcludeServers -join ';')"
@@ -1369,6 +1814,7 @@ foreach ($target in $targets) {
           }
           $level = [string]$item.Level
           $records.Add([pscustomobject]@{
+              TimeUtc    = if ($item.PSObject.Properties['TimeUtc']) { $item.TimeUtc } else { $null }
               Computer   = if ($item.PSObject.Properties['Computer']) { [string]$item.Computer } else { $env:COMPUTERNAME }
               Level      = $level
               EffectiveLevel = Get-HealthEffectiveLevelLocal -Level $level -Suppressed:$suppressed -SuppressedUntil $suppressedUntil -ShowAsPostponedWindowDays $ShowAsPostponedWindowDays
@@ -1496,16 +1942,17 @@ if ($all_messages) {
   }
 
   # save
-  $allMessagesXlsxPath = Join-Path $DATA_DIR "all-messages-$($timestamp).xlsx"
-  $notableMessagesXlsxPath = Join-Path $DATA_DIR "notable-messages-$($timestamp).xlsx"
-  Export-HealthMessagesReportToExcel -Messages $all_messages -FileName $allMessagesXlsxPath
+  $allMessagesClixmlPath = Join-Path $DATA_DIR "all-messages-$($timestamp).clixml"
+  $notableMessagesClixmlPath = Join-Path $DATA_DIR "notable-messages-$($timestamp).clixml"
+  $notableMessagesHtmlPath = Join-Path $DATA_DIR "notable-messages-$($timestamp).html"
+  Export-HealthMessagesReportData -Messages $all_messages -FileName $allMessagesClixmlPath
   $notable_msgs = @(`
       $all_messages `
     | Where-Object { (-not($_.Suppressed) -and $_.level -notin @('debug', 'help', 'pass', 'info')) -or ($_.EffectiveLevel -eq 'postponed') } `
     | Sort-Object -Property @{ Expression = { $SortOrder[$_.EffectiveLevel] } }, Computer `
   )
   if ($notable_msgs) {
-    Export-HealthMessagesReportToExcel -Messages $notable_msgs -FileName $notableMessagesXlsxPath
+    Export-HealthMessagesReportData -Messages $notable_msgs -FileName $notableMessagesClixmlPath
   }
 
   $synopsis = " " + ($notable_msgs | Where-Object { $_.EffectiveLevel } |
@@ -1522,10 +1969,11 @@ if ($all_messages) {
   write-host ""
   if ($notable_msgs) {
     Write-host -for yellow "Found notable messages. I have saved them in these files:"
-    Write-host -for yellow "    $notableMessagesXlsxPath"
-    Write-host -for gray   "    $allMessagesXlsxPath"
-    Write-host -for gray   "Open them on Excel or if you prefer PowerShell load them like this:"
-    Write-host -for gray   "    `$data = Import-Excel $notableMessagesXlsxPath"
+    Write-host -for yellow "    $notableMessagesHtmlPath"
+    Write-host -for gray   "    $notableMessagesClixmlPath"
+    Write-host -for gray   "    $allMessagesClixmlPath"
+    Write-host -for gray   "Open the HTML report in a browser or load the CLIXML in PowerShell like this:"
+    Write-host -for gray   "    `$data = Import-Clixml $notableMessagesClixmlPath"
     Write-host -for gray   '    $data|ogv # GUI review'
     Write-host -for gray   '    $data|select -Property Computer,Level,Message # Console review'
 
@@ -1541,16 +1989,19 @@ if ($all_messages) {
       $notable_msgs | Sort-Object -Property @{ Expression = { $SortOrder[$_.EffectiveLevel] } }, Computer
     )
     $html = $htmlParts -join ''
+    $historicalRows = @(Import-HealthMessagesReportData -DataDir $DATA_DIR)
+    $interactiveReportHtml = Get-HealthInteractiveHtmlReport -Rows $historicalRows -Title ("Get-ComputerHealth findings for {0}" -f ($targets -join ', '))
+    Save-HealthHtmlReport -Path $notableMessagesHtmlPath -Html $interactiveReportHtml
 
     $signedHtml = Add-HealthEmailSignature -Body $html -BodyAsHtml -Signature $emailSignature
     Save-HealthHtmlReport -Path $LAST_REPORT_HTML_PATH -Html $signedHtml
     $smtpNotableSubject = Get-HealthNotableSubject -FallbackSubject $SmtpSubject -NotableMessages $notable_msgs
     Write-Host -for Gray ("Email report decision: {0}" -f $emailDecision.Reason)
-    Invoke-HealthEmail -Subject $smtpNotableSubject -Body $signedHtml -BodyAsHtml -Attachments $notableMessagesXlsxPath -ConfigFile $SmtpConfig -NoSendReport:(-not $sendMailByDefault) -SkipReason $emailDecision.Reason
+    Invoke-HealthEmail -Subject $smtpNotableSubject -Body $signedHtml -BodyAsHtml -Attachments $notableMessagesHtmlPath -ConfigFile $SmtpConfig -NoSendReport:(-not $sendMailByDefault) -SkipReason $emailDecision.Reason
   }
   else {
     Write-host -for green    "GOOD, Nothing notable to record. I have saved less notable messages here:"
-    Write-host -for gray     "    $allMessagesXlsxPath"
+    Write-host -for gray     "    $allMessagesClixmlPath"
     $signedBody = Add-HealthEmailSignature -Body (Get-RelaxHtmlBody) -BodyAsHtml -Signature $emailSignature
     Save-HealthHtmlReport -Path $LAST_REPORT_HTML_PATH -Html $signedBody
     Write-Host -for Gray ("Email report decision: {0}" -f $emailDecision.Reason)

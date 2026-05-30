@@ -16,7 +16,10 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
         'Convert-HealthSynopsisToHtml',
         'Convert-HealthMessagesToHtmlTable',
         'Get-RelaxHtmlBody',
-        'Convert-HealthMessagesToExcelRows',
+        'Convert-HealthMessagesToReportRows',
+        'Export-HealthMessagesReportData',
+        'Import-HealthMessagesReportData',
+        'Get-HealthInteractiveHtmlReport',
         'Get-CachedIpsOfAllDcs',
         'Set-CachedIpsOfAllDcs',
         'Resolve-IpsOfAllDcs',
@@ -201,9 +204,10 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
     $html | Should -Match '>\s*Relax\s*<'
   }
 
-  It 'shapes Excel rows in Invoke-GetComputerHealth including suppression commands' {
-    $rows = @(Convert-HealthMessagesToExcelRows -Messages @(
+  It 'shapes report rows in Invoke-GetComputerHealth including suppression commands' {
+    $rows = @(Convert-HealthMessagesToReportRows -Messages @(
         [pscustomobject]@{
+          TimeUtc = [datetime]'2026-05-30T10:15:00Z'
           Computer = 'SRV1'
           Suppressed = $false
           Level = 'warning'
@@ -215,19 +219,75 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
       ))
 
     $rows.Count | Should -Be 1
+    $rows[0].TimeUtc | Should -Be '2026-05-30T10:15:00.0000000Z'
     $rows[0].Computer | Should -Be 'SRV1'
     $rows[0].Level | Should -Be 'warning'
-    $rows[0].CommandToSuppressMsg | Should -Be 'Invoke-Command SRV1 {c:\it\Get-ComputerHealth\bin\Get-ComputerHealth.ps1 -AddWhitelisting -until 2999-12-31 -sig ''deadbeef'' -ComputerName SRV1 -comment "warning - Disk free space is low"}'
+    $rows[0].WhatToDo | Should -Be 'not-sure'
+    $rows[0].AddWhitelistCommand | Should -Be 'Invoke-Command SRV1 {c:\it\Get-ComputerHealth\bin\Get-ComputerHealth.ps1 -AddWhitelisting -until 2999-12-31 -sig ''deadbeef'' -ComputerName SRV1 -comment "warning - Disk free space is low"}'
   }
 
-  It 'does not generate Excel suppression commands for suppressed or informational rows' {
-    $rows = @(Convert-HealthMessagesToExcelRows -Messages @(
+  It 'does not generate report suppression commands for suppressed or informational rows' {
+    $rows = @(Convert-HealthMessagesToReportRows -Messages @(
         [pscustomobject]@{ Computer = 'SRV1'; Suppressed = $true; Level = 'warning'; Message = 'Already suppressed'; Comment = ''; Hash = '11111111'; Emitter = '' },
         [pscustomobject]@{ Computer = 'SRV2'; Suppressed = $false; Level = 'info'; Message = 'Informational'; Comment = ''; Hash = '22222222'; Emitter = '' }
       ))
 
-    $rows[0].CommandToSuppressMsg | Should -Be ''
-    $rows[1].CommandToSuppressMsg | Should -Be ''
+    $rows[0].AddWhitelistCommand | Should -Be ''
+    $rows[1].AddWhitelistCommand | Should -Be ''
+  }
+
+  It 'saves and reloads report data as clixml' {
+    $tempRoot = Join-Path $env:TEMP ('gch-report-data-' + [guid]::NewGuid().ToString())
+    $dataDir = Join-Path $tempRoot 'data'
+    $path = Join-Path $dataDir 'all-messages-2026-05-30_10.15.clixml'
+
+    try {
+      New-Item -ItemType Directory -Path $dataDir -Force | Out-Null
+      Export-HealthMessagesReportData -Messages @(
+        [pscustomobject]@{
+          Computer = 'SRV1'
+          Suppressed = $false
+          Level = 'warning'
+          EffectiveLevel = 'warning'
+          Message = 'Disk free space is low'
+          Comment = 'Drive C: low'
+          Hash = 'deadbeef'
+          Emitter = 'HealthTest-Disks'
+        }
+      ) -FileName $path
+
+      $rows = @(Import-HealthMessagesReportData -DataDir $dataDir -CutoffDate ([datetime]'2026-05-01'))
+
+      $rows.Count | Should -Be 1
+      $rows[0].Computer | Should -Be 'SRV1'
+      $rows[0].AddWhitelistCommand | Should -Match 'deadbeef'
+    } finally {
+      Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
+    }
+  }
+
+  It 'renders the interactive html report controls and rows' {
+    $html = Get-HealthInteractiveHtmlReport -Title 'Sample Report' -Rows @(
+      [pscustomobject]@{
+        Computer = 'SRV1'
+        Suppressed = $false
+        Level = 'warning'
+        EffectiveLevel = 'warning'
+        WhatToDo = 'not-sure'
+        Message = 'Disk free space is low'
+        Comment = 'Drive C: low'
+        AddWhitelistCommand = 'demo command'
+        Hash = 'deadbeef'
+      }
+    )
+
+    $html | Should -Match '<title>Sample Report</title>'
+    $html | Should -Match 'Hide suppressed'
+    $html | Should -Match 'data-filter="postpone"'
+    $html | Should -Match 'data-column="command"'
+    $html | Should -Match 'Interactive findings report from the last 3 months'
+    $html | Should -Match 'Disk free space is low'
+    $html | Should -Match 'demo command'
   }
 
   It 'loads active suppression expiry dates with last applicable entry winning' {

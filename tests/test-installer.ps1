@@ -49,7 +49,14 @@ function Invoke-InstallerScenario {
     $legacyTempDir = Join-Path $paths.TestRoot 'temp'
     $legacyWorkbookPath = Join-Path $legacyTempDir 'all-messages-legacy.xlsx'
     New-Item -ItemType Directory -Path $legacyTempDir -Force | Out-Null
-    Set-Content -LiteralPath $legacyWorkbookPath -Value 'legacy workbook placeholder' -NoNewline
+    Import-Module ImportExcel -ErrorAction Stop
+    @(
+      [pscustomobject]@{
+        Computer = 'LEGACY'
+        Level = 'warning'
+        Message = 'legacy workbook placeholder'
+      }
+    ) | Export-Excel -Path $legacyWorkbookPath -WorksheetName 'Messages' -AutoSize
 
     $updateParams = @{
       Reinstall = $true
@@ -71,15 +78,16 @@ function Invoke-InstallerScenario {
       & (Join-Path $paths.InstallRoot 'Update-GetHealthCode.ps1') @updateParams
     }
 
-    $migratedWorkbookPath = Join-Path $paths.TestRoot 'data\all-messages-legacy.xlsx'
-    Assert-PathExists -Path $migratedWorkbookPath -Message "Expected disk format migration to move legacy workbook to data: $migratedWorkbookPath"
+    $migratedReportPath = Join-Path $paths.TestRoot 'data\all-messages-legacy.clixml'
+    Assert-PathExists -Path $migratedReportPath -Message "Expected disk format migration to convert legacy workbook to clixml: $migratedReportPath"
     Assert-True -Condition (-not (Test-Path -LiteralPath $legacyWorkbookPath)) -Message "Expected disk format migration to remove legacy workbook from temp: $legacyWorkbookPath"
+    Assert-True -Condition (-not (Test-Path -LiteralPath (Join-Path $paths.TestRoot 'data\all-messages-legacy.xlsx'))) -Message "Expected disk format migration to remove legacy workbook from data."
 
     $diskFormatStatePath = Join-Path $paths.TestRoot 'data\disk-format.psd1'
     Assert-PathExists -Path $diskFormatStatePath -Message "Expected disk format state file to exist: $diskFormatStatePath"
     $diskFormatState = Import-PowerShellDataFile -LiteralPath $diskFormatStatePath -ErrorAction Stop
-    Assert-True -Condition ([int]$diskFormatState.CurrentDiskFormat -ge 5) -Message "Expected CurrentDiskFormat to be at least 5."
-    Assert-True -Condition ([int]$diskFormatState.LatestCompatibleCodeVersion -ge 5) -Message "Expected LatestCompatibleCodeVersion to be at least 5."
+    Assert-True -Condition ([int]$diskFormatState.CurrentDiskFormat -ge 6) -Message "Expected CurrentDiskFormat to be at least 6."
+    Assert-True -Condition ([int]$diskFormatState.LatestCompatibleCodeVersion -ge 6) -Message "Expected LatestCompatibleCodeVersion to be at least 6."
   } finally {
     foreach ($zipPath in @($paths.ReleaseZipPath, $paths.ReleaseZipPathVersionless)) {
       if ($zipPath -and (Test-Path -LiteralPath $zipPath)) {

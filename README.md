@@ -1,6 +1,6 @@
 ﻿# Introduction
 
-**Get-ComputerHealth** is a **production-ready, lightweight, and extendable** PowerShell framework that will scan your server, workstation or fleet of domain servers for **more than a hundred health indicators** (both issues like low RAM, missing updates, disk errors, failed logins and configuration changes like a newly installed software, a TCP port that started listening, a host that stoped responding to pings or accepting connections, full list below). It produces **useful and concise reports, email alerts with attached Excel reports**, and **clean terminal output**. You can easily add your own **custom health tests with plain PowerShell scripts**. **Installation is quick and simple**: in a few minutes you can check all your domain servers and receive daily notifications for issues and changes.
+**Get-ComputerHealth** is a **production-ready, lightweight, and extendable** PowerShell framework that will scan your server, workstation or fleet of domain servers for **more than a hundred health indicators** (both issues like low RAM, missing updates, disk errors, failed logins and configuration changes like a newly installed software, a TCP port that started listening, a host that stoped responding to pings or accepting connections, full list below). It produces **useful and concise reports, email alerts with attached HTML reports**, and **clean terminal output**. You can easily add your own **custom health tests with plain PowerShell scripts**. **Installation is quick and simple**: in a few minutes you can check all your domain servers and receive daily notifications for issues and changes.
 
 <img width="729" height="426" alt="image" src="https://github.com/user-attachments/assets/56ed5109-0f71-4f10-a7ba-2b0cf0e36669" />
 
@@ -24,7 +24,7 @@ This is a **robust production-tested tool** and I have been using it across seve
 
 By default the installer downloads and updates files from this GitHub repository every time you call any of the `Invoke-*.ps1` scripts. You can disable this by setting `AutomaticUpdates = $false` in `./config/gch.psd1` or point the updater to a clone of this repo that you control by setting `RepoUrl`.
 
-The installer also registers and sets PSGallery as **Trusted** and installs the PowerShell module `ImportExcel`.
+Besides PowerShell itself, the toolkit has **no external dependencies**.
 
 Besides installation, this code *should not change the state of the system in any way*. Consequently, auditing it with a modern AI agent is quite easy. 
 
@@ -93,7 +93,7 @@ if (-not (Test-Path "C:\IT\Get-ComputerHealth\bin")) {
     Invoke-WebRequest -useb "https://raw.githubusercontent.com/ndemou/GetComputerHealth/refs/heads/main/Update-GetHealthCode.ps1" -OutFile "C:\IT\Get-ComputerHealth\bin\Update-GetHealthCode.ps1" 
 }
 
-# Download all other scripts & install required modules
+# Download all other scripts
 C:\IT\Get-ComputerHealth\bin\Update-GetHealthCode.ps1 
 
 # Perform your first health test manually
@@ -183,7 +183,7 @@ Open PowerShell as Administrator and run:
 C:\IT\Get-ComputerHealth\bin\Invoke-GetComputerHealth.ps1 -NoSend
 ```
 
-> This scans the local machine, saves an Excel report to `C:\IT\Get-ComputerHealth\temp\`, and emails you any **notable** issues (i.e., Notices, Warnings, or Failures).
+> This scans the local machine, saves CLIXML data plus an interactive HTML report, and emails you any **notable** issues (i.e., Notices, Warnings, or Failures).
 
 For more fine-tuned control, try:
 ```powershell
@@ -201,7 +201,7 @@ $results | ogv
 
 Run `C:\IT\bin\Invoke-GetHealthDomainComputers.ps1`.
 
-> This scans all domain servers and any workstations you have configured, saves an Excel report to `C:\IT\Get-ComputerHealth\temp\`, and emails you any **notable** issues.
+> This scans all domain servers and any workstations you have configured, saves CLIXML data plus an interactive HTML report, and emails you any **notable** issues.
 > The options mentioned above can also be used.
 > Extra options like `-NoUpdate` and `-NoSendMessage` are particularly handy here.
 
@@ -209,7 +209,7 @@ Run `C:\IT\bin\Invoke-GetHealthDomainComputers.ps1`.
 
 By default, the health tests will flag any deviation from a pristine Windows installation (e.g., a custom service, an extra member in the Administrators group, or an additional listening TCP port). If this is expected, you should permitlist it.
 
-1. **Identify the permitlisting command:** Open the generated Excel report. Every message includes a column containing the exact command needed to permitlist that entry.
+1. **Identify the permitlisting command:** Open the generated HTML report or import the matching CLIXML file. Every message includes the exact command needed to permitlist that entry.
 2. **Apply the permitlist:** Run that command on the **target machine** (or via Remote PowerShell).
 
 > **Tip:** You can also permitlist findings manually:
@@ -223,7 +223,7 @@ By default, the health tests will flag any deviation from a pristine Windows ins
 
 # 3. Architecture Overview
 
-The toolkit operates on a **Controller–Agent** model (though it is agentless via PowerShell Remoting). You run the orchestration script on your management machine (the Controller), which executes tests on your servers/workstations (the Targets), aggregates the results into Excel reports, and emails them.
+The toolkit operates on a **Controller–Agent** model (though it is agentless via PowerShell Remoting). You run the orchestration script on your management machine (the Controller), which executes tests on your servers/workstations (the Targets), aggregates the results into CLIXML plus HTML reports, and emails them.
 
 ## Relationship Diagram
 
@@ -238,7 +238,7 @@ flowchart BT
         Orchestrator["Invoke-GetComputerHealth.ps1"]
         Entry["Invoke-GetHealthDomainComputers.ps1"]
         TargetServers["Target Servers"]
-        Report["Excel files"]
+        Report["CLIXML + HTML files"]
         Mailer["Send-Message.ps1"]
  end
  subgraph Target["Target Computer"]
@@ -285,7 +285,7 @@ These are the scripts you actually execute.
   1. Connects to the local host or one or more remote computers.
   2. Triggers a self-update on the remote target.
   3. Runs the health checks.
-  4. Collects output, saves it in Excel format (`C:\IT\Get-ComputerHealth\temp\`), and emails **notable** (non-success) messages.
+  4. Collects output, saves it in CLIXML plus HTML format, and emails **notable** (non-success) messages.
 * **Key Parameters:** `-Computers` (list of targets, local host by default), `-ExcludeServers`, `-Hide` (defines which message types to hide from console output, usually "DIPS").
 * **Email default caveat:** `Invoke-GetComputerHealth.ps1` sends email by default in non-interactive contexts and does not send by default in interactive contexts. If you first connect with `Enter-PSSession` and then run the script on the remote host, that remote PowerShell host can still appear non-interactive to the script. Use `-NoSendReport` inside `Enter-PSSession` when you do not want the default email report.
 
@@ -317,7 +317,7 @@ These scripts run locally on the servers being checked.
 | `C:\IT\Get-ComputerHealth\bin\`    | All script files (`.ps1`). |
 | `C:\IT\Get-ComputerHealth\config\` | Configuration files. |
 | `C:\IT\Get-ComputerHealth\config\Custom-HealthTests` | [Optional custom health tests.](./doc/how-to-add-custom-tests.md)  |
-| `C:\IT\Get-ComputerHealth\temp\`   | Temp files like downloads and Excel reports. |
+| `C:\IT\Get-ComputerHealth\temp\`   | Temp files like downloads and generated email HTML. |
 | `C:\IT\Get-ComputerHealth\log\`    | Logs of script execution. |
 
 # 6. Contributing

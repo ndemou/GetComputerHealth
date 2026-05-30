@@ -2156,8 +2156,6 @@ try {
   Write-Verbose "  MANUAL_ZIP_CACHE_PATTERN    : $MANUAL_ZIP_CACHE_PATTERN"
   Write-Verbose "  repoSlug                    : $repoSlug"
 
-  Ensure-PSModuleInstalled -Name ImportExcel
-
   $p = Join-Path $CFG_DIR 'Get-ComputerHealth.sigs-to-suppress.txt'
   if (-not (Test-Path $p)) {
     Write-Verbose "Creating default suppressions file '$p'"

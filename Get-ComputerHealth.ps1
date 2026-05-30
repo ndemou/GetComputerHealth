@@ -13,7 +13,7 @@ Supports:
 
 
 When `-OutputObjects` is used, each emitted log object includes these fields:
-- `TimeUtc` (UTC timestamp for the message; intended for cross-machine sorting/aggregation and Excel export as UTC)
+- `TimeUtc` (UTC timestamp for the message; intended for cross-machine sorting/aggregation and report export as UTC)
 - `Computer`, `Level`, `Message`, `Hash`, `Suppressed`, `Comment`, `Emitter`
 
 Notable side effects:
@@ -214,7 +214,7 @@ param(
   [switch]$ListAllBuiltInTests
 )
 
-$VERSION="5.2.2"
+$VERSION="6.0.0"
 
 
 $SCRIPT_BIN_DIR = (Resolve-Path -LiteralPath $PSScriptRoot).Path

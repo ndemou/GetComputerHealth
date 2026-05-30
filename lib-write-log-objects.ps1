@@ -10,7 +10,7 @@ Messages are emitted (Write-Output) as PSCustomObjects with the following proper
   Suppressed : bool     # True if message signature is configured as suppressed
   Comment    : string   # Optional additional information
 
-These objects are suitable for filtering, aggregation, and export (e.g. Excel).
+These objects are suitable for filtering, aggregation, and export (e.g. CLIXML).
 
 Optionally, messages are also color-printed to the console (Write-Host).
 
@@ -39,11 +39,11 @@ Additional utilities:
   Get-StringSignature "Some text"
       Returns the 8-character signature associated with the message text.
 
-  Export-ObjectsToExcel $Data $FileName
-      Exports objects to Excel (requires ImportExcel module).
+  Export-ObjectsToClixml $Data $FileName
+      Exports objects to CLIXML.
 
-  Export-HealthMessagesToExcel $Data $FileName
-      Backward-compatible wrapper over Export-ObjectsToExcel.
+  Export-HealthMessagesToClixml $Data $FileName
+      Backward-compatible wrapper over Export-ObjectsToClixml.
 
 ------------------------------------------------------------------------------
 CONFIGURATION MODEL
@@ -96,15 +96,13 @@ All Log-* functions ALWAYS emit exactly one PSCustomObject per call.
 Consumers SHOULD rely on returned objects, not console output, for automation.
 
 ------------------------------------------------------------------------------
-EXCEL EXPORT SUPPORT
+CLIXML EXPORT SUPPORT
 ------------------------------------------------------------------------------
 
-Export-ObjectsToExcel writes provided objects to an Excel worksheet.
+Export-ObjectsToClixml writes provided objects to a CLIXML file.
 
-Export-HealthMessagesToExcel remains as a backward-compatible wrapper for
+Export-HealthMessagesToClixml remains as a backward-compatible wrapper for
 consumers that already shape the rows they want to export.
-
-Requires ImportExcel module.
 
 ------------------------------------------------------------------------------
 #>
@@ -502,6 +500,26 @@ function Write-BasedOnTestResult {
 }
 
 
+function Export-ObjectsToClixml {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)][array]$Data,
+    [Parameter(Mandatory)][string]$FileName
+  )
+
+  $Data | Export-Clixml -LiteralPath $FileName
+}
+
+function Export-HealthMessagesToClixml {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)][array]$Data,
+    [Parameter(Mandatory)][string]$FileName
+  )
+
+  Export-ObjectsToClixml -Data $Data -FileName $FileName
+}
+
 function Export-ObjectsToExcel {
   [CmdletBinding()]
   param(
@@ -510,8 +528,7 @@ function Export-ObjectsToExcel {
     [string]$WorksheetName = 'Messages'
   )
 
-  Import-Module ImportExcel -ErrorAction Stop
-  $Data | Export-Excel -Path $FileName -WorksheetName $WorksheetName -AutoSize -BoldTopRow
+  Export-ObjectsToClixml -Data $Data -FileName $FileName
 }
 
 function Export-HealthMessagesToExcel {
@@ -521,7 +538,7 @@ function Export-HealthMessagesToExcel {
     [Parameter(Mandatory)][string]$FileName
   )
 
-  Export-ObjectsToExcel -Data $Data -FileName $FileName -WorksheetName 'Messages'
+  Export-HealthMessagesToClixml -Data $Data -FileName $FileName
 }
 
 
