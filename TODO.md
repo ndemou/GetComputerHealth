@@ -384,7 +384,7 @@ Windows failed to apply the MDM Policy settings. MDM Policy settings might have 
 ```
 
 Notice that the diagnostic output collected from dcdiag  is a very long string of repeating sentences. We can manipulate it to make it much more succinct by following these steps:
- - Split lines(sentences) on anything that looks like a "word. " or "word; " (e.g. with something like `$output -replace '([a-z]{2,30}[.;]) +','$1\r\n'`)
+ - Split lines(sentences) on anything that looks like a "word. " or "word.) " or "word; " (e.g. with something like `$output -replace '(([a-z]{2,30})(;|[.][)]?)) +','$1\r\n'`)
  - Keep the first 50 lines
  - Remove duplicate lines(sentences)
  - Join all lines again in one
