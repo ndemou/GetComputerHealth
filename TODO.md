@@ -12,13 +12,6 @@ Example `gch.psd1`:
     IpsOfAllDCs = @('10.1.2.3', '10.1.2.4')
 }
 ```
-## [EASY] Report the email decision just before the point where an email is to be send or not
-
-Currently `Invoke-GetComputerHealth.ps1` reports this:
-```
-Email report decision: Email sending enabled by default because the script is running in a non-interactive context.
-```
-Almost as soon as it starts
 
 ## Fix detection of interactive context
 
