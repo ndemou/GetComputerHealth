@@ -287,6 +287,7 @@ These are the scripts you actually execute.
   3. Runs the health checks.
   4. Collects output, saves it in Excel format (`C:\IT\Get-ComputerHealth\temp\`), and emails **notable** (non-success) messages.
 * **Key Parameters:** `-Computers` (list of targets, local host by default), `-ExcludeServers`, `-Hide` (defines which message types to hide from console output, usually "DIPS").
+* **Email default caveat:** `Invoke-GetComputerHealth.ps1` sends email by default in non-interactive contexts and does not send by default in interactive contexts. If you first connect with `Enter-PSSession` and then run the script on the remote host, that remote PowerShell host can still appear non-interactive to the script. Use `-NoSendReport` inside `Enter-PSSession` when you do not want the default email report.
 
 ## B. The Worker (Runs on Targets)
 

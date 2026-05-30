@@ -71,6 +71,7 @@ Forces email sending regardless of whether the script is running in an interacti
 .NOTES ON EMAIL DEFAULTS
 - In an interactive session, email sending defaults to off.
 - In a non-interactive session, email sending defaults to on.
+- When you run this script after `Enter-PSSession`, the remote PowerShell host can look non-interactive to the script even though you are typing at an interactive prompt. This behavior is expected; use `-NoSendReport` in that case if you do not want the default email report.
 - `-NoSendReport` overrides the default and disables email sending.
 - `-SendReport` overrides the default and enables email sending.
 
@@ -1138,7 +1139,6 @@ $emailSignature = Get-HealthEmailSignature -VersionFilePath $VERSION_FILE_PATH -
 $emailDecision = Get-HealthEmailDecision -NoSendReport:$NoSendReport -SendReport:$SendReport -NonInteractiveContext:(Test-IsNonInteractiveContext)
 $sendMailByDefault = [bool]$emailDecision.ShouldSend
 $IpsOfAllDcs = Resolve-IpsOfAllDcs -IpsOfAllDcs $IpsOfAllDcs -WasProvided:$PSBoundParameters.ContainsKey('IpsOfAllDcs') -CachePath $IPS_OF_ALL_DCS_CACHE_PATH
-Write-Host -for Gray ("Email report decision: {0}" -f $emailDecision.Reason)
 
 if (-not (Get-Module -ListAvailable -Name ImportExcel)) {
   throw "Required module 'ImportExcel' is missing. Run Update-GetHealthCode.ps1 to install prerequisites."
@@ -1545,6 +1545,7 @@ if ($all_messages) {
     $signedHtml = Add-HealthEmailSignature -Body $html -BodyAsHtml -Signature $emailSignature
     Save-HealthHtmlReport -Path $LAST_REPORT_HTML_PATH -Html $signedHtml
     $smtpNotableSubject = Get-HealthNotableSubject -FallbackSubject $SmtpSubject -NotableMessages $notable_msgs
+    Write-Host -for Gray ("Email report decision: {0}" -f $emailDecision.Reason)
     Invoke-HealthEmail -Subject $smtpNotableSubject -Body $signedHtml -BodyAsHtml -Attachments $notableMessagesXlsxPath -ConfigFile $SmtpConfig -NoSendReport:(-not $sendMailByDefault) -SkipReason $emailDecision.Reason
   }
   else {
@@ -1552,6 +1553,7 @@ if ($all_messages) {
     Write-host -for gray     "    $allMessagesXlsxPath"
     $signedBody = Add-HealthEmailSignature -Body (Get-RelaxHtmlBody) -BodyAsHtml -Signature $emailSignature
     Save-HealthHtmlReport -Path $LAST_REPORT_HTML_PATH -Html $signedBody
+    Write-Host -for Gray ("Email report decision: {0}" -f $emailDecision.Reason)
     Invoke-HealthEmail -Subject $SmtpSubjectAllGood -Body $signedBody -BodyAsHtml -ConfigFile $SmtpConfig -NoSendReport:(-not $sendMailByDefault) -SkipReason $emailDecision.Reason
   }
 }
