@@ -13,20 +13,6 @@ Example `gch.psd1`:
 }
 ```
 
-## Fix detection of interactive context
-
-When inside a remote PS session Invoke-GetComputerHealth.ps1 reports "running in a non-interactive context". It should detect that it's indeed an interactive shell session.
-
-Example of current situation:
-```
-PS C:\it\Get-ComputerHealth\bin> Enter-PSSession dc01
-
-[dc01]: PS C:\Users\ndemou-admin\Documents> cd C:\it\Get-ComputerHealth\bin\
-[dc01]: PS C:\it\Get-ComputerHealth\bin> .\Invoke-GetComputerHealth.ps1 -Hide DIPS
-...
-Email report decision: Email sending enabled by default because the script is running in a non-interactive context.
-```
-
 ## New gch.psd1 option 'SendReports'
 ```
 SendReports = "Auto" # "Never", "Always", "Auto"
