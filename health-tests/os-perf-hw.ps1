@@ -284,7 +284,12 @@ Uses: Get-DnsDomainControllers, Resolve-DnsName, Test-IsLaptopOrMobile.
             Write-Warning "[FAILURE] Domain member time syncing type is '$timeSyncType' instead of 'NT5DS'.`n$evidenceString"
         }
         elseif ($isActiveVMIC) {
-            Write-Warning "[FAILURE] Domain member is currently syncing from hypervisor (Source='$currentTimeSource').`n$evidenceString"
+            $domainMemberVmicRemediation = @'
+
+To configure this member server to sync time from the domain execute these commands:
+w32tm /config /syncfromflags:DOMHIER /reliable:NO /update; Restart-Service w32time; w32tm /resync /rediscover
+'@
+            Write-Warning "[FAILURE] Domain member is currently syncing from hypervisor (Source='$currentTimeSource').`n$evidenceString$domainMemberVmicRemediation"
         }
         elseif ($isActiveCMOS) {
             if (Test-IsLaptopOrMobile) {
