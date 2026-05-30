@@ -229,10 +229,36 @@ function Convert-ToStringArray {
   )
 }
 
+function Test-SendAlertConfigKey {
+  param(
+    [Parameter(Mandatory)]$Config,
+    [Parameter(Mandatory)][string]$Key
+  )
+
+  if ($Config -is [hashtable]) {
+    return $Config.ContainsKey($Key)
+  }
+
+  return ($Config.PSObject.Properties.Name -contains $Key)
+}
+
+function Get-SendAlertConfigValue {
+  param(
+    [Parameter(Mandatory)]$Config,
+    [Parameter(Mandatory)][string]$Key
+  )
+
+  if ($Config -is [hashtable]) {
+    return $Config[$Key]
+  }
+
+  return $Config.$Key
+}
+
 function Get-SendAlertConfig {
   <#
   .SYNOPSIS
-    Loads and validates the Send-Message JSON configuration.
+    Loads and validates the Send-Message JSON or PowerShell data file configuration.
 
   .DESCRIPTION
     Ensures required keys exist, applies defaults, and normalizes recipient fields.
@@ -247,46 +273,58 @@ function Get-SendAlertConfig {
     throw "Config file not found: $Path"
   }
 
-  $raw = Get-Content -LiteralPath $Path -Raw
-  if ([string]::IsNullOrWhiteSpace($raw)) {
-    throw "Config file is empty: $Path"
+  $extension = [System.IO.Path]::GetExtension($Path)
+  if ($extension -ieq '.psd1') {
+    try {
+      $cfg = Import-PowerShellDataFile -LiteralPath $Path -ErrorAction Stop
+    }
+    catch {
+      throw "Config file is not a valid PowerShell data file: $Path. Error: $($_.Exception.Message)"
+    }
   }
+  else {
+    $raw = Get-Content -LiteralPath $Path -Raw
+    if ([string]::IsNullOrWhiteSpace($raw)) {
+      throw "Config file is empty: $Path"
+    }
 
-  try {
-    $cfg = $raw | ConvertFrom-Json
-  }
-  catch {
-    throw "Config file is not valid JSON: $Path. Error: $($_.Exception.Message)"
+    try {
+      $cfg = $raw | ConvertFrom-Json
+    }
+    catch {
+      throw "Config file is not valid JSON: $Path. Error: $($_.Exception.Message)"
+    }
   }
 
   foreach ($k in @("Server", "From", "To")) {
-    if (-not ($cfg.PSObject.Properties.Name -contains $k)) {
+    if (-not (Test-SendAlertConfigKey -Config $cfg -Key $k)) {
       throw "Config is missing required field '$k'. Required: Server, From, To"
     }
-    if ([string]::IsNullOrWhiteSpace([string]$cfg.$k)) {
+    if ([string]::IsNullOrWhiteSpace([string](Get-SendAlertConfigValue -Config $cfg -Key $k))) {
       throw "Config field '$k' is blank."
     }
   }
 
-  $to = Convert-ToStringArray -Value $cfg.To
+  $to = Convert-ToStringArray -Value (Get-SendAlertConfigValue -Config $cfg -Key 'To')
   if (@($to).Count -lt 1) {
     throw "Config field 'To' produced no recipients after parsing."
   }
 
   $port = 25
-  if ($cfg.PSObject.Properties.Name -contains "Port" -and $cfg.Port) {
-    if (-not ($cfg.Port -as [int])) { throw "Config field 'Port' must be an integer (e.g. 25)." }
-    $port = [int]$cfg.Port
+  if ((Test-SendAlertConfigKey -Config $cfg -Key 'Port') -and (Get-SendAlertConfigValue -Config $cfg -Key 'Port')) {
+    $configuredPort = Get-SendAlertConfigValue -Config $cfg -Key 'Port'
+    if (-not ($configuredPort -as [int])) { throw "Config field 'Port' must be an integer (e.g. 25)." }
+    $port = [int]$configuredPort
   }
 
   $useSsl = $false
-  if ($cfg.PSObject.Properties.Name -contains "UseSsl") {
-    $useSsl = [bool]$cfg.UseSsl
+  if (Test-SendAlertConfigKey -Config $cfg -Key 'UseSsl') {
+    $useSsl = [bool](Get-SendAlertConfigValue -Config $cfg -Key 'UseSsl')
   }
 
   [pscustomobject]@{
-    Server = [string]$cfg.Server
-    From   = [string]$cfg.From
+    Server = [string](Get-SendAlertConfigValue -Config $cfg -Key 'Server')
+    From   = [string](Get-SendAlertConfigValue -Config $cfg -Key 'From')
     To     = $to
     Port   = $port
     UseSsl = $useSsl

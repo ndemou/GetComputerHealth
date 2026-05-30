@@ -23,6 +23,13 @@ After extracting the zip to the stage folder, replaces staged `install.ps1`
 with the currently running script before handoff. This allows in-progress installer
 changes to run through the full staged flow during development.
 
+.PARAMETER Config
+Hashtable or PowerShell data file path for customized installs. `Options.InstallDir`
+sets the install root; `ConfigFiles` writes named .psd1 files under the config folder.
+
+.PARAMETER GenerateConfigPsd1
+Writes a sample `GetComputerHealth-install-config.psd1` file in the current folder.
+
 .NOTES
 Architecture and execution model:
 - Purpose: install/update GetComputerHealth into the current `bin` tree safely.
@@ -45,6 +52,8 @@ param(
   [switch]$ForceRequery,
   [switch]$Reinstall,
   [switch]$DevMode,
+  [object]$Config,
+  [switch]$GenerateConfigPsd1,
 
   [Parameter(DontShow = $true)][switch]$InternalStageRun,
   [Parameter(DontShow = $true)][switch]$SkipMutexAcquire,
@@ -111,6 +120,162 @@ function Add-TextLineUtf8NoBom {
   $enc = New-Object System.Text.UTF8Encoding($false)
   $text = $Line + [Environment]::NewLine
   [System.IO.File]::AppendAllText($Path, $text, $enc)
+}
+
+function ConvertTo-GchPsd1Literal {
+  param(
+    [AllowNull()]$Value,
+    [int]$Indent = 0
+  )
+
+  $spaces = ''.PadLeft($Indent)
+  $childIndent = $Indent + 4
+  $childSpaces = ''.PadLeft($childIndent)
+
+  if ($null -eq $Value) { return '$null' }
+  if ($Value -is [bool]) {
+    if ($Value) { return '$true' }
+    return '$false'
+  }
+  if ($Value -is [int] -or $Value -is [long] -or $Value -is [double] -or $Value -is [decimal]) {
+    return ([string]$Value)
+  }
+  if ($Value -is [hashtable]) {
+    $lines = @('@{')
+    foreach ($key in @($Value.Keys | Sort-Object)) {
+      $keyText = ConvertTo-GchPsd1KeyLiteral -Key ([string]$key)
+      $valueText = ConvertTo-GchPsd1Literal -Value $Value[$key] -Indent $childIndent
+      $lines += ('{0}{1} = {2}' -f $childSpaces, $keyText, $valueText)
+    }
+    $lines += ($spaces + '}')
+    return ($lines -join [Environment]::NewLine)
+  }
+  if ($Value -is [System.Collections.IDictionary]) {
+    $copy = @{}
+    foreach ($key in $Value.Keys) {
+      $copy[[string]$key] = $Value[$key]
+    }
+    return (ConvertTo-GchPsd1Literal -Value $copy -Indent $Indent)
+  }
+  if (($Value -is [System.Collections.IEnumerable]) -and (-not ($Value -is [string]))) {
+    $items = @($Value)
+    if ($items.Count -eq 0) { return '@()' }
+    $itemTexts = @()
+    foreach ($item in $items) {
+      $itemTexts += (ConvertTo-GchPsd1Literal -Value $item -Indent $childIndent)
+    }
+    return ('@({0}{1}{0})' -f [Environment]::NewLine, (($itemTexts | ForEach-Object { $childSpaces + $_ }) -join (',' + [Environment]::NewLine)))
+  }
+
+  $text = [string]$Value
+  return ("'{0}'" -f ($text -replace "'", "''"))
+}
+
+function ConvertTo-GchPsd1KeyLiteral {
+  param([Parameter(Mandatory = $true)][string]$Key)
+
+  if ($Key -match '^[A-Za-z_][A-Za-z0-9_]*$') {
+    return $Key
+  }
+
+  return ("'{0}'" -f ($Key -replace "'", "''"))
+}
+
+function ConvertTo-GchPsd1Text {
+  param([Parameter(Mandatory = $true)]$Value)
+
+  (ConvertTo-GchPsd1Literal -Value $Value -Indent 0) + [Environment]::NewLine
+}
+
+function Get-GchInstallConfigTemplateText {
+  @'
+@{
+    Options = @{
+        # InstallDir is the folder that will contain bin, config, log, temp, and data.
+        InstallDir = 'C:\IT\GetComputerHealth'
+    }
+    ConfigFiles = @{
+        'Send-Message.psd1' = @{
+            Server = 'smtp.contoso.com'
+            From = 'SERVER01+alerts@contoso.com'
+            To = 'ops@contoso.com;admin@contoso.com'
+        }
+        'gch.psd1' = @{
+            AutomaticUpdates = $false
+            RepoUrl = 'https://github.com/ndemou/GetComputerHealth'
+            SendReports = 'Auto'
+            ShowAsPostponedWindowDays = 15
+            IpsOfAllDCs = @('10.1.2.3', '10.1.2.4')
+        }
+    }
+}
+'@
+}
+
+function Write-GchInstallConfigTemplate {
+  $path = Join-Path (Get-Location).Path 'GetComputerHealth-install-config.psd1'
+  Write-TextFileUtf8NoBom -Path $path -Text (Get-GchInstallConfigTemplateText)
+  Write-Host ("Generated install configuration template: {0}" -f $path)
+}
+
+function Resolve-GchInstallConfig {
+  param([AllowNull()]$InputObject)
+
+  if ($null -eq $InputObject) { return $null }
+
+  if ($InputObject -is [string]) {
+    $configPath = [string]$InputObject
+    if ([string]::IsNullOrWhiteSpace($configPath)) { return $null }
+    if (-not (Test-Path -LiteralPath $configPath -PathType Leaf)) {
+      throw "Install configuration file not found: '$configPath'"
+    }
+    return (Import-PowerShellDataFile -LiteralPath $configPath -ErrorAction Stop)
+  }
+
+  return $InputObject
+}
+
+function Get-GchInstallConfigSection {
+  param(
+    [AllowNull()]$ConfigObject,
+    [Parameter(Mandatory = $true)][string]$Key
+  )
+
+  if ($null -eq $ConfigObject) { return $null }
+  if ($ConfigObject -is [hashtable]) {
+    if ($ConfigObject.ContainsKey($Key)) { return $ConfigObject[$Key] }
+    return $null
+  }
+  if ($ConfigObject.PSObject.Properties[$Key]) { return $ConfigObject.$Key }
+  return $null
+}
+
+function Write-GchCustomConfigFiles {
+  param(
+    [AllowNull()]$InstallConfig,
+    [Parameter(Mandatory = $true)][string]$ConfigDir
+  )
+
+  $configFiles = Get-GchInstallConfigSection -ConfigObject $InstallConfig -Key 'ConfigFiles'
+  if ($null -eq $configFiles) { return }
+  if (-not ($configFiles -is [System.Collections.IDictionary])) {
+    throw 'ConfigFiles must be a hashtable whose keys are config file names.'
+  }
+
+  Ensure-Directory -Path $ConfigDir
+  foreach ($name in @($configFiles.Keys | Sort-Object)) {
+    $fileName = [string]$name
+    if ([string]::IsNullOrWhiteSpace($fileName)) {
+      throw 'ConfigFiles contains an empty config file name.'
+    }
+    if ($fileName.IndexOfAny([System.IO.Path]::GetInvalidFileNameChars()) -ge 0 -or $fileName -match '[\\/]') {
+      throw "ConfigFiles file name '$fileName' must be a simple file name."
+    }
+
+    $path = Join-Path $ConfigDir $fileName
+    $text = ConvertTo-GchPsd1Text -Value $configFiles[$name]
+    Write-TextFileUtf8NoBom -Path $path -Text $text
+  }
 }
 
 function Get-GchDefaultConfigText {
@@ -534,6 +699,8 @@ function Set-InternetSourceAttemptState {
 }
 
 function Get-TargetBinPath {
+  $installOptions = Get-GchInstallConfigSection -ConfigObject $script:InstallConfig -Key 'Options'
+
   if ($InternalStageRun) {
     if ([string]::IsNullOrWhiteSpace($PathToBin)) {
       throw 'Internal staged execution requires -PathToBin.'
@@ -541,10 +708,18 @@ function Get-TargetBinPath {
     return ([System.IO.Path]::GetFullPath($PathToBin))
   }
 
+  if ($installOptions -and (Test-GchConfigKey -Config $installOptions -Key 'InstallDir')) {
+    $installDir = [string](Get-GchConfigValue -Config $installOptions -Key 'InstallDir')
+    if ([string]::IsNullOrWhiteSpace($installDir)) {
+      throw 'Config.Options.InstallDir cannot be empty.'
+    }
+    return ([System.IO.Path]::GetFullPath((Join-Path $installDir 'bin')))
+  }
+
   $cwd = (Get-Location).Path
   $leaf = Split-Path -Leaf $cwd
   if ($leaf -ine 'bin') {
-    throw 'This installer must be run from a folder named "bin".'
+    throw 'This installer must be run from a folder named "bin" unless -Config @{ Options = @{ InstallDir = ... } } is provided.'
   }
 
   ([System.IO.Path]::GetFullPath($cwd))
@@ -2011,13 +2186,21 @@ $state = $null
 $sourcePlan = $null
 $stageRoot = $null
 $zipPath = $null
+$script:InstallConfig = $null
 
 try {
+  if ($GenerateConfigPsd1) {
+    Write-GchInstallConfigTemplate
+    return
+  }
+
+  $script:InstallConfig = Resolve-GchInstallConfig -InputObject $Config
   $targetBin = Get-TargetBinPath
   Initialize-Paths -BinPath $targetBin
+  Write-GchCustomConfigFiles -InstallConfig $script:InstallConfig -ConfigDir $script:ConfigDir
   Ensure-GchConfigFile -Path $script:GchConfigPath -RepoUrl $DEFAULT_REPO_URL -ShowAsPostponedWindowDays $DEFAULT_SHOW_AS_POSTPONED_WINDOW_DAYS
   $gchConfig = Read-GchConfigFile -Path $script:GchConfigPath
-  if ((-not $InternalStageRun) -and (Test-GchConfigKey -Config $gchConfig -Key 'AutomaticUpdates') -and (Test-GchFalsyValue -Value (Get-GchConfigValue -Config $gchConfig -Key 'AutomaticUpdates'))) {
+  if ((-not $InternalStageRun) -and ($null -eq $script:InstallConfig) -and (Test-GchConfigKey -Config $gchConfig -Key 'AutomaticUpdates') -and (Test-GchFalsyValue -Value (Get-GchConfigValue -Config $gchConfig -Key 'AutomaticUpdates'))) {
     Write-Warning "Automatic updates are disabled by '$script:GchConfigPath'. install.ps1 will not make changes."
     return
   }

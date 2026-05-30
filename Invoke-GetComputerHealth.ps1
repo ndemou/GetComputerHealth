@@ -144,6 +144,10 @@ $SHOW_AS_POSTPONED_WINDOW_DAYS = 150
 $SmtpSubject = 'Notable Messages from Get-ComputerHealth of LIST_OF_COMPUTERS'
 $SmtpSubjectAllGood = 'RELAX. No notable Messages from Get-ComputerHealth of LIST_OF_COMPUTERS'
 $SmtpConfig = Join-Path $CONFIG_DIR 'Send-Message.conf'
+$SmtpConfigPsd1 = Join-Path $CONFIG_DIR 'Send-Message.psd1'
+if ((-not (Test-Path -LiteralPath $SmtpConfig -PathType Leaf)) -and (Test-Path -LiteralPath $SmtpConfigPsd1 -PathType Leaf)) {
+  $SmtpConfig = $SmtpConfigPsd1
+}
 #------------------------------------------------------------------------
 # Functions
 #------------------------------------------------------------------------
