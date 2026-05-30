@@ -38,6 +38,48 @@ Besides installation, this code *should not change the state of the system in an
 
 **To centrally scan workstations**, you must be able to manage them with Remote PowerShell (running `Enter-PSSession WorkstationName` or `Invoke-Command WorkstationName` should work). Domain-joined servers are usually centrally managed with zero configuration.
 
+## Super-simple customized install
+
+For a customized install, download just the installer/updater script and pass one `-Config` hashtable. The top-level `Options` branch controls installer behavior; the `ConfigFiles` branch writes configuration files under the install root's `config` folder.
+
+```powershell
+Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/ndemou/GetComputerHealth/refs/heads/main/Update-GetHealthCode.ps1" -OutFile ".\Update-GetHealthCode.ps1"
+& .\Update-GetHealthCode.ps1 -Config @{
+    Options = @{
+        InstallDir = 'C:\IT\GetComputerHealth'
+    }
+    ConfigFiles = @{
+        'Send-Message.psd1' = @{
+            Server = 'smtp.contoso.com'
+            From   = 'SERVER01+alerts@contoso.com'
+            To     = 'ops@contoso.com;admin@contoso.com'
+        }
+        'gch.psd1' = @{
+            AutomaticUpdates = $false
+            SendReports = 'Auto' # 'Never', 'Always', or 'Auto'
+            ShowAsPostponedWindowDays = 15
+            IpsOfAllDCs = @('10.1.2.3', '10.1.2.4')
+        }
+    }
+}
+```
+
+In the example above:
+
+* `Options.InstallDir` means the tool is installed into `C:\IT\GetComputerHealth\bin`, while configuration is written to `C:\IT\GetComputerHealth\config`.
+* Each child of `ConfigFiles` becomes one PowerShell data file in `config`. For example, `ConfigFiles['gch.psd1']` writes `C:\IT\GetComputerHealth\config\gch.psd1`.
+* Passing `AutomaticUpdates = $false` in `gch.psd1` disables future automatic updates, but it does not block the installation command that explicitly supplied `-Config`.
+
+If you prefer to edit a file instead of embedding a hashtable in the command, generate a template, customize it, and pass the path to `-Config`:
+
+```powershell
+Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/ndemou/GetComputerHealth/refs/heads/main/install.ps1" -OutFile ".\install.ps1"
+& .\install.ps1 -GenerateConfigPsd1
+notepad .\GetComputerHealth-install-config.psd1
+& .\install.ps1 -Config .\GetComputerHealth-install-config.psd1
+```
+
+
 ## OPTION 1: Installation Plus a Quick Run
 
 * **Security Note:** Each time you run `Invoke-GetComputerHealth`, it will call `Update-GetHealthCode.ps1` and fetch code from this repository.
