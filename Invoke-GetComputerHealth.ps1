@@ -783,6 +783,40 @@ function Get-HealthEffectiveLevel {
   return $realLevel
 }
 
+function Convert-HealthTimeValueToUtcIsoString {
+  [CmdletBinding()]
+  param(
+    $Value
+  )
+
+  if ($null -eq $Value) {
+    return ''
+  }
+
+  if ($Value -is [datetimeoffset]) {
+    return ([datetimeoffset]$Value).ToUniversalTime().ToString('o')
+  }
+
+  if ($Value -is [datetime]) {
+    return ([datetime]$Value).ToUniversalTime().ToString('o')
+  }
+
+  if ($Value.PSObject -and $Value.PSObject.Properties['UtcDateTime'] -and $Value.UtcDateTime) {
+    return ([datetime]$Value.UtcDateTime).ToUniversalTime().ToString('o')
+  }
+
+  if ($Value.PSObject -and $Value.PSObject.Properties['DateTime'] -and $Value.DateTime) {
+    return ([datetime]$Value.DateTime).ToUniversalTime().ToString('o')
+  }
+
+  $text = [string]$Value
+  if ([string]::IsNullOrWhiteSpace($text)) {
+    return ''
+  }
+
+  return ([datetime]$text).ToUniversalTime().ToString('o')
+}
+
 function Convert-HealthMessagesToReportRows {
   [CmdletBinding()]
   param(
@@ -794,12 +828,7 @@ function Convert-HealthMessagesToReportRows {
     $suppressed = if ($message.PSObject.Properties['Suppressed']) { [bool]$message.Suppressed } else { $false }
     $timeUtc = ''
     if ($message.PSObject.Properties['TimeUtc'] -and $message.TimeUtc) {
-      if ($message.TimeUtc -is [datetimeoffset]) {
-        $timeUtc = ([datetimeoffset]$message.TimeUtc).ToUniversalTime().ToString('o')
-      }
-      else {
-        $timeUtc = ([datetime]$message.TimeUtc).ToUniversalTime().ToString('o')
-      }
+      $timeUtc = Convert-HealthTimeValueToUtcIsoString -Value $message.TimeUtc
     }
 
     [pscustomobject]@{

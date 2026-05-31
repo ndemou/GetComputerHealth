@@ -34,7 +34,8 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
         'Get-GchConfigValue',
         'Resolve-GchConfiguredNonNegativeInteger',
         'Get-HealthSuppressionExpiryMap',
-        'Get-HealthEffectiveLevel'
+        'Get-HealthEffectiveLevel',
+        'Convert-HealthTimeValueToUtcIsoString'
       )) {
       $funcAst = $ast.Find({
           param($node)
@@ -246,6 +247,35 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
 
     $rows.Count | Should -Be 1
     $rows[0].TimeUtc | Should -Be '2026-05-31T07:03:10.0000000+00:00'
+  }
+
+  It 'normalizes deserialized clixml DateTimeOffset TimeUtc values without throwing' {
+    $tempRoot = Join-Path $env:TEMP ('gch-timeutc-clixml-' + [guid]::NewGuid().ToString())
+    $path = Join-Path $tempRoot 'rows.clixml'
+
+    try {
+      New-Item -ItemType Directory -Path $tempRoot -Force | Out-Null
+      @(
+        [pscustomobject]@{
+          TimeUtc = [datetimeoffset]'2026-05-31T07:03:10+00:00'
+          Computer = 'SRV1'
+          Suppressed = $false
+          Level = 'warning'
+          Message = 'Disk free space is low'
+          Comment = 'Drive C: low'
+          Hash = 'deadbeef'
+          Emitter = 'HealthTest-Disks'
+        }
+      ) | Export-Clixml -LiteralPath $path
+
+      $imported = Import-Clixml -LiteralPath $path
+      $rows = @(Convert-HealthMessagesToReportRows -Messages $imported)
+
+      $rows.Count | Should -Be 1
+      $rows[0].TimeUtc | Should -Be '2026-05-31T07:03:10.0000000Z'
+    } finally {
+      Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
+    }
   }
 
   It 'saves and reloads report data as zipped clixml' {
