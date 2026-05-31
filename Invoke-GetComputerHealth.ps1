@@ -1073,7 +1073,7 @@ function Get-HealthInteractiveHtmlReport {
       font-size: 16px;
       letter-spacing: -0.03em;
     }
-    .controls, .column-controls, .summary {
+    .controls, .column-controls {
       display: flex;
       flex-wrap: wrap;
       gap: 10px;
@@ -1113,8 +1113,7 @@ function Get-HealthInteractiveHtmlReport {
       color: #fff;
       border-color: var(--accent);
     }
-    .summary {
-      gap: 18px;
+    .show-postponed-status {
       color: var(--muted);
       font-size: 13px;
     }
@@ -1123,9 +1122,6 @@ function Get-HealthInteractiveHtmlReport {
       color: var(--muted);
       font-size: 10px;
       font-family: Segoe UI, Arial, sans-serif;
-    }
-    .summary .status-item {
-      white-space: nowrap;
     }
     .utility-button {
       background: linear-gradient(180deg, #2f80ed 0%, #1f62c4 100%);
@@ -1368,24 +1364,22 @@ function Get-HealthInteractiveHtmlReport {
     <div class="hero">
       <h1>$safeTitle</h1>
       <div class="controls">
+        <span class="controls-label">Filters:</span>
         <input id="textFilter" type="text" placeholder="Filter text. Example: foo -bar">
-        <button id="copyVisibleCommands" type="button" class="utility-button hidden"><strong>Copy Action Commands</strong></button>
-        <span id="copyStatus" class="copy-status"></span>
-      </div>
-      <div class="controls">
-        <span class="controls-label">Show rows with this action:</span>
-        <button type="button" class="what-filter active-filter" data-filter="">All actions</button>
-        <button type="button" class="what-filter" data-filter="suppress">Suppress</button>
-        <button type="button" class="what-filter" data-filter="postpone">Postpone</button>
-        <button type="button" class="what-filter" data-filter="must-fix">Must-fix</button>
-        <button type="button" class="what-filter" data-filter="not-sure">Not-sure</button>
+        <select id="actionFilter">
+          <option value="">All actions</option>
+          <option value="suppress">Suppress</option>
+          <option value="postpone">Postpone</option>
+          <option value="must-fix">Must-fix</option>
+          <option value="not-sure">Not-sure</option>
+        </select>
         <label class="plain-toggle" for="showPostponed">
           <span class="toggle-text">Show Postponed</span>
           <input id="showPostponed" type="checkbox">
           <span class="toggle-track" aria-hidden="true"></span>
         </label>
+        <span id="showPostponedStatus" class="show-postponed-status"></span>
       </div>
-      <div class="summary" id="summary"></div>
       <div class="column-controls">
         <span class="controls-label">Visible Columns:</span>
         <label><input class="column-toggle" type="checkbox" data-column="computer" checked> Computer</label>
@@ -1394,6 +1388,8 @@ function Get-HealthInteractiveHtmlReport {
         <label><input class="column-toggle" type="checkbox" data-column="message" checked> Message</label>
         <label><input class="column-toggle" type="checkbox" data-column="comment" checked> Comment</label>
         <label><input class="column-toggle" type="checkbox" data-column="command"> Action Command</label>
+        <button id="copyVisibleCommands" type="button" class="utility-button hidden"><strong>Copy Action Commands</strong></button>
+        <span id="copyStatus" class="copy-status"></span>
       </div>
     </div>
     <div class="table-wrap">
@@ -1540,8 +1536,7 @@ function Get-HealthInteractiveHtmlReport {
       }
 
       function currentWhatFilter() {
-        var active = document.querySelector('.what-filter.active-filter');
-        return active ? active.getAttribute('data-filter') : '';
+        return document.getElementById('actionFilter').value || '';
       }
 
       function sortButtonText(direction) {
@@ -1698,9 +1693,7 @@ function Get-HealthInteractiveHtmlReport {
           });
         });
 
-        document.getElementById('summary').innerHTML = ''
-          + '<span class="status-item">Visible findings: ' + filtered.length + '</span>'
-          + '<span class="status-item">Loaded findings: ' + rows.length + '</span>';
+        document.getElementById('showPostponedStatus').textContent = '(showing ' + filtered.length + ' of ' + rows.length + ' findings)';
 
         window.__gchVisibleCommands = filtered.map(function (row) {
           return buildWhitelistCommand(row);
@@ -1727,16 +1720,6 @@ function Get-HealthInteractiveHtmlReport {
         });
       }
 
-      document.querySelectorAll('.what-filter').forEach(function (button) {
-        button.addEventListener('click', function () {
-          document.querySelectorAll('.what-filter').forEach(function (item) {
-            item.classList.remove('active-filter');
-          });
-          button.classList.add('active-filter');
-          render();
-        });
-      });
-
       document.querySelectorAll('.sort-toggle').forEach(function (button) {
         button.addEventListener('click', function () {
           var current = this.getAttribute('data-sort-direction') || '';
@@ -1759,6 +1742,7 @@ function Get-HealthInteractiveHtmlReport {
       });
 
       document.getElementById('textFilter').addEventListener('input', render);
+      document.getElementById('actionFilter').addEventListener('change', render);
       document.getElementById('showPostponed').addEventListener('change', render);
       document.getElementById('copyVisibleCommands').addEventListener('click', function () {
         var commands = window.__gchVisibleCommands || [];

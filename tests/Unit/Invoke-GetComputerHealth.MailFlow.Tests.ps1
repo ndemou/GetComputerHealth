@@ -343,18 +343,22 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
     $html | Should -Match '>Get-ComputerHealth version 8.0.7, last update 2026-05-31 08:58<'
     $html | Should -Match 'Copy Action Commands'
     $html | Should -Match 'plain-toggle'
-    $html | Should -Match 'Show rows with this action:'
+    $html | Should -Match 'Filters:'
     $html | Should -Match 'Visible Columns:'
     $html | Should -Match 'data-column="action" checked'
     $html | Should -Match 'font-size: 16px;'
     $html | Should -Not -Match 'Interactive notable findings for this run'
-    $html | Should -Match 'data-filter="postpone"'
     $html | Should -Match 'Show Postponed'
     $html | Should -Match 'id="showPostponed" type="checkbox"'
+    $html | Should -Match 'id="actionFilter"'
+    $html | Should -Match '>All actions<'
+    $html | Should -Match '>Suppress<'
+    $html | Should -Match '>Postpone<'
     $html | Should -Not -Match 'id="showPostponed" type="checkbox" checked'
     $html | Should -Match 'data-column="message" checked'
     $html | Should -Match 'data-column="command"'
     $html | Should -Not -Match 'data-column="command" checked'
+    $html | Should -Not -Match 'class="what-filter'
     $html | Should -Not -Match 'id="sortField"'
     $html | Should -Not -Match 'id="sortDirection"'
     $html | Should -Match 'min-width: 190px;'
@@ -367,7 +371,7 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
     $html | Should -Match 'tbody td\.col-comment \{'
     $html | Should -Match 'font-family: Consolas, "Courier New", monospace;'
     $html | Should -Match '\.postponed-text \{'
-    $html | Should -Match '\.summary \{'
+    $html | Should -Match '\.show-postponed-status \{'
     $html | Should -Match '\.sort-toggle \{'
     $html | Should -Match '\.sort-toggle\.active \{'
     $html | Should -Match '\.utility-button \{'
@@ -381,9 +385,10 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
     $html | Should -Match 'class="col-message"><button type="button" class="sort-toggle"'
     $html | Should -Match 'class="col-comment">Comment</th>'
     $html | Should -Match 'Action Command'
-    $html | Should -Match '<span class="status-item">Visible findings: '
-    $html | Should -Match '<span class="status-item">Loaded findings: '
-    $html | Should -Not -Match 'Postponed shown: '
+    $html | Should -Match 'showing '
+    $html | Should -Match 'of '
+    $html | Should -Not -Match 'Visible findings: '
+    $html | Should -Not -Match 'Loaded findings: '
     $html | Should -Match 'class="footer"'
     $html | Should -Match '<col class="col-command col-width-command">'
     $html | Should -Match '__gchVisibleCommands'
@@ -399,6 +404,7 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
     $html | Should -Match "\\u25BC"
     $html | Should -Match "\\u25B2"
     $html | Should -Match "\\u25CF"
+    $html | Should -Match "document.getElementById\('showPostponedStatus'\)\.textContent = '\(showing ' \+ filtered.length \+ ' of ' \+ rows.length \+ ' findings\)';"
     $html | Should -Match "document.getElementById\('copyVisibleCommands'\)\.classList\.toggle\('hidden', window\.__gchVisibleCommands\.length === 0\);"
   }
 
