@@ -1064,14 +1064,8 @@ function Get-HealthInteractiveHtmlReport {
     }
     h1 {
       margin: 0 0 8px 0;
-      font-size: 31px;
+      font-size: 16px;
       letter-spacing: -0.03em;
-    }
-    .sub {
-      color: var(--muted);
-      font-size: 14px;
-      max-width: 920px;
-      line-height: 1.5;
     }
     .controls, .column-controls, .summary {
       display: flex;
@@ -1090,8 +1084,8 @@ function Get-HealthInteractiveHtmlReport {
       box-shadow: inset 0 1px 0 rgba(255,255,255,0.7);
     }
     .controls input[type=text] {
-      min-width: 380px;
-      flex: 1 1 420px;
+      min-width: 190px;
+      flex: 0 1 210px;
     }
     button, .pill {
       border: 1px solid var(--line);
@@ -1113,9 +1107,13 @@ function Get-HealthInteractiveHtmlReport {
       color: #fff;
       border-color: var(--accent);
     }
-    .summary .pill {
-      cursor: default;
-      background: rgba(255,255,255,0.78);
+    .summary {
+      gap: 18px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .summary .status-item {
+      white-space: nowrap;
     }
     .utility-button {
       background: linear-gradient(180deg, #ffffff 0%, #f0f8f5 100%);
@@ -1170,6 +1168,10 @@ function Get-HealthInteractiveHtmlReport {
       font-size: 13px;
       font-weight: 600;
     }
+    .column-controls label {
+      font-size: 13px;
+      color: var(--ink);
+    }
     .table-wrap {
       background: var(--panel-strong);
       border: 1px solid var(--line);
@@ -1183,9 +1185,9 @@ function Get-HealthInteractiveHtmlReport {
       border-collapse: collapse;
       table-layout: auto;
     }
-    col.col-width-computer { width: 11%; }
-    col.col-width-level { width: 9%; }
-    col.col-width-action { width: 10%; }
+    col.col-width-computer { width: 1%; }
+    col.col-width-level { width: 1%; }
+    col.col-width-action { width: 1%; }
     col.col-width-message { width: 28%; }
     col.col-width-comment { width: 18%; }
     col.col-width-command { width: 24%; }
@@ -1214,6 +1216,23 @@ function Get-HealthInteractiveHtmlReport {
     }
     tbody tr:hover {
       background: #f7fbf9;
+    }
+    .col-computer, .col-level, .col-action {
+      white-space: nowrap;
+      width: 1%;
+    }
+    .col-message {
+      font-size: 13px;
+    }
+    .col-comment {
+      color: #41515a;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 12px;
+      white-space: pre-wrap;
+      line-height: 1.45;
+    }
+    .postponed-text {
+      color: #7a7f87;
     }
     .level-badge, .what-badge {
       display: inline-block;
@@ -1276,7 +1295,6 @@ function Get-HealthInteractiveHtmlReport {
   <div class="shell">
     <div class="hero">
       <h1>$safeTitle</h1>
-      <div class="sub">Interactive notable findings for this run. This contains the same notable findings as the simple report, including suppressed ones.</div>
       <div class="controls">
         <input id="textFilter" type="text" placeholder="Filter text. Example: foo -bar">
         <select id="sortField">
@@ -1294,15 +1312,16 @@ function Get-HealthInteractiveHtmlReport {
         <button type="button" class="what-filter" data-filter="postpone">Postpone</button>
         <button type="button" class="what-filter" data-filter="must-fix">Must-fix</button>
         <button type="button" class="what-filter" data-filter="not-sure">Not-sure</button>
-        <label class="toggle-pill" for="hideSuppressed">
-          <span class="toggle-text">Hide suppressed</span>
-          <input id="hideSuppressed" type="checkbox" checked>
+        <label class="toggle-pill" for="showPostponed">
+          <span class="toggle-text">Show Postponed</span>
+          <input id="showPostponed" type="checkbox">
           <span class="toggle-track" aria-hidden="true"></span>
         </label>
       </div>
       <div class="column-controls">
         <label><input class="column-toggle" type="checkbox" data-column="computer" checked> Computer</label>
         <label><input class="column-toggle" type="checkbox" data-column="level" checked> Level</label>
+        <label><input class="column-toggle" type="checkbox" data-column="message" checked> Message</label>
         <label><input class="column-toggle" type="checkbox" data-column="comment" checked> Comment</label>
         <label><input class="column-toggle" type="checkbox" data-column="command"> AddWhitelist command</label>
       </div>
@@ -1313,8 +1332,8 @@ function Get-HealthInteractiveHtmlReport {
         <colgroup>
           <col class="col-computer col-width-computer">
           <col class="col-level col-width-level">
-          <col class="col-width-action">
-          <col class="col-width-message">
+          <col class="col-action col-width-action">
+          <col class="col-message col-width-message">
           <col class="col-comment col-width-comment">
           <col class="col-command col-width-command">
         </colgroup>
@@ -1322,8 +1341,8 @@ function Get-HealthInteractiveHtmlReport {
           <tr>
             <th class="col-computer">Computer</th>
             <th class="col-level">Level</th>
-            <th>What to do</th>
-            <th>Message</th>
+            <th class="col-action">What to do</th>
+            <th class="col-message">Message</th>
             <th class="col-comment">Comment</th>
             <th class="col-command">AddWhitelist command</th>
           </tr>
@@ -1461,14 +1480,14 @@ function Get-HealthInteractiveHtmlReport {
       function render() {
         var filterText = document.getElementById('textFilter').value;
         var tokens = tokenize(filterText);
-        var hideSuppressed = document.getElementById('hideSuppressed').checked;
+        var showPostponed = document.getElementById('showPostponed').checked;
         var sortField = document.getElementById('sortField').value;
         var ascending = document.getElementById('sortDirection').getAttribute('data-direction') !== 'desc';
         var whatFilter = currentWhatFilter();
         var body = document.getElementById('reportRows');
         var filtered = rows.filter(function (row) {
           normalizeAction(row);
-          if (hideSuppressed && (String(row.Suppressed).toLowerCase() === 'true')) {
+          if (!showPostponed && String(row.EffectiveLevel || row.Level || '').toLowerCase() === 'postponed') {
             return false;
           }
           if (whatFilter && row.WhatToDo !== whatFilter) {
@@ -1494,15 +1513,17 @@ function Get-HealthInteractiveHtmlReport {
 
         body.innerHTML = filtered.map(function (row, index) {
           var key = htmlEncode(keyForRow(row));
+          var isPostponed = String(row.EffectiveLevel || row.Level || '').toLowerCase() === 'postponed';
+          var postponedClass = isPostponed ? ' postponed-text' : '';
           var commentHtml = htmlEncode(row.Comment || '').replace(/\r?\n/g, '<br>');
           var commandHtml = htmlEncode(buildWhitelistCommand(row)).replace(/\r?\n/g, '<br>');
           return ''
             + '<tr>'
             + '<td class="col-computer">' + htmlEncode(row.Computer || '') + '</td>'
             + '<td class="col-level"><span class="level-badge ' + levelClass((row.EffectiveLevel || row.Level || '').toLowerCase()) + '">' + htmlEncode(row.EffectiveLevel || row.Level || '') + '</span></td>'
-            + '<td><button type="button" class="what-badge ' + actionClass(row.WhatToDo) + '" data-row-key="' + key + '" data-index="' + index + '">' + htmlEncode(row.WhatToDo) + '</button></td>'
-            + '<td>' + htmlEncode(row.Message || '') + '</td>'
-            + '<td class="col-comment">' + commentHtml + '</td>'
+            + '<td class="col-action"><button type="button" class="what-badge ' + actionClass(row.WhatToDo) + '" data-row-key="' + key + '" data-index="' + index + '">' + htmlEncode(row.WhatToDo) + '</button></td>'
+            + '<td class="col-message' + postponedClass + '">' + htmlEncode(row.Message || '') + '</td>'
+            + '<td class="col-comment' + postponedClass + '">' + commentHtml + '</td>'
             + '<td class="col-command cmd">' + commandHtml + '</td>'
             + '</tr>';
         }).join('');
@@ -1521,9 +1542,9 @@ function Get-HealthInteractiveHtmlReport {
         });
 
         document.getElementById('summary').innerHTML = ''
-          + '<span class="pill">Visible findings: ' + filtered.length + '</span>'
-          + '<span class="pill">Loaded findings: ' + rows.length + '</span>'
-          + '<span class="pill">Suppressed hidden by default: ' + (hideSuppressed ? 'yes' : 'no') + '</span>';
+          + '<span class="status-item">Visible findings: ' + filtered.length + '</span>'
+          + '<span class="status-item">Loaded findings: ' + rows.length + '</span>'
+          + '<span class="status-item">Postponed shown: ' + (showPostponed ? 'yes' : 'no') + '</span>';
 
         window.__gchVisibleCommands = filtered.map(function (row) {
           return buildWhitelistCommand(row);
@@ -1560,7 +1581,7 @@ function Get-HealthInteractiveHtmlReport {
 
       document.getElementById('textFilter').addEventListener('input', render);
       document.getElementById('sortField').addEventListener('change', render);
-      document.getElementById('hideSuppressed').addEventListener('change', render);
+      document.getElementById('showPostponed').addEventListener('change', render);
       document.getElementById('copyVisibleCommands').addEventListener('click', function () {
         var commands = window.__gchVisibleCommands || [];
         if (!commands.length) {
