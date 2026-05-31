@@ -355,6 +355,8 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
     $html | Should -Match 'data-column="message" checked'
     $html | Should -Match 'data-column="command"'
     $html | Should -Not -Match 'data-column="command" checked'
+    $html | Should -Not -Match 'id="sortField"'
+    $html | Should -Not -Match 'id="sortDirection"'
     $html | Should -Match 'min-width: 190px;'
     $html | Should -Match 'flex: 0 1 210px;'
     $html | Should -Match 'table-layout: auto;'
@@ -366,12 +368,19 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
     $html | Should -Match 'font-family: Consolas, "Courier New", monospace;'
     $html | Should -Match '\.postponed-text \{'
     $html | Should -Match '\.summary \{'
+    $html | Should -Match '\.sort-toggle \{'
+    $html | Should -Match '\.sort-toggle\.active \{'
     $html | Should -Match '\.utility-button \{'
     $html | Should -Match 'margin-left: auto;'
     $html | Should -Match '\.utility-button\.hidden \{'
-    $html | Should -Match 'class="col-action">Action</th>'
-    $html | Should -Match 'class="col-message">Message</th>'
+    $html | Should -Match 'data-sort-field="Computer"'
+    $html | Should -Match 'data-sort-field="EffectiveLevel"'
+    $html | Should -Match 'data-sort-field="WhatToDo"'
+    $html | Should -Match 'data-sort-field="Message"'
+    $html | Should -Match 'class="col-action"><button type="button" class="sort-toggle"'
+    $html | Should -Match 'class="col-message"><button type="button" class="sort-toggle"'
     $html | Should -Match 'class="col-comment">Comment</th>'
+    $html | Should -Match 'Action Command'
     $html | Should -Match '<span class="status-item">Visible findings: '
     $html | Should -Match '<span class="status-item">Loaded findings: '
     $html | Should -Not -Match 'Postponed shown: '
@@ -385,6 +394,11 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
     $html | Should -Match "var storageKey = 'gch-report-actions-v2';"
     $html | Should -Match 'ActionHistory: actionHistory\.slice\(-100\)'
     $html | Should -Match 'ActionState: actionState'
+    $html | Should -Match 'function sortButtonText\(direction\)'
+    $html | Should -Match 'function currentSort\(\)'
+    $html | Should -Match "\\u25BC"
+    $html | Should -Match "\\u25B2"
+    $html | Should -Match "\\u25CF"
     $html | Should -Match "document.getElementById\('copyVisibleCommands'\)\.classList\.toggle\('hidden', window\.__gchVisibleCommands\.length === 0\);"
   }
 

@@ -1057,15 +1057,15 @@ function Get-HealthInteractiveHtmlReport {
     .shell {
       max-width: 1500px;
       margin: 0 auto;
-      padding: 30px 24px 40px 24px;
+      padding: 5px 24px 40px 24px;
     }
     .hero {
       background: linear-gradient(180deg, rgba(255,255,255,0.96) 0%, rgba(248,251,249,0.92) 100%);
       border: 1px solid var(--line);
       border-radius: 24px;
-      padding: 24px 24px 20px 24px;
+      padding: 12px 24px 20px 24px;
       box-shadow: var(--shadow);
-      margin-bottom: 18px;
+      margin-bottom: 5px;
       backdrop-filter: blur(10px);
     }
     h1 {
@@ -1232,6 +1232,37 @@ function Get-HealthInteractiveHtmlReport {
       padding: 14px 12px;
       white-space: nowrap;
     }
+    .sort-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: 0;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      padding: 0;
+      font-size: 11px;
+      line-height: 1;
+      box-shadow: none;
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+    .sort-toggle:hover {
+      transform: none;
+      box-shadow: none;
+      color: var(--ink);
+    }
+    .sort-toggle.active {
+      color: var(--accent-strong);
+    }
+    .sort-toggle .sort-label {
+      font-size: 12px;
+      letter-spacing: 0.04em;
+    }
+    .sort-toggle .sort-glyph {
+      font-size: 11px;
+      line-height: 1;
+    }
     tbody td {
       padding: 12px;
       border-bottom: 1px solid #edf1ef;
@@ -1245,6 +1276,22 @@ function Get-HealthInteractiveHtmlReport {
     .col-computer, .col-level, .col-action {
       white-space: nowrap;
       width: 1%;
+    }
+    thead th.col-computer {
+      padding-left: 10px;
+      padding-right: 2px;
+    }
+    tbody td.col-computer {
+      padding-left: 10px;
+      padding-right: 2px;
+    }
+    thead th.col-level, thead th.col-action {
+      padding-left: 2px;
+      padding-right: 2px;
+    }
+    tbody td.col-level, tbody td.col-action {
+      padding-left: 2px;
+      padding-right: 2px;
     }
     .col-message {
       font-size: 13px;
@@ -1270,7 +1317,7 @@ function Get-HealthInteractiveHtmlReport {
     .level-failure { background: var(--failure); color: #fff; }
     .level-warning { background: var(--warning); color: #111; }
     .level-notice { background: var(--notice); color: #fff; }
-    .level-postponed { background: var(--postponed); color: #fff; }
+    .level-postponed { background: #767676; color: #fff; }
     .level-pass { background: var(--pass); color: #fff; }
     .level-debug, .level-info { background: var(--debug); color: #fff; }
     .what-suppress { background: var(--suppress); color: #fff; }
@@ -1304,7 +1351,7 @@ function Get-HealthInteractiveHtmlReport {
     }
     @media (max-width: 1100px) {
       .shell {
-        padding: 18px;
+        padding: 5px 18px 18px 18px;
       }
       .controls input[type=text] {
         min-width: 240px;
@@ -1322,12 +1369,6 @@ function Get-HealthInteractiveHtmlReport {
       <h1>$safeTitle</h1>
       <div class="controls">
         <input id="textFilter" type="text" placeholder="Filter text. Example: foo -bar">
-        <select id="sortField">
-          <option value="Computer">Sort by computer</option>
-          <option value="EffectiveLevel">Sort by level</option>
-          <option value="Message">Sort by message</option>
-        </select>
-        <button id="sortDirection" type="button">Ascending</button>
         <button id="copyVisibleCommands" type="button" class="utility-button hidden"><strong>Copy Action Commands</strong></button>
         <span id="copyStatus" class="copy-status"></span>
       </div>
@@ -1352,7 +1393,7 @@ function Get-HealthInteractiveHtmlReport {
         <label><input class="column-toggle" type="checkbox" data-column="action" checked> Action</label>
         <label><input class="column-toggle" type="checkbox" data-column="message" checked> Message</label>
         <label><input class="column-toggle" type="checkbox" data-column="comment" checked> Comment</label>
-        <label><input class="column-toggle" type="checkbox" data-column="command"> AddWhitelist command</label>
+        <label><input class="column-toggle" type="checkbox" data-column="command"> Action Command</label>
       </div>
     </div>
     <div class="table-wrap">
@@ -1367,12 +1408,12 @@ function Get-HealthInteractiveHtmlReport {
         </colgroup>
         <thead>
           <tr>
-            <th class="col-computer">Computer</th>
-            <th class="col-level">Level</th>
-            <th class="col-action">Action</th>
-            <th class="col-message">Message</th>
+            <th class="col-computer"><button type="button" class="sort-toggle" data-sort-field="Computer" data-sort-direction="" aria-label="Toggle sort for Computer" title="Toggle sort for Computer"><span class="sort-label">Computer</span><span class="sort-glyph">&#9679;</span></button></th>
+            <th class="col-level"><button type="button" class="sort-toggle" data-sort-field="EffectiveLevel" data-sort-direction="" aria-label="Toggle sort for Level" title="Toggle sort for Level"><span class="sort-label">Level</span><span class="sort-glyph">&#9679;</span></button></th>
+            <th class="col-action"><button type="button" class="sort-toggle" data-sort-field="WhatToDo" data-sort-direction="" aria-label="Toggle sort for Action" title="Toggle sort for Action"><span class="sort-label">Action</span><span class="sort-glyph">&#9679;</span></button></th>
+            <th class="col-message"><button type="button" class="sort-toggle" data-sort-field="Message" data-sort-direction="" aria-label="Toggle sort for Message" title="Toggle sort for Message"><span class="sort-label">Message</span><span class="sort-glyph">&#9679;</span></button></th>
             <th class="col-comment">Comment</th>
-            <th class="col-command">AddWhitelist command</th>
+            <th class="col-command">Action Command</th>
           </tr>
         </thead>
         <tbody id="reportRows"></tbody>
@@ -1503,6 +1544,27 @@ function Get-HealthInteractiveHtmlReport {
         return active ? active.getAttribute('data-filter') : '';
       }
 
+      function sortButtonText(direction) {
+        if (direction === 'asc') {
+          return '\u25B2';
+        }
+        if (direction === 'desc') {
+          return '\u25BC';
+        }
+        return '\u25CF';
+      }
+
+      function currentSort() {
+        var active = document.querySelector('.sort-toggle.active');
+        if (!active) {
+          return { field: '', direction: '' };
+        }
+        return {
+          field: active.getAttribute('data-sort-field') || '',
+          direction: active.getAttribute('data-sort-direction') || ''
+        };
+      }
+
       function setCopyStatus(message, cssClass) {
         var status = document.getElementById('copyStatus');
         status.textContent = message || '';
@@ -1570,8 +1632,7 @@ function Get-HealthInteractiveHtmlReport {
         var filterText = document.getElementById('textFilter').value;
         var tokens = tokenize(filterText);
         var showPostponed = document.getElementById('showPostponed').checked;
-        var sortField = document.getElementById('sortField').value;
-        var ascending = document.getElementById('sortDirection').getAttribute('data-direction') !== 'desc';
+        var sort = currentSort();
         var whatFilter = currentWhatFilter();
         var body = document.getElementById('reportRows');
         var filtered = rows.filter(function (row) {
@@ -1596,9 +1657,11 @@ function Get-HealthInteractiveHtmlReport {
           return true;
         });
 
-        filtered.sort(function (left, right) {
-          return compareRows(left, right, sortField, ascending);
-        });
+        if (sort.field && sort.direction) {
+          filtered.sort(function (left, right) {
+            return compareRows(left, right, sort.field, sort.direction === 'asc');
+          });
+        }
 
         body.innerHTML = filtered.map(function (row, index) {
           var key = htmlEncode(keyForRow(row));
@@ -1655,6 +1718,13 @@ function Get-HealthInteractiveHtmlReport {
             cell.classList.toggle('hidden-column', !checkbox.checked);
           });
         });
+        document.querySelectorAll('.sort-toggle').forEach(function (button) {
+          var direction = button.getAttribute('data-sort-direction') || '';
+          var glyph = button.querySelector('.sort-glyph');
+          if (glyph) {
+            glyph.textContent = sortButtonText(direction);
+          }
+        });
       }
 
       document.querySelectorAll('.what-filter').forEach(function (button) {
@@ -1667,17 +1737,28 @@ function Get-HealthInteractiveHtmlReport {
         });
       });
 
-      document.getElementById('sortDirection').setAttribute('data-direction', 'asc');
-      document.getElementById('sortDirection').addEventListener('click', function () {
-        var current = this.getAttribute('data-direction');
-        var next = current === 'asc' ? 'desc' : 'asc';
-        this.setAttribute('data-direction', next);
-        this.textContent = next === 'asc' ? 'Ascending' : 'Descending';
-        render();
+      document.querySelectorAll('.sort-toggle').forEach(function (button) {
+        button.addEventListener('click', function () {
+          var current = this.getAttribute('data-sort-direction') || '';
+          var next = '';
+          if (current === '') {
+            next = 'asc';
+          } else if (current === 'asc') {
+            next = 'desc';
+          }
+          document.querySelectorAll('.sort-toggle').forEach(function (item) {
+            item.classList.remove('active');
+            item.setAttribute('data-sort-direction', '');
+          });
+          if (next) {
+            this.classList.add('active');
+            this.setAttribute('data-sort-direction', next);
+          }
+          render();
+        });
       });
 
       document.getElementById('textFilter').addEventListener('input', render);
-      document.getElementById('sortField').addEventListener('change', render);
       document.getElementById('showPostponed').addEventListener('change', render);
       document.getElementById('copyVisibleCommands').addEventListener('click', function () {
         var commands = window.__gchVisibleCommands || [];
