@@ -1128,10 +1128,19 @@ function Get-HealthInteractiveHtmlReport {
       white-space: nowrap;
     }
     .utility-button {
-      background: linear-gradient(180deg, #ffffff 0%, #f0f8f5 100%);
+      background: linear-gradient(180deg, #2f80ed 0%, #1f62c4 100%);
+      color: #ffffff;
+      border-color: #1d55a6;
+      margin-left: auto;
+    }
+    .utility-button:hover {
+      background: linear-gradient(180deg, #3689f2 0%, #255fb3 100%);
     }
     .utility-button strong {
       font-weight: 700;
+    }
+    .utility-button.hidden {
+      display: none;
     }
     .toggle-track {
       position: relative;
@@ -1319,7 +1328,7 @@ function Get-HealthInteractiveHtmlReport {
           <option value="Message">Sort by message</option>
         </select>
         <button id="sortDirection" type="button">Ascending</button>
-        <button id="copyVisibleCommands" type="button" class="utility-button"><strong>Copy Action Commands</strong></button>
+        <button id="copyVisibleCommands" type="button" class="utility-button hidden"><strong>Copy Action Commands</strong></button>
         <span id="copyStatus" class="copy-status"></span>
       </div>
       <div class="controls">
@@ -1335,15 +1344,16 @@ function Get-HealthInteractiveHtmlReport {
           <span class="toggle-track" aria-hidden="true"></span>
         </label>
       </div>
+      <div class="summary" id="summary"></div>
       <div class="column-controls">
         <span class="controls-label">Visible Columns:</span>
         <label><input class="column-toggle" type="checkbox" data-column="computer" checked> Computer</label>
         <label><input class="column-toggle" type="checkbox" data-column="level" checked> Level</label>
+        <label><input class="column-toggle" type="checkbox" data-column="action" checked> Action</label>
         <label><input class="column-toggle" type="checkbox" data-column="message" checked> Message</label>
         <label><input class="column-toggle" type="checkbox" data-column="comment" checked> Comment</label>
         <label><input class="column-toggle" type="checkbox" data-column="command"> AddWhitelist command</label>
       </div>
-      <div class="summary" id="summary"></div>
     </div>
     <div class="table-wrap">
       <table>
@@ -1634,6 +1644,10 @@ function Get-HealthInteractiveHtmlReport {
         }).filter(function (command) {
           return Boolean(command);
         });
+        document.getElementById('copyVisibleCommands').classList.toggle('hidden', window.__gchVisibleCommands.length === 0);
+        if (window.__gchVisibleCommands.length === 0) {
+          setCopyStatus('', '');
+        }
 
         document.querySelectorAll('.column-toggle').forEach(function (checkbox) {
           var columnClass = '.col-' + checkbox.getAttribute('data-column');
@@ -2455,7 +2469,7 @@ if ($all_messages) {
     if ([string]::IsNullOrWhiteSpace($interactiveLocationSuffix)) {
       $interactiveLocationSuffix = ($targets -join ', ')
     }
-    $interactiveReportTitle = "Test findings for {0} -- {1}" -f (($targets -join ', '), $interactiveLocationSuffix)
+    $interactiveReportTitle = "Test findings for {0} — {1}" -f (($targets -join ', '), $interactiveLocationSuffix)
     $interactiveReportHtml = Get-HealthInteractiveHtmlReport -Rows $interactiveRows -Title $interactiveReportTitle -FooterHtml $emailSignature.HtmlBottom
     Save-HealthHtmlReport -Path $reportArtifacts.InteractiveReportTempPath -Html $interactiveReportHtml
 

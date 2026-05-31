@@ -148,6 +148,15 @@ Write-Output ([pscustomobject]@{
       param([string]$Message)
       $script:WarningMessages += $Message
     }
+    function Log-Debug {
+      param([string]$Message)
+    }
+    function Test-Path {
+      param(
+        [string]$LiteralPath
+      )
+      $true
+    }
     function Log-Info {
       param([string]$Message)
       $script:InfoMessages += $Message
@@ -157,5 +166,43 @@ Write-Output ([pscustomobject]@{
 
     $script:InvokedScriptPaths | Should -Be @('C:\CustomTests\alpha.ps1')
     $script:WarningMessages.Count | Should -Be 2
+  }
+
+  It 'does not warn when the custom tests folder does not exist' {
+    $parseErrors = $null
+    $tokens = $null
+    $ast = [System.Management.Automation.Language.Parser]::ParseFile($script:GetComputerHealthScript, [ref]$tokens, [ref]$parseErrors)
+    $funcAst = $ast.Find({
+        param($node)
+        $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+        $node.Name -eq 'Invoke-HealthTestsFromFolder'
+      }, $true)
+
+    $funcAst | Should -Not -BeNullOrEmpty
+    . ([scriptblock]::Create($funcAst.Extent.Text))
+    $script:WarningMessages = @()
+    $script:InfoMessages = @()
+    $script:DebugMessages = @()
+
+    function Log-Warning {
+      param([string]$Message)
+      $script:WarningMessages += $Message
+    }
+    function Log-Info {
+      param([string]$Message)
+      $script:InfoMessages += $Message
+    }
+    function Log-Debug {
+      param([string]$Message)
+      $script:DebugMessages += $Message
+    }
+
+    $missingPath = [System.IO.Path]::Combine([System.IO.Path]::GetTempPath(), 'gch-missing-custom-tests-' + [guid]::NewGuid().ToString('N'))
+
+    Invoke-HealthTestsFromFolder -FolderPath $missingPath
+
+    $script:WarningMessages.Count | Should -Be 0
+    $script:InfoMessages.Count | Should -Be 0
+    $script:DebugMessages.Count | Should -Be 1
   }
 }

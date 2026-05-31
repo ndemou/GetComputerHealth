@@ -752,6 +752,11 @@ function Invoke-HealthTestsFromFolder {
     [string]$FolderPath
   )
 
+  if (-not (Test-Path -LiteralPath $FolderPath)) {
+    Log-Debug "Custom health test path '$FolderPath' was not found."
+    return
+  }
+
   $files = @(Get-CustomHealthTestFilesFromPath -Path $FolderPath)
   if (-not $files) { return }
 

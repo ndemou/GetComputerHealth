@@ -345,6 +345,7 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
     $html | Should -Match 'plain-toggle'
     $html | Should -Match 'Show rows with this action:'
     $html | Should -Match 'Visible Columns:'
+    $html | Should -Match 'data-column="action" checked'
     $html | Should -Match 'font-size: 16px;'
     $html | Should -Not -Match 'Interactive notable findings for this run'
     $html | Should -Match 'data-filter="postpone"'
@@ -365,6 +366,9 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
     $html | Should -Match 'font-family: Consolas, "Courier New", monospace;'
     $html | Should -Match '\.postponed-text \{'
     $html | Should -Match '\.summary \{'
+    $html | Should -Match '\.utility-button \{'
+    $html | Should -Match 'margin-left: auto;'
+    $html | Should -Match '\.utility-button\.hidden \{'
     $html | Should -Match 'class="col-action">Action</th>'
     $html | Should -Match 'class="col-message">Message</th>'
     $html | Should -Match 'class="col-comment">Comment</th>'
@@ -381,6 +385,7 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
     $html | Should -Match "var storageKey = 'gch-report-actions-v2';"
     $html | Should -Match 'ActionHistory: actionHistory\.slice\(-100\)'
     $html | Should -Match 'ActionState: actionState'
+    $html | Should -Match "document.getElementById\('copyVisibleCommands'\)\.classList\.toggle\('hidden', window\.__gchVisibleCommands\.length === 0\);"
   }
 
   It 'builds interactive commands from WhatToDo and hides postponed action buttons' {
