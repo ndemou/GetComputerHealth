@@ -51,7 +51,7 @@ Write-Warning "[PASS] Relative path custom test worked"
           -OnlyTheseTests '.\relative-test.ps1'
       )
 
-      ($records | Where-Object { $_.Level -eq 'pass' -and $_.Message -eq 'Relative path custom test worked' }).Count | Should -Be 1
+      @($records | Where-Object { $_.Level -eq 'pass' -and $_.Message -eq 'Relative path custom test worked' }).Count | Should -Be 1
     }
     finally {
       Set-Location -LiteralPath $oldLocation
@@ -95,5 +95,24 @@ Write-Output ([pscustomobject]@{
     finally {
       Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
     }
+  }
+
+  It 'accepts the legacy ScriptPath alias when invoking custom scripts from a folder' {
+    $parseErrors = $null
+    $tokens = $null
+    $ast = [System.Management.Automation.Language.Parser]::ParseFile($script:GetComputerHealthScript, [ref]$tokens, [ref]$parseErrors)
+    $funcAst = $ast.Find({
+        param($node)
+        $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+        $node.Name -eq 'Invoke-HealthTestsFromFolder'
+      }, $true)
+
+    $funcAst | Should -Not -BeNullOrEmpty
+    . ([scriptblock]::Create($funcAst.Extent.Text))
+
+    $command = Get-Command Invoke-HealthTestsFromFolder -ErrorAction Stop
+
+    $command.Parameters.ContainsKey('FolderPath') | Should -BeTrue
+    $command.Parameters['FolderPath'].Aliases | Should -Contain 'ScriptPath'
   }
 }

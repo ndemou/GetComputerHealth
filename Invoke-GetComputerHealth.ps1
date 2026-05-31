@@ -136,6 +136,7 @@ $SEND_MESSAGE_SCRIPT_PATH = Join-Path $SCRIPT_BIN_DIR 'Send-Message.ps1'
 $LIB_LOG_OBJECTS_PATH = Join-Path $SCRIPT_BIN_DIR 'lib-write-log-objects.ps1'
 $VERSION_FILE_PATH = Join-Path $SCRIPT_BIN_DIR 'VERSION'
 $IPS_OF_ALL_DCS_CACHE_PATH = Join-Path $TEMP_DIR 'cache.IpsOfAllDcs.clixml'
+$LAST_INTERACTIVE_REPORT_HTML_PATH = Join-Path $TEMP_DIR 'last-interactive-report.html'
 $LAST_REPORT_HTML_PATH = Join-Path $TEMP_DIR 'last-report.html'
 $PROJECT_URL = 'https://github.com/ndemou/GetComputerHealth'
 $GCH_CONFIG_PATH = Join-Path $CONFIG_DIR 'gch.psd1'
@@ -604,6 +605,25 @@ function Save-HealthHtmlReport {
   Set-Content -LiteralPath $Path -Value $Html -Encoding UTF8
 }
 
+function Move-HealthReportFile {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)][string]$SourcePath,
+    [Parameter(Mandatory)][string]$DestinationPath
+  )
+
+  $destinationDir = Split-Path -Parent $DestinationPath
+  if (-not [string]::IsNullOrWhiteSpace($destinationDir)) {
+    New-Item -ItemType Directory -Path $destinationDir -Force | Out-Null
+  }
+
+  if (Test-Path -LiteralPath $DestinationPath -PathType Leaf) {
+    Remove-Item -LiteralPath $DestinationPath -Force
+  }
+
+  Move-Item -LiteralPath $SourcePath -Destination $DestinationPath -Force
+}
+
 function Remove-OldInvokeTranscriptLogs {
   [CmdletBinding()]
   param(
@@ -773,11 +793,6 @@ function Convert-HealthMessagesToReportRows {
     $level = if ($message.PSObject.Properties['Level']) { [string]$message.Level } else { '' }
     $suppressed = if ($message.PSObject.Properties['Suppressed']) { [bool]$message.Suppressed } else { $false }
 
-    $commandToSuppressMsg = ''
-    if ((-not $suppressed) -and ($level -notin @('info', 'debug'))) {
-      $commandToSuppressMsg = Get-HealthSuppressionCommand -MessageRecord $message
-    }
-
     [pscustomobject]@{
       TimeUtc              = if ($message.PSObject.Properties['TimeUtc'] -and $message.TimeUtc) { ([datetime]$message.TimeUtc).ToUniversalTime().ToString('o') } else { '' }
       Computer             = if ($message.PSObject.Properties['Computer']) { [string]$message.Computer } else { '' }
@@ -790,7 +805,6 @@ function Convert-HealthMessagesToReportRows {
       Hash                 = if ($message.PSObject.Properties['Hash']) { [string]$message.Hash } else { '' }
       SuppressedUntil      = if ($message.PSObject.Properties['SuppressedUntil'] -and $message.SuppressedUntil) { ([datetime]$message.SuppressedUntil).ToString('yyyy-MM-dd') } else { '' }
       Emitter              = if ($message.PSObject.Properties['Emitter']) { [string]$message.Emitter } else { '' }
-      AddWhitelistCommand  = $commandToSuppressMsg
     }
   }
 }
@@ -806,12 +820,93 @@ function Export-HealthMessagesReportData {
   $rows | Export-Clixml -LiteralPath $FileName
 }
 
+function Compress-HealthReportDataFile {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)][string]$SourcePath,
+    [Parameter(Mandatory)][string]$DestinationPath
+  )
+
+  Add-Type -AssemblyName 'System.IO.Compression'
+  Add-Type -AssemblyName 'System.IO.Compression.FileSystem'
+
+  $destinationDir = Split-Path -Parent $DestinationPath
+  if (-not [string]::IsNullOrWhiteSpace($destinationDir)) {
+    New-Item -ItemType Directory -Path $destinationDir -Force | Out-Null
+  }
+
+  if (Test-Path -LiteralPath $DestinationPath -PathType Leaf) {
+    Remove-Item -LiteralPath $DestinationPath -Force
+  }
+
+  $sourceItem = Get-Item -LiteralPath $SourcePath -ErrorAction Stop
+  $archive = [System.IO.Compression.ZipFile]::Open($DestinationPath, [System.IO.Compression.ZipArchiveMode]::Create)
+  try {
+    [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile(
+      $archive,
+      $sourceItem.FullName,
+      $sourceItem.Name,
+      [System.IO.Compression.CompressionLevel]::Optimal
+    ) | Out-Null
+  }
+  finally {
+    $archive.Dispose()
+  }
+
+  Remove-Item -LiteralPath $SourcePath -Force
+}
+
+function Convert-HealthReportRowsToInteractiveRows {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)][object[]]$Rows
+  )
+
+  foreach ($row in $Rows) {
+    if (-not $row) {
+      continue
+    }
+
+    $effectiveLevel = if ($row.PSObject.Properties['EffectiveLevel']) { [string]$row.EffectiveLevel } else { '' }
+    if ($effectiveLevel -in @('debug', 'info', 'pass')) {
+      continue
+    }
+
+    [pscustomobject]@{
+      Computer       = if ($row.PSObject.Properties['Computer']) { [string]$row.Computer } else { '' }
+      Suppressed     = if ($row.PSObject.Properties['Suppressed']) { [bool]$row.Suppressed } else { $false }
+      Level          = if ($row.PSObject.Properties['Level']) { [string]$row.Level } else { '' }
+      EffectiveLevel = $effectiveLevel
+      Message        = if ($row.PSObject.Properties['Message']) { [string]$row.Message } else { '' }
+      Comment        = if ($row.PSObject.Properties['Comment']) { [string]$row.Comment } else { '' }
+      Hash           = if ($row.PSObject.Properties['Hash']) { [string]$row.Hash } else { '' }
+    }
+  }
+}
+
+function Get-HealthReportArtifactPaths {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)][string]$DataDir,
+    [Parameter(Mandatory)][string]$TempDir,
+    [Parameter(Mandatory)][string]$Timestamp
+  )
+
+  return [pscustomobject]@{
+    AllMessagesClixmlTempPath      = Join-Path $TempDir "all-messages-$Timestamp.clixml"
+    AllMessagesZipPath             = Join-Path $DataDir "all-messages-$Timestamp.clixml.zip"
+    InteractiveReportTempPath      = Join-Path $TempDir "interactive-report-$Timestamp.html"
+    LastInteractiveReportHtmlPath  = Join-Path $TempDir 'last-interactive-report.html'
+    LastEmailBodyHtmlPath          = Join-Path $TempDir 'last-report.html'
+  }
+}
+
 function Import-HealthMessagesReportData {
   [CmdletBinding()]
   param(
     [Parameter(Mandatory)][string]$DataDir,
     [datetime]$CutoffDate = (Get-Date).AddMonths(-3),
-    [string]$Pattern = 'all-messages-*.clixml'
+    [string]$Pattern = 'all-messages-*.clixml.zip'
   )
 
   if (-not (Test-Path -LiteralPath $DataDir -PathType Container)) {
@@ -825,7 +920,36 @@ function Import-HealthMessagesReportData {
   $rows = New-Object System.Collections.ArrayList
   foreach ($item in $items) {
     try {
-      $imported = Import-Clixml -LiteralPath $item.FullName -ErrorAction Stop
+      if ($item.Extension -ieq '.zip') {
+        Add-Type -AssemblyName 'System.IO.Compression'
+        Add-Type -AssemblyName 'System.IO.Compression.FileSystem'
+        $extractDir = Join-Path ([System.IO.Path]::GetTempPath()) ('gch-report-import-' + [guid]::NewGuid().ToString('N'))
+        New-Item -ItemType Directory -Path $extractDir -Force | Out-Null
+        try {
+          $archive = [System.IO.Compression.ZipFile]::OpenRead($item.FullName)
+          try {
+            $entry = $archive.Entries | Where-Object { $_.Name -like '*.clixml' } | Select-Object -First 1
+            if ($null -eq $entry) {
+              throw "Archive does not contain a .clixml entry."
+            }
+
+            $extractedPath = Join-Path $extractDir $entry.Name
+            [System.IO.Compression.ZipFileExtensions]::ExtractToFile($entry, $extractedPath, $true)
+          }
+          finally {
+            $archive.Dispose()
+          }
+
+          $imported = Import-Clixml -LiteralPath $extractedPath -ErrorAction Stop
+        }
+        finally {
+          Remove-Item -LiteralPath $extractDir -Recurse -Force -ErrorAction SilentlyContinue
+        }
+      }
+      else {
+        $imported = Import-Clixml -LiteralPath $item.FullName -ErrorAction Stop
+      }
+
       foreach ($row in @($imported)) {
         if ($row) {
           [void]$rows.Add($row)
@@ -1068,7 +1192,7 @@ function Get-HealthInteractiveHtmlReport {
       }
 
       function keyForRow(row) {
-        return [row.Hash || '', row.Computer || '', row.Message || '', row.TimeUtc || ''].join('|');
+        return [row.Hash || '', row.Computer || '', row.Message || ''].join('|');
       }
 
       function saveState() {
@@ -1144,6 +1268,24 @@ function Get-HealthInteractiveHtmlReport {
         return ascending ? result : result * -1;
       }
 
+      function buildWhitelistCommand(row) {
+        var level = String(row.Level || '').toLowerCase();
+        var hash = String(row.Hash || '');
+        var computer = String(row.Computer || '');
+        var message = String(row.Message || '');
+        if (!hash || !computer || !message) {
+          return '';
+        }
+        if (String(row.Suppressed).toLowerCase() === 'true') {
+          return '';
+        }
+        if (level === 'info' || level === 'debug') {
+          return '';
+        }
+        var safeComment = (level + ' - ' + message).replace(/"/g, '\\"');
+        return "Invoke-Command " + computer + " {c:\\it\\Get-ComputerHealth\\bin\\Get-ComputerHealth.ps1 -AddWhitelisting -until 2999-12-31 -sig '" + hash + "' -ComputerName " + computer + " -comment \\"" + safeComment + "\\""}";
+      }
+
       function render() {
         var filterText = document.getElementById('textFilter').value;
         var tokens = tokenize(filterText);
@@ -1181,7 +1323,7 @@ function Get-HealthInteractiveHtmlReport {
         body.innerHTML = filtered.map(function (row, index) {
           var key = htmlEncode(keyForRow(row));
           var commentHtml = htmlEncode(row.Comment || '').replace(/\r?\n/g, '<br>');
-          var commandHtml = htmlEncode(row.AddWhitelistCommand || '').replace(/\r?\n/g, '<br>');
+          var commandHtml = htmlEncode(buildWhitelistCommand(row)).replace(/\r?\n/g, '<br>');
           return ''
             + '<tr>'
             + '<td class="col-computer">' + htmlEncode(row.Computer || '') + '</td>'
@@ -1942,18 +2084,16 @@ if ($all_messages) {
   }
 
   # save
-  $allMessagesClixmlPath = Join-Path $DATA_DIR "all-messages-$($timestamp).clixml"
-  $notableMessagesClixmlPath = Join-Path $DATA_DIR "notable-messages-$($timestamp).clixml"
-  $notableMessagesHtmlPath = Join-Path $DATA_DIR "notable-messages-$($timestamp).html"
-  Export-HealthMessagesReportData -Messages $all_messages -FileName $allMessagesClixmlPath
+  $reportArtifacts = Get-HealthReportArtifactPaths -DataDir $DATA_DIR -TempDir $TEMP_DIR -Timestamp $timestamp
+  $allMessagesClixmlTempPath = $reportArtifacts.AllMessagesClixmlTempPath
+  $allMessagesZipPath = $reportArtifacts.AllMessagesZipPath
+  Export-HealthMessagesReportData -Messages $all_messages -FileName $allMessagesClixmlTempPath
+  Compress-HealthReportDataFile -SourcePath $allMessagesClixmlTempPath -DestinationPath $allMessagesZipPath
   $notable_msgs = @(`
       $all_messages `
     | Where-Object { (-not($_.Suppressed) -and $_.level -notin @('debug', 'help', 'pass', 'info')) -or ($_.EffectiveLevel -eq 'postponed') } `
     | Sort-Object -Property @{ Expression = { $SortOrder[$_.EffectiveLevel] } }, Computer `
   )
-  if ($notable_msgs) {
-    Export-HealthMessagesReportData -Messages $notable_msgs -FileName $notableMessagesClixmlPath
-  }
 
   $synopsis = " " + ($notable_msgs | Where-Object { $_.EffectiveLevel } |
     Group-Object EffectiveLevel -NoElement |
@@ -1969,11 +2109,11 @@ if ($all_messages) {
   write-host ""
   if ($notable_msgs) {
     Write-host -for yellow "Found notable messages. I have saved them in these files:"
-    Write-host -for yellow "    $notableMessagesHtmlPath"
-    Write-host -for gray   "    $notableMessagesClixmlPath"
-    Write-host -for gray   "    $allMessagesClixmlPath"
-    Write-host -for gray   "Open the HTML report in a browser or load the CLIXML in PowerShell like this:"
-    Write-host -for gray   "    `$data = Import-Clixml $notableMessagesClixmlPath"
+    Write-host -for yellow "    $($reportArtifacts.LastInteractiveReportHtmlPath)"
+    Write-host -for gray   "    $allMessagesZipPath"
+    Write-host -for gray   "Open the HTML report in a browser or expand/load the CLIXML archive in PowerShell like this:"
+    Write-host -for gray   "    Expand-Archive -LiteralPath $allMessagesZipPath -DestinationPath .\temp\report-data -Force"
+    Write-host -for gray   "    `$data = Import-Clixml .\temp\report-data\all-messages-$timestamp.clixml"
     Write-host -for gray   '    $data|ogv # GUI review'
     Write-host -for gray   '    $data|select -Property Computer,Level,Message # Console review'
 
@@ -1990,18 +2130,26 @@ if ($all_messages) {
     )
     $html = $htmlParts -join ''
     $historicalRows = @(Import-HealthMessagesReportData -DataDir $DATA_DIR)
-    $interactiveReportHtml = Get-HealthInteractiveHtmlReport -Rows $historicalRows -Title ("Get-ComputerHealth findings for {0}" -f ($targets -join ', '))
-    Save-HealthHtmlReport -Path $notableMessagesHtmlPath -Html $interactiveReportHtml
+    $interactiveRows = @(Convert-HealthReportRowsToInteractiveRows -Rows $historicalRows)
+    $interactiveReportHtml = Get-HealthInteractiveHtmlReport -Rows $interactiveRows -Title ("Get-ComputerHealth findings for {0}" -f ($targets -join ', '))
+    Save-HealthHtmlReport -Path $reportArtifacts.InteractiveReportTempPath -Html $interactiveReportHtml
 
     $signedHtml = Add-HealthEmailSignature -Body $html -BodyAsHtml -Signature $emailSignature
-    Save-HealthHtmlReport -Path $LAST_REPORT_HTML_PATH -Html $signedHtml
+    Save-HealthHtmlReport -Path $reportArtifacts.LastEmailBodyHtmlPath -Html $signedHtml
     $smtpNotableSubject = Get-HealthNotableSubject -FallbackSubject $SmtpSubject -NotableMessages $notable_msgs
     Write-Host -for Gray ("Email report decision: {0}" -f $emailDecision.Reason)
-    Invoke-HealthEmail -Subject $smtpNotableSubject -Body $signedHtml -BodyAsHtml -Attachments $notableMessagesHtmlPath -ConfigFile $SmtpConfig -NoSendReport:(-not $sendMailByDefault) -SkipReason $emailDecision.Reason
+    try {
+      Invoke-HealthEmail -Subject $smtpNotableSubject -Body $signedHtml -BodyAsHtml -Attachments $reportArtifacts.InteractiveReportTempPath -ConfigFile $SmtpConfig -NoSendReport:(-not $sendMailByDefault) -SkipReason $emailDecision.Reason
+    }
+    finally {
+      if (Test-Path -LiteralPath $reportArtifacts.InteractiveReportTempPath -PathType Leaf) {
+        Move-HealthReportFile -SourcePath $reportArtifacts.InteractiveReportTempPath -DestinationPath $reportArtifacts.LastInteractiveReportHtmlPath
+      }
+    }
   }
   else {
     Write-host -for green    "GOOD, Nothing notable to record. I have saved less notable messages here:"
-    Write-host -for gray     "    $allMessagesClixmlPath"
+    Write-host -for gray     "    $allMessagesZipPath"
     $signedBody = Add-HealthEmailSignature -Body (Get-RelaxHtmlBody) -BodyAsHtml -Signature $emailSignature
     Save-HealthHtmlReport -Path $LAST_REPORT_HTML_PATH -Html $signedBody
     Write-Host -for Gray ("Email report decision: {0}" -f $emailDecision.Reason)

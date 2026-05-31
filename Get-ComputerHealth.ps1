@@ -742,7 +742,11 @@ Lists all loaded HealthTest-* functions with their description text.
 
 function Invoke-HealthTestsFromFolder {
   [CmdletBinding()]
-  param([Parameter(Mandatory = $true, Position = 0)][string]$FolderPath)
+  param(
+    [Parameter(Mandatory = $true, Position = 0)]
+    [Alias('ScriptPath')]
+    [string]$FolderPath
+  )
 
   $files = @(Get-CustomHealthTestFilesFromPath -Path $FolderPath)
   if (-not $files) { return }
@@ -1353,7 +1357,7 @@ else {
   }
 }
 
-if ($IncludeTestsFromFolder) {
+if (-not [string]::IsNullOrWhiteSpace($IncludeTestsFromFolder)) {
   # Also Custom HealthTest-*
-  Invoke-HealthTestsFromFolder $IncludeTestsFromFolder
+  Invoke-HealthTestsFromFolder -FolderPath $IncludeTestsFromFolder
 }

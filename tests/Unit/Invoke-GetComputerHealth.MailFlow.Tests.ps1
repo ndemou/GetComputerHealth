@@ -18,12 +18,16 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
         'Get-RelaxHtmlBody',
         'Convert-HealthMessagesToReportRows',
         'Export-HealthMessagesReportData',
+        'Compress-HealthReportDataFile',
+        'Convert-HealthReportRowsToInteractiveRows',
+        'Get-HealthReportArtifactPaths',
         'Import-HealthMessagesReportData',
         'Get-HealthInteractiveHtmlReport',
         'Get-CachedIpsOfAllDcs',
         'Set-CachedIpsOfAllDcs',
         'Resolve-IpsOfAllDcs',
         'Save-HealthHtmlReport',
+        'Move-HealthReportFile',
         'Remove-OldInvokeTranscriptLogs',
         'Read-GchConfigFile',
         'Test-GchConfigKey',
@@ -204,7 +208,7 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
     $html | Should -Match '>\s*Relax\s*<'
   }
 
-  It 'shapes report rows in Invoke-GetComputerHealth including suppression commands' {
+  It 'shapes report rows in Invoke-GetComputerHealth' {
     $rows = @(Convert-HealthMessagesToReportRows -Messages @(
         [pscustomobject]@{
           TimeUtc = [datetime]'2026-05-30T10:15:00Z'
@@ -223,23 +227,14 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
     $rows[0].Computer | Should -Be 'SRV1'
     $rows[0].Level | Should -Be 'warning'
     $rows[0].WhatToDo | Should -Be 'not-sure'
-    $rows[0].AddWhitelistCommand | Should -Be 'Invoke-Command SRV1 {c:\it\Get-ComputerHealth\bin\Get-ComputerHealth.ps1 -AddWhitelisting -until 2999-12-31 -sig ''deadbeef'' -ComputerName SRV1 -comment "warning - Disk free space is low"}'
+    $rows[0].Hash | Should -Be 'deadbeef'
   }
 
-  It 'does not generate report suppression commands for suppressed or informational rows' {
-    $rows = @(Convert-HealthMessagesToReportRows -Messages @(
-        [pscustomobject]@{ Computer = 'SRV1'; Suppressed = $true; Level = 'warning'; Message = 'Already suppressed'; Comment = ''; Hash = '11111111'; Emitter = '' },
-        [pscustomobject]@{ Computer = 'SRV2'; Suppressed = $false; Level = 'info'; Message = 'Informational'; Comment = ''; Hash = '22222222'; Emitter = '' }
-      ))
-
-    $rows[0].AddWhitelistCommand | Should -Be ''
-    $rows[1].AddWhitelistCommand | Should -Be ''
-  }
-
-  It 'saves and reloads report data as clixml' {
+  It 'saves and reloads report data as zipped clixml' {
     $tempRoot = Join-Path $env:TEMP ('gch-report-data-' + [guid]::NewGuid().ToString())
     $dataDir = Join-Path $tempRoot 'data'
-    $path = Join-Path $dataDir 'all-messages-2026-05-30_10.15.clixml'
+    $tempPath = Join-Path $tempRoot 'all-messages-2026-05-30_10.15.clixml'
+    $zipPath = Join-Path $dataDir 'all-messages-2026-05-30_10.15.clixml.zip'
 
     try {
       New-Item -ItemType Directory -Path $dataDir -Force | Out-Null
@@ -254,16 +249,33 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
           Hash = 'deadbeef'
           Emitter = 'HealthTest-Disks'
         }
-      ) -FileName $path
+      ) -FileName $tempPath
+      Compress-HealthReportDataFile -SourcePath $tempPath -DestinationPath $zipPath
 
       $rows = @(Import-HealthMessagesReportData -DataDir $dataDir -CutoffDate ([datetime]'2026-05-01'))
 
+      (Test-Path -LiteralPath $tempPath -PathType Leaf) | Should -BeFalse
+      (Test-Path -LiteralPath $zipPath -PathType Leaf) | Should -BeTrue
       $rows.Count | Should -Be 1
       $rows[0].Computer | Should -Be 'SRV1'
-      $rows[0].AddWhitelistCommand | Should -Match 'deadbeef'
+      $rows[0].Hash | Should -Be 'deadbeef'
     } finally {
       Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
     }
+  }
+
+  It 'filters interactive rows down to actionable levels and fields' {
+    $rows = @(Convert-HealthReportRowsToInteractiveRows -Rows @(
+        [pscustomobject]@{ Computer = 'SRV1'; Suppressed = $false; Level = 'warning'; EffectiveLevel = 'warning'; Message = 'Disk free space is low'; Comment = 'Drive C: low'; Hash = 'deadbeef'; Emitter = 'x'; TimeUtc = 'y'; WhatToDo = 'not-sure' },
+        [pscustomobject]@{ Computer = 'SRV2'; Suppressed = $false; Level = 'info'; EffectiveLevel = 'info'; Message = 'Informational'; Comment = ''; Hash = '11111111' },
+        [pscustomobject]@{ Computer = 'SRV3'; Suppressed = $false; Level = 'pass'; EffectiveLevel = 'pass'; Message = 'Passed'; Comment = ''; Hash = '22222222' }
+      ))
+
+    $rows.Count | Should -Be 1
+    $rows[0].Computer | Should -Be 'SRV1'
+    $rows[0].PSObject.Properties.Name | Should -Contain 'Hash'
+    $rows[0].PSObject.Properties.Name | Should -Not -Contain 'Emitter'
+    $rows[0].PSObject.Properties.Name | Should -Not -Contain 'TimeUtc'
   }
 
   It 'renders the interactive html report controls and rows' {
@@ -273,10 +285,8 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
         Suppressed = $false
         Level = 'warning'
         EffectiveLevel = 'warning'
-        WhatToDo = 'not-sure'
         Message = 'Disk free space is low'
         Comment = 'Drive C: low'
-        AddWhitelistCommand = 'demo command'
         Hash = 'deadbeef'
       }
     )
@@ -287,7 +297,18 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
     $html | Should -Match 'data-column="command"'
     $html | Should -Match 'Interactive findings report from the last 3 months'
     $html | Should -Match 'Disk free space is low'
-    $html | Should -Match 'demo command'
+    $html | Should -Match 'buildWhitelistCommand'
+    $html | Should -Match 'deadbeef'
+  }
+
+  It 'uses a dedicated active html report path for the email attachment' {
+    $paths = Get-HealthReportArtifactPaths -DataDir 'C:\data' -TempDir 'C:\temp' -Timestamp '2026-05-31_07.05'
+
+    $paths.AllMessagesClixmlTempPath | Should -Be 'C:\temp\all-messages-2026-05-31_07.05.clixml'
+    $paths.AllMessagesZipPath | Should -Be 'C:\data\all-messages-2026-05-31_07.05.clixml.zip'
+    $paths.InteractiveReportTempPath | Should -Be 'C:\temp\interactive-report-2026-05-31_07.05.html'
+    $paths.LastInteractiveReportHtmlPath | Should -Be 'C:\temp\last-interactive-report.html'
+    $paths.LastEmailBodyHtmlPath | Should -Be 'C:\temp\last-report.html'
   }
 
   It 'loads active suppression expiry dates with last applicable entry winning' {
@@ -396,7 +417,7 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
 
   It 'saves the generated html report to disk' {
     $tempRoot = Join-Path $env:TEMP ('gch-html-report-' + [guid]::NewGuid().ToString())
-    $reportPath = Join-Path $tempRoot 'last-report.html'
+    $reportPath = Join-Path $tempRoot 'last-interactive-report.html'
     $html = '<div>hello report</div>'
 
     try {
@@ -404,6 +425,26 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
 
       (Test-Path -LiteralPath $reportPath -PathType Leaf) | Should -BeTrue
       (Get-Content -LiteralPath $reportPath -Raw) | Should -Match ([regex]::Escape($html))
+    }
+    finally {
+      Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
+    }
+  }
+
+  It 'replaces the last interactive report when moving a timestamped html report into place' {
+    $tempRoot = Join-Path $env:TEMP ('gch-html-move-' + [guid]::NewGuid().ToString())
+    $sourcePath = Join-Path $tempRoot 'interactive-report-2026-05-31_07.05.html'
+    $destinationPath = Join-Path $tempRoot 'last-interactive-report.html'
+
+    try {
+      New-Item -ItemType Directory -Path $tempRoot -Force | Out-Null
+      Set-Content -LiteralPath $sourcePath -Value 'new-report' -Encoding UTF8
+      Set-Content -LiteralPath $destinationPath -Value 'old-report' -Encoding UTF8
+
+      Move-HealthReportFile -SourcePath $sourcePath -DestinationPath $destinationPath
+
+      (Test-Path -LiteralPath $sourcePath -PathType Leaf) | Should -BeFalse
+      ((Get-Content -LiteralPath $destinationPath -Raw).TrimEnd("`r", "`n")) | Should -Be 'new-report'
     }
     finally {
       Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
