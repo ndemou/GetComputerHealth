@@ -214,7 +214,7 @@ param(
   [switch]$ListAllBuiltInTests
 )
 
-$VERSION="8.0.2"
+$VERSION="8.0.3"
 
 
 $SCRIPT_BIN_DIR = (Resolve-Path -LiteralPath $PSScriptRoot).Path
