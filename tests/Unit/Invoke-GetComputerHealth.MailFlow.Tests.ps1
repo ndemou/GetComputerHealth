@@ -230,6 +230,24 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
     $rows[0].Hash | Should -Be 'deadbeef'
   }
 
+  It 'normalizes DateTimeOffset TimeUtc values without throwing' {
+    $rows = @(Convert-HealthMessagesToReportRows -Messages @(
+        [pscustomobject]@{
+          TimeUtc = [datetimeoffset]'2026-05-31T07:03:10+00:00'
+          Computer = 'SRV1'
+          Suppressed = $false
+          Level = 'warning'
+          Message = 'Disk free space is low'
+          Comment = 'Drive C: low'
+          Hash = 'deadbeef'
+          Emitter = 'HealthTest-Disks'
+        }
+      ))
+
+    $rows.Count | Should -Be 1
+    $rows[0].TimeUtc | Should -Be '2026-05-31T07:03:10.0000000+00:00'
+  }
+
   It 'saves and reloads report data as zipped clixml' {
     $tempRoot = Join-Path $env:TEMP ('gch-report-data-' + [guid]::NewGuid().ToString())
     $dataDir = Join-Path $tempRoot 'data'

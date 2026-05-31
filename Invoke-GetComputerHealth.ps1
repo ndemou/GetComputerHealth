@@ -792,9 +792,18 @@ function Convert-HealthMessagesToReportRows {
   foreach ($message in $Messages) {
     $level = if ($message.PSObject.Properties['Level']) { [string]$message.Level } else { '' }
     $suppressed = if ($message.PSObject.Properties['Suppressed']) { [bool]$message.Suppressed } else { $false }
+    $timeUtc = ''
+    if ($message.PSObject.Properties['TimeUtc'] -and $message.TimeUtc) {
+      if ($message.TimeUtc -is [datetimeoffset]) {
+        $timeUtc = ([datetimeoffset]$message.TimeUtc).ToUniversalTime().ToString('o')
+      }
+      else {
+        $timeUtc = ([datetime]$message.TimeUtc).ToUniversalTime().ToString('o')
+      }
+    }
 
     [pscustomobject]@{
-      TimeUtc              = if ($message.PSObject.Properties['TimeUtc'] -and $message.TimeUtc) { ([datetime]$message.TimeUtc).ToUniversalTime().ToString('o') } else { '' }
+      TimeUtc              = $timeUtc
       Computer             = if ($message.PSObject.Properties['Computer']) { [string]$message.Computer } else { '' }
       Suppressed           = $suppressed
       Level                = $level
