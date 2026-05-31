@@ -120,6 +120,10 @@ param(
   [object[]]$PassThruArgs = @()
 )
 
+if ($null -ne $Hide) {
+  $Hide = ([string]$Hide).ToUpperInvariant()
+}
+
 #------------------------------------------------------------------------
 # Configuration
 #------------------------------------------------------------------------
@@ -1001,10 +1005,12 @@ function Get-HealthInteractiveHtmlReport {
   [CmdletBinding()]
   param(
     [Parameter(Mandatory)][object[]]$Rows,
-    [string]$Title = 'Get-ComputerHealth Findings Report'
+    [string]$Title = 'Get-ComputerHealth Findings Report',
+    [string]$FooterHtml = ''
   )
 
   $safeTitle = [System.Net.WebUtility]::HtmlEncode($Title)
+  $safeFooterHtml = [string]$FooterHtml
   $jsonRows = @($Rows) | ConvertTo-Json -Depth 6 -Compress
   $jsonRows = $jsonRows -replace '</script>', '<\/script>'
 
@@ -1112,6 +1118,12 @@ function Get-HealthInteractiveHtmlReport {
       color: var(--muted);
       font-size: 13px;
     }
+    .footer {
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 10px;
+      font-family: Segoe UI, Arial, sans-serif;
+    }
     .summary .status-item {
       white-space: nowrap;
     }
@@ -1121,23 +1133,7 @@ function Get-HealthInteractiveHtmlReport {
     .utility-button strong {
       font-weight: 700;
     }
-    .toggle-pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 10px;
-      padding: 5px 8px 5px 10px;
-      border: 1px solid var(--line);
-      border-radius: 999px;
-      background: rgba(255,255,255,0.94);
-      color: var(--ink);
-      box-shadow: 0 4px 14px rgba(23,33,38,0.06);
-      cursor: pointer;
-      user-select: none;
-    }
-    .toggle-pill input {
-      display: none;
-    }
-    .toggle-pill .toggle-track {
+    .toggle-track {
       position: relative;
       width: 42px;
       height: 24px;
@@ -1145,8 +1141,9 @@ function Get-HealthInteractiveHtmlReport {
       background: #c7d4cf;
       transition: background-color 0.15s ease;
       flex: 0 0 auto;
+      display: inline-block;
     }
-    .toggle-pill .toggle-track::after {
+    .toggle-track::after {
       content: '';
       position: absolute;
       top: 3px;
@@ -1158,14 +1155,33 @@ function Get-HealthInteractiveHtmlReport {
       box-shadow: 0 2px 6px rgba(23,33,38,0.18);
       transition: transform 0.15s ease;
     }
-    .toggle-pill input:checked + .toggle-track {
+    .plain-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--ink);
+      user-select: none;
+    }
+    .plain-toggle input {
+      position: absolute;
+      opacity: 0;
+      width: 1px;
+      height: 1px;
+      pointer-events: none;
+    }
+    .plain-toggle input:checked + .toggle-track {
       background: var(--accent);
     }
-    .toggle-pill input:checked + .toggle-track::after {
+    .plain-toggle input:checked + .toggle-track::after {
       transform: translateX(18px);
     }
-    .toggle-pill .toggle-text {
+    .plain-toggle .toggle-text {
       font-size: 13px;
+      font-weight: 600;
+    }
+    .controls-label {
+      font-size: 13px;
+      color: var(--muted);
       font-weight: 600;
     }
     .column-controls label {
@@ -1224,7 +1240,7 @@ function Get-HealthInteractiveHtmlReport {
     .col-message {
       font-size: 13px;
     }
-    .col-comment {
+    tbody td.col-comment {
       color: #41515a;
       font-family: Consolas, "Courier New", monospace;
       font-size: 12px;
@@ -1303,22 +1319,24 @@ function Get-HealthInteractiveHtmlReport {
           <option value="Message">Sort by message</option>
         </select>
         <button id="sortDirection" type="button">Ascending</button>
-        <button id="copyVisibleCommands" type="button" class="utility-button"><strong>Copy Visible Commands</strong></button>
+        <button id="copyVisibleCommands" type="button" class="utility-button"><strong>Copy Action Commands</strong></button>
         <span id="copyStatus" class="copy-status"></span>
       </div>
       <div class="controls">
+        <span class="controls-label">Show rows with this action:</span>
         <button type="button" class="what-filter active-filter" data-filter="">All actions</button>
         <button type="button" class="what-filter" data-filter="suppress">Suppress</button>
         <button type="button" class="what-filter" data-filter="postpone">Postpone</button>
         <button type="button" class="what-filter" data-filter="must-fix">Must-fix</button>
         <button type="button" class="what-filter" data-filter="not-sure">Not-sure</button>
-        <label class="toggle-pill" for="showPostponed">
+        <label class="plain-toggle" for="showPostponed">
           <span class="toggle-text">Show Postponed</span>
           <input id="showPostponed" type="checkbox">
           <span class="toggle-track" aria-hidden="true"></span>
         </label>
       </div>
       <div class="column-controls">
+        <span class="controls-label">Visible Columns:</span>
         <label><input class="column-toggle" type="checkbox" data-column="computer" checked> Computer</label>
         <label><input class="column-toggle" type="checkbox" data-column="level" checked> Level</label>
         <label><input class="column-toggle" type="checkbox" data-column="message" checked> Message</label>
@@ -1341,7 +1359,7 @@ function Get-HealthInteractiveHtmlReport {
           <tr>
             <th class="col-computer">Computer</th>
             <th class="col-level">Level</th>
-            <th class="col-action">What to do</th>
+            <th class="col-action">Action</th>
             <th class="col-message">Message</th>
             <th class="col-comment">Comment</th>
             <th class="col-command">AddWhitelist command</th>
@@ -1350,32 +1368,57 @@ function Get-HealthInteractiveHtmlReport {
         <tbody id="reportRows"></tbody>
       </table>
     </div>
+    <div class="footer">$safeFooterHtml</div>
   </div>
   <script>
     (function () {
-      var storageKey = 'gch-report-actions-v1';
+      var storageKey = 'gch-report-actions-v2';
       var rows = $jsonRows;
       if (!Array.isArray(rows)) {
         rows = rows ? [rows] : [];
       }
       var levelOrder = { failure: 1, warning: 2, notice: 3, postponed: 4, info: 5, pass: 6, debug: 7 };
       var actionState = {};
+      var actionHistory = [];
       try {
         var saved = window.localStorage.getItem(storageKey);
         if (saved) {
-          actionState = JSON.parse(saved) || {};
+          var parsedState = JSON.parse(saved) || {};
+          if (Array.isArray(parsedState)) {
+            actionHistory = parsedState.slice(-100);
+          } else {
+            if (parsedState.ActionHistory && Array.isArray(parsedState.ActionHistory)) {
+              actionHistory = parsedState.ActionHistory.slice(-100);
+            }
+            if (parsedState.ActionState && parsedState.ActionState.constructor === Object) {
+              actionState = parsedState.ActionState;
+            }
+          }
         }
       } catch (error) {
         actionState = {};
+        actionHistory = [];
       }
 
       function keyForRow(row) {
-        return [row.Hash || '', row.Computer || '', row.Message || ''].join('|');
+        return [row.Computer || '', row.Hash || ''].join('|');
+      }
+
+      if (!Object.keys(actionState).length && actionHistory.length) {
+        actionHistory.forEach(function (entry) {
+          if (!entry || !entry.ComputerName || !entry.FindingHash || !entry.WhatToDo) {
+            return;
+          }
+          actionState[[entry.ComputerName, entry.FindingHash].join('|')] = entry.WhatToDo;
+        });
       }
 
       function saveState() {
         try {
-          window.localStorage.setItem(storageKey, JSON.stringify(actionState));
+          window.localStorage.setItem(storageKey, JSON.stringify({
+            ActionHistory: actionHistory.slice(-100),
+            ActionState: actionState
+          }));
         } catch (error) {
         }
       }
@@ -1401,8 +1444,27 @@ function Get-HealthInteractiveHtmlReport {
         var key = keyForRow(row);
         if (actionState[key]) {
           row.WhatToDo = actionState[key];
-        } else if (!row.WhatToDo) {
+        } else {
           row.WhatToDo = 'not-sure';
+        }
+      }
+
+      function rememberActionChoice(row) {
+        var choice = {
+          ComputerName: String(row.Computer || ''),
+          FindingHash: String(row.Hash || ''),
+          WhatToDo: String(row.WhatToDo || 'not-sure')
+        };
+        actionHistory = actionHistory.filter(function (entry) {
+          return !(
+            entry &&
+            entry.ComputerName === choice.ComputerName &&
+            entry.FindingHash === choice.FindingHash
+          );
+        });
+        actionHistory.push(choice);
+        if (actionHistory.length > 100) {
+          actionHistory = actionHistory.slice(actionHistory.length - 100);
         }
       }
 
@@ -1457,6 +1519,7 @@ function Get-HealthInteractiveHtmlReport {
         var hash = String(row.Hash || '');
         var computer = String(row.Computer || '');
         var message = String(row.Message || '');
+        var whatToDo = String(row.WhatToDo || '').toLowerCase();
         if (!hash || !computer || !message) {
           return '';
         }
@@ -1466,15 +1529,31 @@ function Get-HealthInteractiveHtmlReport {
         if (level === 'info' || level === 'debug') {
           return '';
         }
-        var safeComment = (level + ' - ' + message).replace(/"/g, '\\"');
+        if (whatToDo === 'must-fix' || whatToDo === 'not-sure' || !whatToDo) {
+          return '';
+        }
+        var until = '2999-12-31';
+        if (whatToDo === 'postpone') {
+          var untilDate = new Date();
+          untilDate.setDate(untilDate.getDate() + 30);
+          until = untilDate.getFullYear()
+            + '-' + String(untilDate.getMonth() + 1).padStart(2, '0')
+            + '-' + String(untilDate.getDate()).padStart(2, '0');
+        }
+        else if (whatToDo !== 'suppress') {
+          return '';
+        }
+        var safeComment = (level + ' - ' + message).replace(/"/g, '`"');
         return "Invoke-Command " + computer
-          + " {c:\\it\\Get-ComputerHealth\\bin\\Get-ComputerHealth.ps1 -AddWhitelisting -until 2999-12-31 -sig '"
+          + " {\"c:\\it\\Get-ComputerHealth\\bin\\Get-ComputerHealth.ps1\" -AddWhitelisting -until "
+          + until
+          + " -sig '"
           + hash
           + "' -ComputerName "
           + computer
-          + " -comment \\\""
+          + " -comment \""
           + safeComment
-          + "\\\"}";
+          + "\"}";
       }
 
       function render() {
@@ -1517,11 +1596,15 @@ function Get-HealthInteractiveHtmlReport {
           var postponedClass = isPostponed ? ' postponed-text' : '';
           var commentHtml = htmlEncode(row.Comment || '').replace(/\r?\n/g, '<br>');
           var commandHtml = htmlEncode(buildWhitelistCommand(row)).replace(/\r?\n/g, '<br>');
+          var actionHtml = '';
+          if (!isPostponed) {
+            actionHtml = '<button type="button" class="what-badge ' + actionClass(row.WhatToDo) + '" data-row-key="' + key + '" data-index="' + index + '">' + htmlEncode(row.WhatToDo) + '</button>';
+          }
           return ''
             + '<tr>'
             + '<td class="col-computer">' + htmlEncode(row.Computer || '') + '</td>'
             + '<td class="col-level"><span class="level-badge ' + levelClass((row.EffectiveLevel || row.Level || '').toLowerCase()) + '">' + htmlEncode(row.EffectiveLevel || row.Level || '') + '</span></td>'
-            + '<td class="col-action"><button type="button" class="what-badge ' + actionClass(row.WhatToDo) + '" data-row-key="' + key + '" data-index="' + index + '">' + htmlEncode(row.WhatToDo) + '</button></td>'
+            + '<td class="col-action">' + actionHtml + '</td>'
             + '<td class="col-message' + postponedClass + '">' + htmlEncode(row.Message || '') + '</td>'
             + '<td class="col-comment' + postponedClass + '">' + commentHtml + '</td>'
             + '<td class="col-command cmd">' + commandHtml + '</td>'
@@ -1536,6 +1619,7 @@ function Get-HealthInteractiveHtmlReport {
             }
             matchingRow.WhatToDo = rotateAction(matchingRow.WhatToDo);
             actionState[keyForRow(matchingRow)] = matchingRow.WhatToDo;
+            rememberActionChoice(matchingRow);
             saveState();
             render();
           });
@@ -1543,8 +1627,7 @@ function Get-HealthInteractiveHtmlReport {
 
         document.getElementById('summary').innerHTML = ''
           + '<span class="status-item">Visible findings: ' + filtered.length + '</span>'
-          + '<span class="status-item">Loaded findings: ' + rows.length + '</span>'
-          + '<span class="status-item">Postponed shown: ' + (showPostponed ? 'yes' : 'no') + '</span>';
+          + '<span class="status-item">Loaded findings: ' + rows.length + '</span>';
 
         window.__gchVisibleCommands = filtered.map(function (row) {
           return buildWhitelistCommand(row);
@@ -1617,7 +1700,7 @@ function Get-HealthInteractiveHtmlReport {
         copyPromise.then(function () {
           setCopyStatus(commands.length + ' visible command(s) copied.', 'success');
         }).catch(function () {
-          setCopyStatus('Could not copy visible commands.', 'error');
+          setCopyStatus('Could not copy action commands.', 'error');
         });
       });
       document.querySelectorAll('.column-toggle').forEach(function (checkbox) {
@@ -2367,7 +2450,13 @@ if ($all_messages) {
     )
     $html = $htmlParts -join ''
     $interactiveRows = @(Convert-HealthReportRowsToInteractiveRows -Rows $notable_msgs)
-    $interactiveReportHtml = Get-HealthInteractiveHtmlReport -Rows $interactiveRows -Title ("Get-ComputerHealth findings for {0}" -f ($targets -join ', '))
+    $interactiveLocationLine = (($emailSignature.Text -split "\r?\n")[0]).Trim()
+    $interactiveLocationSuffix = $interactiveLocationLine -replace '^Tests started from\s+\S+\s+', ''
+    if ([string]::IsNullOrWhiteSpace($interactiveLocationSuffix)) {
+      $interactiveLocationSuffix = ($targets -join ', ')
+    }
+    $interactiveReportTitle = "Test findings for {0} -- {1}" -f (($targets -join ', '), $interactiveLocationSuffix)
+    $interactiveReportHtml = Get-HealthInteractiveHtmlReport -Rows $interactiveRows -Title $interactiveReportTitle -FooterHtml $emailSignature.HtmlBottom
     Save-HealthHtmlReport -Path $reportArtifacts.InteractiveReportTempPath -Html $interactiveReportHtml
 
     $signedHtml = Add-HealthEmailSignature -Body $html -BodyAsHtml -Signature $emailSignature

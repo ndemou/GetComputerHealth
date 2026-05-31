@@ -327,7 +327,7 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
   }
 
   It 'renders the interactive html report controls and rows' {
-    $html = Get-HealthInteractiveHtmlReport -Title 'Sample Report' -Rows @(
+    $html = Get-HealthInteractiveHtmlReport -Title 'Sample Report' -FooterHtml 'Get-ComputerHealth version 8.0.7, last update 2026-05-31 08:58' -Rows @(
       [pscustomobject]@{
         Computer = 'SRV1'
         Suppressed = $false
@@ -340,8 +340,11 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
     )
 
     $html | Should -Match '<title>Sample Report</title>'
-    $html | Should -Match 'Copy Visible Commands'
-    $html | Should -Match 'toggle-pill'
+    $html | Should -Match '>Get-ComputerHealth version 8.0.7, last update 2026-05-31 08:58<'
+    $html | Should -Match 'Copy Action Commands'
+    $html | Should -Match 'plain-toggle'
+    $html | Should -Match 'Show rows with this action:'
+    $html | Should -Match 'Visible Columns:'
     $html | Should -Match 'font-size: 16px;'
     $html | Should -Not -Match 'Interactive notable findings for this run'
     $html | Should -Match 'data-filter="postpone"'
@@ -358,19 +361,84 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
     $html | Should -Match 'col\.col-width-level \{ width: 1%; \}'
     $html | Should -Match 'col\.col-width-action \{ width: 1%; \}'
     $html | Should -Match '\.col-comment \{'
+    $html | Should -Match 'tbody td\.col-comment \{'
     $html | Should -Match 'font-family: Consolas, "Courier New", monospace;'
     $html | Should -Match '\.postponed-text \{'
     $html | Should -Match '\.summary \{'
-    $html | Should -Match 'class="col-action">What to do</th>'
+    $html | Should -Match 'class="col-action">Action</th>'
     $html | Should -Match 'class="col-message">Message</th>'
+    $html | Should -Match 'class="col-comment">Comment</th>'
     $html | Should -Match '<span class="status-item">Visible findings: '
-    $html | Should -Match 'Postponed shown: '
+    $html | Should -Match '<span class="status-item">Loaded findings: '
+    $html | Should -Not -Match 'Postponed shown: '
+    $html | Should -Match 'class="footer"'
     $html | Should -Match '<col class="col-command col-width-command">'
     $html | Should -Match '__gchVisibleCommands'
     $html | Should -Match 'navigator\.clipboard'
     $html | Should -Match 'Disk free space is low'
     $html | Should -Match 'buildWhitelistCommand'
     $html | Should -Match 'deadbeef'
+    $html | Should -Match "var storageKey = 'gch-report-actions-v2';"
+    $html | Should -Match 'ActionHistory: actionHistory\.slice\(-100\)'
+    $html | Should -Match 'ActionState: actionState'
+  }
+
+  It 'builds interactive commands from WhatToDo and hides postponed action buttons' {
+    $html = Get-HealthInteractiveHtmlReport -Title 'Sample Report' -Rows @(
+      [pscustomobject]@{
+        Computer = 'SRV1'
+        Suppressed = $false
+        Level = 'warning'
+        EffectiveLevel = 'warning'
+        Message = 'Disk free space is low'
+        Comment = 'Drive C: low'
+        Hash = 'deadbeef'
+        WhatToDo = 'suppress'
+      },
+      [pscustomobject]@{
+        Computer = 'SRV2'
+        Suppressed = $false
+        Level = 'warning'
+        EffectiveLevel = 'warning'
+        Message = 'CPU load is high'
+        Comment = 'Investigate'
+        Hash = 'feedbead'
+        WhatToDo = 'postpone'
+      },
+      [pscustomobject]@{
+        Computer = 'SRV3'
+        Suppressed = $false
+        Level = 'warning'
+        EffectiveLevel = 'warning'
+        Message = 'Backup failed'
+        Comment = 'Fix soon'
+        Hash = '12345678'
+        WhatToDo = 'must-fix'
+      },
+      [pscustomobject]@{
+        Computer = 'SRV4'
+        Suppressed = $true
+        Level = 'warning'
+        EffectiveLevel = 'postponed'
+        Message = 'Known issue'
+        Comment = 'Waiting'
+        Hash = '87654321'
+        WhatToDo = 'postpone'
+      }
+    )
+
+    $html | Should -Match "var until = '2999-12-31';"
+    $html | Should -Match "if \(whatToDo === 'postpone'\)"
+    $html | Should -Match "if \(whatToDo === 'must-fix' \|\| whatToDo === 'not-sure' \|\| !whatToDo\)"
+    $html | Should -Match "row\.WhatToDo = 'not-sure';"
+    $html | Should -Match 'ComputerName: String\(row\.Computer \|\| ''''\)'
+    $html | Should -Match 'FindingHash: String\(row\.Hash \|\| ''''\)'
+    $html | Should -Match 'WhatToDo: String\(row\.WhatToDo \|\| ''not-sure''\)'
+    $html | Should -Match 'if \(actionHistory\.length > 100\)'
+    $html | Should -Match "if \(!isPostponed\)"
+    $html | Should -Match '\{\\"c:\\\\it\\\\Get-ComputerHealth\\\\bin\\\\Get-ComputerHealth\.ps1\\" -AddWhitelisting -until '
+    $html | Should -Match ' -comment \\"'
+    $html | Should -Not -Match '\\\\\\\\"'
   }
 
   It 'uses a dedicated active html report path for the email attachment' {

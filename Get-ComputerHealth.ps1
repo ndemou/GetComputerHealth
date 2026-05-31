@@ -144,7 +144,7 @@ param(
   [switch]$OutputObjects,
 
   [Parameter(ParameterSetName = 'Run')]
-  [ValidatePattern('^[DIPNWFSC]*$')]
+  [ValidatePattern('(?i)^[DIPNWFSC]*$')]
   [string]$Hide = '',
 
   [Parameter(ParameterSetName = 'Run')]
@@ -215,6 +215,10 @@ param(
 )
 
 $VERSION="8.0.7"
+
+if ($null -ne $Hide) {
+  $Hide = ([string]$Hide).ToUpperInvariant()
+}
 
 
 $SCRIPT_BIN_DIR = (Resolve-Path -LiteralPath $PSScriptRoot).Path
