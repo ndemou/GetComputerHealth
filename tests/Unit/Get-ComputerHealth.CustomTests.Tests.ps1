@@ -115,4 +115,47 @@ Write-Output ([pscustomobject]@{
     $command.Parameters.ContainsKey('FolderPath') | Should -BeTrue
     $command.Parameters['FolderPath'].Aliases | Should -Contain 'ScriptPath'
   }
+
+  It 'skips custom test entries whose script path cannot be determined' {
+    $parseErrors = $null
+    $tokens = $null
+    $ast = [System.Management.Automation.Language.Parser]::ParseFile($script:GetComputerHealthScript, [ref]$tokens, [ref]$parseErrors)
+    $funcAst = $ast.Find({
+        param($node)
+        $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+        $node.Name -eq 'Invoke-HealthTestsFromFolder'
+      }, $true)
+
+    $funcAst | Should -Not -BeNullOrEmpty
+    . ([scriptblock]::Create($funcAst.Extent.Text))
+    $script:InvokedScriptPaths = @()
+    $script:WarningMessages = @()
+    $script:InfoMessages = @()
+
+    function Get-CustomHealthTestFilesFromPath {
+      param([string]$Path)
+      @(
+        'C:\CustomTests\alpha.ps1'
+        [pscustomobject]@{ FullName = '' }
+        [pscustomobject]@{ Name = 'missing-full-name' }
+      )
+    }
+    function Invoke-CustomHealthTestScript {
+      param([string]$ScriptPath)
+      $script:InvokedScriptPaths += $ScriptPath
+    }
+    function Log-Warning {
+      param([string]$Message)
+      $script:WarningMessages += $Message
+    }
+    function Log-Info {
+      param([string]$Message)
+      $script:InfoMessages += $Message
+    }
+
+    Invoke-HealthTestsFromFolder -FolderPath 'C:\CustomTests'
+
+    $script:InvokedScriptPaths | Should -Be @('C:\CustomTests\alpha.ps1')
+    $script:WarningMessages.Count | Should -Be 2
+  }
 }

@@ -1275,19 +1275,19 @@ function Get-HealthInteractiveHtmlReport {
         <label><input class="column-toggle" type="checkbox" data-column="computer" checked> Computer</label>
         <label><input class="column-toggle" type="checkbox" data-column="level" checked> Level</label>
         <label><input class="column-toggle" type="checkbox" data-column="comment" checked> Comment</label>
-        <label><input class="column-toggle" type="checkbox" data-column="command" checked> AddWhitelist command</label>
+        <label><input class="column-toggle" type="checkbox" data-column="command"> AddWhitelist command</label>
       </div>
       <div class="summary" id="summary"></div>
     </div>
     <div class="table-wrap">
       <table>
         <colgroup>
-          <col class="col-width-computer">
-          <col class="col-width-level">
+          <col class="col-computer col-width-computer">
+          <col class="col-level col-width-level">
           <col class="col-width-action">
           <col class="col-width-message">
-          <col class="col-width-comment">
-          <col class="col-width-command">
+          <col class="col-comment col-width-comment">
+          <col class="col-command col-width-command">
         </colgroup>
         <thead>
           <tr>

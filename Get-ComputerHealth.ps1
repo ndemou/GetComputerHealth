@@ -752,7 +752,21 @@ function Invoke-HealthTestsFromFolder {
   if (-not $files) { return }
 
   foreach ($file in $files) {
-    Invoke-CustomHealthTestScript -ScriptPath $file.FullName
+    $scriptPath = $null
+
+    if ($file -is [string]) {
+      $scriptPath = $file
+    }
+    elseif ($file -and $file.PSObject.Properties['FullName']) {
+      $scriptPath = [string]$file.FullName
+    }
+
+    if ([string]::IsNullOrWhiteSpace($scriptPath)) {
+      Log-Warning "Skipping a custom test entry from '$FolderPath' because its script path could not be determined."
+      continue
+    }
+
+    Invoke-CustomHealthTestScript -ScriptPath $scriptPath
   }
 
   Log-Info "Ran $($files.Count) custom health test script(s) from '$FolderPath'."
