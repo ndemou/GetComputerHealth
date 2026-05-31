@@ -282,14 +282,14 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
     }
   }
 
-  It 'filters interactive rows down to actionable levels and fields' {
+  It 'shapes interactive rows from the current notable findings set' {
     $rows = @(Convert-HealthReportRowsToInteractiveRows -Rows @(
         [pscustomobject]@{ Computer = 'SRV1'; Suppressed = $false; Level = 'warning'; EffectiveLevel = 'warning'; Message = 'Disk free space is low'; Comment = 'Drive C: low'; Hash = 'deadbeef'; Emitter = 'x'; TimeUtc = 'y'; WhatToDo = 'not-sure' },
         [pscustomobject]@{ Computer = 'SRV2'; Suppressed = $false; Level = 'info'; EffectiveLevel = 'info'; Message = 'Informational'; Comment = ''; Hash = '11111111' },
         [pscustomobject]@{ Computer = 'SRV3'; Suppressed = $false; Level = 'pass'; EffectiveLevel = 'pass'; Message = 'Passed'; Comment = ''; Hash = '22222222' }
       ))
 
-    $rows.Count | Should -Be 1
+    $rows.Count | Should -Be 3
     $rows[0].Computer | Should -Be 'SRV1'
     $rows[0].PSObject.Properties.Name | Should -Contain 'Hash'
     $rows[0].PSObject.Properties.Name | Should -Not -Contain 'Emitter'
@@ -310,10 +310,14 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
     )
 
     $html | Should -Match '<title>Sample Report</title>'
-    $html | Should -Match 'Hide suppressed'
+    $html | Should -Match 'Copy Visible Commands'
+    $html | Should -Match 'toggle-pill'
     $html | Should -Match 'data-filter="postpone"'
     $html | Should -Match 'data-column="command"'
-    $html | Should -Match 'Interactive findings report from the last 3 months'
+    $html | Should -Match 'table-layout: auto;'
+    $html | Should -Match '__gchVisibleCommands'
+    $html | Should -Match 'navigator\.clipboard'
+    $html | Should -Match 'Interactive notable findings for this run'
     $html | Should -Match 'Disk free space is low'
     $html | Should -Match 'buildWhitelistCommand'
     $html | Should -Match 'deadbeef'

@@ -876,16 +876,11 @@ function Convert-HealthReportRowsToInteractiveRows {
       continue
     }
 
-    $effectiveLevel = if ($row.PSObject.Properties['EffectiveLevel']) { [string]$row.EffectiveLevel } else { '' }
-    if ($effectiveLevel -in @('debug', 'info', 'pass')) {
-      continue
-    }
-
     [pscustomobject]@{
       Computer       = if ($row.PSObject.Properties['Computer']) { [string]$row.Computer } else { '' }
       Suppressed     = if ($row.PSObject.Properties['Suppressed']) { [bool]$row.Suppressed } else { $false }
       Level          = if ($row.PSObject.Properties['Level']) { [string]$row.Level } else { '' }
-      EffectiveLevel = $effectiveLevel
+      EffectiveLevel = if ($row.PSObject.Properties['EffectiveLevel']) { [string]$row.EffectiveLevel } else { '' }
       Message        = if ($row.PSObject.Properties['Message']) { [string]$row.Message } else { '' }
       Comment        = if ($row.PSObject.Properties['Comment']) { [string]$row.Comment } else { '' }
       Hash           = if ($row.PSObject.Properties['Hash']) { [string]$row.Hash } else { '' }
@@ -993,12 +988,16 @@ function Get-HealthInteractiveHtmlReport {
   <title>$safeTitle</title>
   <style>
     :root {
-      --bg: #f5f7f4;
-      --panel: #ffffff;
-      --ink: #182022;
-      --muted: #617076;
-      --line: #d7dfdc;
-      --accent: #1f5fa8;
+      --bg: #eef3ee;
+      --bg-accent: #dce8df;
+      --panel: rgba(255,255,255,0.92);
+      --panel-strong: #ffffff;
+      --ink: #172126;
+      --muted: #607179;
+      --line: #d4ddd8;
+      --accent: #0f766e;
+      --accent-strong: #0b5c56;
+      --accent-soft: #d7f0ea;
       --failure: #ff4d4f;
       --warning: #ffb300;
       --notice: #1e88e5;
@@ -1009,33 +1008,41 @@ function Get-HealthInteractiveHtmlReport {
       --suppress: #475467;
       --postpone: #2e7d32;
       --notsure: #8a6f00;
+      --shadow: 0 18px 48px rgba(23,33,38,0.10);
     }
     body {
       margin: 0;
       font-family: Segoe UI, Arial, sans-serif;
-      background: linear-gradient(180deg, #f8faf8 0%, #edf3ef 100%);
+      background:
+        radial-gradient(circle at top left, rgba(15,118,110,0.12), transparent 28%),
+        radial-gradient(circle at top right, rgba(30,136,229,0.10), transparent 22%),
+        linear-gradient(180deg, var(--bg) 0%, var(--bg-accent) 100%);
       color: var(--ink);
     }
     .shell {
-      max-width: 1400px;
+      max-width: 1500px;
       margin: 0 auto;
-      padding: 24px;
+      padding: 30px 24px 40px 24px;
     }
     .hero {
-      background: var(--panel);
+      background: linear-gradient(180deg, rgba(255,255,255,0.96) 0%, rgba(248,251,249,0.92) 100%);
       border: 1px solid var(--line);
-      border-radius: 18px;
-      padding: 20px 22px;
-      box-shadow: 0 8px 30px rgba(24,32,34,0.06);
-      margin-bottom: 16px;
+      border-radius: 24px;
+      padding: 24px 24px 20px 24px;
+      box-shadow: var(--shadow);
+      margin-bottom: 18px;
+      backdrop-filter: blur(10px);
     }
     h1 {
       margin: 0 0 8px 0;
-      font-size: 28px;
+      font-size: 31px;
+      letter-spacing: -0.03em;
     }
     .sub {
       color: var(--muted);
       font-size: 14px;
+      max-width: 920px;
+      line-height: 1.5;
     }
     .controls, .column-controls, .summary {
       display: flex;
@@ -1046,24 +1053,31 @@ function Get-HealthInteractiveHtmlReport {
     }
     .controls input[type=text], .controls select {
       border: 1px solid var(--line);
-      border-radius: 10px;
-      padding: 9px 12px;
+      border-radius: 14px;
+      padding: 10px 14px;
       font-size: 14px;
-      background: #fff;
+      background: rgba(255,255,255,0.92);
       color: var(--ink);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.7);
     }
     .controls input[type=text] {
-      min-width: 360px;
-      flex: 1 1 360px;
+      min-width: 380px;
+      flex: 1 1 420px;
     }
     button, .pill {
       border: 1px solid var(--line);
       border-radius: 999px;
-      padding: 8px 12px;
-      background: #fff;
+      padding: 9px 14px;
+      background: rgba(255,255,255,0.94);
       color: var(--ink);
       cursor: pointer;
       font-size: 13px;
+      transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease, background-color 0.12s ease;
+      box-shadow: 0 4px 14px rgba(23,33,38,0.06);
+    }
+    button:hover, .pill:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 18px rgba(23,33,38,0.10);
     }
     button.active-filter {
       background: var(--accent);
@@ -1072,45 +1086,113 @@ function Get-HealthInteractiveHtmlReport {
     }
     .summary .pill {
       cursor: default;
+      background: rgba(255,255,255,0.78);
+    }
+    .utility-button {
+      background: linear-gradient(180deg, #ffffff 0%, #f0f8f5 100%);
+    }
+    .utility-button strong {
+      font-weight: 700;
+    }
+    .toggle-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 5px 8px 5px 10px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(255,255,255,0.94);
+      color: var(--ink);
+      box-shadow: 0 4px 14px rgba(23,33,38,0.06);
+      cursor: pointer;
+      user-select: none;
+    }
+    .toggle-pill input {
+      display: none;
+    }
+    .toggle-pill .toggle-track {
+      position: relative;
+      width: 42px;
+      height: 24px;
+      border-radius: 999px;
+      background: #c7d4cf;
+      transition: background-color 0.15s ease;
+      flex: 0 0 auto;
+    }
+    .toggle-pill .toggle-track::after {
+      content: '';
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #fff;
+      box-shadow: 0 2px 6px rgba(23,33,38,0.18);
+      transition: transform 0.15s ease;
+    }
+    .toggle-pill input:checked + .toggle-track {
+      background: var(--accent);
+    }
+    .toggle-pill input:checked + .toggle-track::after {
+      transform: translateX(18px);
+    }
+    .toggle-pill .toggle-text {
+      font-size: 13px;
+      font-weight: 600;
     }
     .table-wrap {
-      background: var(--panel);
+      background: var(--panel-strong);
       border: 1px solid var(--line);
-      border-radius: 18px;
-      box-shadow: 0 8px 30px rgba(24,32,34,0.06);
-      overflow: hidden;
+      border-radius: 24px;
+      box-shadow: var(--shadow);
+      overflow: auto;
+      backdrop-filter: blur(10px);
     }
     table {
       width: 100%;
       border-collapse: collapse;
-      table-layout: fixed;
+      table-layout: auto;
+    }
+    col.col-width-computer { width: 11%; }
+    col.col-width-level { width: 9%; }
+    col.col-width-action { width: 10%; }
+    col.col-width-message { width: 28%; }
+    col.col-width-comment { width: 18%; }
+    col.col-width-command { width: 24%; }
+    thead {
+      position: sticky;
+      top: 0;
+      z-index: 2;
     }
     thead th {
-      background: #f0f4f2;
+      background: linear-gradient(180deg, #eef6f3 0%, #e7f0ec 100%);
       text-align: left;
       font-size: 12px;
       letter-spacing: 0.04em;
       text-transform: uppercase;
       color: var(--muted);
       border-bottom: 1px solid var(--line);
-      padding: 12px 10px;
+      padding: 14px 12px;
+      white-space: nowrap;
     }
     tbody td {
-      padding: 10px;
+      padding: 12px;
       border-bottom: 1px solid #edf1ef;
       vertical-align: top;
       font-size: 13px;
       overflow-wrap: anywhere;
     }
     tbody tr:hover {
-      background: #f9fbfa;
+      background: #f7fbf9;
     }
     .level-badge, .what-badge {
       display: inline-block;
       border-radius: 999px;
-      padding: 3px 8px;
+      padding: 4px 10px;
       font-weight: 700;
       font-size: 12px;
+      white-space: nowrap;
     }
     .level-failure { background: var(--failure); color: #fff; }
     .level-warning { background: var(--warning); color: #111; }
@@ -1127,6 +1209,7 @@ function Get-HealthInteractiveHtmlReport {
       font-family: Consolas, "Courier New", monospace;
       font-size: 12px;
       white-space: pre-wrap;
+      line-height: 1.45;
     }
     .hidden-column {
       display: none;
@@ -1134,13 +1217,37 @@ function Get-HealthInteractiveHtmlReport {
     .muted {
       color: var(--muted);
     }
+    .copy-status {
+      font-size: 12px;
+      color: var(--muted);
+      min-height: 18px;
+      margin-left: 4px;
+    }
+    .copy-status.success {
+      color: var(--accent-strong);
+    }
+    .copy-status.error {
+      color: var(--mustfix);
+    }
+    @media (max-width: 1100px) {
+      .shell {
+        padding: 18px;
+      }
+      .controls input[type=text] {
+        min-width: 240px;
+        flex-basis: 100%;
+      }
+      table {
+        min-width: 980px;
+      }
+    }
   </style>
 </head>
 <body>
   <div class="shell">
     <div class="hero">
       <h1>$safeTitle</h1>
-      <div class="sub">Interactive findings report from the last 3 months of stored CLIXML data. Suppressed findings are loaded but hidden by default.</div>
+      <div class="sub">Interactive notable findings for this run. This contains the same notable findings as the simple report, including suppressed ones.</div>
       <div class="controls">
         <input id="textFilter" type="text" placeholder="Filter text. Example: foo -bar">
         <select id="sortField">
@@ -1149,7 +1256,8 @@ function Get-HealthInteractiveHtmlReport {
           <option value="Message">Sort by message</option>
         </select>
         <button id="sortDirection" type="button">Ascending</button>
-        <label><input id="hideSuppressed" type="checkbox" checked> Hide suppressed</label>
+        <button id="copyVisibleCommands" type="button" class="utility-button"><strong>Copy Visible Commands</strong></button>
+        <span id="copyStatus" class="copy-status"></span>
       </div>
       <div class="controls">
         <button type="button" class="what-filter active-filter" data-filter="">All actions</button>
@@ -1157,6 +1265,11 @@ function Get-HealthInteractiveHtmlReport {
         <button type="button" class="what-filter" data-filter="postpone">Postpone</button>
         <button type="button" class="what-filter" data-filter="must-fix">Must-fix</button>
         <button type="button" class="what-filter" data-filter="not-sure">Not-sure</button>
+        <label class="toggle-pill" for="hideSuppressed">
+          <span class="toggle-text">Hide suppressed</span>
+          <input id="hideSuppressed" type="checkbox" checked>
+          <span class="toggle-track" aria-hidden="true"></span>
+        </label>
       </div>
       <div class="column-controls">
         <label><input class="column-toggle" type="checkbox" data-column="computer" checked> Computer</label>
@@ -1168,6 +1281,14 @@ function Get-HealthInteractiveHtmlReport {
     </div>
     <div class="table-wrap">
       <table>
+        <colgroup>
+          <col class="col-width-computer">
+          <col class="col-width-level">
+          <col class="col-width-action">
+          <col class="col-width-message">
+          <col class="col-width-comment">
+          <col class="col-width-command">
+        </colgroup>
         <thead>
           <tr>
             <th class="col-computer">Computer</th>
@@ -1262,6 +1383,12 @@ function Get-HealthInteractiveHtmlReport {
         return active ? active.getAttribute('data-filter') : '';
       }
 
+      function setCopyStatus(message, cssClass) {
+        var status = document.getElementById('copyStatus');
+        status.textContent = message || '';
+        status.className = 'copy-status' + (cssClass ? ' ' + cssClass : '');
+      }
+
       function compareRows(left, right, field, ascending) {
         var a = left[field] || '';
         var b = right[field] || '';
@@ -1292,7 +1419,14 @@ function Get-HealthInteractiveHtmlReport {
           return '';
         }
         var safeComment = (level + ' - ' + message).replace(/"/g, '\\"');
-        return "Invoke-Command " + computer + " {c:\\it\\Get-ComputerHealth\\bin\\Get-ComputerHealth.ps1 -AddWhitelisting -until 2999-12-31 -sig '" + hash + "' -ComputerName " + computer + " -comment \\"" + safeComment + "\\""}";
+        return "Invoke-Command " + computer
+          + " {c:\\it\\Get-ComputerHealth\\bin\\Get-ComputerHealth.ps1 -AddWhitelisting -until 2999-12-31 -sig '"
+          + hash
+          + "' -ComputerName "
+          + computer
+          + " -comment \\\""
+          + safeComment
+          + "\\\"}";
       }
 
       function render() {
@@ -1362,6 +1496,12 @@ function Get-HealthInteractiveHtmlReport {
           + '<span class="pill">Loaded findings: ' + rows.length + '</span>'
           + '<span class="pill">Suppressed hidden by default: ' + (hideSuppressed ? 'yes' : 'no') + '</span>';
 
+        window.__gchVisibleCommands = filtered.map(function (row) {
+          return buildWhitelistCommand(row);
+        }).filter(function (command) {
+          return Boolean(command);
+        });
+
         document.querySelectorAll('.column-toggle').forEach(function (checkbox) {
           var columnClass = '.col-' + checkbox.getAttribute('data-column');
           document.querySelectorAll(columnClass).forEach(function (cell) {
@@ -1392,6 +1532,44 @@ function Get-HealthInteractiveHtmlReport {
       document.getElementById('textFilter').addEventListener('input', render);
       document.getElementById('sortField').addEventListener('change', render);
       document.getElementById('hideSuppressed').addEventListener('change', render);
+      document.getElementById('copyVisibleCommands').addEventListener('click', function () {
+        var commands = window.__gchVisibleCommands || [];
+        if (!commands.length) {
+          setCopyStatus('No visible commands to copy.', 'error');
+          return;
+        }
+        var text = commands.join('\r\n');
+        var copyPromise = null;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          copyPromise = navigator.clipboard.writeText(text);
+        } else {
+          copyPromise = new Promise(function (resolve, reject) {
+            var textArea = document.createElement('textarea');
+            textArea.value = text;
+            textArea.setAttribute('readonly', 'readonly');
+            textArea.style.position = 'absolute';
+            textArea.style.left = '-9999px';
+            document.body.appendChild(textArea);
+            textArea.select();
+            try {
+              if (document.execCommand('copy')) {
+                resolve();
+              } else {
+                reject(new Error('copy failed'));
+              }
+            } catch (error) {
+              reject(error);
+            } finally {
+              document.body.removeChild(textArea);
+            }
+          });
+        }
+        copyPromise.then(function () {
+          setCopyStatus(commands.length + ' visible command(s) copied.', 'success');
+        }).catch(function () {
+          setCopyStatus('Could not copy visible commands.', 'error');
+        });
+      });
       document.querySelectorAll('.column-toggle').forEach(function (checkbox) {
         checkbox.addEventListener('change', render);
       });
@@ -2138,8 +2316,7 @@ if ($all_messages) {
       $notable_msgs | Sort-Object -Property @{ Expression = { $SortOrder[$_.EffectiveLevel] } }, Computer
     )
     $html = $htmlParts -join ''
-    $historicalRows = @(Import-HealthMessagesReportData -DataDir $DATA_DIR)
-    $interactiveRows = @(Convert-HealthReportRowsToInteractiveRows -Rows $historicalRows)
+    $interactiveRows = @(Convert-HealthReportRowsToInteractiveRows -Rows $notable_msgs)
     $interactiveReportHtml = Get-HealthInteractiveHtmlReport -Rows $interactiveRows -Title ("Get-ComputerHealth findings for {0}" -f ($targets -join ', '))
     Save-HealthHtmlReport -Path $reportArtifacts.InteractiveReportTempPath -Html $interactiveReportHtml
 
