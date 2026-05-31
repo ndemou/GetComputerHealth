@@ -1,12 +1,10 @@
 ﻿# Introduction
 
-**Get-ComputerHealth** is a **production-ready, lightweight, and extendable** PowerShell framework that will scan your server, workstation or fleet of domain servers for **more than a hundred health indicators** (both issues like low RAM, missing updates, disk errors, failed logins and configuration changes like a newly installed software, a TCP port that started listening, a host that stoped responding to pings or accepting connections, full list below). It produces **useful and concise reports, email alerts with attached HTML reports**, and **clean terminal output**. You can easily add your own **custom health tests with plain PowerShell scripts**. **Installation is quick and simple**: in a few minutes you can check all your domain servers and receive daily notifications for issues and changes.
+**Get-ComputerHealth** is a **production-ready, lightweight, secure and extendable** PowerShell framework that **installs in a flash** and scans your server, workstation or fleet of domain servers for **more than a hundred health indicators** (both issues like low RAM, missing updates, disk errors, failed logins and configuration changes like a newly installed software, a TCP port that started listening, a host that stoped responding to pings or accepting connections). It produces **useful and concise reports, and email alerts**. You can easily add your own **custom health tests with plain PowerShell scripts**. 
 
 <img width="729" height="426" alt="image" src="https://github.com/user-attachments/assets/56ed5109-0f71-4f10-a7ba-2b0cf0e36669" />
 
 <img width="1086" height="251" alt="Example of the report you receive via email" src="https://github.com/user-attachments/assets/694eb16f-fbc9-420c-b96e-dead56715085" />
-
-<img width="977" height="598" alt="Example of Terminal Output" src="https://github.com/user-attachments/assets/4925c744-2eaa-428c-939e-ec98e14e38b8" />
 
 # Status / Is this code for you?
 
@@ -14,17 +12,18 @@ This is a **robust production-tested tool** and I have been using it across seve
 
 **BUT:**
 
- 1. **I may opt to move fast and break things.** I will not do it lightly because I'll have to clean up issues at several production sites, but I *will do it* if the rewards worth to me. So be prepared for some occasional manual work (such as suppressing spurious alerts or needing to perform a manual reinstall). 
- 2. **Don't expect official support.** I am happy to help when I can, but my availability is limited. You should be comfortable with PowerShell.
- > On the plus side, in the unlikely event that you need to dive into the code, it is surprisingly small and straightforward: **the core is about 1,000 lines, including comments.** The tests do exceed ten thousand lines, but most tests are a dozen or two dozen lines and a few are a few hundred lines. So any modern AI agent can easily understand and fix issues in the code. In fact, the vast majority of the code *was* written by Codex, with myself acting as the architect, lead developer, reviewer, and QC.
- 4. **I am currently the only user I know of**, so there is a chance I have some blind spots.
- 5. **I have not tested it on domains with more than a few dozen servers or with DCs connected via WAN.** It is possible that certain domain-related tests could cause excessive WAN traffic. Test it while observing traffic (and I would be glad if you let me know the results).
+ 1. **Don't expect official support.** I am happy to help when I can, but my availability is limited. You should be comfortable with PowerShell.
+ 2. **I am currently the only user I know of**, so there is a chance I have some blind spots.
+ 3. **There's a tiny chance of breaking changes.** I'll avoid it because I'll have to clean up issues at several production sites, but I *will do it* if the rewards worth to me. 
+ 4. **I have not tested it on domains with more than a few dozen servers or with DCs connected via WAN.** It is possible that certain domain-related tests could cause excessive WAN traffic. Test it while observing traffic (and I would be glad if you let me know the results).
+
+ > On the plus side, in the unlikely event that you need to dive into the code, it is surprisingly small and straightforward: **the core is about 1,000 lines, including comments.** The code that creates html reports is quite heavy. The tests measure in excess of ten thousand lines, but most of them are a dozen or two dozen lines and a few are a few hundred lines. So any modern AI agent can easily understand and fix issues in the code. In fact, the vast majority of the code *was* written by Codex, with myself acting as the architect, lead developer, reviewer, and QC.
 
 # Security
 
-By default the installer downloads and updates files from this GitHub repository every time you call any of the `Invoke-*.ps1` scripts. You can disable this by setting `AutomaticUpdates = $false` in `./config/gch.psd1` or point the updater to a clone of this repo that you control by setting `RepoUrl`.
+By default the installer downloads and updates files from this GitHub repository every time you call any of the `Invoke-*.ps1` scripts. **You can disable automatic udpates** by setting `AutomaticUpdates = $false` in `./config/gch.psd1` or point the updater to a clone of this repo that you control by setting `RepoUrl`.
 
-Besides PowerShell itself, the toolkit has **no external dependencies**.
+This toolkit has **no external dependencies**.
 
 Besides installation, this code *should not change the state of the system in any way*. Consequently, auditing it with a modern AI agent is quite easy. 
 
@@ -273,19 +272,19 @@ These are the scripts you actually execute.
 
 ### `Invoke-GetHealthDomainComputers.ps1`
 
-* **Role:** The “Easy Button” wrapper for testing all domain servers.
+* **Role:** The “Easy Button” wrapper for testing all domain servers and generating reports.
 * **Function:** By default, it tests all computers running a Windows Server OS, but you are free to edit it to add extra hosts or exclude others.
 * **Usage:** Run this manually or schedule it to run daily (via the SYSTEM account) to check the entire domain.
 * **Note:** You need to create this script yourself; an example is provided in this documentation.
 
 ### `Invoke-GetComputerHealth.ps1` (for one computer)
 
-* **Role:** The Engine/Orchestrator. It tests the local host by default or the computers you specify.
+* **Role:** The Engine/Orchestrator. It tests the local host by default or the computers you specify and generates reports.
 * **Function:** It manages the workflow:
   1. Connects to the local host or one or more remote computers.
   2. Triggers a self-update on the remote target.
   3. Runs the health checks.
-  4. Collects output, saves it in CLIXML plus HTML format, and emails **notable** (non-success) messages.
+  4. Collects output, saves it in CLIXML, generates HTML reports, and emails *notable* (non-success) messages.
 * **Key Parameters:** `-Computers` (list of targets, local host by default), `-ExcludeServers`, `-Hide` (defines which message types to hide from console output, usually "DIPS").
 * **Email default caveat:** `Invoke-GetComputerHealth.ps1` sends email by default in non-interactive contexts and does not send by default in interactive contexts. If you first connect with `Enter-PSSession` and then run the script on the remote host, that remote PowerShell host can still appear non-interactive to the script. Use `-NoSendReport` inside `Enter-PSSession` when you do not want the default email report.
 
@@ -376,7 +375,7 @@ Note that if you only want to add a few custom tests, you do not need to modify 
 | GpupdatePolicyApply              | Checks whether the machine secure channel is healthy enough for Group Policy processing |
 | GpWmiFilterNamespacesOnLocalHost | Checks whether Group Policy WMI filter namespaces are accessible on the local host |
 | HotfixBaseline                   | Checks whether all required hotfixes from the baseline are installed |
-| HyperVReplicationHealth         | Checks Hyper-V VM replication health, missing replication, and running replica VMs |
+| HyperVReplicationHealth          | Checks Hyper-V VM replication health, missing replication, and running replica VMs |
 | HyperVRunningVMs                 | Lists running Hyper-V virtual machines on the host |
 | IisBindings                      | Checks IIS bindings for wildcard or otherwise risky binding configurations |
 | InstalledRolesFeatures           | Checks for installed Windows roles or features that are outside the intended baseline |
