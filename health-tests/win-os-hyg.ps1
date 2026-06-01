@@ -240,9 +240,9 @@ Uses: None.
   if($bad.Count -eq 0){
     Write-Warning "[PASS] Schannel baseline OK (SSL3/TLS1.0/TLS1.1 disabled, TLS1.2 enabled)"
   } else {
-    $why="Inbound services that rely on Schannel may negotiate legacy TLS/SSL protocols if they remain enabled. E.g. LDAP over TLS, WinRM, ADWS..."
-    $comment = ("Detected mismatches:`n"+($bad | ForEach-Object { "  - {0}: Current={1}, Recommended={2}" -f $_.Protocol,$_.CurrentState,$should[$_.Protocol] } | Out-String) + "`nRegistry snapshot:`n"+$det+$why)
-    Write-Warning "[WARNING] Schannel baseline not hardened`n$comment"
+    $why="Inbound services that rely on Schannel may negotiate legacy TLS/SSL protocols if they remain enabled. E.g. IIS web server, RDP/RDS, AD DS/LDAPS, WinRM/ADWS(Remote PowerShell), encrypted SQL, OWA and other exchange componets, .Net apps & PowerShell scripts, RRAS/SSTP VPN."
+    $comment = ($why + "`nDetected mismatches:`n"+($bad | ForEach-Object { "  - {0}: Current={1}, Recommended={2}" -f $_.Protocol,$_.CurrentState,$should[$_.Protocol] } | Out-String) + "`nRegistry snapshot:`n"+$det)
+    Write-Warning "[WARNING] Schannel baseline not hardened" + "`n" + $comment
   }
 }
 
