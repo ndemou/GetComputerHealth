@@ -60,11 +60,9 @@ Test-IpReachability -Ip '10.1.11.50,10.1.11.55 10.1.11.56' `
     $s = $Ip.Trim()
     if ($s -match '[,\s]') { $ips = @($s -split '[,\s]+' | Where-Object { $_ -and $_.Trim() } | ForEach-Object { $_.Trim() }) }
     else { $ips = @($s) }
-  }
-  elseif ($Ip -is [System.Collections.IEnumerable]) {
+  } elseif ($Ip -is [System.Collections.IEnumerable]) {
     foreach ($x in $Ip) { if ($null -ne $x -and "$x".Trim()) { $ips += "$x".Trim() } }
-  }
-  else { $ips = @("$Ip".Trim()) }
+  } else { $ips = @("$Ip".Trim()) }
   if ($ips.Count -eq 0) { return @() }
   $ips = @($ips | Select-Object -Unique)
 
@@ -101,8 +99,7 @@ Test-IpReachability -Ip '10.1.11.50,10.1.11.55 10.1.11.56' `
       $t = $null
       try {
         $t = $p.SendPingAsync($a, $TimeoutMs)
-      }
-      catch {
+      } catch {
         $st.lastStatus = "PROGRAM EXCEPTION: $($_.Exception.Message)"
         Write-Verbose "attempt=$attempt/$maxAttempts ip=$a status='$($st.lastStatus)' retry=no (program exception)"
         try { $p.Dispose() } catch {}
@@ -116,8 +113,7 @@ Test-IpReachability -Ip '10.1.11.50,10.1.11.55 10.1.11.56' `
     if ($tasks.Count -gt 0) {
       try {
         [System.Threading.Tasks.Task]::WaitAll([System.Threading.Tasks.Task[]]$tasks)
-      }
-      catch {
+      } catch {
         Write-Warning "WaitAll exception: $($_.Exception.GetType().FullName): $($_.Exception.Message)"
       }
     }
@@ -133,8 +129,7 @@ Test-IpReachability -Ip '10.1.11.50,10.1.11.55 10.1.11.56' `
           $msg = $b.task.Exception.InnerException.Message
           $st.lastStatus = "PROGRAM EXCEPTION: $msg"
           $statusName = $st.lastStatus
-        }
-        elseif ($b.task.Status -eq [System.Threading.Tasks.TaskStatus]::RanToCompletion) {
+        } elseif ($b.task.Status -eq [System.Threading.Tasks.TaskStatus]::RanToCompletion) {
           $r = $b.task.Result
           $statusName = $r.Status.ToString()
           $st.lastStatus = $statusName
@@ -143,17 +138,14 @@ Test-IpReachability -Ip '10.1.11.50,10.1.11.55 10.1.11.56' `
             $st.rttMs = $r.RoundtripTime
             $st.respondedOnAttempt = $attempt
           }
-        }
-        else {
+        } else {
           $statusName = $b.task.Status.ToString()
           $st.lastStatus = $statusName
         }
-      }
-      catch {
+      } catch {
         $st.lastStatus = "PROGRAM EXCEPTION: $($_.Exception.Message)"
         $statusName = $st.lastStatus
-      }
-      finally {
+      } finally {
         try { $b.ping.Dispose() } catch {}
       }
 
@@ -165,8 +157,7 @@ Test-IpReachability -Ip '10.1.11.50,10.1.11.55 10.1.11.56' `
 
       if ($st.responded) {
         Write-Verbose "attempt=$attempt/$maxAttempts ip=$a status='$statusName' rttMs=$($st.rttMs) retry=no (success)"
-      }
-      else {
+      } else {
         $why = "no"
         if ($attempt -ge $maxAttempts) { $why = "no (attempt limit reached)" }
         elseif ($terminalStatuses.Contains("$($st.lastStatus)")) { $why = "no (terminal status)" }
@@ -250,8 +241,7 @@ Test-TcpPort -Target 'google.com' -Ports '80,443,4444' `
   $ipObj = $null
   if ([System.Net.IPAddress]::TryParse($target, [ref]$ipObj)) {
     $ipString = $ipObj.IPAddressToString
-  }
-  else {
+  } else {
     try { $addrs = [System.Net.Dns]::GetHostAddresses($target) } catch { throw "Failed to resolve '$target': $($_.Exception.Message)" }
     if (-not $addrs -or $addrs.Count -eq 0) { throw "Failed to resolve '$target' (no addresses returned)" }
     $pick = ($addrs | Where-Object { $_.AddressFamily -eq [System.Net.Sockets.AddressFamily]::InterNetwork } | Select-Object -First 1)
@@ -264,11 +254,9 @@ Test-TcpPort -Target 'google.com' -Ports '80,443,4444' `
   elseif ($Ports -is [int[]]) { $portsList = $Ports }
   elseif ($Ports -is [string]) {
     foreach ($tok in ($Ports -split '[^\d]+')) { if ($tok -match '^\d+$') { $portsList += [int]$tok } }
-  }
-  elseif ($Ports -is [System.Collections.IEnumerable]) {
+  } elseif ($Ports -is [System.Collections.IEnumerable]) {
     foreach ($p in $Ports) { if ($null -ne $p -and "$p" -match '^\d+$') { $portsList += [int]$p } }
-  }
-  else {
+  } else {
     if ("$Ports" -match '^\d+$') { $portsList = @([int]$Ports) }
   }
 
@@ -300,18 +288,15 @@ Test-TcpPort -Target 'google.com' -Ports '80,443,4444' `
           try {
             $it.Client.EndConnect($it.IAR)
             $open = $true; $detail = "connected"
-          }
-          catch {
+          } catch {
             $e = $_.Exception
             if ($e -is [System.Net.Sockets.SocketException]) {
               $detail = $e.SocketErrorCode.ToString()
-            }
-            else {
+            } else {
               $detail = $e.GetType().FullName
             }
           }
-        }
-        catch {
+        } catch {
           $detail = $_.Exception.GetType().FullName
         }
 
@@ -357,6 +342,7 @@ Notes / interpretation
 - A TCP port is considered CLOSED/FILTERED if the connect fails or does not complete within the timeout.
 - If OpenPorts/ClosedPorts are omitted, only the ping expectation is validated.
 - If -SkipPing is used, only port expectations are validated.
+- If -HostFriendlyName is passed, it is used to refer to the host in all messages.
 
 Example
   Test-NetConnectivityToHost -TargetHost 10.30.0.2 -RespondsToPing:$true -OpenPorts @(53,88,135,389,445) -ClosedPorts @(22,3389) -PortTimeoutMs 1000
@@ -372,6 +358,8 @@ Example (boolean result only)
     [Parameter(Mandatory = $true)]
     [Alias('Host')]
     [string]$TargetHost,
+
+    [string]$HostFriendlyName,
 
     [Parameter(Mandatory = $true, ParameterSetName = 'Ping')]
     [bool]$RespondsToPing,
@@ -397,6 +385,8 @@ Example (boolean result only)
   }
 
   $ok = $true
+  $displayName = if ([string]::IsNullOrWhiteSpace($HostFriendlyName)) { $TargetHost } else { $HostFriendlyName }
+  
   $openExpected = @(); if ($OpenPorts) { $openExpected = @($OpenPorts | ForEach-Object { [int]$_ } | Sort-Object -Unique) }
   $closedExpected = @(); if ($ClosedPorts) { $closedExpected = @($ClosedPorts | ForEach-Object { [int]$_ } | Sort-Object -Unique) }
 
@@ -412,23 +402,20 @@ Example (boolean result only)
 
   if ($isIPv4 -or $isIPv6) {
     $TargetIp = $targetName
-  }
-  else {
+  } else {
     try {
       if (Get-Command Resolve-DnsName -ErrorAction SilentlyContinue) {
         $TargetIp = Resolve-DnsName -Name $targetName -Type A -ErrorAction Stop | Select-Object -ExpandProperty IPAddress -First 1
-      }
-      else {
+      } else {
         $TargetIp = ([System.Net.Dns]::GetHostAddresses($targetName) | Select-Object -First 1).IPAddressToString
       }
-    }
-    catch {
+    } catch {
       $ok = $false
-      & $LogFailure "Failed to resolve $($TargetHost): $($_.Exception.Message)"
+      & $LogFailure "Failed to resolve $($displayName): $($_.Exception.Message)"
     }
 
     if (-not $TargetIp) {
-      & $LogFailure "Failed to resolve $TargetHost"
+      & $LogFailure "Failed to resolve $displayName"
       if ($ReturnTrueFalse) { return $false }
       return
     }
@@ -446,9 +433,8 @@ Example (boolean result only)
           $portState[[int]$r.Port] = [bool]$r.Open
         }
       }
-    }
-    catch {
-      & $LogFailure ("TCP probe failed for host {0}: {1}" -f $TargetHost, $_.Exception.Message)
+    } catch {
+      & $LogFailure ("TCP probe failed for host {0}: {1}" -f $displayName, $_.Exception.Message)
       $ok = $false
     }
   }
@@ -467,8 +453,7 @@ Example (boolean result only)
         if ($pingTask.IsCompleted -and -not $pingTask.IsFaulted -and $pingTask.Result) {
           $pingActual = ($pingTask.Result.Status -eq [System.Net.NetworkInformation.IPStatus]::Success)
         }
-      }
-      catch {
+      } catch {
         $pingActual = $false
       }
     }
@@ -476,12 +461,12 @@ Example (boolean result only)
     try { if ($pingObj) { $pingObj.Dispose() } } catch {}
 
     if ($RespondsToPing -and -not $pingActual) {
-      & $LogFailure "Host $TargetHost was expected to respond to ping, but does not"
+      & $LogFailure "Host $displayName was expected to respond to ping, but does not"
       $ok = $false
     }
 
     if ((-not $RespondsToPing) -and $pingActual) {
-      & $LogFailure "Host $TargetHost was expected to NOT respond to ping, but it does"
+      & $LogFailure "Host $displayName was expected to NOT respond to ping, but it does"
       $ok = $false
     }
   }
@@ -490,7 +475,7 @@ Example (boolean result only)
     $isOpen = $false
     if ($portState.ContainsKey($p)) { $isOpen = [bool]$portState[$p] }
     if (-not $isOpen) {
-      & $LogFailure "Port $($TargetHost):$p was expected to be OPEN, but is not"
+      & $LogFailure "Port $($displayName):$p was expected to be OPEN, but is not"
       $ok = $false
     }
   }
@@ -499,7 +484,7 @@ Example (boolean result only)
     $isOpen = $false
     if ($portState.ContainsKey($p)) { $isOpen = [bool]$portState[$p] }
     if ($isOpen) {
-      & $LogFailure "Port $($TargetHost):$p was expected to be CLOSED/FILTERED, but is not"
+      & $LogFailure "Port $($displayName):$p was expected to be CLOSED/FILTERED, but is not"
       $ok = $false
     }
   }
@@ -509,7 +494,7 @@ Example (boolean result only)
   }
 
   if ($ok) {
-    & $LogPass "Connectivity to $TargetHost is as expected"
+    & $LogPass "Connectivity to $displayName is as expected"
   }
 }
 
@@ -581,11 +566,9 @@ instead returns the list of responsive hosts.
     $s = $KnownHostIps.Trim()
     if ($s -match '[,\s]') { $ips = @($s -split '[,\s]+' | Where-Object { $_ -and $_.Trim() } | ForEach-Object { $_.Trim() }) }
     else { $ips = @($s) }
-  }
-  elseif ($KnownHostIps -is [System.Collections.IEnumerable]) {
+  } elseif ($KnownHostIps -is [System.Collections.IEnumerable]) {
     foreach ($x in $KnownHostIps) { if ($null -ne $x -and "$x".Trim()) { $ips += "$x".Trim() } }
-  }
-  else { $ips = @("$KnownHostIps".Trim()) }
+  } else { $ips = @("$KnownHostIps".Trim()) }
   $ips = @($ips | Where-Object { $_ } | Select-Object -Unique)
 
   $progress_msg = "Pinging $($ips.Count) hosts"
@@ -604,15 +587,13 @@ instead returns the list of responsive hosts.
     $message = "The $NetworkDescription network may be UNRECHABLE because none of the hosts replied to pings"
     $comment = "List of hosts that didn't reply: ($($ips -join ', ')); Maybe some VPN connection is down"
     Write-Warning "[FAILURE] $message`n$comment" 
-  }
-  elseif ($dead -and $dead.Count -gt 0) {
+  } elseif ($dead -and $dead.Count -gt 0) {
     $message = "The $NetworkDescription network is reachable (at least one host replied to pings)"
     Write-Warning "[PASS] $message"
     $message = "Note that some hosts of $NetworkDescription did not reply to pings (that's often normal)"
     $comment = "List of hosts that didn't reply: ($($dead -join ', '))`nIf some hosts are consistently failing, consider if you should update the list of hosts you ping"
     Write-Warning "[NOTICE] $message`n$comment" 
-  }
-  else {
+  } else {
     $message = "The $NetworkDescription network is reachable; all known hosts replied to pings"
     $comment = "List of hosts that replied: ($($ips -join ', '))"
     Write-Warning "[PASS] $message`n$comment" 
@@ -689,13 +670,11 @@ Test-ShareLikelyUp -SharePath '\\server01.contoso.local\share' -DnsCidrs '10.30.
       if ($prefixLength -lt 0 -or $prefixLength -gt 32) {
         throw "Invalid IPv4 CIDR prefix length in $Cidr"
       }
-    }
-    elseif ($candidateIp.AddressFamily -eq [System.Net.Sockets.AddressFamily]::InterNetworkV6) {
+    } elseif ($candidateIp.AddressFamily -eq [System.Net.Sockets.AddressFamily]::InterNetworkV6) {
       if ($prefixLength -lt 0 -or $prefixLength -gt 128) {
         throw "Invalid IPv6 CIDR prefix length in $Cidr"
       }
-    }
-    else {
+    } else {
       throw "Unsupported address family in $Cidr"
     }
 
@@ -729,11 +708,9 @@ Test-ShareLikelyUp -SharePath '\\server01.contoso.local\share' -DnsCidrs '10.30.
 
       $null = $client.EndConnect($async)
       return $true
-    }
-    catch {
+    } catch {
       return $false
-    }
-    finally {
+    } finally {
       $client.Close()
     }
   }
@@ -754,8 +731,7 @@ Test-ShareLikelyUp -SharePath '\\server01.contoso.local\share' -DnsCidrs '10.30.
         return $parsed.IPAddressToString
       }
       return $null
-    }
-    catch {
+    } catch {
       return $null
     }
   }
@@ -765,8 +741,7 @@ Test-ShareLikelyUp -SharePath '\\server01.contoso.local\share' -DnsCidrs '10.30.
     try {
       $null = [System.Net.IPAddress]::Parse($Text)
       return $true
-    }
-    catch {
+    } catch {
       return $false
     }
   }
@@ -793,8 +768,7 @@ Test-ShareLikelyUp -SharePath '\\server01.contoso.local\share' -DnsCidrs '10.30.
         ForEach-Object { $_.ServerAddresses } |
         Where-Object { $_ } |
         Select-Object -Unique)
-    }
-    catch {
+    } catch {
       $result.FailureReason = "Failed to read client DNS server configuration."
       return $result
     }
@@ -806,8 +780,7 @@ Test-ShareLikelyUp -SharePath '\\server01.contoso.local\share' -DnsCidrs '10.30.
             $result.MatchingDnsServers += $dnsServer
             break
           }
-        }
-        catch {
+        } catch {
         }
       }
     }
@@ -823,11 +796,9 @@ Test-ShareLikelyUp -SharePath '\\server01.contoso.local\share' -DnsCidrs '10.30.
   $ipv6LiteralAddress = ConvertFrom-Ipv6LiteralHost -HostName $targetHost
   if ($ipv6LiteralAddress) {
     $result.ResolvedAddresses = @($ipv6LiteralAddress)
-  }
-  elseif (Test-IsIpAddress -Text $targetHost) {
+  } elseif (Test-IsIpAddress -Text $targetHost) {
     $result.ResolvedAddresses = @(([System.Net.IPAddress]::Parse($targetHost)).IPAddressToString)
-  }
-  else {
+  } else {
     try {
       $result.ResolvedAddresses = @([System.Net.Dns]::GetHostAddresses($targetHost) |
         Where-Object {
@@ -835,8 +806,7 @@ Test-ShareLikelyUp -SharePath '\\server01.contoso.local\share' -DnsCidrs '10.30.
           $_.AddressFamily -eq [System.Net.Sockets.AddressFamily]::InterNetworkV6
         } |
         Select-Object -ExpandProperty IPAddressToString -Unique)
-    }
-    catch {
+    } catch {
       $result.FailureReason = "DNS resolution failed."
       return $result
     }
