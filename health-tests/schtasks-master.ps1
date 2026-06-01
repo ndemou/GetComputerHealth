@@ -20,8 +20,9 @@ Uses: Get-ScheduledTask, Get-ScheduledTaskInfo, Get-ScheduledTaskDeepInfo.
       'Firefox Default Browser Agent*',
       'Office Actions Server*',
       'Clipboard User Service*',
-      "Optimize Start Menu Cache Files-*",
-      "User_Feed_Synchronization-*"
+      'Optimize Start Menu Cache Files-*',
+      'User_Feed_Synchronization-*',
+      'SoftLanding*'
     )
     $OK_TASK_RESULTS = @(0,267009,267010,267011,267012,267013,267014)
 
