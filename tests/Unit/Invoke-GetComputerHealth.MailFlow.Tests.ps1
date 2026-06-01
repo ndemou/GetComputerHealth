@@ -138,7 +138,7 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
     $html | Should -Match 'margin-bottom:10px; font-family:Segoe UI, Arial, sans-serif; font-size:12px; color:#000'
     $html | Should -Not -Match 'border:1px solid'
     $html | Should -Match 'Drive C: has only 4% free<br>Investigate temp usage'
-    $html | Should -Match ([regex]::Escape('c:\it\Get-ComputerHealth\bin\Get-ComputerHealth.ps1 -AddWhitelisting -until 2999-12-31 -sig &#39;deadbeef&#39; -ComputerName SRV1 -comment &quot;warning - Disk free space is low&quot;'))
+    $html | Should -Match ([regex]::Escape('&amp; &quot;c:\it\Get-ComputerHealth\bin\Get-ComputerHealth.ps1&quot; -AddWhitelisting -until 2999-12-31 -sig &#39;deadbeef&#39; -ComputerName SRV1 -comment &quot;warning - Disk free space is low&quot;'))
     $html | Should -Not -Match ([regex]::Escape('Invoke-Command SRV1 {'))
   }
 
@@ -159,7 +159,7 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
     $html | Should -Match 'background-color:#2e7d32; color:#fff'
     $html | Should -Match '>Postponed</span>'
     $html | Should -Match 'Postponed until 2026-06-01, real level warning'
-    $html | Should -Not -Match ([regex]::Escape('c:\it\Get-ComputerHealth\bin\Get-ComputerHealth.ps1 -AddWhitelisting'))
+    $html | Should -Not -Match ([regex]::Escape('&amp; &quot;c:\it\Get-ComputerHealth\bin\Get-ComputerHealth.ps1&quot; -AddWhitelisting'))
   }
 
   It 'summarizes postponed findings after active notable levels' {
@@ -191,8 +191,8 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
       }
     )
 
-    $html | Should -Match ([regex]::Escape('Invoke-Command SRV1 {c:\it\Get-ComputerHealth\bin\Get-ComputerHealth.ps1 -AddWhitelisting -until 2999-12-31 -sig &#39;deadbeef&#39; -ComputerName SRV1 -comment &quot;warning - Disk free space is low&quot;}'))
-    $html | Should -Match ([regex]::Escape('Invoke-Command SRV2 {c:\it\Get-ComputerHealth\bin\Get-ComputerHealth.ps1 -AddWhitelisting -until 2999-12-31 -sig &#39;feedbead&#39; -ComputerName SRV2 -comment &quot;notice - A few failed login attempts&quot;}'))
+    $html | Should -Match ([regex]::Escape('Invoke-Command SRV1 {&amp; &quot;c:\it\Get-ComputerHealth\bin\Get-ComputerHealth.ps1&quot; -AddWhitelisting -until 2999-12-31 -sig &#39;deadbeef&#39; -ComputerName SRV1 -comment &quot;warning - Disk free space is low&quot;}'))
+    $html | Should -Match ([regex]::Escape('Invoke-Command SRV2 {&amp; &quot;c:\it\Get-ComputerHealth\bin\Get-ComputerHealth.ps1&quot; -AddWhitelisting -until 2999-12-31 -sig &#39;feedbead&#39; -ComputerName SRV2 -comment &quot;notice - A few failed login attempts&quot;}'))
   }
 
   It 'renders the Relax html body as the email-safe card layout' {
@@ -322,7 +322,7 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
     $rows.Count | Should -Be 3
     $rows[0].Computer | Should -Be 'SRV1'
     $rows[0].PSObject.Properties.Name | Should -Contain 'Hash'
-    $rows[0].PSObject.Properties.Name | Should -Not -Contain 'Emitter'
+    $rows[0].PSObject.Properties.Name | Should -Contain 'Emitter'
     $rows[0].PSObject.Properties.Name | Should -Not -Contain 'TimeUtc'
   }
 
@@ -336,6 +336,7 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
         Message = 'Disk free space is low'
         Comment = 'Drive C: low'
         Hash = 'deadbeef'
+        Emitter = 'UnitTest'
       }
     )
 
@@ -356,6 +357,8 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
     $html | Should -Match '>Postpone<'
     $html | Should -Not -Match 'id="showPostponed" type="checkbox" checked'
     $html | Should -Match 'data-column="message" checked'
+    $html | Should -Match 'data-column="emitter"'
+    $html | Should -Not -Match 'data-column="emitter" checked'
     $html | Should -Match 'data-column="command"'
     $html | Should -Not -Match 'data-column="command" checked'
     $html | Should -Not -Match 'class="what-filter'
@@ -367,8 +370,10 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
     $html | Should -Match 'col\.col-width-computer \{ width: 1%; \}'
     $html | Should -Match 'col\.col-width-level \{ width: 1%; \}'
     $html | Should -Match 'col\.col-width-action \{ width: 1%; \}'
-    $html | Should -Match '\.col-comment \{'
-    $html | Should -Match 'tbody td\.col-comment \{'
+    $html | Should -Match 'col\.col-width-emitter \{ width: 1%; \}'
+    $html | Should -Match '\.col-emitter \{'
+    $html | Should -Match '\.message-info \{'
+    $html | Should -Match '\.message-comment \{'
     $html | Should -Match 'font-family: Consolas, "Courier New", monospace;'
     $html | Should -Match '\.postponed-text \{'
     $html | Should -Match '\.show-postponed-status \{'
@@ -381,10 +386,12 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
     $html | Should -Match 'data-sort-field="EffectiveLevel"'
     $html | Should -Match 'data-sort-field="WhatToDo"'
     $html | Should -Match 'data-sort-field="Message"'
+    $html | Should -Match 'data-sort-field="Emitter"'
     $html | Should -Match 'class="col-action"><button type="button" class="sort-toggle"'
     $html | Should -Match 'class="col-message"><button type="button" class="sort-toggle"'
-    $html | Should -Match 'class="col-comment">Comment</th>'
+    $html | Should -Match 'class="col-emitter"><button type="button" class="sort-toggle"'
     $html | Should -Match 'Action Command'
+    $html | Should -Match 'Emitter'
     $html | Should -Match 'showing '
     $html | Should -Match 'of '
     $html | Should -Not -Match 'Visible findings: '
@@ -396,16 +403,29 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
     $html | Should -Match 'Disk free space is low'
     $html | Should -Match 'buildWhitelistCommand'
     $html | Should -Match 'deadbeef'
+    $html | Should -Match 'UnitTest'
     $html | Should -Match "var storageKey = 'gch-report-actions-v2';"
     $html | Should -Match 'ActionHistory: actionHistory\.slice\(-100\)'
     $html | Should -Match 'ActionState: actionState'
     $html | Should -Match 'function sortButtonText\(direction\)'
     $html | Should -Match 'function currentSort\(\)'
+    $html | Should -Match 'function parseFilterTokens\(text\)'
+    $html | Should -Match 'token\.negated'
+    $html | Should -Match 'data-comment-key='
+    $html | Should -Match '&#8505;&#65039;'
     $html | Should -Match "\\u25BC"
     $html | Should -Match "\\u25B2"
     $html | Should -Match "\\u25CF"
     $html | Should -Match "document.getElementById\('showPostponedStatus'\)\.textContent = '\(showing ' \+ filtered.length \+ ' of ' \+ rows.length \+ ' findings\)';"
     $html | Should -Match "document.getElementById\('copyVisibleCommands'\)\.classList\.toggle\('hidden', window\.__gchVisibleCommands\.length === 0\);"
+    $html | Should -Match '"Computer":"SRV1"'
+    $html | Should -Match '"Suppressed":false'
+    $html | Should -Match '"Level":"warning"'
+    $html | Should -Match '"EffectiveLevel":"warning"'
+    $html | Should -Match '"Message":"Disk free space is low"'
+    $html | Should -Match '"Comment":"Drive C: low"'
+    $html | Should -Match '"Hash":"deadbeef"'
+    $html | Should -Match '"Emitter":"UnitTest"'
   }
 
   It 'builds interactive commands from WhatToDo and hides postponed action buttons' {
@@ -418,6 +438,7 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
         Message = 'Disk free space is low'
         Comment = 'Drive C: low'
         Hash = 'deadbeef'
+        Emitter = 'UnitTest'
         WhatToDo = 'suppress'
       },
       [pscustomobject]@{
@@ -428,6 +449,7 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
         Message = 'CPU load is high'
         Comment = 'Investigate'
         Hash = 'feedbead'
+        Emitter = 'UnitTest'
         WhatToDo = 'postpone'
       },
       [pscustomobject]@{
@@ -438,6 +460,7 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
         Message = 'Backup failed'
         Comment = 'Fix soon'
         Hash = '12345678'
+        Emitter = 'UnitTest'
         WhatToDo = 'must-fix'
       },
       [pscustomobject]@{
@@ -448,6 +471,7 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
         Message = 'Known issue'
         Comment = 'Waiting'
         Hash = '87654321'
+        Emitter = 'UnitTest'
         WhatToDo = 'postpone'
       }
     )
@@ -461,9 +485,12 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
     $html | Should -Match 'WhatToDo: String\(row\.WhatToDo \|\| ''not-sure''\)'
     $html | Should -Match 'if \(actionHistory\.length > 100\)'
     $html | Should -Match "if \(!isPostponed\)"
-    $html | Should -Match '\{\\"c:\\\\it\\\\Get-ComputerHealth\\\\bin\\\\Get-ComputerHealth\.ps1\\" -AddWhitelisting -until '
+    $html | Should -Match '\{& \\"c:\\\\it\\\\Get-ComputerHealth\\\\bin\\\\Get-ComputerHealth\.ps1\\" -AddWhitelisting -until '
     $html | Should -Match ' -comment \\"'
     $html | Should -Not -Match '\\\\\\\\"'
+    $html | Should -Match 'function commandsShareSingleComputer\(commands\)'
+    $html | Should -Match 'function simplifyCommandsForSingleComputer\(commands\)'
+    $html | Should -Match 'commands = simplifyCommandsForSingleComputer\(commands\);'
   }
 
   It 'uses a dedicated active html report path for the email attachment' {
@@ -471,6 +498,7 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
 
     $paths.AllMessagesClixmlTempPath | Should -Be 'C:\temp\all-messages-2026-05-31_07.05.clixml'
     $paths.AllMessagesZipPath | Should -Be 'C:\data\all-messages-2026-05-31_07.05.clixml.zip'
+    $paths.LastAllFindingsClixmlPath | Should -Be 'C:\temp\last-all-findings.clixml'
     $paths.InteractiveReportTempPath | Should -Be 'C:\temp\interactive-report-2026-05-31_07.05.html'
     $paths.LastInteractiveReportHtmlPath | Should -Be 'C:\temp\last-interactive-report.html'
     $paths.LastEmailBodyHtmlPath | Should -Be 'C:\temp\last-report.html'

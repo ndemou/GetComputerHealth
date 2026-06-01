@@ -371,7 +371,7 @@ function Get-HealthSuppressionCommand {
     if ($commentText.Length -gt 400) {
       $commentText = $commentText.Substring(0, 400)
     }
-    $baseCommand = ("c:\it\Get-ComputerHealth\bin\Get-ComputerHealth.ps1 -AddWhitelisting -until 2999-12-31 -sig '{0}' -ComputerName {1} -comment ""{2}""" -f $hash.ToLowerInvariant(), $computer.Trim(), $commentText)
+    $baseCommand = ("& ""c:\it\Get-ComputerHealth\bin\Get-ComputerHealth.ps1"" -AddWhitelisting -until 2999-12-31 -sig '{0}' -ComputerName {1} -comment ""{2}""" -f $hash.ToLowerInvariant(), $computer.Trim(), $commentText)
     if ($WrapInInvokeCommand) {
       return ("Invoke-Command {0} {{{1}}}" -f $computer.Trim(), $baseCommand)
     }
@@ -917,6 +917,7 @@ function Convert-HealthReportRowsToInteractiveRows {
       Message        = if ($row.PSObject.Properties['Message']) { [string]$row.Message } else { '' }
       Comment        = if ($row.PSObject.Properties['Comment']) { [string]$row.Comment } else { '' }
       Hash           = if ($row.PSObject.Properties['Hash']) { [string]$row.Hash } else { '' }
+      Emitter        = if ($row.PSObject.Properties['Emitter']) { [string]$row.Emitter } else { '' }
     }
   }
 }
@@ -932,6 +933,7 @@ function Get-HealthReportArtifactPaths {
   return [pscustomobject]@{
     AllMessagesClixmlTempPath      = Join-Path $TempDir "all-messages-$Timestamp.clixml"
     AllMessagesZipPath             = Join-Path $DataDir "all-messages-$Timestamp.clixml.zip"
+    LastAllFindingsClixmlPath      = Join-Path $TempDir 'last-all-findings.clixml'
     InteractiveReportTempPath      = Join-Path $TempDir "interactive-report-$Timestamp.html"
     LastInteractiveReportHtmlPath  = Join-Path $TempDir 'last-interactive-report.html'
     LastEmailBodyHtmlPath          = Join-Path $TempDir 'last-report.html'
@@ -1210,7 +1212,7 @@ function Get-HealthInteractiveHtmlReport {
     col.col-width-level { width: 1%; }
     col.col-width-action { width: 1%; }
     col.col-width-message { width: 28%; }
-    col.col-width-comment { width: 18%; }
+    col.col-width-emitter { width: 1%; }
     col.col-width-command { width: 24%; }
     thead {
       position: sticky;
@@ -1292,12 +1294,46 @@ function Get-HealthInteractiveHtmlReport {
     .col-message {
       font-size: 13px;
     }
-    tbody td.col-comment {
-      color: #41515a;
+    .col-emitter {
+      white-space: nowrap;
+      width: 1%;
+    }
+    .message-block {
+      display: block;
+    }
+    .message-main {
+      display: flex;
+      align-items: flex-start;
+      gap: 6px;
+    }
+    .message-info {
+      border: 0;
+      background: transparent;
+      color: #355f8c;
+      cursor: pointer;
+      padding: 0;
+      margin: 0;
+      font-size: 13px;
+      line-height: 1.2;
+      box-shadow: none;
+      flex: 0 0 auto;
+    }
+    .message-info:hover {
+      transform: none;
+      box-shadow: none;
+      color: #22476a;
+    }
+    .message-comment {
+      margin-top: 6px;
+      margin-left: 19px;
+      color: #1f4268;
       font-family: Consolas, "Courier New", monospace;
       font-size: 12px;
-      white-space: pre-wrap;
       line-height: 1.45;
+      white-space: pre-wrap;
+    }
+    .message-comment.hidden-column {
+      display: none;
     }
     .postponed-text {
       color: #7a7f87;
@@ -1386,7 +1422,7 @@ function Get-HealthInteractiveHtmlReport {
         <label><input class="column-toggle" type="checkbox" data-column="level" checked> Level</label>
         <label><input class="column-toggle" type="checkbox" data-column="action" checked> Action</label>
         <label><input class="column-toggle" type="checkbox" data-column="message" checked> Message</label>
-        <label><input class="column-toggle" type="checkbox" data-column="comment" checked> Comment</label>
+        <label><input class="column-toggle" type="checkbox" data-column="emitter"> Emitter</label>
         <label><input class="column-toggle" type="checkbox" data-column="command"> Action Command</label>
         <button id="copyVisibleCommands" type="button" class="utility-button hidden"><strong>Copy Action Commands</strong></button>
         <span id="copyStatus" class="copy-status"></span>
@@ -1399,7 +1435,7 @@ function Get-HealthInteractiveHtmlReport {
           <col class="col-level col-width-level">
           <col class="col-action col-width-action">
           <col class="col-message col-width-message">
-          <col class="col-comment col-width-comment">
+          <col class="col-emitter col-width-emitter">
           <col class="col-command col-width-command">
         </colgroup>
         <thead>
@@ -1408,7 +1444,7 @@ function Get-HealthInteractiveHtmlReport {
             <th class="col-level"><button type="button" class="sort-toggle" data-sort-field="EffectiveLevel" data-sort-direction="" aria-label="Toggle sort for Level" title="Toggle sort for Level"><span class="sort-label">Level</span><span class="sort-glyph">&#9679;</span></button></th>
             <th class="col-action"><button type="button" class="sort-toggle" data-sort-field="WhatToDo" data-sort-direction="" aria-label="Toggle sort for Action" title="Toggle sort for Action"><span class="sort-label">Action</span><span class="sort-glyph">&#9679;</span></button></th>
             <th class="col-message"><button type="button" class="sort-toggle" data-sort-field="Message" data-sort-direction="" aria-label="Toggle sort for Message" title="Toggle sort for Message"><span class="sort-label">Message</span><span class="sort-glyph">&#9679;</span></button></th>
-            <th class="col-comment">Comment</th>
+            <th class="col-emitter"><button type="button" class="sort-toggle" data-sort-field="Emitter" data-sort-direction="" aria-label="Toggle sort for Emitter" title="Toggle sort for Emitter"><span class="sort-label">Emitter</span><span class="sort-glyph">&#9679;</span></button></th>
             <th class="col-command">Action Command</th>
           </tr>
         </thead>
@@ -1420,6 +1456,7 @@ function Get-HealthInteractiveHtmlReport {
   <script>
     (function () {
       var storageKey = 'gch-report-actions-v2';
+      var expandedComments = {};
       var rows = $jsonRows;
       if (!Array.isArray(rows)) {
         rows = rows ? [rows] : [];
@@ -1522,8 +1559,45 @@ function Get-HealthInteractiveHtmlReport {
         return values[(index + 1) % values.length];
       }
 
-      function tokenize(text) {
-        return String(text || '').toLowerCase().split(/\s+/).filter(Boolean);
+      function parseFilterTokens(text) {
+        var tokens = [];
+        var source = String(text || '');
+        var current = '';
+        var inQuotes = false;
+        var isNegated = false;
+        var i;
+
+        function pushCurrent() {
+          if (!current) {
+            return;
+          }
+          tokens.push({
+            value: current.toLowerCase(),
+            negated: isNegated
+          });
+          current = '';
+          isNegated = false;
+        }
+
+        for (i = 0; i < source.length; i++) {
+          var ch = source.charAt(i);
+          if (ch === '"') {
+            inQuotes = !inQuotes;
+            continue;
+          }
+          if (!inQuotes && /\s/.test(ch)) {
+            pushCurrent();
+            continue;
+          }
+          if (!inQuotes && !current && ch === '-') {
+            isNegated = true;
+            continue;
+          }
+          current += ch;
+        }
+
+        pushCurrent();
+        return tokens;
       }
 
       function rowSearchText(row) {
@@ -1531,7 +1605,8 @@ function Get-HealthInteractiveHtmlReport {
           row.Computer || '',
           row.EffectiveLevel || row.Level || '',
           row.Message || '',
-          row.Comment || ''
+          row.Comment || '',
+          row.Emitter || ''
         ].join(' ').toLowerCase();
       }
 
@@ -1612,7 +1687,7 @@ function Get-HealthInteractiveHtmlReport {
         }
         var safeComment = (level + ' - ' + message).replace(/"/g, '`"');
         return "Invoke-Command " + computer
-          + " {\"c:\\it\\Get-ComputerHealth\\bin\\Get-ComputerHealth.ps1\" -AddWhitelisting -until "
+          + " {& \"c:\\it\\Get-ComputerHealth\\bin\\Get-ComputerHealth.ps1\" -AddWhitelisting -until "
           + until
           + " -sig '"
           + hash
@@ -1623,9 +1698,38 @@ function Get-HealthInteractiveHtmlReport {
           + "\"}";
       }
 
+      function commandsShareSingleComputer(commands) {
+        if (!commands || commands.length < 1) {
+          return false;
+        }
+        var firstMatch = /^Invoke-Command\s+(\S+)\s+\{/i.exec(commands[0] || '');
+        if (!firstMatch) {
+          return false;
+        }
+        var computer = firstMatch[1];
+        for (var i = 1; i < commands.length; i++) {
+          var match = /^Invoke-Command\s+(\S+)\s+\{/i.exec(commands[i] || '');
+          if (!match || match[1] !== computer) {
+            return false;
+          }
+        }
+        return true;
+      }
+
+      function simplifyCommandsForSingleComputer(commands) {
+        if (!commandsShareSingleComputer(commands)) {
+          return commands;
+        }
+        return commands.map(function (command) {
+          return String(command || '')
+            .replace(/^Invoke-Command\s+\S+\s+\{/i, '')
+            .replace(/\}$/, '');
+        });
+      }
+
       function render() {
         var filterText = document.getElementById('textFilter').value;
-        var tokens = tokenize(filterText);
+        var tokens = parseFilterTokens(filterText);
         var showPostponed = document.getElementById('showPostponed').checked;
         var sort = currentSort();
         var whatFilter = currentWhatFilter();
@@ -1641,11 +1745,14 @@ function Get-HealthInteractiveHtmlReport {
           var haystack = rowSearchText(row);
           for (var i = 0; i < tokens.length; i++) {
             var token = tokens[i];
-            if (token.charAt(0) === '-') {
-              if (token.length > 1 && haystack.indexOf(token.substring(1)) !== -1) {
+            if (!token || !token.value) {
+              continue;
+            }
+            if (token.negated) {
+              if (haystack.indexOf(token.value) !== -1) {
                 return false;
               }
-            } else if (haystack.indexOf(token) === -1) {
+            } else if (haystack.indexOf(token.value) === -1) {
               return false;
             }
           }
@@ -1665,6 +1772,13 @@ function Get-HealthInteractiveHtmlReport {
           var commentHtml = htmlEncode(row.Comment || '').replace(/\r?\n/g, '<br>');
           var commandHtml = htmlEncode(buildWhitelistCommand(row)).replace(/\r?\n/g, '<br>');
           var actionHtml = '';
+          var hasComment = Boolean(row.Comment);
+          var showComment = Boolean(expandedComments[keyForRow(row)]);
+          var messageCommentClass = 'message-comment' + (showComment ? '' : ' hidden-column') + postponedClass;
+          var infoButtonHtml = '';
+          if (hasComment) {
+            infoButtonHtml = '<button type="button" class="message-info" data-comment-key="' + key + '" title="Show or hide comment" aria-label="Show or hide comment">&#8505;&#65039;</button>';
+          }
           if (!isPostponed) {
             actionHtml = '<button type="button" class="what-badge ' + actionClass(row.WhatToDo) + '" data-row-key="' + key + '" data-index="' + index + '">' + htmlEncode(row.WhatToDo) + '</button>';
           }
@@ -1673,8 +1787,8 @@ function Get-HealthInteractiveHtmlReport {
             + '<td class="col-computer">' + htmlEncode(row.Computer || '') + '</td>'
             + '<td class="col-level"><span class="level-badge ' + levelClass((row.EffectiveLevel || row.Level || '').toLowerCase()) + '">' + htmlEncode(row.EffectiveLevel || row.Level || '') + '</span></td>'
             + '<td class="col-action">' + actionHtml + '</td>'
-            + '<td class="col-message' + postponedClass + '">' + htmlEncode(row.Message || '') + '</td>'
-            + '<td class="col-comment' + postponedClass + '">' + commentHtml + '</td>'
+            + '<td class="col-message' + postponedClass + '"><div class="message-block"><div class="message-main">' + infoButtonHtml + '<span>' + htmlEncode(row.Message || '') + '</span></div><div class="' + messageCommentClass + '">' + commentHtml + '</div></div></td>'
+            + '<td class="col-emitter">' + htmlEncode(row.Emitter || '') + '</td>'
             + '<td class="col-command cmd">' + commandHtml + '</td>'
             + '</tr>';
         }).join('');
@@ -1689,6 +1803,14 @@ function Get-HealthInteractiveHtmlReport {
             actionState[keyForRow(matchingRow)] = matchingRow.WhatToDo;
             rememberActionChoice(matchingRow);
             saveState();
+            render();
+          });
+        });
+
+        document.querySelectorAll('.message-info').forEach(function (button) {
+          button.addEventListener('click', function () {
+            var commentKey = button.getAttribute('data-comment-key') || '';
+            expandedComments[commentKey] = !expandedComments[commentKey];
             render();
           });
         });
@@ -1750,6 +1872,7 @@ function Get-HealthInteractiveHtmlReport {
           setCopyStatus('No visible commands to copy.', 'error');
           return;
         }
+        commands = simplifyCommandsForSingleComputer(commands);
         var text = commands.join('\r\n');
         var copyPromise = null;
         if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -2486,7 +2609,9 @@ if ($all_messages) {
   $reportArtifacts = Get-HealthReportArtifactPaths -DataDir $DATA_DIR -TempDir $TEMP_DIR -Timestamp $timestamp
   $allMessagesClixmlTempPath = $reportArtifacts.AllMessagesClixmlTempPath
   $allMessagesZipPath = $reportArtifacts.AllMessagesZipPath
+  $lastAllFindingsClixmlPath = $reportArtifacts.LastAllFindingsClixmlPath
   Export-HealthMessagesReportData -Messages $all_messages -FileName $allMessagesClixmlTempPath
+  Copy-Item -LiteralPath $allMessagesClixmlTempPath -Destination $lastAllFindingsClixmlPath -Force
   Compress-HealthReportDataFile -SourcePath $allMessagesClixmlTempPath -DestinationPath $allMessagesZipPath
   $notable_msgs = @(`
       $all_messages `
@@ -2509,10 +2634,10 @@ if ($all_messages) {
   if ($notable_msgs) {
     Write-host -for yellow "Found notable messages. I have saved them in these files:"
     Write-host -for yellow "    $($reportArtifacts.LastInteractiveReportHtmlPath)"
+    Write-host -for gray   "    $lastAllFindingsClixmlPath"
     Write-host -for gray   "    $allMessagesZipPath"
-    Write-host -for gray   "Open the HTML report in a browser or expand/load the CLIXML archive in PowerShell like this:"
-    Write-host -for gray   "    Expand-Archive -LiteralPath $allMessagesZipPath -DestinationPath .\temp\report-data -Force"
-    Write-host -for gray   "    `$data = Import-Clixml .\temp\report-data\all-messages-$timestamp.clixml"
+    Write-host -for gray   "Open the HTML report in a browser or load the CLIXML findings in PowerShell like this:"
+    Write-host -for gray   "    `$data = Import-Clixml $lastAllFindingsClixmlPath"
     Write-host -for gray   '    $data|ogv # GUI review'
     Write-host -for gray   '    $data|select -Property Computer,Level,Message # Console review'
 
