@@ -417,7 +417,7 @@ function Convert-HealthSynopsisToHtml {
     return ''
   }
 
-    return "<div style='margin:0 0 8px 0; font-family:Segoe UI, Arial, sans-serif; font-size:12px; color:#000'>" + ($parts -join '   ') + "</div><div style='border-top:1px solid #cfcfcf; margin:0 0 12px 0'></div>"
+    return "<div style='margin:0 0 8px 0; font-family:Segoe UI, Arial, sans-serif; font-size:16px; color:#000'>" + ($parts -join '   ') + "</div><div style='border-top:1px solid #cfcfcf; margin:0 0 12px 0'></div>"
 }
 
 function Convert-HealthMessagesToHtmlTable {
@@ -458,18 +458,18 @@ function Convert-HealthMessagesToHtmlTable {
         }
       }
 
-      $detailsHtml += "<div style='margin-top:4px; color:#2e7d32; font-size:10px; font-family:Segoe UI, Arial, sans-serif'>Postponed until " + ([System.Net.WebUtility]::HtmlEncode($postponedUntilText)) + ", real level " + ([System.Net.WebUtility]::HtmlEncode($realLevel.ToLowerInvariant())) + "</div>"
+      $detailsHtml += "<div style='margin-top:4px; color:#2e7d32; font-size:13px; font-family:Segoe UI, Arial, sans-serif'>Postponed until " + ([System.Net.WebUtility]::HtmlEncode($postponedUntilText)) + ", real level " + ([System.Net.WebUtility]::HtmlEncode($realLevel.ToLowerInvariant())) + "</div>"
     }
 
     if (($level -ine 'postponed') -and (-not [string]::IsNullOrWhiteSpace($suppressionCommand))) {
       $detailsHtml += "<div style='margin-top:4px; color:#666; font-size:6pt; font-family:""Arial Narrow"", Arial, sans-serif'>" + ([System.Net.WebUtility]::HtmlEncode($suppressionCommand)) + "</div>"
     }
 
-    "<div style='margin-bottom:10px; font-family:Segoe UI, Arial, sans-serif; font-size:12px; color:#000'>$detailsHtml</div>"
+    "<div style='margin-bottom:10px; font-family:Segoe UI, Arial, sans-serif; font-size:16px; color:#000'>$detailsHtml</div>"
   }
 
   return @(
-    "<div style='width:100%; font-family:Segoe UI, Arial, sans-serif; font-size:12px'>"
+    "<div style='width:100%; font-family:Segoe UI, Arial, sans-serif; font-size:16px'>"
     ($rows -join '')
     "</div>"
   ) -join ''
