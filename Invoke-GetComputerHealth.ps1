@@ -426,15 +426,12 @@ function Convert-HealthMessagesToHtmlTable {
     [Parameter(Mandatory)][object[]]$Messages
   )
 
-  $wrapSuppressionInInvokeCommand = (@($Messages | Where-Object { $_.Computer } | Select-Object -ExpandProperty Computer -Unique).Count -gt 1)
-
   $rows = foreach ($message in $Messages) {
     $realLevel = if ($message.PSObject.Properties['Level']) { [string]$message.Level } else { '' }
     $level = if ($message.PSObject.Properties['EffectiveLevel']) { [string]$message.EffectiveLevel } else { $realLevel }
     $computer = if ($message.PSObject.Properties['Computer']) { [string]$message.Computer } else { '' }
     $text = if ($message.PSObject.Properties['Message']) { [string]$message.Message } else { '' }
-    $comment = if ($message.PSObject.Properties['Comment']) { [string]$message.Comment } else { '' }
-    $suppressionCommand = Get-HealthSuppressionCommand -MessageRecord $message -WrapInInvokeCommand:$wrapSuppressionInInvokeCommand
+    $suppressionCommand = Get-HealthSuppressionCommand -MessageRecord $message -WrapInInvokeCommand:$false
     $displayLevel = if ([string]::IsNullOrWhiteSpace($level)) { '' } else { $level.Substring(0, 1).ToUpperInvariant() + $level.Substring(1).ToLowerInvariant() }
     $levelBackground = switch ($level.ToLowerInvariant()) {
       'failure' { '#ff4d4f' }
@@ -451,11 +448,6 @@ function Convert-HealthMessagesToHtmlTable {
     $messageHtml = [System.Net.WebUtility]::HtmlEncode($text)
     $headerHtml = "<div><span style='font-weight:700; color:rgba(0,0,0,0.8)'>" + ([System.Net.WebUtility]::HtmlEncode($computer)) + "</span><span style='display:inline-block; margin-left:8px; padding:1px 6px; border-radius:999px; background-color:$levelBackground; color:$levelForeground'>" + ([System.Net.WebUtility]::HtmlEncode($displayLevel)) + "</span><span style='margin-left:8px'>$messageHtml</span></div>"
     $detailsHtml = $headerHtml
-
-    if (-not [string]::IsNullOrWhiteSpace($comment)) {
-      $commentHtml = [System.Net.WebUtility]::HtmlEncode($comment) -replace '(\r\n|\n|\r)', '<br>'
-      $detailsHtml += "<div style='margin-top:4px; color:#1f5fa8; font-size:10px; font-family:Consolas, ""Courier New"", monospace'>$commentHtml</div>"
-    }
 
     if (($level -ieq 'postponed') -and (-not [string]::IsNullOrWhiteSpace($realLevel))) {
       $postponedUntilText = 'unknown date'

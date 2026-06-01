@@ -120,7 +120,7 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
         $html | Should -Not -Match '<pre'
     }
 
-  It 'renders notable findings as inline heading blocks with comment and suppression command styling' {
+  It 'renders notable findings as inline heading blocks with plain suppression command styling' {
     $html = Convert-HealthMessagesToHtmlTable -Messages @(
       [pscustomobject]@{
         Level = 'warning'
@@ -137,9 +137,9 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
     $html | Should -Match '>Warning</span><span style=''margin-left:8px''>Disk free space is low</span>'
     $html | Should -Match 'margin-bottom:10px; font-family:Segoe UI, Arial, sans-serif; font-size:12px; color:#000'
     $html | Should -Not -Match 'border:1px solid'
-    $html | Should -Match 'Drive C: has only 4% free<br>Investigate temp usage'
     $html | Should -Match ([regex]::Escape('&amp; &quot;c:\it\Get-ComputerHealth\bin\Get-ComputerHealth.ps1&quot; -AddWhitelisting -until 2999-12-31 -sig &#39;deadbeef&#39; -ComputerName SRV1 -comment &quot;warning - Disk free space is low&quot;'))
     $html | Should -Not -Match ([regex]::Escape('Invoke-Command SRV1 {'))
+    $html | Should -Not -Match 'Drive C: has only 4% free'
   }
 
   It 'renders postponed findings with a green effective level and postponement detail' {
@@ -173,7 +173,7 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
     $html | Should -Match "font-weight:700; font-size:120%'>1</span> <span.+>failure</span>   <span style='font-weight:700; font-size:120%'>1</span> <span.+>warning</span>   <span style='font-weight:700; font-size:120%'>1</span> <span.+>postponed</span>"
   }
 
-  It 'keeps Invoke-Command wrapping in html when multiple computers are present' {
+  It 'keeps plain suppression commands in html when multiple computers are present' {
     $html = Convert-HealthMessagesToHtmlTable -Messages @(
       [pscustomobject]@{
         Level = 'warning'
@@ -191,8 +191,10 @@ Describe 'Invoke-GetComputerHealth mail flow helpers' {
       }
     )
 
-    $html | Should -Match ([regex]::Escape('Invoke-Command SRV1 {&amp; &quot;c:\it\Get-ComputerHealth\bin\Get-ComputerHealth.ps1&quot; -AddWhitelisting -until 2999-12-31 -sig &#39;deadbeef&#39; -ComputerName SRV1 -comment &quot;warning - Disk free space is low&quot;}'))
-    $html | Should -Match ([regex]::Escape('Invoke-Command SRV2 {&amp; &quot;c:\it\Get-ComputerHealth\bin\Get-ComputerHealth.ps1&quot; -AddWhitelisting -until 2999-12-31 -sig &#39;feedbead&#39; -ComputerName SRV2 -comment &quot;notice - A few failed login attempts&quot;}'))
+    $html | Should -Match ([regex]::Escape('&amp; &quot;c:\it\Get-ComputerHealth\bin\Get-ComputerHealth.ps1&quot; -AddWhitelisting -until 2999-12-31 -sig &#39;deadbeef&#39; -ComputerName SRV1 -comment &quot;warning - Disk free space is low&quot;'))
+    $html | Should -Match ([regex]::Escape('&amp; &quot;c:\it\Get-ComputerHealth\bin\Get-ComputerHealth.ps1&quot; -AddWhitelisting -until 2999-12-31 -sig &#39;feedbead&#39; -ComputerName SRV2 -comment &quot;notice - A few failed login attempts&quot;'))
+    $html | Should -Not -Match ([regex]::Escape('Invoke-Command SRV1 {'))
+    $html | Should -Not -Match ([regex]::Escape('Invoke-Command SRV2 {'))
   }
 
   It 'renders the Relax html body as the email-safe card layout' {
