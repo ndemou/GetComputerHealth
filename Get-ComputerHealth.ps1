@@ -1054,153 +1054,154 @@ if ($ListAllBuiltInTests) {
   return
 }
 
-#+-----------------------------------------------------------
-#| Collect system information
-#|
+# if we were called with -AddWhitelisting we skip some uneeded work to save time
+if (-not $AddWhitelisting ) {
+    #+-----------------------------------------------------------
+    #| Collect system information
+    #|
 
-#     Domain Role                              |
-#  ------------------------------------------- |
-#  Value | Meaning                             |
-#  ----- | ----------------------------------- |
-#  0     | Workstation not joined to a domain  |
-#  1     | Workstation joined to a domain      |
-#  2     | Server not joined to a domain       |
-#  3     | Server joined to a domain           |
-#  4     | Domain controller (non-FSMO)        |
-#  5     | Domain controller (PDC Emulator)    |
-#
-$computerSystem = $null
-$domainRole = 0
-try {
-  $computerSystem = Get-CimInstance Win32_ComputerSystem -ErrorAction Stop
-  if ($null -ne $computerSystem.PSObject.Properties['DomainRole']) {
-    $domainRole = $computerSystem.DomainRole
-  }
-  else {
-    Log-Warning "Could not determine host domain role from Win32_ComputerSystem; assuming standalone workstation."
-  }
-}
-catch {
-  Log-Warning "Could not query Win32_ComputerSystem domain role; assuming standalone workstation."
-}
-#------------------------------------------
-# What type of system are we running on
-#------------------------------------------
-$isHostVM = Test-IsVirtualMachine
-$isHostMobile = Test-IsLaptopOrMobile
-$IsHostInDomain = ($domainRole -in 1, 3, 4, 5)
-$isHostServer = ($domainRole -in 3, 4, 5)
-$isHostDC = ($domainRole -in 4, 5)
-$isHostDnsServer = $null -ne (Get-Service -Name DNS -ErrorAction SilentlyContinue)
-$isHostDhcpServer = ($isHostServer -and (Get-WindowsFeature DHCP -ErrorAction SilentlyContinue).InstallState -eq 'Installed')
-if (-not $RunWithoutElevation) {
-  $isHostHyperV = (Get-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V).State -eq 'Enabled'
-}
-else {
-  $isHostHyperV = $false
-}
-$isHostPDC = $false
-$currentDomain = $null
-if ($isHostDC) {
-  $isHostPDC = $false
-  $domainInfo = $null
-  try {
-    $domainInfo = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain()
-    $currentDomain = $domainInfo
-    $isHostPDC = (($domainInfo.PdcRoleOwner.Name -replace '[.].*') -eq $env:COMPUTERNAME)
-  }
-  catch {
-    Log-Warning "Could not determine if host is the PDC emulator for its domain."
-  }
-}
-
-$normalizedIpsOfAllDcs = @(
-  $IpsOfAllDcs |
-  Where-Object { $_ } |
-  ForEach-Object { $_.ToString().Trim() } |
-  Where-Object { $_ }
-)
-
-$ipCounts = @{}
-$validIpsList = New-Object System.Collections.Generic.List[string]
-$invalidIps = New-Object System.Collections.Generic.List[string]
-
-foreach ($ip in $normalizedIpsOfAllDcs) {
-  if ($ipCounts.ContainsKey($ip)) { $ipCounts[$ip]++ } else { $ipCounts[$ip] = 1 }
-
-  $parsed = $ip -as [ipaddress]
-  $isValidV4 = ($parsed -and ($parsed.AddressFamily -eq [System.Net.Sockets.AddressFamily]::InterNetwork))
-
-  if ($isValidV4) {
-    if (-not $validIpsList.Contains($ip)) {
-      [void]$validIpsList.Add($ip)
+    #     Domain Role                              |
+    #  ------------------------------------------- |
+    #  Value | Meaning                             |
+    #  ----- | ----------------------------------- |
+    #  0     | Workstation not joined to a domain  |
+    #  1     | Workstation joined to a domain      |
+    #  2     | Server not joined to a domain       |
+    #  3     | Server joined to a domain           |
+    #  4     | Domain controller (non-FSMO)        |
+    #  5     | Domain controller (PDC Emulator)    |
+    #
+    $computerSystem = $null
+    $domainRole = 0
+    try {
+      $computerSystem = Get-CimInstance Win32_ComputerSystem -ErrorAction Stop
+      if ($null -ne $computerSystem.PSObject.Properties['DomainRole']) {
+        $domainRole = $computerSystem.DomainRole
+      }
+      else {
+        Log-Warning "Could not determine host domain role from Win32_ComputerSystem; assuming standalone workstation."
+      }
     }
-  }
-  else {
-    if (-not $invalidIps.Contains($ip)) {
-      [void]$invalidIps.Add($ip)
+    catch {
+      Log-Warning "Could not query Win32_ComputerSystem domain role; assuming standalone workstation."
     }
-  }
+    #------------------------------------------
+    # What type of system are we running on
+    #------------------------------------------
+    $isHostVM = Test-IsVirtualMachine
+    $isHostMobile = Test-IsLaptopOrMobile
+    $IsHostInDomain = ($domainRole -in 1, 3, 4, 5)
+    $isHostServer = ($domainRole -in 3, 4, 5)
+    $isHostDC = ($domainRole -in 4, 5)
+    $isHostDnsServer = $null -ne (Get-Service -Name DNS -ErrorAction SilentlyContinue)
+    $isHostDhcpServer = ($isHostServer -and (Get-WindowsFeature DHCP -ErrorAction SilentlyContinue).InstallState -eq 'Installed')
+    if (-not $RunWithoutElevation) {
+      $isHostHyperV = (Get-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V).State -eq 'Enabled'
+    }
+    else {
+      $isHostHyperV = $false
+    }
+    $isHostPDC = $false
+    $currentDomain = $null
+    if ($isHostDC) {
+      $isHostPDC = $false
+      $domainInfo = $null
+      try {
+        $domainInfo = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain()
+        $currentDomain = $domainInfo
+        $isHostPDC = (($domainInfo.PdcRoleOwner.Name -replace '[.].*') -eq $env:COMPUTERNAME)
+      }
+      catch {
+        Log-Warning "Could not determine if host is the PDC emulator for its domain."
+      }
+    }
+
+    $normalizedIpsOfAllDcs = @(
+      $IpsOfAllDcs |
+      Where-Object { $_ } |
+      ForEach-Object { $_.ToString().Trim() } |
+      Where-Object { $_ }
+    )
+
+    $ipCounts = @{}
+    $validIpsList = New-Object System.Collections.Generic.List[string]
+    $invalidIps = New-Object System.Collections.Generic.List[string]
+
+    foreach ($ip in $normalizedIpsOfAllDcs) {
+      if ($ipCounts.ContainsKey($ip)) { $ipCounts[$ip]++ } else { $ipCounts[$ip] = 1 }
+
+      $parsed = $ip -as [ipaddress]
+      $isValidV4 = ($parsed -and ($parsed.AddressFamily -eq [System.Net.Sockets.AddressFamily]::InterNetwork))
+
+      if ($isValidV4) {
+        if (-not $validIpsList.Contains($ip)) {
+          [void]$validIpsList.Add($ip)
+        }
+      }
+      else {
+        if (-not $invalidIps.Contains($ip)) {
+          [void]$invalidIps.Add($ip)
+        }
+      }
+    }
+
+    foreach ($entry in $ipCounts.GetEnumerator() | Where-Object { $_.Value -gt 1 } | Sort-Object Key) {
+      Log-Warning "Duplicate IP '$($entry.Key)' provided in -IpsOfAllDcs $($entry.Value) times; using one instance."
+    }
+
+    if ($invalidIps.Count -gt 0) {
+      throw "Invalid IPv4 value(s) supplied in -IpsOfAllDcs: $($invalidIps -join ', ')"
+    }
+
+    $validIpsOfAllDcs = @($validIpsList)
+
+    # Explicitly created so host-fact values are publicly accessible to all health tests,
+    # including custom health tests loaded at runtime.
+    $Global:GCHDQMTA = [pscustomobject]@{
+      isHostVM               = $isHostVM
+      isHostMobile           = $isHostMobile
+      IsHostInDomain         = $IsHostInDomain
+      isHostServer           = $isHostServer
+      isHostDC               = $isHostDC
+      isHostPDC              = $isHostPDC
+      isHostDnsServer        = $isHostDnsServer
+      isHostDhcpServer       = $isHostDhcpServer
+      isHostHyperV           = $isHostHyperV
+      GetCurrentDomain       = $currentDomain
+      SkipSlowTests          = $SkipSlowTests
+      IpsOfAllDcs            = @($validIpsOfAllDcs)
+    }
+
+    #|
+    #| Collect system information
+    #+-----------------------------------------------------------
+
+    #+-----------------------------------------------------------
+    #| Dot source health tests
+    #|
+
+    . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\syscfg-featdisc.ps1")
+    . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\srvc-exe-resolve.ps1")
+    . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\file-dir-anlz.ps1")
+    . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\schtasks-master.ps1")
+    . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\net-conn.ps1")
+    . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\os-perf-hw.ps1")
+    . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\win-os-hyg.ps1")
+
+    if ($isHostDC) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\OnlyIfHostIs-DC.ps1") }
+    if ($isHostDnsServer) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\OnlyIfHostIs-DnsServer.ps1") }
+    if ($isHostDhcpServer) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\OnlyIfHostIs-DhcpServer.ps1") }
+    if ($IsHostInDomain) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\OnlyIfHostIs-InDomain.ps1") }
+    if ($IsHostInDomain -and -not $isHostDC) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\OnlyIfHostIs-InDomainButNotDC.ps1") }
+    if ($isHostMobile) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\OnlyIfHostIs-Mobile.ps1") }
+    if ($isHostHyperV) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\OnlyIfHostIs-HyperV.ps1") }
+    if ($isHostServer) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\OnlyIfHostIs-Server.ps1") }
+    #|
+    #| Dot source health tests
+    #+-----------------------------------------------------------
+
+    $allHealthTests = Get-Command -CommandType Function -Name 'HealthTest-*' -ErrorAction SilentlyContinue
 }
-
-foreach ($entry in $ipCounts.GetEnumerator() | Where-Object { $_.Value -gt 1 } | Sort-Object Key) {
-  Log-Warning "Duplicate IP '$($entry.Key)' provided in -IpsOfAllDcs $($entry.Value) times; using one instance."
-}
-
-if ($invalidIps.Count -gt 0) {
-  throw "Invalid IPv4 value(s) supplied in -IpsOfAllDcs: $($invalidIps -join ', ')"
-}
-
-$validIpsOfAllDcs = @($validIpsList)
-
-# Explicitly created so host-fact values are publicly accessible to all health tests,
-# including custom health tests loaded at runtime.
-$Global:GCHDQMTA = [pscustomobject]@{
-  isHostVM               = $isHostVM
-  isHostMobile           = $isHostMobile
-  IsHostInDomain         = $IsHostInDomain
-  isHostServer           = $isHostServer
-  isHostDC               = $isHostDC
-  isHostPDC              = $isHostPDC
-  isHostDnsServer        = $isHostDnsServer
-  isHostDhcpServer       = $isHostDhcpServer
-  isHostHyperV           = $isHostHyperV
-  GetCurrentDomain       = $currentDomain
-  SkipSlowTests          = $SkipSlowTests
-  IpsOfAllDcs            = @($validIpsOfAllDcs)
-}
-
-#|
-#| Collect system information
-#+-----------------------------------------------------------
-
-#+-----------------------------------------------------------
-#| Dot source health tests
-#|
-
-. (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\syscfg-featdisc.ps1")
-. (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\srvc-exe-resolve.ps1")
-. (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\file-dir-anlz.ps1")
-. (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\schtasks-master.ps1")
-. (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\net-conn.ps1")
-. (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\os-perf-hw.ps1")
-. (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\win-os-hyg.ps1")
-
-if ($isHostDC) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\OnlyIfHostIs-DC.ps1") }
-if ($isHostDnsServer) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\OnlyIfHostIs-DnsServer.ps1") }
-if ($isHostDhcpServer) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\OnlyIfHostIs-DhcpServer.ps1") }
-if ($IsHostInDomain) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\OnlyIfHostIs-InDomain.ps1") }
-if ($IsHostInDomain -and -not $isHostDC) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\OnlyIfHostIs-InDomainButNotDC.ps1") }
-if ($isHostMobile) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\OnlyIfHostIs-Mobile.ps1") }
-if ($isHostHyperV) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\OnlyIfHostIs-HyperV.ps1") }
-if ($isHostServer) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\OnlyIfHostIs-Server.ps1") }
-#|
-#| Dot source health tests
-#+-----------------------------------------------------------
-
-$allHealthTests = Get-Command -CommandType Function -Name 'HealthTest-*' -ErrorAction SilentlyContinue
-
-if ($ListAllBuiltInTests) { Get-HealthTest $allHealthTests; return }
 
 # Fail if not run as Administrator (elevated)
 # None of the functionality that follows is available to non-admins
