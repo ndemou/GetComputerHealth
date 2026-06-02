@@ -83,61 +83,19 @@ notepad .\GetComputerHealth-install-config.psd1
 ```
 
 
-## OPTION 1: Installation Plus a Quick Run
-
-* **Security Note:** Each time you run `Invoke-GetComputerHealth`, it will call `Update-GetHealthCode.ps1` and fetch code from this repository.
+## Quick Run
 
 Run these commands from an elevated PowerShell terminal:
 
 ```powershell
-# Create C:\IT\Get-ComputerHealth\bin and download the installer/updater script
-if (-not (Test-Path "C:\IT\Get-ComputerHealth\bin")) { 
-    New-Item -Path "C:\IT\Get-ComputerHealth\bin" -ItemType Directory -Force
-    Invoke-WebRequest -useb "https://raw.githubusercontent.com/ndemou/GetComputerHealth/refs/heads/main/Update-GetHealthCode.ps1" -OutFile "C:\IT\Get-ComputerHealth\bin\Update-GetHealthCode.ps1" 
-}
-
-# Download all other scripts
-C:\IT\Get-ComputerHealth\bin\Update-GetHealthCode.ps1 
-
-# Perform your first health test manually
 C:\IT\Get-ComputerHealth\bin\Invoke-GetComputerHealth.ps1
 ```
 
-> (You can change `C:\IT\Get-ComputerHealth` to any path you prefer.)
+## Automatic Daily Monitoring of One Computer
 
-## OPTION 2: Installation Plus Automatic Daily Monitoring of One Computer
-
-* **Security Note:** Each time you run `Invoke-GetComputerHealth`, it will call `Update-GetHealthCode.ps1` and fetch code from this repository.
-
-1. Copy the commands below into Notepad.
-2. Replace the **PLACEHOLDERS** at the top with your actual configuration.
-3. Run all commands from an elevated PowerShell terminal.
+Run these commands from an elevated PowerShell terminal:
 
 ```powershell
-#--------- CHANGE THIS PART ---------
-$mailServer="SMTP_SERVER.CONTOSO.COM"
-$fromAddress="SENDER@CONTOSO.COM"
-$toAddress="RECIPIENT@CONTOSO.COM"
-#------------------------------------
-
-# Create C:\IT\Get-ComputerHealth\bin and download the installer/updater script
-if (-not (Test-Path "C:\IT\Get-ComputerHealth\bin")) { 
-    New-Item -Path "C:\IT\Get-ComputerHealth\bin" -ItemType Directory -Force
-    Invoke-WebRequest -useb "https://raw.githubusercontent.com/ndemou/GetComputerHealth/refs/heads/main/Update-GetHealthCode.ps1" -OutFile "C:\IT\Get-ComputerHealth\bin\Update-GetHealthCode.ps1" 
-}
-
-# Download all other scripts & install required modules
-C:\IT\Get-ComputerHealth\bin\Update-GetHealthCode.ps1 
-
-# Setup email delivery
-@"
-{"Server":  "$mailServer",
-"From":  "$($env:COMPUTERNAME)+$fromAddress",
-"To":  "$toAddress",
-"Port":  25,
-"UseSsl":  false}
-"@ | Out-File "C:\IT\Get-ComputerHealth\config\Send-Message.conf" -Encoding utf8 -Force
-
 # Test email delivery
 C:\IT\Get-ComputerHealth\bin\Send-Message.ps1 -Subject "First test from $($env:COMPUTERNAME)" -ConfigFile "C:\IT\Get-ComputerHealth\config\Send-Message.conf" -Verbose
 
@@ -149,7 +107,7 @@ C:\IT\Get-ComputerHealth\bin\Invoke-GetComputerHealth.ps1
 New-ScheduledTaskForPSScript -ScriptPath "C:\IT\Get-ComputerHealth\bin\Invoke-GetComputerHealth.ps1" -ScheduleType Daily -Time 07:12
 ```
 
-## OPTION 3: Installation Plus Automatic Daily Monitoring of Multiple Domain-Joined Computers
+## Automatic Daily Monitoring of Multiple Domain-Joined Computers
 
 1. Follow the instructions for monitoring a single computer on the management machine (the controller).
 2. Copy the code below into your editor and fill in the proper values on the three lines under `CONFIGURATION`:
@@ -178,28 +136,6 @@ if (-not $NoUpdate) {
 
 # 2. Common Tasks
 
-## How to Manually Perform a Health Check for One Computer
-
-Open PowerShell as Administrator and run:
-
-```powershell
-C:\IT\Get-ComputerHealth\bin\Invoke-GetComputerHealth.ps1 -NoSend
-```
-
-> This scans the local machine, saves CLIXML data plus an interactive HTML report, and emails you any **notable** issues (i.e., Notices, Warnings, or Failures).
-
-For more fine-tuned control, try:
-```powershell
-$results = C:\IT\Get-ComputerHealth\bin\Get-ComputerHealth.ps1 -OutputConsoleMessages -OutputObjects -Hide DIP
-$results | ogv
-```
-
-> **Tips:**
-> * `-OutputConsoleMessages` generates the colorful output in your console.
-> * `-OutputObjects` is what populates `$results`.
-> * `-Hide DIP` hides **D**ebug, **I**nfo, and **P**ass messages from the console, showing only **N**otices, **W**arnings, **F**ailures, and **S**uppressed messages.
-> * Available options allow you to skip slow tests (`-SkipSlowTests`), skip non-essential tests (`-SkipNonEssentialTests`), exclude specific tests (`-ExcludeTests`), or run specific tests (`-OnlyTheseTests`). Autocomplete using `-` + `TAB` is your friend.
-
 ## How to Manually Perform a Domain Health Check
 
 Run `C:\IT\bin\Invoke-GetHealthDomainComputers.ps1`.
@@ -221,6 +157,19 @@ By default, the health tests will flag any deviation from a pristine Windows ins
 ## How to Add Custom Tests
 
 [Follow these instructions](./doc/how-to-add-custom-tests.md)
+
+## Tips for fine-tuned control
+
+```powershell
+$results = C:\IT\Get-ComputerHealth\bin\Get-ComputerHealth.ps1 -OutputConsoleMessages -OutputObjects -Hide DIP
+$results | ogv
+```
+
+> **Tips:**
+> * `-OutputConsoleMessages` generates the colorful output in your console.
+> * `-OutputObjects` is what populates `$results`.
+> * `-Hide DIP` hides **D**ebug, **I**nfo, and **P**ass messages from the console, showing only **N**otices, **W**arnings, **F**ailures, and **S**uppressed messages.
+> * Available options allow you to skip slow tests (`-SkipSlowTests`), skip non-essential tests (`-SkipNonEssentialTests`), exclude specific tests (`-ExcludeTests`), or run specific tests (`-OnlyTheseTests`). Autocomplete using `-` + `TAB` is your friend.
 
 ---
 
