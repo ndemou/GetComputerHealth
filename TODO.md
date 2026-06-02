@@ -38,7 +38,7 @@ Update our documentation with the above info.
 
 You can get an overview of sus write-warning expressions with this command:
 ```
-(sls "write-warning" .\health-tests\*).line -replace '^.*write-warning', 'write-warning' -replace ' *} else(if)? {.*' -replace '; if [(]' |sls 'write-warning .{76,}$' | sls '`n([" +]*)?(\$details|\$comment)(.{0,4})$' -NotMatch
+(sls "write-warning" .\health-tests\*).line -replace '^.*write-warning', 'write-warning' -replace ' *} else(if)? {.*' -replace '; if [(].*' |sls 'write-warning .{76,}$' | sls '`n([" +]*)?(\$details|\$comment)(.{0,4})$' -NotMatch|%{$_.Line} | ?{$_.length -gt 100}
 ```
 
 After fixing anything it's better to check the resulting `git diff` from codex with this ChatGPT prompt: 
