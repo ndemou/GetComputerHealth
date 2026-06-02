@@ -3,8 +3,8 @@
 *(Information for users)*
 
 ## TL;DR
-
-All `.ps1` files in `C:\IT\config\Custom-HealthTests\` are executed directly. Your script should report its result(s) like this:
+  
+All `.ps1` files in `C:\IT\GetComputerHealth\config\Custom-HealthTests\` are executed directly. Your script should report its result(s) like this:
 ```powershell
 Write-Warning "[PASS] Description of what's OK"
 Write-Warning "[FAILURE] Description of the issue"
@@ -16,7 +16,7 @@ The code you write will run with **high privileges** and, apart from any tempora
 
 To add a custom test:
 
-1. Create the folder `C:\IT\config\Custom-HealthTests\` on the target computer.
+1. Create the folder `C:\IT\GetComputerHealth\config\Custom-HealthTests\` on the target computer.
 2. Create one or more `.ps1` scripts in that folder (for example, `"tests-for-$env:COMPUTERNAME.ps1"`).
 3. Put the test logic in the script and make the script emit `Write-Warning` messages for its findings.
 4. Run the script directly to test it.
@@ -127,20 +127,17 @@ Available properties:
 First, ask your human to run these commands on the computer where they are writing the test. The output will help you understand the current situation: do the expected folders exist, and are there already any custom tests?
 
 ```powershell
-Test-Path C:\IT\ # must exist
-Test-Path C:\IT\config\ # create it if it does not exist
-Test-Path C:\IT\config\Custom-HealthTests\ # create it if it does not exist
-Get-ChildItem C:\IT\config\Custom-HealthTests\
-if (Test-Path C:\IT\config\Custom-HealthTests\*.ps1) { sls '^ *function HealthTest-' C:\IT\config\Custom-HealthTests\*.ps1 -Context 10 }
+Test-Path C:\IT\GetComputerHealth\ # must exist
+Test-Path C:\IT\GetComputerHealth\config\Custom-HealthTests\ # create it if it does not exist
+Get-ChildItem C:\IT\GetComputerHealth\config\Custom-HealthTests\
+if (Test-Path C:\IT\GetComputerHealth\config\Custom-HealthTests\) { ls C:\IT\GetComputerHealth\config\Custom-HealthTests\*.ps1 } # shows existing health tests
 ```
 
-Then ask your human to describe the test they want to implement.
+Then ask your human to describe the test they want to implement and choose an appropriate file name that is not already used.
 
-If custom test files already exist, suggest creating a new file for the new test, but comply if they prefer to add it to an existing `.ps1` file.
+Write the code for the requested test and give your human step-by-step instructions for adding it: `notepad C:\IT\GetComputerHealth\config\Custom-HealthTests\<a nice name not already existing>.ps1`
 
-Finally, write the code for the requested test and give your human step-by-step instructions for adding it and verifying that it works.
-
-When possible, prefer copy-paste-ready PowerShell commands.
+Ask the user to execute it and verify it works. (See notes below.)
 
 ## How to Test Your Script
 
@@ -149,12 +146,14 @@ When possible, prefer copy-paste-ready PowerShell commands.
 # WARNING: [PASS] All is cool!
 ```
 
-> The `WARNING:` prefix is a sideeffect of the fact that all messages are output by Write-Warning: `[PASS]`, `[NOTICE]`, and everything else
+> The `WARNING:` prefix is a sideeffect of the fact that all messages are output by Write-Warning (`[PASS]`, `[NOTICE]`, and everything else).
 
-If you want nicely colored console output and/or structured results like what you get from `Get-ComputerHealth.ps1` run them like this:
+OR
 
 ```powershell
-$r = C:\IT\Get-ComputerHealth\bin\Get-ComputerHealth.ps1 -OnlyTheseTests "my-cooll-test.ps1"
+$results = C:\IT\Get-ComputerHealth\bin\Get-ComputerHealth.ps1 -OnlyTheseTests "my-cooll-test.ps1"
 # or if the script is not under .\config
-$r = C:\IT\Get-ComputerHealth\bin\Get-ComputerHealth.ps1 -OnlyTheseTests "C:\temp\my-cooll-test.ps1"
+$results = C:\IT\Get-ComputerHealth\bin\Get-ComputerHealth.ps1 -OnlyTheseTests "C:\temp\my-cooll-test.ps1"
 ```
+
+> This gives you nicely colored console output and structured results.
