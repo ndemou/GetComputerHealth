@@ -1154,7 +1154,14 @@ if (-not $AddWhitelisting ) {
     }
 
     $validIpsOfAllDcs = @($validIpsList)
-
+    if ($IsHostInDomain -and $validIpsOfAllDcs.Count -eq 0) {
+      Log-failure "Cannot run many domain-related tests because no valid IPv4 addresses were provided in -IpsOfAllDcs. Marking this host as non-domain for test applicability."
+      $IsHostInDomain = $false
+      $isHostDC = $false
+      $isHostPDC = $false
+      $currentDomain = $null
+    }
+    
     # Explicitly created so host-fact values are publicly accessible to all health tests,
     # including custom health tests loaded at runtime.
     $Global:GchData = [pscustomobject]@{
@@ -1239,14 +1246,6 @@ if ($AddWhitelisting ) {
 
 
 if ($DoNothing) { return }
-
-if ($IsHostInDomain -and $validIpsOfAllDcs.Count -eq 0) {
-  Log-failure "Cannot run many domain-related tests because no valid IPv4 addresses were provided in -IpsOfAllDcs. Marking this host as non-domain for test applicability."
-  $IsHostInDomain = $false
-  $isHostDC = $false
-  $isHostPDC = $false
-  $currentDomain = $null
-}
 
 if (-not $OutputConsoleMessages -and -not $OutputObjects) {
   Write-UsageHelp
