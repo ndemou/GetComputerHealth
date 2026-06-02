@@ -48,3 +48,7 @@ function HealthTest-RecentBakExist {
     }
 }
 ```
+
+## Other helper functions
+
+You may wish to use functions from `helpers-for-healthtests.ps1`.

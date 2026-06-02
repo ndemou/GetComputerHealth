@@ -82,3 +82,6 @@ Policy Health tests have special handling:
 - `[FAILURE]` findings are not auto-suppressed
 - A flag is appended to `Get-ComputerHealth.sigs-to-suppress.txt` so future runs are treated normally
 
+### Helpers
+
+Feel free to use functions from `helpers-for-healthtests.ps1`.
