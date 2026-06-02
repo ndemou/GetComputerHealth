@@ -17,6 +17,14 @@ This is a **robust production-tested toolkit** and I have been using it across s
 
  > On the plus side, in the unlikely event that you need to dive into the code, it is surprisingly small and straightforward: **the core is about 1,000 lines, including comments.** The code that creates HTML reports is quite heavy. The tests total more than ten thousand lines, but most of them are a dozen or two dozen lines, and a few are a few hundred lines. So any modern AI agent can easily understand and fix issues in the code. In fact, the vast majority of the code *was* written by Codex, with me acting as the architect, lead developer, reviewer, and QC.
 
+## Comparison to PRTG, Zabbix 
+
+Pros: you can get from “nothing installed” to “extremely useful daily Windows health findings”  in a minute and adding custom tests is trivial.
+
+Cons: has none of these: central dashboards, long-term metrics, escalation policies, maintenance windows, topology, dependency modeling, real time monitoring and support for non-Windows systems.
+
+GetComputerHealth is intentionally smaller and Windows-admin focused. It includes many checks that Zabbix/PRTG can only reproduce through custom UserParameters, scripts, or purpose-built templates: AD/GPO consistency, DNS/DHCP configuration hygiene, local hardening baselines, pending reboot/VSS/WMI/driver checks, unexpected ports/services/software drift, and others.
+
 # Security
 
 By default, the installer downloads and updates files from this GitHub repository every time you call any of the `Invoke-*.ps1` scripts. **You can disable automatic updates** by setting `AutomaticUpdates = $false` in `./config/gch.psd1`, or point the updater to a clone of this repo that you control by setting `RepoUrl`.
