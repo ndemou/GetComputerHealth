@@ -1107,7 +1107,7 @@ Impact: Medium(Time)
 Tags: Essential
 Uses: Get-Command, Get-BitLockerVolume.
 #>
-    if ($Global:GchData.isHostVM) {
+    if (Test-IsVirtualMachine) {
         Write-Warning "[info] Computer is a VM; skipping HealthTest-BitLockerStatus"
 		return
 	}

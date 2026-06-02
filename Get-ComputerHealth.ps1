@@ -1162,18 +1162,9 @@ if (-not $AddWhitelisting ) {
       $currentDomain = $null
     }
     
-    # Explicitly created so host-fact values are publicly accessible to all health tests,
+    # Explicitly created so shared run data is publicly accessible to all health tests,
     # including custom health tests loaded at runtime.
     $Global:GchData = [pscustomobject]@{
-      isHostVM               = $isHostVM
-      isHostMobile           = $isHostMobile
-      IsHostInDomain         = $IsHostInDomain
-      isHostServer           = $isHostServer
-      isHostDC               = $isHostDC
-      isHostPDC              = $isHostPDC
-      isHostDnsServer        = $isHostDnsServer
-      isHostDhcpServer       = $isHostDhcpServer
-      isHostHyperV           = $isHostHyperV
       GetCurrentDomain       = $currentDomain
       SkipSlowTests          = $SkipSlowTests
       IpsOfAllDcs            = @($validIpsOfAllDcs)

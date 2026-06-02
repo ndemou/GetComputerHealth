@@ -50,9 +50,13 @@ Uses: Get-NetConnectionProfile, Test-NetConnectivityToNetwork.
   }
 
   # Phase 3, Check if NLA category(public, private, domain) is proper.
-  if (-not $Global:GchData.isHostServer) { return } # N/A for workstations
+  $domainRole = (Get-CimInstance Win32_ComputerSystem).DomainRole
+  $isHostServer = ($domainRole -in 2, 3, 4, 5)
+  $isHostInDomain = ($domainRole -in 1, 3, 4, 5)
 
-  if ($Global:GchData.IsHostInDomain) {
+  if (-not $isHostServer) { return } # N/A for workstations
+
+  if ($isHostInDomain) {
     $allowedCategories = @('DomainAuthenticated')
   } else {
     $allowedCategories = @('Private')
