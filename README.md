@@ -19,19 +19,19 @@ This is a **robust production-tested toolkit** and I have been using it across s
 
 ## Comparison to PRTG, Zabbix 
 
-Pros: you can get from “nothing installed” to “extremely useful daily Windows health findings”  in a minute and adding custom tests is trivial.
+**Pros**: you can get from “nothing installed” to “definitely useful daily Windows health findings” in a minute and adding custom tests is trivial.
 
-Cons: has none of these: central dashboards, long-term metrics, escalation policies, maintenance windows, topology, dependency modeling, real time monitoring and support for non-Windows systems.
+**Cons**: has none of these: central dashboards, long-term metrics, escalation policies, maintenance windows, topology, dependency modeling, real time monitoring and support for non-Windows systems.
 
-GetComputerHealth is intentionally smaller and Windows-admin focused. It includes many checks that Zabbix/PRTG can only reproduce through custom UserParameters, scripts, or purpose-built templates: AD/GPO consistency, DNS/DHCP configuration hygiene, local hardening baselines, pending reboot/VSS/WMI/driver checks, unexpected ports/services/software drift, and others.
+GetComputerHealth is intentionally smaller and Windows-admin focused. It includes out of the box many checks that Zabbix/PRTG can only reproduce through custom UserParameters, scripts, or purpose-built templates: AD/GPO consistency, DNS/DHCP configuration hygiene, local hardening baselines, pending reboot/VSS/WMI/driver checks, unexpected open ports/stopped services/newly installed software, and others.
 
 # Security
 
-By default, the installer downloads and updates files from this GitHub repository every time you call any of the `Invoke-*.ps1` scripts. **You can disable automatic updates** by setting `AutomaticUpdates = $false` in `./config/gch.psd1`, or point the updater to a clone of this repo that you control by setting `RepoUrl`.
+By default, the installer downloads and updates files from this GitHub repository every time you call any of the `Invoke-*.ps1` scripts. You can point the updater to a clone of this repo that you control by setting `RepoUrl` in `./config/gch.psd1`, or or disable automatic updates by setting `AutomaticUpdates = $false`.
 
 This toolkit has **no external dependencies**.
 
-Besides installation, this code *should not change the state of the system in any way*. Consequently, auditing it with a modern AI agent is quite easy. 
+Besides installation, this code *should not change the state of the system in any way*. The code has been kept simple and clean in order to allow auditing it with a modern AI agent. 
 
 ---
 
@@ -41,12 +41,11 @@ Besides installation, this code *should not change the state of the system in an
 
 **To receive emails** with results/alerts, you need a mail server that permits unauthenticated delivery.
 
-**To centrally scan workstations**, you must be able to manage them with Remote PowerShell (running `Enter-PSSession WorkstationName` or `Invoke-Command WorkstationName` should work). Domain-joined servers are usually centrally managed with zero configuration.
+**To centrally scan workstations/servers**, you must be able to manage them with Remote PowerShell (i.e. running `Enter-PSSession ComputerName` or `Invoke-Command ComputerName` should work). Domain-joined servers are usually centrally managed with zero configuration.
 
 ## Super-simple customized install
 
-For a customized install, download just the installer/updater script and pass a single `-Config` hashtable. The top-level `Options` branch controls installer behavior; the `ConfigFiles` branch writes configuration files under the install root's `config` folder.
-
+Customize and run this: 
 ```powershell
 Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/ndemou/GetComputerHealth/refs/heads/main/Update-GetHealthCode.ps1" -OutFile ".\Update-GetHealthCode.ps1"
 & .\Update-GetHealthCode.ps1 -Config @{
@@ -71,9 +70,8 @@ Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/ndemou/Get
 
 In the example above:
 
-* `Options.InstallDir` means the tool is installed into `C:\IT\GetComputerHealth\bin`, while configuration is written to `C:\IT\GetComputerHealth\config`.
 * Each child of `ConfigFiles` becomes one PowerShell data file in `config`. For example, `ConfigFiles['gch.psd1']` writes `C:\IT\GetComputerHealth\config\gch.psd1`.
-* Passing `AutomaticUpdates = $false` in `gch.psd1` disables future automatic updates, but it does not block the installation command that explicitly supplied `-Config`.
+* Passing `AutomaticUpdates = $false` in `gch.psd1` disables future automatic updates.
 
 If you prefer to edit a file instead of embedding a hashtable in the command, generate a template, customize it, and pass the path to `-Config`:
 
