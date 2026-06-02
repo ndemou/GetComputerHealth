@@ -104,24 +104,6 @@ You may wish to consider the extra guidelines on how to write [`built-in-healtht
 
 There are also some specialized helper functions you may wish to use. See [`helpers-for-custom-ht.md`](helpers-for-custom-ht.md).
 
-### Host facts available to custom health tests
-
-`Get-ComputerHealth.ps1` populates a global variable named `$Global:GCHDQMTA` with host facts. Custom health tests can access these host facts instead of recomputing them.
-
-Available properties:
-
-* `$Global:GCHDQMTA.isHostVM` (based on heuristics)
-* `$Global:GCHDQMTA.isHostMobile` (based on heuristics)
-* `$Global:GCHDQMTA.IsHostInDomain`
-* `$Global:GCHDQMTA.isHostServer`
-* `$Global:GCHDQMTA.isHostDC`
-* `$Global:GCHDQMTA.isHostPDC`
-* `$Global:GCHDQMTA.isHostDnsServer`
-* `$Global:GCHDQMTA.isHostDhcpServer`
-* `$Global:GCHDQMTA.isHostHyperV`
-* `$Global:GCHDQMTA.DebugSkipSlowTests = $DebugSkipSlowTests`
-* `$Global:GCHDQMTA.GetCurrentDomain = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain()`
-
 # Instructions for LLMs Helping a Novice Write a Custom Test
 
 First, ask your human to run these commands on the computer where they are writing the test. The output will help you understand the current situation: do the expected folders exist, and are there already any custom tests?
