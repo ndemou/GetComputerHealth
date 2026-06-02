@@ -27,7 +27,7 @@ Uses: Get-NetConnectionProfile, Test-NetConnectivityToNetwork.
   param()
 
   $POPULAR_HOSTS = @('8.8.8.8','8.8.4.4','1.1.1.1','1.1.1.2')
-  $hostFacts = $Global:GchData
+  $hostFacts = $Global:GCHDQMTA
 
   # Phase 1, Collect Data
   $profiles = @(Get-NetConnectionProfile) # We'll let an unexpected exception bubble up -- the caller catches and displays exceptions nicely

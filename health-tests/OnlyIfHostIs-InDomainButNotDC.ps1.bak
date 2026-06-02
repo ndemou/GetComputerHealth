@@ -23,7 +23,7 @@ service discovery.
   $role = $cs.DomainRole
   if ($role -in 0,2) { Write-Warning "[NOTICE] This test (HealthTest-InterfaceDnsServersUseDcs) is not applicable to non-domain joined hosts"; return }
   if ($role -in 4,5) { Write-Warning "[NOTICE] This test (HealthTest-InterfaceDnsServersUseDcs) is not applicable to Domain Controllers"; return }
-  $dcIps = @($Global:GchData.IpsOfAllDcs)
+  $dcIps = @($Global:GCHDQMTA.IpsOfAllDcs)
 
   $nets = Get-CimInstance Win32_NetworkAdapterConfiguration -Filter "IPEnabled=TRUE"
   if (-not $nets) {
@@ -78,7 +78,7 @@ Uses: Test-ComputerSecureChannel.
 #>
   [CmdletBinding()] param()
 
-  $dcIps = @($Global:GchData.IpsOfAllDcs)
+  $dcIps = @($Global:GCHDQMTA.IpsOfAllDcs)
 
   if (!(Test-ComputerSecureChannel)) {
       Write-Warning "[WARNING] Can't connected to any Domain Controller. Can not run gpupdate.`nMake sure you are on the domain LAN or connected via VPN."

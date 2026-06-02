@@ -73,7 +73,7 @@ Default: empty (show all). Typical value: `DIP`
 (Parameter set: Run) Disables first-run auto-baselining for policy tests (`Tags: Policy`, e.g. `HealthTest-InstalledSW`). By default, first run auto-suppresses emitted `[NOTICE]`/`[WARNING]` findings for each policy test and records a marker in the suppression file.
 
 .PARAMETER IpsOfAllDcs
-(Parameter set: Run) Optional list of Domain Controller IP addresses passed in by the orchestrator. Stored in `$Global:GchData.IpsOfAllDcs` for health tests that need it.
+(Parameter set: Run) Optional list of Domain Controller IP addresses passed in by the orchestrator. Stored in `$Global:GCHDQMTA.IpsOfAllDcs` for health tests that need it.
 
 .PARAMETER DoNothing
 (Parameter set: Run) Immediate no-op return (useful for smoke-testing invocation/parameter binding).
@@ -1157,7 +1157,7 @@ if (-not $AddWhitelisting ) {
 
     # Explicitly created so host-fact values are publicly accessible to all health tests,
     # including custom health tests loaded at runtime.
-    $Global:GchData = [pscustomobject]@{
+    $Global:GCHDQMTA = [pscustomobject]@{
       isHostVM               = $isHostVM
       isHostMobile           = $isHostMobile
       IsHostInDomain         = $IsHostInDomain
@@ -1267,7 +1267,7 @@ Initialize-LogSystem `
 #|
 #|
 #+-----------------------------------------------------------
-Log-Debug "`$global:GchData" -Comment "$(($global:GchData|Format-List|Out-String).trim())"
+Log-Debug "`$global:GCHDQMTA" -Comment "$(($global:GCHDQMTA|Format-List|Out-String).trim())"
 Log-Debug '$allHealthTests' -comment "$(($allHealthTests).name -join ', ')"
 
 Log-info "$((Split-Path $PSCommandPath -Leaf) -replace '.ps1'), ver.$VERSION, Nick Demou, enLogic"

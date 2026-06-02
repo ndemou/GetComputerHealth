@@ -127,7 +127,7 @@ Impact: Medium(Network)
 Tags: Essential
 Uses: Resolve-DnsName.
 #>
-  $dcIps = @($Global:GchData.IpsOfAllDcs)
+  $dcIps = @($Global:GCHDQMTA.IpsOfAllDcs)
 
   $domain = (Get-CimInstance Win32_ComputerSystem).Domain
   $ares = $null
