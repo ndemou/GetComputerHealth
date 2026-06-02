@@ -1,14 +1,14 @@
 ﻿# Introduction
 
-**Get-ComputerHealth** is a **production-ready, lightweight, secure, and extensible** PowerShell framework that **installs in a flash** and scans your server, workstation, or fleet of domain servers for **more than a hundred health indicators** (both issues like low RAM, missing updates, disk errors, and failed logins, and configuration changes like newly installed software, a TCP port that started listening, a host that stopped responding to pings, or a host that stopped accepting connections). It produces **useful and concise reports and email alerts**. You can easily add your own **custom health tests with plain PowerShell scripts**. 
+**Get-ComputerHealth** is a **production-ready, lightweight, secure, and extensible** PowerShell toolkit that **installs in a flash** and scans your server, workstation, or fleet of domain servers for **more than a hundred health indicators** (both issues like low RAM, missing updates, disk errors, and failed logins, and configuration changes like newly installed software, a TCP port that started listening, a host that stopped responding to pings, or a host that stopped accepting connections). It produces **useful and concise reports and email alerts**. You can easily add your own **custom health tests with plain PowerShell scripts**. 
 
 <img width="729" height="426" alt="image" src="https://github.com/user-attachments/assets/56ed5109-0f71-4f10-a7ba-2b0cf0e36669" />
 
 <img width="1086" height="251" alt="Example of the report you receive via email" src="https://github.com/user-attachments/assets/694eb16f-fbc9-420c-b96e-dead56715085" />
 
-# Status / Is this code for you?
+# Status / Is this toolkit for you?
 
-This is a **robust production-tested tool** and I have been using it across several domains and multiple servers for many months.
+This is a **robust production-tested toolkit** and I have been using it across several domains and multiple servers for many months.
 
 **BUT:**
 
