@@ -27,7 +27,6 @@ Uses: Get-NetConnectionProfile, Test-NetConnectivityToNetwork.
   param()
 
   $POPULAR_HOSTS = @('8.8.8.8','8.8.4.4','1.1.1.1','1.1.1.2')
-  $hostFacts = $Global:GchData
 
   # Phase 1, Collect Data
   $profiles = @(Get-NetConnectionProfile) # We'll let an unexpected exception bubble up -- the caller catches and displays exceptions nicely
@@ -51,9 +50,9 @@ Uses: Get-NetConnectionProfile, Test-NetConnectivityToNetwork.
   }
 
   # Phase 3, Check if NLA category(public, private, domain) is proper.
-  if (-not $hostFacts.isHostServer) { return } # N/A for workstations
+  if (-not $Global:GchData.isHostServer) { return } # N/A for workstations
 
-  if ($hostFacts.IsHostInDomain) {
+  if ($Global:GchData.IsHostInDomain) {
     $allowedCategories = @('DomainAuthenticated')
   } else {
     $allowedCategories = @('Private')
