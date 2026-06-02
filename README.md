@@ -1,6 +1,6 @@
 ﻿# Introduction
 
-**Get-ComputerHealth** is a **production-ready, lightweight, secure and extendable** PowerShell framework that **installs in a flash** and scans your server, workstation or fleet of domain servers for **more than a hundred health indicators** (both issues like low RAM, missing updates, disk errors, failed logins and configuration changes like a newly installed software, a TCP port that started listening, a host that stoped responding to pings or accepting connections). It produces **useful and concise reports, and email alerts**. You can easily add your own **custom health tests with plain PowerShell scripts**. 
+**Get-ComputerHealth** is a **production-ready, lightweight, secure, and extensible** PowerShell framework that **installs in a flash** and scans your server, workstation, or fleet of domain servers for **more than a hundred health indicators** (both issues like low RAM, missing updates, disk errors, and failed logins, and configuration changes like newly installed software, a TCP port that started listening, a host that stopped responding to pings, or a host that stopped accepting connections). It produces **useful and concise reports and email alerts**. You can easily add your own **custom health tests with plain PowerShell scripts**. 
 
 <img width="729" height="426" alt="image" src="https://github.com/user-attachments/assets/56ed5109-0f71-4f10-a7ba-2b0cf0e36669" />
 
@@ -14,14 +14,14 @@ This is a **robust production-tested tool** and I have been using it across seve
 
  1. **Don't expect official support.** I am happy to help when I can, but my availability is limited. You should be comfortable with PowerShell.
  2. **I am currently the only user I know of**, so there is a chance I have some blind spots.
- 3. **There's a tiny chance of breaking changes.** I'll avoid it because I'll have to clean up issues at several production sites, but I *will do it* if the rewards worth to me. 
+ 3. **There's a tiny chance of breaking changes.** I'll avoid them because I'll have to clean up issues at several production sites, but I *will do it* if the rewards are worth it to me.
  4. **I have not tested it on domains with more than a few dozen servers or with DCs connected via WAN.** It is possible that certain domain-related tests could cause excessive WAN traffic. Test it while observing traffic (and I would be glad if you let me know the results).
 
- > On the plus side, in the unlikely event that you need to dive into the code, it is surprisingly small and straightforward: **the core is about 1,000 lines, including comments.** The code that creates html reports is quite heavy. The tests measure in excess of ten thousand lines, but most of them are a dozen or two dozen lines and a few are a few hundred lines. So any modern AI agent can easily understand and fix issues in the code. In fact, the vast majority of the code *was* written by Codex, with myself acting as the architect, lead developer, reviewer, and QC.
+ > On the plus side, in the unlikely event that you need to dive into the code, it is surprisingly small and straightforward: **the core is about 1,000 lines, including comments.** The code that creates HTML reports is quite heavy. The tests total more than ten thousand lines, but most of them are a dozen or two dozen lines, and a few are a few hundred lines. So any modern AI agent can easily understand and fix issues in the code. In fact, the vast majority of the code *was* written by Codex, with me acting as the architect, lead developer, reviewer, and QC.
 
 # Security
 
-By default the installer downloads and updates files from this GitHub repository every time you call any of the `Invoke-*.ps1` scripts. **You can disable automatic udpates** by setting `AutomaticUpdates = $false` in `./config/gch.psd1` or point the updater to a clone of this repo that you control by setting `RepoUrl`.
+By default, the installer downloads and updates files from this GitHub repository every time you call any of the `Invoke-*.ps1` scripts. **You can disable automatic updates** by setting `AutomaticUpdates = $false` in `./config/gch.psd1`, or point the updater to a clone of this repo that you control by setting `RepoUrl`.
 
 This toolkit has **no external dependencies**.
 
@@ -39,7 +39,7 @@ Besides installation, this code *should not change the state of the system in an
 
 ## Super-simple customized install
 
-For a customized install, download just the installer/updater script and pass one `-Config` hashtable. The top-level `Options` branch controls installer behavior; the `ConfigFiles` branch writes configuration files under the install root's `config` folder.
+For a customized install, download just the installer/updater script and pass a single `-Config` hashtable. The top-level `Options` branch controls installer behavior; the `ConfigFiles` branch writes configuration files under the install root's `config` folder.
 
 ```powershell
 Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/ndemou/GetComputerHealth/refs/heads/main/Update-GetHealthCode.ps1" -OutFile ".\Update-GetHealthCode.ps1"
@@ -328,7 +328,7 @@ Note that if you only want to add a few custom tests, you do not need to modify 
 
 # 7. List of Available Tests
 
-(Run `Get-ComputerHealth.ps1 -ListAllBuiltInTests` to get an always up to date list.)
+(Run `Get-ComputerHealth.ps1 -ListAllBuiltInTests` to get an always up-to-date list.)
 
 | Name | Description |
 | --- | --- |
