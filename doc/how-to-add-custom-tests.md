@@ -23,11 +23,9 @@ To add a custom test:
 
 ## More details and examples
 
- - You may define helper functions or dot-source other .ps1 files.
- - You may define more than one helper function if that makes the script easier to understand.
- - The script itself should be directly runnable, so the top level of the file must eventually execute the test.
+Examples of the two most common patterns of tests follow.
 
-### Pattern 1, “Was an issue found”
+### Pattern 1, “Test for a single issue”
 
 ```powershell
 function Test-IsFooLessThanLimit {
@@ -70,30 +68,29 @@ Test-LargeDirectories
 
 Often this style covers your needs:
 ```powershell
-Write-Warning "[PASS] $allGoodDescription"
-Write-Warning "[FAILURE] $issueDescription"
+Write-Warning "[PASS] <A single terse line that describes the good status>"
+Write-Warning "[FAILURE] <A single terse line that uniquely describes the issue>""
 ````
 
 But if you have details to report, use this style:
 ```powershell
-$issueDescription = "A single terse line that uniquely describes the issue"
 $details = "More details" + "`n" + "Even in multiple lines" + "`n" + "Up to 32K characters."
-Write-Warning ("[NOTICE] $issueDescription" + "`n" + $details)
+Write-Warning ("[NOTICE] <A single terse line that uniquely describes the issue>" + "`n" + $details)
 ```
 
-A proper issue description should not change when the **essence** of the issue has not changed. There is no restriction for the optional `$details`.
+**An important detail**: A good issue description should not change when the *essence* of the issue does not change. There is no restriction for the optional `$details`.
 
 For example, suppose you want to flag folders with too many files. Consider these two descriptions:
 
 ```powershell
-$description = "Directory $dir has more than 10000 child items" # Proper
-$description = "Directory $dir has $FilesCount items"           # NOT proper
+"Directory $dir has more than 10000 child items" # good description
+"Directory $dir has $FilesCount items"            # bad description
 ```
 
 Folder `C:\foo` having 1002 files is essentially the same issue as `C:\foo` having 1003 files, so both situations should produce the same description string.
-The second version is not proper because it varies with a detail that is not essential to the identity of the issue (the irrelevant detail of exactly how many files the folder contains).
+The second version is not good because it varies with a detail that is not essential to the identity of the issue (the irrelevant detail of exactly how many files the folder contains).
 
-> **NOTICE** Both descriptions contain variables, but the variable in the proper description (`$dir`) identifies an essential aspect of the finding: which folder has too many files. The variable in the improper description adds irrelevant noise.
+> **NOTICE** Both descriptions contain variables, but the variable in the good description (`$dir`) identifies an essential aspect of the finding: which folder has too many files. The variable in the improper description adds irrelevant noise.
 
 > **TIP** This matters because the signature, and therefore the suppression, of an issue depends on the description text remaining stable. Punctuation is discarded and spacing is normalized, but otherwise every character matters.
 
@@ -103,7 +100,7 @@ The wrapper that invokes your scripts will catch and report exceptions in detail
 
 ## Optional Features You Might Find Useful
 
-It's best to consider the extra guidelines on how to write [`built-in-healthtest-functions.md`](built-in-healthtest-functions.md).
+You may wish to consider the extra guidelines on how to write [`built-in-healthtest-functions.md`](built-in-healthtest-functions.md).
 
 There are also some specialized helper functions you may wish to use. See [`helpers-for-custom-ht.md`](helpers-for-custom-ht.md).
 
