@@ -1,31 +1,37 @@
 ﻿# Introduction
 
-**Get-ComputerHealth** is a **production-ready, lightweight, secure and extendable** PowerShell framework that **installs in a flash** and scans your server, workstation or fleet of domain servers for **more than a hundred health indicators** (both issues like low RAM, missing updates, disk errors, failed logins and configuration changes like a newly installed software, a TCP port that started listening, a host that stoped responding to pings or accepting connections). It produces **useful and concise reports, and email alerts**. You can easily add your own **custom health tests with plain PowerShell scripts**. 
+**Get-ComputerHealth** is a **production-ready, lightweight, secure, and extensible** PowerShell toolkit that **installs in a flash** and scans your server, workstation, or fleet of domain servers for **more than a hundred health indicators** (both issues like low RAM, missing updates, disk errors, and failed logins, and configuration changes like newly installed software, a TCP port that started listening, a host that stopped responding to pings, or a host that stopped accepting connections). It produces **useful and concise reports and email alerts**. You can easily add your own **custom health tests with plain PowerShell scripts**. 
 
-<img width="729" height="426" alt="image" src="https://github.com/user-attachments/assets/56ed5109-0f71-4f10-a7ba-2b0cf0e36669" />
+<img width="729" height="426" alt="Example of the report you receive via email"  src="https://github.com/user-attachments/assets/56ed5109-0f71-4f10-a7ba-2b0cf0e36669" />
 
-<img width="1086" height="251" alt="Example of the report you receive via email" src="https://github.com/user-attachments/assets/694eb16f-fbc9-420c-b96e-dead56715085" />
+# Status / Is this toolkit for you?
 
-# Status / Is this code for you?
-
-This is a **robust production-tested tool** and I have been using it across several domains and multiple servers for many months.
+This is a **robust production-tested toolkit** and I have been using it across several domains and multiple servers for many months.
 
 **BUT:**
 
  1. **Don't expect official support.** I am happy to help when I can, but my availability is limited. You should be comfortable with PowerShell.
  2. **I am currently the only user I know of**, so there is a chance I have some blind spots.
- 3. **There's a tiny chance of breaking changes.** I'll avoid it because I'll have to clean up issues at several production sites, but I *will do it* if the rewards worth to me. 
+ 3. **There's a tiny chance of breaking changes.** I'll avoid them because I'll have to clean up issues at several production sites, but I *will do it* if the rewards are worth it to me.
  4. **I have not tested it on domains with more than a few dozen servers or with DCs connected via WAN.** It is possible that certain domain-related tests could cause excessive WAN traffic. Test it while observing traffic (and I would be glad if you let me know the results).
 
- > On the plus side, in the unlikely event that you need to dive into the code, it is surprisingly small and straightforward: **the core is about 1,000 lines, including comments.** The code that creates html reports is quite heavy. The tests measure in excess of ten thousand lines, but most of them are a dozen or two dozen lines and a few are a few hundred lines. So any modern AI agent can easily understand and fix issues in the code. In fact, the vast majority of the code *was* written by Codex, with myself acting as the architect, lead developer, reviewer, and QC.
+ > On the plus side, in the unlikely event that you need to dive into the code, it is surprisingly small and straightforward: **the core is about 1,000 lines, including comments.** The code that creates HTML reports is quite heavy. The tests total more than ten thousand lines, but most of them are a dozen or two dozen lines, and a few are a few hundred lines. So any modern AI agent can easily understand and fix issues in the code. In fact, the vast majority of the code *was* written by Codex, with me acting as the architect, lead developer, reviewer, and QC.
+
+## Comparison to PRTG, Zabbix 
+
+**Pros**: you can get from “nothing installed” to “definitely useful daily Windows health findings” in a minute and adding custom tests is trivial.
+
+**Cons**: has none of these: central dashboards, long-term metrics, escalation policies, maintenance windows, topology, dependency modeling, real time monitoring and support for non-Windows systems.
+
+GetComputerHealth is intentionally smaller and Windows-admin focused. It includes out of the box many checks that Zabbix/PRTG can only reproduce through custom UserParameters, scripts, or purpose-built templates: AD/GPO consistency, DNS/DHCP configuration hygiene, local hardening baselines, pending reboot/VSS/WMI/driver checks, unexpected open ports/stopped services/newly installed software, and others.
 
 # Security
 
-By default the installer downloads and updates files from this GitHub repository every time you call any of the `Invoke-*.ps1` scripts. **You can disable automatic udpates** by setting `AutomaticUpdates = $false` in `./config/gch.psd1` or point the updater to a clone of this repo that you control by setting `RepoUrl`.
+By default, the installer downloads and updates files from this GitHub repository every time you call any of the `Invoke-*.ps1` scripts. You can point the updater to a clone of this repo that you control by setting `RepoUrl` in `./config/gch.psd1`, or or disable automatic updates by setting `AutomaticUpdates = $false`.
 
 This toolkit has **no external dependencies**.
 
-Besides installation, this code *should not change the state of the system in any way*. Consequently, auditing it with a modern AI agent is quite easy. 
+Besides installation, this code *should not change the state of the system in any way*. The code has been kept simple and clean in order to allow auditing it with a modern AI agent. 
 
 ---
 
@@ -35,12 +41,11 @@ Besides installation, this code *should not change the state of the system in an
 
 **To receive emails** with results/alerts, you need a mail server that permits unauthenticated delivery.
 
-**To centrally scan workstations**, you must be able to manage them with Remote PowerShell (running `Enter-PSSession WorkstationName` or `Invoke-Command WorkstationName` should work). Domain-joined servers are usually centrally managed with zero configuration.
+**To centrally scan workstations/servers**, you must be able to manage them with Remote PowerShell (i.e. running `Enter-PSSession ComputerName` or `Invoke-Command ComputerName` should work). Domain-joined servers are usually centrally managed with zero configuration.
 
 ## Super-simple customized install
 
-For a customized install, download just the installer/updater script and pass one `-Config` hashtable. The top-level `Options` branch controls installer behavior; the `ConfigFiles` branch writes configuration files under the install root's `config` folder.
-
+Customize and run this: 
 ```powershell
 Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/ndemou/GetComputerHealth/refs/heads/main/Update-GetHealthCode.ps1" -OutFile ".\Update-GetHealthCode.ps1"
 & .\Update-GetHealthCode.ps1 -Config @{
@@ -65,9 +70,8 @@ Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/ndemou/Get
 
 In the example above:
 
-* `Options.InstallDir` means the tool is installed into `C:\IT\GetComputerHealth\bin`, while configuration is written to `C:\IT\GetComputerHealth\config`.
 * Each child of `ConfigFiles` becomes one PowerShell data file in `config`. For example, `ConfigFiles['gch.psd1']` writes `C:\IT\GetComputerHealth\config\gch.psd1`.
-* Passing `AutomaticUpdates = $false` in `gch.psd1` disables future automatic updates, but it does not block the installation command that explicitly supplied `-Config`.
+* Passing `AutomaticUpdates = $false` in `gch.psd1` disables future automatic updates.
 
 If you prefer to edit a file instead of embedding a hashtable in the command, generate a template, customize it, and pass the path to `-Config`:
 
@@ -79,61 +83,19 @@ notepad .\GetComputerHealth-install-config.psd1
 ```
 
 
-## OPTION 1: Installation Plus a Quick Run
-
-* **Security Note:** Each time you run `Invoke-GetComputerHealth`, it will call `Update-GetHealthCode.ps1` and fetch code from this repository.
+## Quick Run
 
 Run these commands from an elevated PowerShell terminal:
 
 ```powershell
-# Create C:\IT\Get-ComputerHealth\bin and download the installer/updater script
-if (-not (Test-Path "C:\IT\Get-ComputerHealth\bin")) { 
-    New-Item -Path "C:\IT\Get-ComputerHealth\bin" -ItemType Directory -Force
-    Invoke-WebRequest -useb "https://raw.githubusercontent.com/ndemou/GetComputerHealth/refs/heads/main/Update-GetHealthCode.ps1" -OutFile "C:\IT\Get-ComputerHealth\bin\Update-GetHealthCode.ps1" 
-}
-
-# Download all other scripts
-C:\IT\Get-ComputerHealth\bin\Update-GetHealthCode.ps1 
-
-# Perform your first health test manually
 C:\IT\Get-ComputerHealth\bin\Invoke-GetComputerHealth.ps1
 ```
 
-> (You can change `C:\IT\Get-ComputerHealth` to any path you prefer.)
+## Automatic Daily Monitoring of One Computer
 
-## OPTION 2: Installation Plus Automatic Daily Monitoring of One Computer
-
-* **Security Note:** Each time you run `Invoke-GetComputerHealth`, it will call `Update-GetHealthCode.ps1` and fetch code from this repository.
-
-1. Copy the commands below into Notepad.
-2. Replace the **PLACEHOLDERS** at the top with your actual configuration.
-3. Run all commands from an elevated PowerShell terminal.
+Run these commands from an elevated PowerShell terminal:
 
 ```powershell
-#--------- CHANGE THIS PART ---------
-$mailServer="SMTP_SERVER.CONTOSO.COM"
-$fromAddress="SENDER@CONTOSO.COM"
-$toAddress="RECIPIENT@CONTOSO.COM"
-#------------------------------------
-
-# Create C:\IT\Get-ComputerHealth\bin and download the installer/updater script
-if (-not (Test-Path "C:\IT\Get-ComputerHealth\bin")) { 
-    New-Item -Path "C:\IT\Get-ComputerHealth\bin" -ItemType Directory -Force
-    Invoke-WebRequest -useb "https://raw.githubusercontent.com/ndemou/GetComputerHealth/refs/heads/main/Update-GetHealthCode.ps1" -OutFile "C:\IT\Get-ComputerHealth\bin\Update-GetHealthCode.ps1" 
-}
-
-# Download all other scripts & install required modules
-C:\IT\Get-ComputerHealth\bin\Update-GetHealthCode.ps1 
-
-# Setup email delivery
-@"
-{"Server":  "$mailServer",
-"From":  "$($env:COMPUTERNAME)+$fromAddress",
-"To":  "$toAddress",
-"Port":  25,
-"UseSsl":  false}
-"@ | Out-File "C:\IT\Get-ComputerHealth\config\Send-Message.conf" -Encoding utf8 -Force
-
 # Test email delivery
 C:\IT\Get-ComputerHealth\bin\Send-Message.ps1 -Subject "First test from $($env:COMPUTERNAME)" -ConfigFile "C:\IT\Get-ComputerHealth\config\Send-Message.conf" -Verbose
 
@@ -145,7 +107,7 @@ C:\IT\Get-ComputerHealth\bin\Invoke-GetComputerHealth.ps1
 New-ScheduledTaskForPSScript -ScriptPath "C:\IT\Get-ComputerHealth\bin\Invoke-GetComputerHealth.ps1" -ScheduleType Daily -Time 07:12
 ```
 
-## OPTION 3: Installation Plus Automatic Daily Monitoring of Multiple Domain-Joined Computers
+## Automatic Daily Monitoring of Multiple Domain-Joined Computers
 
 1. Follow the instructions for monitoring a single computer on the management machine (the controller).
 2. Copy the code below into your editor and fill in the proper values on the three lines under `CONFIGURATION`:
@@ -174,28 +136,6 @@ if (-not $NoUpdate) {
 
 # 2. Common Tasks
 
-## How to Manually Perform a Health Check for One Computer
-
-Open PowerShell as Administrator and run:
-
-```powershell
-C:\IT\Get-ComputerHealth\bin\Invoke-GetComputerHealth.ps1 -NoSend
-```
-
-> This scans the local machine, saves CLIXML data plus an interactive HTML report, and emails you any **notable** issues (i.e., Notices, Warnings, or Failures).
-
-For more fine-tuned control, try:
-```powershell
-$results = C:\IT\Get-ComputerHealth\bin\Get-ComputerHealth.ps1 -OutputConsoleMessages -OutputObjects -Hide DIP
-$results | ogv
-```
-
-> **Tips:**
-> * `-OutputConsoleMessages` generates the colorful output in your console.
-> * `-OutputObjects` is what populates `$results`.
-> * `-Hide DIP` hides **D**ebug, **I**nfo, and **P**ass messages from the console, showing only **N**otices, **W**arnings, **F**ailures, and **S**uppressed messages.
-> * Available options allow you to skip slow tests (`-SkipSlowTests`), skip non-essential tests (`-SkipNonEssentialTests`), exclude specific tests (`-ExcludeTests`), or run specific tests (`-OnlyTheseTests`). Autocomplete using `-` + `TAB` is your friend.
-
 ## How to Manually Perform a Domain Health Check
 
 Run `C:\IT\bin\Invoke-GetHealthDomainComputers.ps1`.
@@ -217,6 +157,19 @@ By default, the health tests will flag any deviation from a pristine Windows ins
 ## How to Add Custom Tests
 
 [Follow these instructions](./doc/how-to-add-custom-tests.md)
+
+## Tips for fine-tuned control
+
+```powershell
+$results = C:\IT\Get-ComputerHealth\bin\Get-ComputerHealth.ps1 -OutputConsoleMessages -OutputObjects -Hide DIP
+$results | ogv
+```
+
+> **Tips:**
+> * `-OutputConsoleMessages` generates the colorful output in your console.
+> * `-OutputObjects` is what populates `$results`.
+> * `-Hide DIP` hides **D**ebug, **I**nfo, and **P**ass messages from the console, showing only **N**otices, **W**arnings, **F**ailures, and **S**uppressed messages.
+> * Available options allow you to skip slow tests (`-SkipSlowTests`), skip non-essential tests (`-SkipNonEssentialTests`), exclude specific tests (`-ExcludeTests`), or run specific tests (`-OnlyTheseTests`). Autocomplete using `-` + `TAB` is your friend.
 
 ---
 
@@ -328,7 +281,7 @@ Note that if you only want to add a few custom tests, you do not need to modify 
 
 # 7. List of Available Tests
 
-(Run `Get-ComputerHealth.ps1 -ListAllBuiltInTests` to get an always up to date list.)
+(Run `Get-ComputerHealth.ps1 -ListAllBuiltInTests` to get an always up-to-date list.)
 
 | Name | Description |
 | --- | --- |
