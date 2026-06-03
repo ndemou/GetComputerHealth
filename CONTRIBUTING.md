@@ -2,7 +2,7 @@
 
 This project is intentionally small and script-first. Contributions should preserve that style: direct PowerShell, minimal abstraction, and behavior that is easy to debug on a real Windows machine.
 
-This guide is for contributors. If you want to add your own out-of-tree checks as a user, use [`doc/how-to-add-custom-tests.md`](./doc/how-to-add-custom-tests.md) instead.
+This guide is for contributors. If you want to add your own out-of-tree checks as a user, see [`doc/how-to-add-custom-tests.md`](./doc/how-to-add-custom-tests.md) instead.
 
 ## Environment
 

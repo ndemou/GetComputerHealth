@@ -3,15 +3,15 @@
 
 ## What is an On-Disk Format Migration
 
-Sometimes a new version, besides the expected changes of code in `.\bin`, needs to work with:
+Sometimes a new version needs more than the expected code changes in `.\bin`. It may also need to work with:
 
   * different file or directory names or different directory structure (e.g. moving a subfolder from one place to another)
   * different format for some file(s)
   * or a mixture of the above
 
-Examples: We decide to give a better name to a folder or file. We decide switch the format of a configuration file from plain-text to psd1 or json. 
+Examples: We decide to give a folder or file a better name. We decide to switch the format of a configuration file from plain text to PSD1 or JSON.
 
-In that case, we say that the *On-Disk Format* changes, and we invoke an *On-Disk Format Migration* script to perform the change in a controlled and safe manner.
+In that case, the *On-Disk Format* changes, and we invoke an *On-Disk Format Migration* script to perform the change in a controlled, safe manner.
 
 We keep track of the current "version" of the On-Disk Format by recording it in `data\disk-format.psd1`.
 
@@ -29,8 +29,8 @@ We keep track of the current "version" of the On-Disk Format by recording it in 
 ```
 
 The basic rules are these:
-  * When the On-Disk Format needs to change, we also increase the code's major version number and ofcourse both of the above (`CurrentDiskFormat`, `LatestCompatibleCodeVersion`).
-  * When the code's major version number needs to increase, but no change is required in the On-Disk Format, we only increment `LatestCompatibleCodeVersion`.
+  * When the On-Disk Format needs to change, we also increase the code's major version number and both values above (`CurrentDiskFormat`, `LatestCompatibleCodeVersion`).
+  * When the code's major version number needs to increase but the On-Disk Format does not need to change, we only increment `LatestCompatibleCodeVersion`.
 
 As a result `LatestCompatibleCodeVersion` is expected to be always aligned with the latest installed code release.
 
@@ -38,7 +38,7 @@ As a result `LatestCompatibleCodeVersion` is expected to be always aligned with 
 
 ## Migration Scripts & Migration Manifest
 
-Migration scripts are ps1 with this path and name `.\bin\disk-format-migrations\migrate-to-version-V.ps1` where `V` is the On-Disk Format version that will result if this migration script runs succesfully. 
+Migration scripts are ps1 files with this path and name: `.\bin\disk-format-migrations\migrate-to-version-V.ps1`. Here, `V` is the On-Disk Format version that will result if the migration script runs successfully.
 
 Migration scripts are invoked by the updater.
 
@@ -50,55 +50,55 @@ Migration scripts begin with this mandatory help-block:
 A short description of what the script does (the changes it performs on the On-Disk Format)
 
 .MANIFEST
-ModifiedTopFolders = temp, config 
+ModifiedTopFolders = temp, config
 # comma separated list of top folders (spaces are ignored)
 # 'bin' is always modified, so no need to include it
 NewTopFolders = foo
 ```
-Modified top folders means top-level installation folders such as `config`, `log`, etc. If a migration MAY modifie a folder itself or any file under it, that folder is considered modified.
+Modified top folders are top-level installation folders such as `config`, `log`, and similar folders. If a migration may modify a folder itself or any file under it, that folder is considered modified.
 
 Migration scripts must:
-  1. Optionally run one or more precondition tests. 
-    1.1. If the tests reveals that no action is needed the script must return with exit code 1 and emit the message "No migration is needed" as the last line in stdout.
-    1.2. If the tests reveals any problem the script must emit a message explaining the situation in stderr, emit "Migration failed" as the last stderr and return with exit code 2.
-    1.3. If the tests pass (or not tests are defined) code execution proceeds
+  1. Optionally run one or more precondition tests.
+    1.1. If the tests reveal that no action is needed, the script must return exit code 1 and emit the message "No migration is needed" as the last line in stdout.
+    1.2. If the tests reveal any problem, the script must emit a message explaining the situation in stderr, emit "Migration failed" as the last stderr line, and return exit code 2.
+    1.3. If the tests pass, or no tests are defined, code execution proceeds.
   2. Perform the migration
   3. Optionally perform a post-migration verification (throw on failure).
   4. Print this as the last line in stdout "PATH_TO_UPDATER=C:\some\path\to\Update-GetHealthCode.ps1" and return with exit code 0.
 
-The migration script is expected to generate verbose output on the actions it performs (this output is captured by a Start-Transcript controlled by the updaterd)
+The migration script is expected to generate verbose output about the actions it performs. This output is captured by a Start-Transcript controlled by the updater.
 
 ## Main Design
 
-The updater is responsible for invoking these scripts that perform On-Disk Format Migrations and making sure their output finds its way in the log file via Start-Transcript.
+The updater is responsible for invoking the scripts that perform On-Disk Format Migrations. It must also make sure their output reaches the log file via Start-Transcript.
 
 The updater must:
 
 1. acquire a mutex so that two updates (and migrations) can never overlap
-2. detect the source On-Disk Format version from `data\disk-format.psd1` -- if no such file exists it assumes CurrentDiskFormat = 4 and LatestCompatibleCodeVersion = 4.
+2. detect the source On-Disk Format version from `data\disk-format.psd1`. If no such file exists, assume CurrentDiskFormat = 4 and LatestCompatibleCodeVersion = 4.
 3. determine the target On-Disk Format version from the version of the zip file (`$versionToInstall`)
 4. Decide what to do:
   4.1. If the source On-Disk Format version already matches the target On-Disk Format version, no On-Disk Format Migration is needed.
   4.2. If the target On-Disk Format version is lower than the source On-Disk Format version, that is a format downgrade request and must throw.
   4.3. If the Code Version is lower than the currently installed Code Version, but the required On-Disk Format version is unchanged, that code downgrade is allowed. No On-Disk Format Migration is needed.
-  4.4. If the Code Version(CV) is higher than the Current On-Disk Format version (FV) then all migration scripts with version(V) such that `FV < V <= CV` must run in ascending order. For each one:
+  4.4. If the Code Version (CV) is higher than the Current On-Disk Format version (FV), all migration scripts with version (V) such that `FV < V <= CV` must run in ascending order. For each one:
     4.4.1. load the migration manifest from the script and set arrays: $ModifiedTopFolders and $NewTopFolders
     4.4.2. create backups for every modified top folder
     4.4.3. run the selected migrations
     4.4.4. If migration script throws or returns an exit code that reveals a failure:
        4.4.4.1. revert all modified top folders from backups ($ModifiedTopFolders)
        4.4.4.2. delete any new top folders introduced from the migration ($NewTopFolders)
-       4.4.4.3. buble up the exception
-    4.4.5. If all seem to have gonne well 
+       4.4.4.3. bubble up the exception
+    4.4.5. If everything appears to have gone well
        4.4.5.1. persist the final On-Disk Format version in `data\disk-format.psd1`.
        4.4.5.2. release the mutex
        4.4.5.3. execute the updater that is returned by the last migration script
 
-Migrations are not required to be adjacent. E.g. to go from disk format 3 to 11 you may need to run migrations 4,6,10 and 11(skipping versions 5,7,8,9 is normal because On-Disk Format is tied to the code's major version number, and not every major code version requires a migration).
+Migrations are not required to be adjacent. For example, to go from disk format 3 to 11, you may need to run migrations 4, 6, 10, and 11. Skipping versions 5, 7, 8, and 9 is normal because On-Disk Format is tied to the code's major version number, and not every major code version requires a migration.
 
-Backups must be logged. Backups older than 7 days must be deleted (updater does the cleanup). Backups are created inside the modified top folder and are named like `config\3-to-4.bak` (a backup of the contents of top folder `config` for a migration from version 3 to version 4). If an existing backup with the same name (i.e. same version transition) is found it is deleted.
+Backups must be logged. Backups older than 7 days must be deleted; the updater handles this cleanup. Backups are created inside the modified top folder and are named like `config\3-to-4.bak`. That example is a backup of the contents of top folder `config` for a migration from version 3 to version 4. If an existing backup with the same name, meaning the same version transition, is found, it is deleted.
 
-The updater must acquire the named OS mutex `Global\GetComputerHealth-DiskFormatMigration` within a reasonable timeout. 
+The updater must acquire the named OS mutex `Global\GetComputerHealth-DiskFormatMigration` within a reasonable timeout.
 
 The updater must print at least:
     1. the detected source format
@@ -116,7 +116,7 @@ Migration design should optimize for pragmatic robustness:
   * the ability to resume safely or abort safely
   * human readable logging
 
-The goal is not "revert everything at all costs." The goal is to make progress in small safe steps and leave the installation in a known, repairable, and well-logged state if something fails.
+The goal is not "revert everything at all costs." The goal is to make progress in small, safe steps and leave the installation in a known, repairable, well-logged state if something fails.
 
 ## Rules for Migration Implementations
 

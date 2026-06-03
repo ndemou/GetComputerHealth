@@ -1,7 +1,7 @@
 ﻿# TODO
 
 ## Option IpsOfAllDcs in gch.psd1
-The trick with `cache.IpsOfAllDcs.clixml` is a hack. I should incorporate it into gch.psd1. An on-disk format migration can take care of populating it if the file is found and removing the file. 
+The trick with `cache.IpsOfAllDcs.clixml` is a hack. I should incorporate it into gch.psd1. An on-disk format migration can populate the new setting if the file is found, and then remove the old file.
 
 Example `gch.psd1`:
 ```pwsh
@@ -17,31 +17,31 @@ Example `gch.psd1`:
 ```
 SendReports = "Auto" # "Never", "Always", "Auto"
 ```
-The default is "Auto" wich is the current behaviour (send when running in non-interactive session -- e.g. from a scheduled task--, don't send when run from an interactive one -- e.g. from the terminal)
+The default is "Auto", which matches the current behavior: send when running in a non-interactive session, such as from a scheduled task, and do not send when running from an interactive session, such as a terminal.
 
-## Send-Message.ps1 should support both a json and and a psd1 configuration file 
-Default is to prefer to read and to generate the psd1 configuration file (.\config\Send-Message.psd1).
+## Send-Message.ps1 should support both JSON and PSD1 configuration files
+By default, prefer reading and generating the PSD1 configuration file (.\config\Send-Message.psd1).
 
-We also want an On-Disk Format migration to accompany this change(see relevant dev documentation). The migration must convert any existing json configuration (.\config\Send-Message.conf) to psd1(.\config\Send-Message.psd1) and then delete .\config\Send-Message.conf. 
+This change should also include an On-Disk Format migration; see the relevant developer documentation. The migration must convert any existing JSON configuration (.\config\Send-Message.conf) to PSD1 (.\config\Send-Message.psd1), and then delete .\config\Send-Message.conf.
 
 ## New helper script CustomTests.ps1
 
-`CustomTests.ps1 -New "scriptName"` should a) create necessary folders if needed b) create a sample script `scriptName.ps1` and c) output the full path to the script. The sample code must be checking if disk C: has at least 10GB free space. Code must follow the recomendations of the documentation, including enough comments to help a user that has never created a custom health test before modify it for their needs. At the top it should include a link to the relevant documentation (how to add a custom health test).
+`CustomTests.ps1 -New "scriptName"` should: a) create the necessary folders if needed, b) create a sample script named `scriptName.ps1`, and c) output the full path to the script. The sample code should check whether disk C: has at least 10 GB free. It must follow the documentation recommendations and include enough comments to help a first-time custom health test author modify it for their needs. It should include a link to the relevant documentation at the top.
 
 `CustomTests.ps1 -List` should return a list of all scripts with custom health tests (file objects).
 
-`CustomTests.ps1 -Invoke ScriptFilenName.ps1` should be calling `Get-ComputerHealth.ps1 -Hide "" -OnlyTheseTests ScriptFilenName.ps1` with the options needed to invoke the specific custom test.
+`CustomTests.ps1 -Invoke ScriptFilenName.ps1` should call `Get-ComputerHealth.ps1 -Hide "" -OnlyTheseTests ScriptFilenName.ps1` with the options needed to invoke the specific custom test.
 
 Update our documentation with the above info.
 
 ## Avoid complex string expressions in Write-Warning
 
-You can get an overview of sus write-warning expressions with this command:
+You can get an overview of suspicious Write-Warning expressions with this command:
 ```
 (sls "write-warning" .\health-tests\*).line -replace '^.*write-warning', 'write-warning' -replace ' *} else(if)? {.*' -replace '; if [(].*' |sls 'write-warning .{76,}$' | sls '`n([" +]*)?(\$details|\$comment)(.{0,4})$' -NotMatch|%{$_.Line} | ?{$_.length -gt 100}
 ```
 
-After fixing anything it's better to check the resulting `git diff` from codex with this ChatGPT prompt: 
+After fixing anything, check the resulting `git diff` from Codex with this ChatGPT prompt:
 > Do any of the changes in this diff change what will be displayed by write-warning?
 
 ## Stop using legacy parameter set that adapts Pester 5 syntax to Pester 4 syntax
@@ -52,7 +52,7 @@ So that we don't get this warning: "You are using Legacy parameter set that adap
 
 ## New tests for CPU, GPU, Disks temperature
 
-Verify we don't allready have any of them
+Verify we don't already have any of them.
 
 -----------------------------------------
 
@@ -72,36 +72,36 @@ These are the functions:
   - HealthTest-LocalAdminsBaseline
   - HealthTest-InstalledRolesFeatures
 
-Phase 1) 
-Add the "Policy" Tag to these functions. Also all these tests should not emit [Failure] for finding services,shares,admins or roles respectively but only for other serious failures. E.g. "[failure] Unintended role/feature installed" should become "[warning] Unintended role/feature installed"
+Phase 1)
+Add the "Policy" tag to these functions. These tests should not emit [Failure] when they find services, shares, admins, or roles. They should use [Failure] only for other serious failures. For example, "[failure] Unintended role/feature installed" should become "[warning] Unintended role/feature installed".
 
-Phase 2) 
-For these functions: remove any exceptions for findings that are currently ignored as benign (e.g. Microsoft services, default shares, etc).
-So after this change all services are to be reported (including Microsoft ones), and all shares (including default ones) and all administrators and all roles.
-Thus we also need to adjust the function names accordingly: NonMicrosoftServices -> Services; NonDefaultShares -> Shares
+Phase 2)
+For these functions, remove any exceptions for findings that are currently ignored as benign, such as Microsoft services or default shares.
+After this change, all services should be reported, including Microsoft ones. All shares, including default ones, all administrators, and all roles should also be reported.
+Adjust the function names accordingly: NonMicrosoftServices -> Services; NonDefaultShares -> Shares.
 
 ## Enhance -AddWhitelisting with reason
 
 Current interface:
-```powershell
+```powershelll
 Get-ComputerHealth.ps1 -AddWhitelisting -until 2026-06-15 -ComputerName WEB1 -sig '50636e99' -Comment "failure - TCP port 636(LDAPS) unreachable on dc02.mazars-gr.local"
 ```
 New interface (note the change of -Comment to -Message and the extra `-Reason` which is an optional parameter)
-```powershell
+```powershelll
 Get-ComputerHealth.ps1 -AddWhitelisting -until 2026-06-15 -ComputerName WEB1 -sig '50636e99' -Message "failure - TCP port 636(LDAPS) unreachable on dc02.mazars-gr.local" -Reason "Networking team will open the traffic soon"
 ```
 
-Fix the code that generates the `CommandToSuppressMsg` excel column. Excel should contain a `-Reason "NO_REASON_ENTERED"` so that it's easy for the operator to enter a reason if they want to. 
+Fix the code that generates the `CommandToSuppressMsg` Excel column. Excel should contain a `-Reason "NO_REASON_ENTERED"` placeholder so that the operator can easily enter a reason.
 
-Also describe this usage scenario in the README: Operator gets an email with notable messages. They open the excel, and observe the findings. If they want to suppress a finding they execute the contents of `CommandToSuppressMsg` column (and optionaly changing the `-Reason` and/or `-until`). 
+Also describe this usage scenario in the README: The operator receives an email with notable messages, opens the Excel file, and reviews the findings. If they want to suppress a finding, they execute the contents of the `CommandToSuppressMsg` column, optionally changing `-Reason` and/or `-until`.
 
-It would be really usefull to include the reason of suppression in the findings that are reported to the operator and saved to disk. It will also be usefull if they include the `-Until` date (date until which they are suppressed)
+It would be useful to include the suppression reason in the findings that are reported to the operator and saved to disk. It would also be useful to include the `-Until` date, which is the date until which the finding is suppressed.
 
 ## New format for Get-ComputerHealth.sigs-to-suppress.txt
 
 Must use clixml for the configuration/state file of Get-ComputerHealth.
 
-```powershell
+```powershelll
 $ConfigAndState = @{
     'POLICY_TEST_WAS_RUN' = @{
         'InstalledSW' = [pscustomobject]@{
@@ -159,10 +159,10 @@ In order to not break existing systems, we need an On-Disk Format migration(see 
 
 ## New feature: "*Required* Findings"
 
-I want a test that verifies a TCP port is indeed open (This is often a very important indicator of "everything's good"). 
+I want a test that verifies a TCP port is indeed open. This is often a very important indicator that "everything is good."
 
 Imagine this rule in `Get-ComputerHealth.conf`:
-```powershel
+```powershell
 'REQUIRED_FINDING' = @{
        'UnexpectedListeningPorts' = [pscustomobject]@{
         'bfc162fa' = [pscustomobject]@{
@@ -172,20 +172,20 @@ Imagine this rule in `Get-ComputerHealth.conf`:
         }
 }
 ```
-Rules like this are loaded at the start of the program. When the specified HealthTest function(`UnexpectedListeningPorts`) is executed all the finding signatures it emits are recorded. If they don't include the REQUIRED signature a failure is emitted: `[failure] This finding that must appear in a healthy system did not: Computer is listening to port 443`. If the function is not executed nothing happens.
+Rules like this are loaded at the start of the program. When the specified HealthTest function (`UnexpectedListeningPorts`) runs, all finding signatures it emits are recorded. If they do not include the REQUIRED signature, a failure is emitted: `[failure] This finding that must appear in a healthy system did not: Computer is listening to port 443`. If the function is not executed, nothing happens.
 
-Also implement new option `-SetAsRequired` so the user can mark a finding as required. Similar to `AddWhiteList`. Example: 
+Also implement a new `-SetAsRequired` option so the user can mark a finding as required. It is similar to `AddWhiteList`. Example:
 ```
-Get-ComputerHealth.ps1 -SetAsRequired -Test 'UnexpectedListeningPorts' -Signature '12345678' -Comment 'Listening port 443' -ComputerName 'Server1' 
+Get-ComputerHealth.ps1 -SetAsRequired -Test 'UnexpectedListeningPorts' -Signature '12345678' -Comment 'Listening port 443' -ComputerName 'Server1'
 ```
 
-This functionality will be very useful for ports, installed SW, services and roles.
+This functionality will be very useful for ports, installed software, services, and roles.
 
 ## Find redundant health tests
 
-Do a quick first pass to group health tests in clusters of tests that seem like they might be checking the same stuff.
+Do a quick first pass to group health tests into clusters that seem to check the same things.
 
-The check each cluster thinking: “which tests are merely different views of the same fact” vs “which tests detect a genuinely different failure mode”. Then combine tests that are merely different views of the same fact.
+Then check each cluster by asking: “Which tests are merely different views of the same fact?” and “Which tests detect a genuinely different failure mode?” Combine tests that are merely different views of the same fact.
 
 ### First-pass clusters and combine candidates
 
@@ -266,19 +266,19 @@ Windows failed to apply the MDM Policy settings. MDM Policy settings might have 
 ---end of diagnostic output---
 ```
 
-Notice that the diagnostic output collected from dcdiag  is a very long string of repeating sentences. We can manipulate it to make it much more succinct by following these steps:
- - Split lines(sentences) on anything that looks like a "word. " or "word.) " or "word; " (e.g. with something like `$output -replace '(([a-z]{2,30})(;|[.][)]?)) +','$1\r\n'`)
+Notice that the diagnostic output collected from dcdiag is a very long string of repeating sentences. We can make it much more succinct with these steps:
+ - Split lines (sentences) on anything that looks like "word. ", "word.) ", or "word; ". For example: `$output -replace '(([a-z]{2,30})(;|[.][)]?)) +','$1\r\n'`
  - Keep the first 50 lines
- - Remove duplicate lines(sentences)
- - Join all lines again in one
+ - Remove duplicate lines (sentences)
+ - Join all lines back into one line
  - If more than 2000 characters, keep the first 1997 suffixed with "...".
 
-For example, the above diagnostic output will become: 
+For example, the diagnostic output above will become:
 ```
 Windows failed to apply the MDM Policy settings. MDM Policy settings might have its own log file. Please click on the "More information" link. An error event occurred. EventID: 0x80000013
 ```
 
-For the moment I only noticed a need for this post-processing on the output of dcdiag but it's best to have separate function for this post-processing.
+So far, I have only noticed a need for this post-processing on dcdiag output, but it is best to create a separate function for this post-processing.
 
 ## Use the new installer (~\dev\TI)
 
@@ -295,14 +295,14 @@ See also : .\tests\script-analysis.ps1
 
   - HealthTest-EnabledScheduledTasks: I should include a hash of the action and the file(s) it runs
 
-  - I could be monitoring the CPU and memory pressure *while* running all/most 
-    other tests. This has pros and cons so I can make it a separate check 
+  - I could be monitoring the CPU and memory pressure *while* running all/most
+    other tests. This has pros and cons so I can make it a separate check
     (e.g. some tests *do* stress the CPU (maybe RAM also).
 
   - Also measure CPU, board temperature.
 
   - `-AddWhitelisting` should be deleting any existing line for the signature.
-    Note that even without this fix, everything works as it should 
+    Note that even without this fix, everything works as it should
     (because the last config line wins), but it's confusing to have
     conflicting lines.
 
@@ -311,11 +311,11 @@ See also : .\tests\script-analysis.ps1
          -Arg1 test,foo,bar             --> @("test","foo","bar")
          -Arg1 test -Arg1 foo -Arg1 bar --> @("test","foo","bar")
          -Arg1 @("test","foo","bar")    --> @("test","foo","bar")
-         -Arg1 "test,foo,bar"           --> "test,foo,bar" 
-         -Arg1 "test foo bar"           --> "test foo bar" 
-    If I don't expect the values to have spaces or commas I could fix the last 2 cases manually
+         -Arg1 "test,foo,bar"           --> "test,foo,bar"
+         -Arg1 "test foo bar"           --> "test foo bar"
+    If I do not expect the values to contain spaces or commas, I could fix the last two cases manually.
 
-  - `Start-HealthTestVeeamRecentBackupsExist` expects to read a text in clear text from a file. Maybe use credentials manager (note that credentials manager stores passwords per user which complicates stuff -- you run it from your account and works, run from SYSTEM and doesn't)
+  - `Start-HealthTestVeeamRecentBackupsExist` expects to read clear-text data from a file. Maybe use Credential Manager. Note that Credential Manager stores passwords per user, which complicates things: it may work from your account but not from SYSTEM.
 
 ## Some tests that have Scope: Domain should ideally be executed on one DC
 
@@ -342,7 +342,7 @@ Impact: Medium(Time)
 Uses: Get-ProcessMitigation.
 FalsePositives: None.
 
-TODO: Check all protections not just the 3 below. Get-ProcessMitigation -System 
+TODO: Check all protections not just the 3 below. Get-ProcessMitigation -System
 TODO: What are the popular defaults?
 #>
     if (-not (Get-Command Get-ProcessMitigation -ErrorAction SilentlyContinue)) { Write-Warning "[notice] Exploit Protection cmdlets unavailable"; return }
@@ -639,7 +639,7 @@ function HealthTest-OrphanedHyperVFiles {
 ```
 
 ## HealthTest-SysvolContentConsistency
-The function HealthTest-SysvolContentConsistency calculates the size and file count of the entire `\\SYSVOL\...\Policies` tree across **all** Domain Controllers over the network. In a production environment with branch offices or many GPOs, this is dangerous. It generates massive WAN traffic. Since Health Tests are already running on every single DC you could in theory compute the hashes locally on each DC (and compute real hashes instead of the pseudo sigs that this function computes) and then exchange and compare them. This will be super fast even over WAN.
+The function HealthTest-SysvolContentConsistency calculates the size and file count of the entire `\\SYSVOL\...\Policies` tree across **all** domain controllers over the network. In a production environment with branch offices or many GPOs, this is dangerous because it can generate massive WAN traffic. Since health tests already run on every DC, we could compute hashes locally on each DC, using real hashes instead of the pseudo signatures this function computes. We could then exchange and compare those hashes. This should be very fast, even over WAN.
 
 
 ## Look at these Gemini suggestions
@@ -647,11 +647,11 @@ The function HealthTest-SysvolContentConsistency calculates the size and file co
 ### 1. Minor Logical Errors (`Test-NetConnectionFast` & `TimeSync`)
 
 **A. `Test-NetConnectionFast` (DNS ordering bug)**
-The original code fetches all IP addresses and arbitrarily picks the first one or filters clumsily. If a host has IPv6 but the network doesn't route it, the test fails even if IPv4 works.
+The original code fetches all IP addresses and arbitrarily picks the first one, or filters them clumsily. If a host has IPv6 but the network does not route it, the test fails even if IPv4 works.
 
 **The Fix: Enforce IPv4 and Registry-Based Time Checks**
 
-```powershell
+```powershelll
     # Inside Test-NetConnectionFast process block:
     try {
         # Force IPv4 resolution to match your "IPv4 only is acceptable" requirement
@@ -669,13 +669,13 @@ The original code fetches all IP addresses and arbitrarily picks the first one o
 ```
 
 **B. `HealthTest-TimeSyncPolicy` (Localization bug)**
-The check `$currentTimeSource -eq 'Local CMOS Clock'` fails on non-English Windows (e.g., "Lokale CMOS-Uhr").
+The check `$currentTimeSource -eq 'Local CMOS Clock'` fails on non-English Windows, such as "Lokale CMOS-Uhr".
 
 **Suggestion:** Instead of parsing the localized text output of `w32tm /query /source`, check the **Registry** configuration, which is language-neutral.
 
 **The Fix: **
 
-```powershell
+```powershelll
     # Replace the text comparison with a check on the configuration type
     $w32Param = Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Services\W32Time\Parameters'
     $isNt5Ds  = $w32Param.Type -eq 'NT5DS'
@@ -692,13 +692,13 @@ The check `$currentTimeSource -eq 'Local CMOS Clock'` fails on non-English Windo
 
 ### 2: False Positives in Driver Signing
 
-`Win32_PnPSignedDriver` and `Get-AuthenticodeSignature` are unreliable for modern drivers because they often look for an embedded signature in the `.sys` file. Many valid Microsoft/Intel/Realtek drivers are unsigned binary files whose signature lives in an external `.cat` (Catalog) file.
+`Win32_PnPSignedDriver` and `Get-AuthenticodeSignature` are unreliable for modern drivers because they often look for an embedded signature in the `.sys` file. Many valid Microsoft, Intel, and Realtek driver binaries are unsigned because their signatures live in external `.cat` catalog files.
 
-**Suggestion:** Use the `Get-AppLockerFileInformation` cmdlet (available on most modern Windows versions) to check signatures. It is "Catalog-aware" and will correctly identify a file as signed even if the signature is external.
+**Suggestion:** Use the `Get-AppLockerFileInformation` cmdlet, available on most modern Windows versions, to check signatures. It is catalog-aware and will correctly identify a file as signed even if the signature is external.
 
 **Modified Code (`HealthTest-UnsignedDrivers`):**
 
-```powershell
+```powershelll
     # Inside the loop where you have the driver path ($sysPath):
 
     # 1. Try standard Authenticode (fastest)

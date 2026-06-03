@@ -1,4 +1,4 @@
-﻿## Built in HealthTest- functions
+﻿## Built-in HealthTest functions
 
 *(Information for developers only)*
 
@@ -11,10 +11,10 @@
   Write-Warning "[LEVEL] Description of the issue"
   Write-Warning ("[LEVEL] Description of the issue" + "`n" + $details)
   ```
-  Where `LEVEL` is one of `PASS`, `INFO`, `NOTICE`, `WARNING`, or `FAILURE`; More info on [`how-to-add-custom-tests.md`](how-to-add-custom-tests.md).
+  Where `LEVEL` is one of `PASS`, `INFO`, `NOTICE`, `WARNING`, or `FAILURE`. See [`how-to-add-custom-tests.md`](how-to-add-custom-tests.md) for more information.
 - Be explicit about scope and prerequisites.
   If a test only applies to DCs, domain-joined machines, laptops, and so on, use the special fields in the top-level help block. If they don't cover your situation, short-circuit early.
-- Catch exceptions only when you can recover or downgrade cleanly, Otherwise you should do nothing because the framework that invokes the functions catches exceptions, reports them, and aborts execution of the rest of the HealthTest code. A typical example where you need to handle exceptions is when you you are iterating over a list making some test on each item and you don't want an exception in one item to cause skipping all others.
+- Catch exceptions only when you can recover or downgrade cleanly. Otherwise, do nothing because the framework that invokes the functions catches exceptions, reports them, and aborts the rest of the HealthTest code. A typical example is iterating over a list and testing each item, where you do not want an exception for one item to skip all the others.
 
 ### Function Shape
 
@@ -38,7 +38,7 @@ Uses: Get-ChildItem.
 }
 ```
 
-The function **must** include the top level help block immediately after the opening `{` and it must have standardized `field: value` lines.
+The function **must** include the top-level help block immediately after the opening `{`, and it must use standardized `field: value` lines.
 
 The `Field: Value` lines follow this exact order (note that some are optional):
    1. `Description:` What kind of issues it detects or what findings it uncovers (160 chars max).
@@ -46,10 +46,10 @@ The `Field: Value` lines follow this exact order (note that some are optional):
       `Hyper-V` is accepted as an alias spelling for `HyperV`, but use `HyperV` in new help blocks for consistency.
    3. `Scope:`. Options are `Computer`, `Domain`, `Forest`
    4. `Category:` primary plus optional secondary category. Options are: `Availability/Server Down Signals`,`Security & Stability Risks`,`Configuration Hygiene & Best Practices`,`Audit/Compliance/Informational`
-   5. `Impact:` either "low" if there's low impact on all dimensions, or one or more "<level>(<dimension>)" pairs where <lever> is either "Medium" or "High" and  dimension is one of "CPU","Disk","Network","RAM","Time"
+   5. `Impact:` either "low" when all dimensions have low impact, or one or more "<level>(<dimension>)" pairs. In those pairs, <level> is either "Medium" or "High", and <dimension> is one of "CPU", "Disk", "Network", "RAM", or "Time".
    6. `Tags:` optional comma-separated values. Supported values: `Essential`, `Policy`, `Suppressed`.
    7. `Uses:` optional, up to three essential external cmdlets or executables if any.
-   8. `FalsePositives:` optional short note only if False Positives are to be expected
+   8. `FalsePositives:` optional short note, only if false positives are expected.
 
 ### About the Tags field
 
@@ -64,7 +64,7 @@ Supported tags:
 
 ### Slow tests
 
-If your test needs more than 3secs to complete, indicate it in the Impact field (`Impact: ... High(Time)`). 
+If your test needs more than 3 seconds to complete, indicate that in the Impact field (`Impact: ... High(Time)`).
 `-SkipSlowTests` uses that marker.
 
 ### Suppressed Inventory Tests
@@ -75,7 +75,7 @@ Use `Suppressed` only when every message from the test is expected inventory dat
 
 ### Policy Inventory Tests
 
-Tests with the `Policy` tag are those that inventory a system aspect where the initial controlled state is accepted as a baseline. For example the Open ports, installed software and enabled services after a clean installation of a server.
+Tests with the `Policy` tag inventory a system aspect where the initial controlled state is accepted as a baseline. For example, this can cover open ports, installed software, and enabled services after a clean server installation.
 
 Policy Health tests have special handling:
 - The first run automatically suppresses `[WARNING]` and `[NOTICE]` findings from that policy test (except if `-DontAutosetPolicy` is used)
