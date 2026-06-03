@@ -2,6 +2,26 @@
 Helper functions for Custom Health Tests
 #>
 
+
+function Read-JsonFile {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path,
+
+        [Parameter()]
+        [string]$Encoding = 'UTF8'
+    )
+
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { return $null }
+
+    $raw = Get-Content -LiteralPath $Path -Raw -Encoding $Encoding
+
+    if ([string]::IsNullOrWhiteSpace($raw)) { return $null }
+
+    $raw | ConvertFrom-Json
+}
+
+
 function Start-HealthTestVeeamRecentConfigBackupsExist{
 <#
 .SYNOPSIS
