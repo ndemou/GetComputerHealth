@@ -78,7 +78,7 @@ $details = "More details" + "`n" + "Even in multiple lines" + "`n" + "Up to 32K 
 Write-Warning ("[NOTICE] <A single terse line that uniquely describes the issue>" + "`n" + $details)
 ```
 
-**An important detail**: A good issue description should not change when the *essence* of the issue does not change. There is no restriction for the optional `$details`.
+**An important detail**: A good issue description should not change when the *essence* of the issue does not change. The optional `$details` value has no such restriction.
 
 For example, suppose you want to flag folders with too many files. Consider these two descriptions:
 
@@ -87,16 +87,16 @@ For example, suppose you want to flag folders with too many files. Consider thes
 "Directory $dir has $FilesCount items"            # bad description
 ```
 
-Folder `C:\foo` having 1002 files is essentially the same issue as `C:\foo` having 1003 files, so both situations should produce the same description string.
-The second version is not good because it varies with a detail that is not essential to the identity of the issue (the irrelevant detail of exactly how many files the folder contains).
+Folder `C:\foo` having 1002 files is essentially the same issue as `C:\foo` having 1003 files. Both situations should therefore produce the same description string.
+The second version is not good because it varies with a detail that is not essential to the identity of the issue: exactly how many files the folder contains.
 
 > **NOTICE** Both descriptions contain variables, but the variable in the good description (`$dir`) identifies an essential aspect of the finding: which folder has too many files. The variable in the improper description adds irrelevant noise.
 
-> **TIP** This matters because the signature, and therefore the suppression, of an issue depends on the description text remaining stable. Punctuation is discarded and spacing is normalized, but otherwise every character matters.
+> **TIP** This matters because an issue's signature, and therefore its suppression, depends on stable description text. Punctuation is discarded and spacing is normalized, but otherwise every character matters.
 
 ## When to Handle Exceptions
 
-The wrapper that invokes your scripts will catch and report exceptions in detail. It will then continue with the next script. So, you don't need to catch excpetions if a) you are going to abort execution anyway and b) you are not going to collect any more information than what is included in the exception itself.
+The wrapper that invokes your scripts will catch and report exceptions in detail. It will then continue with the next script. Therefore, you do not need to catch exceptions if you are going to abort execution anyway and will not collect more information than the exception already provides.
 
 ## Optional Features You Might Find Useful
 
@@ -106,7 +106,7 @@ There are also some specialized helper functions you may wish to use. See [`help
 
 # Instructions for LLMs Helping a Novice Write a Custom Test
 
-First, ask your human to run these commands on the computer where they are writing the test. The output will help you understand the current situation: do the expected folders exist, and are there already any custom tests?
+First, ask your human to run these commands on the computer where they are writing the test. The output will help you understand whether the expected folders exist and whether any custom tests already exist.
 
 ```powershell
 Test-Path C:\IT\GetComputerHealth\ # must exist
@@ -117,7 +117,7 @@ if (Test-Path C:\IT\GetComputerHealth\config\Custom-HealthTests\) { ls C:\IT\Get
 
 Then ask your human to describe the test they want to implement and choose an appropriate file name that is not already used.
 
-Write the code for the requested test and give your human step-by-step instructions for adding it: `notepad C:\IT\GetComputerHealth\config\Custom-HealthTests\<a nice name not already existing>.ps1`
+Write the code for the requested test and give your human step-by-step instructions for adding it. For example: `notepad C:\IT\GetComputerHealth\config\Custom-HealthTests\<a nice name not already existing>.ps1`
 
 Ask the user to execute it and verify it works. (See notes below.)
 
@@ -128,7 +128,7 @@ Ask the user to execute it and verify it works. (See notes below.)
 # WARNING: [PASS] All is cool!
 ```
 
-> The `WARNING:` prefix is a sideeffect of the fact that all messages are output by Write-Warning (`[PASS]`, `[NOTICE]`, and everything else).
+> The `WARNING:` prefix is a side effect of outputting all messages with Write-Warning (`[PASS]`, `[NOTICE]`, and everything else).
 
 OR
 

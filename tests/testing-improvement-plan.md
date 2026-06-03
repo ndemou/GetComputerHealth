@@ -1,10 +1,10 @@
 ﻿# Test Improvement Plan
 
-This repo does not need a full testing framework migration right now. The current script-based approach is acceptable, but a few small changes would make it materially better in reliability, maintainability, diagnostics, and day-to-day usage.
+This repo does not need a full testing framework migration right now. The current script-based approach is acceptable. However, a few small changes would materially improve reliability, maintainability, diagnostics, and day-to-day usage.
 
 ## Goal
 
-Keep the current "run PowerShell scripts directly" model, but make failures easier to trust, easier to debug, and less dependent on one specific machine state.
+Keep the current "run PowerShell scripts directly" model. Make failures easier to trust, easier to debug, and less dependent on one specific machine state.
 
 ## Phase 1: Make Test Results More Consistent
 

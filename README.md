@@ -1,6 +1,10 @@
 ﻿# Introduction
 
-**Get-ComputerHealth** is a **production-ready, lightweight, secure, and extensible** PowerShell toolkit that **installs in a flash** and scans your server, workstation, or fleet of domain servers for **more than a hundred health indicators** (both issues like low RAM, missing updates, disk errors, and failed logins, and configuration changes like newly installed software, a TCP port that started listening, a host that stopped responding to pings, or a host that stopped accepting connections). It produces **useful and concise reports and email alerts**. You can easily add your own **custom health tests with plain PowerShell scripts**. 
+**Get-ComputerHealth** is a **production-ready, lightweight, secure, and extensible** PowerShell toolkit that **installs in a flash**. It scans your server, workstation, or fleet of domain servers for **more than a hundred health indicators**.
+
+These include issues such as low RAM, missing updates, disk errors, and failed logins. They also include configuration changes, such as newly installed software, a TCP port that started listening, a host that stopped responding to pings, or a host that stopped accepting connections.
+
+It produces **useful, concise reports and email alerts**. You can also add your own **custom health tests with plain PowerShell scripts**.
 
 <img width="729" height="426" alt="Example of the report you receive via email"  src="https://github.com/user-attachments/assets/56ed5109-0f71-4f10-a7ba-2b0cf0e36669" />
 
@@ -12,26 +16,30 @@ This is a **robust production-tested toolkit** and I have been using it across s
 
  1. **Don't expect official support.** I am happy to help when I can, but my availability is limited. You should be comfortable with PowerShell.
  2. **I am currently the only user I know of**, so there is a chance I have some blind spots.
- 3. **There's a tiny chance of breaking changes.** I'll avoid them because I'll have to clean up issues at several production sites, but I *will do it* if the rewards are worth it to me.
- 4. **I have not tested it on domains with more than a few dozen servers or with DCs connected via WAN.** It is possible that certain domain-related tests could cause excessive WAN traffic. Test it while observing traffic (and I would be glad if you let me know the results).
+ 3. **There's a tiny chance of breaking changes.** I'll avoid them because I would have to clean up issues at several production sites. However, I *will do it* if the benefits are worth it to me.
+ 4. **I have not tested it on domains with more than a few dozen servers, or with DCs connected via WAN.** Some domain-related tests could cause excessive WAN traffic. Test while observing traffic. I would be glad to hear the results.
 
- > On the plus side, in the unlikely event that you need to dive into the code, it is surprisingly small and straightforward: **the core is about 1,000 lines, including comments.** The code that creates HTML reports is quite heavy. The tests total more than ten thousand lines, but most of them are a dozen or two dozen lines, and a few are a few hundred lines. So any modern AI agent can easily understand and fix issues in the code. In fact, the vast majority of the code *was* written by Codex, with me acting as the architect, lead developer, reviewer, and QC.
+ > On the plus side, if you ever need to dive into the code, it is surprisingly small and straightforward: **the core is about 1,000 lines, including comments.** The HTML report code is heavier. The tests total more than ten thousand lines, but most are only a dozen or two dozen lines. Only a few are a few hundred lines. Any modern AI agent can understand and fix issues in this codebase. In fact, the vast majority of the code *was* written by Codex, with me acting as the architect, lead developer, reviewer, and QC.
 
-## Comparison to PRTG, Zabbix 
+## Comparison to PRTG, Zabbix
 
-**Pros**: you can get from “nothing installed” to “definitely useful daily Windows health findings” in a minute and adding custom tests is trivial.
+**Pros**: you can get from “nothing installed” to “definitely useful daily Windows health findings” in a minute, and adding custom tests is trivial.
 
-**Cons**: has none of these: central dashboards, long-term metrics, escalation policies, maintenance windows, topology, dependency modeling, real time monitoring and support for non-Windows systems.
+**Cons**: it does not provide central dashboards, long-term metrics, escalation policies, maintenance windows, topology, dependency modeling, real-time monitoring, or support for non-Windows systems.
 
-GetComputerHealth is intentionally smaller and Windows-admin focused. It includes out of the box many checks that Zabbix/PRTG can only reproduce through custom UserParameters, scripts, or purpose-built templates: AD/GPO consistency, DNS/DHCP configuration hygiene, local hardening baselines, pending reboot/VSS/WMI/driver checks, unexpected open ports/stopped services/newly installed software, and others.
+GetComputerHealth is intentionally smaller and focused on Windows administration. Out of the box, it includes many checks that Zabbix or PRTG can only reproduce through custom UserParameters, scripts, or purpose-built templates.
+
+Examples include AD/GPO consistency, DNS/DHCP configuration hygiene, local hardening baselines, pending reboot/VSS/WMI/driver checks, unexpected open ports, stopped services, newly installed software, and others.
 
 # Security
 
-By default, the installer downloads and updates files from this GitHub repository every time you call any of the `Invoke-*.ps1` scripts. You can point the updater to a clone of this repo that you control by setting `RepoUrl` in `./config/gch.psd1`, or or disable automatic updates by setting `AutomaticUpdates = $false`.
+By default, the installer downloads and updates files from this GitHub repository every time you call any of the `Invoke-*.ps1` scripts. You can point the updater to a clone of this repo that you control by setting `RepoUrl` in `./config/gch.psd1`.
+
+You can also disable automatic updates by setting `AutomaticUpdates = $false`.
 
 This toolkit has **no external dependencies**.
 
-Besides installation, this code *should not change the state of the system in any way*. The code has been kept simple and clean in order to allow auditing it with a modern AI agent. 
+Aside from installation, this code *should not change the state of the system in any way*. The code is intentionally simple and clean so it can be audited with a modern AI agent.
 
 ---
 
@@ -41,11 +49,11 @@ Besides installation, this code *should not change the state of the system in an
 
 **To receive emails** with results/alerts, you need a mail server that permits unauthenticated delivery.
 
-**To centrally scan workstations/servers**, you must be able to manage them with Remote PowerShell (i.e. running `Enter-PSSession ComputerName` or `Invoke-Command ComputerName` should work). Domain-joined servers are usually centrally managed with zero configuration.
+**To centrally scan workstations or servers**, you must be able to manage them with Remote PowerShell. For example, running `Enter-PSSession ComputerName` or `Invoke-Command ComputerName` should work. Domain-joined servers are usually centrally managed with zero configuration.
 
 ## Super-simple customized install
 
-Customize and run this: 
+Customize and run this:
 ```powershell
 Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/ndemou/GetComputerHealth/refs/heads/main/Update-GetHealthCode.ps1" -OutFile ".\Update-GetHealthCode.ps1"
 & .\Update-GetHealthCode.ps1 -Config @{
@@ -130,7 +138,7 @@ if (-not $NoUpdate) {
 ```
 
 3. Save it as `C:\IT\bin\Invoke-GetHealthDomainComputers.ps1`.
-4. Edit the scheduled task to execute this script instead of `C:\IT\Get-ComputerHealth\bin\Invoke-GetComputerHealth.ps1`. 
+4. Edit the scheduled task to execute this script instead of `C:\IT\Get-ComputerHealth\bin\Invoke-GetComputerHealth.ps1`.
 
 ---
 
@@ -146,9 +154,9 @@ Run `C:\IT\bin\Invoke-GetHealthDomainComputers.ps1`.
 
 ## How to Suppress a False Positive (Permitlisting)
 
-By default, the health tests will flag any deviation from a pristine Windows installation (e.g., a custom service, an extra member in the Administrators group, or an additional listening TCP port). If this is expected, you should permitlist it.
+By default, health tests flag any deviation from a pristine Windows installation. Examples include a custom service, an extra member in the Administrators group, or an additional listening TCP port. If the finding is expected, permitlist it.
 
-1. **Identify the permitlisting command:** Open the generated HTML report or import the matching CLIXML file. Every message includes the exact command needed to permitlist that entry.
+1. **Identify the permitlisting command:** Open the generated HTML report or import the matching CLIXML file. Every message includes the exact command needed to permitlist it.
 2. **Apply the permitlist:** Run that command on the **target machine** (or via Remote PowerShell).
 
 > **Tip:** You can also permitlist findings manually:
@@ -169,13 +177,13 @@ $results | ogv
 > * `-OutputConsoleMessages` generates the colorful output in your console.
 > * `-OutputObjects` is what populates `$results`.
 > * `-Hide DIP` hides **D**ebug, **I**nfo, and **P**ass messages from the console, showing only **N**otices, **W**arnings, **F**ailures, and **S**uppressed messages.
-> * Available options allow you to skip slow tests (`-SkipSlowTests`), skip non-essential tests (`-SkipNonEssentialTests`), exclude specific tests (`-ExcludeTests`), or run specific tests (`-OnlyTheseTests`). Autocomplete using `-` + `TAB` is your friend.
+> * Available options let you skip slow tests (`-SkipSlowTests`), skip non-essential tests (`-SkipNonEssentialTests`), exclude specific tests (`-ExcludeTests`), or run specific tests (`-OnlyTheseTests`). Autocomplete using `-` + `TAB` is your friend.
 
 ---
 
 # 3. Architecture Overview
 
-The toolkit operates on a **Controller–Agent** model (though it is agentless via PowerShell Remoting). You run the orchestration script on your management machine (the Controller), which executes tests on your servers/workstations (the Targets), aggregates the results into CLIXML plus HTML reports, and emails them.
+The toolkit operates on a **Controller–Agent** model, though it is agentless via PowerShell Remoting. You run the orchestration script on your management machine (the Controller). It executes tests on your servers or workstations (the Targets), aggregates the results into CLIXML and HTML reports, and emails them.
 
 ## Relationship Diagram
 
@@ -239,7 +247,7 @@ These are the scripts you actually execute.
   3. Runs the health checks.
   4. Collects output, saves it in CLIXML, generates HTML reports, and emails *notable* (non-success) messages.
 * **Key Parameters:** `-Computers` (list of targets, local host by default), `-ExcludeServers`, `-Hide` (defines which message types to hide from console output, usually "DIPS").
-* **Email default caveat:** `Invoke-GetComputerHealth.ps1` sends email by default in non-interactive contexts and does not send by default in interactive contexts. If you first connect with `Enter-PSSession` and then run the script on the remote host, that remote PowerShell host can still appear non-interactive to the script. Use `-NoSendReport` inside `Enter-PSSession` when you do not want the default email report.
+* **Email default caveat:** `Invoke-GetComputerHealth.ps1` sends email by default in non-interactive contexts, and does not send by default in interactive contexts. If you first connect with `Enter-PSSession` and then run the script on the remote host, that remote PowerShell host can still appear non-interactive to the script. Use `-NoSendReport` inside `Enter-PSSession` when you do not want the default email report.
 
 ## B. The Worker (Runs on Targets)
 
@@ -247,7 +255,7 @@ These scripts run locally on the servers being checked.
 
 * **`Get-ComputerHealth.ps1`**
   * **Role:** The Local Runner.
-  * **Function:** It loads the test library and executes the tests. It handles the logic for **permitlisting** (suppressing known failures) and generates clean, colorized console output.
+  * **Function:** It loads the test library and executes the tests. It handles **permitlisting** (suppressing known failures) and generates clean, colorized console output.
   * **Usage:** Can be run interactively on a specific server for troubleshooting (e.g., `.\Get-ComputerHealth.ps1 -OutputConsoleMessages`).
 
 * **`health-tests\*.ps1`**
@@ -256,7 +264,7 @@ These scripts run locally on the servers being checked.
 
 * **`Update-GetHealthCode.ps1`**
   * **Role:** The Updater.
-  * **Function:** Ensures the local `C:\IT\Get-ComputerHealth\bin` folder has the latest version of all scripts by downloading them from the central repository. It runs automatically before tests begin (unless `-NoUpdate` is used).
+  * **Function:** Ensures the local `C:\IT\Get-ComputerHealth\bin` folder has the latest version of all scripts by downloading them from the central repository. It runs automatically before tests begin, unless `-NoUpdate` is used.
 
 ## C. Utilities
 
@@ -276,7 +284,7 @@ These scripts run locally on the servers being checked.
 
 [See `CONTRIBUTING.md`](./CONTRIBUTING.md).
 
-Note that if you only want to add a few custom tests, you do not need to modify the core code. [See `doc/how-to-add-custom-tests.md`](./doc/how-to-add-custom-tests.md).
+If you only want to add a few custom tests, you do not need to modify the core code. [See `doc/how-to-add-custom-tests.md`](./doc/how-to-add-custom-tests.md).
 
 
 # 7. List of Available Tests

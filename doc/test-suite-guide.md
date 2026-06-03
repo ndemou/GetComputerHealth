@@ -342,7 +342,7 @@ This is a structure/quality check, not a runtime behavior check.
 
 ## Extra Validation Scripts
 
-These scripts are useful. Both of the scripts below are now included by [`tests/run-all-tests.ps1`](../tests/run-all-tests.ps1) in the full suite, and the syntax pass is also included in smoke mode.
+These scripts are useful. Both scripts below are now included by [`tests/run-all-tests.ps1`](../tests/run-all-tests.ps1) in the full suite. The syntax pass is also included in smoke mode.
 
 ### [`scripts/syntax/Test-RepoPowerShellSyntax.ps1`](../scripts/syntax/Test-RepoPowerShellSyntax.ps1)
 

@@ -1,8 +1,8 @@
-# Available Helpers for custom health tests
+# Available Helpers for Custom Health Tests
 
-*(Information for both users & developers)*
+*(Information for both users and developers)*
 
-## How to check that recent Veeam backups exist in a folder
+## How to check whether recent Veeam backups exist in a folder
 
 ### For backups stored in local drives (NOT mapped drives)
 
@@ -14,7 +14,7 @@ function HealthTest-FreshVeeamBackups {
 ```
 ### For backups stored in network shares
 
-First create a configuration file with this information (note that you need to double all backslashes in paths):
+First, create a configuration file with this information. Note that you need to double all backslashes in paths:
 ```powershell
 @"
     {
@@ -24,7 +24,7 @@ First create a configuration file with this information (note that you need to d
     }
 "@ > "C:\it\config\HealthTest-RecentBackupsExist.config"
 ```
-And then create a custom health test that references this config file:
+Then create a custom health test that references this config file:
 
 ```powershell
 function HealthTest-FreshVeeamBackups {
