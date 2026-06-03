@@ -103,7 +103,7 @@ Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Network)
 Tags: Essential
-Uses: None.
+Uses: Get-CimInstance, ipconfig.exe.
 #>
   [CmdletBinding()] param()
   $cs = Get-CimInstance Win32_ComputerSystem
@@ -156,7 +156,7 @@ AppliesTo: DomainJoined
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: low
-Uses: None.
+Uses: nltest.exe.
 #>
   [CmdletBinding()] param()
 
@@ -189,7 +189,7 @@ Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: High(Network)
 Tags: Essential
-Uses: Resolve-DnsName, Test-NetConnectionFast.
+Uses: Resolve-DnsName, Get-CimInstance.
 #>
   $dcs  = Get-DomainControllers
 
@@ -266,7 +266,7 @@ Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time)
 Tags: Essential
-Uses: None.
+Uses: certutil.exe.
 #>
   $out=& certutil -recoveryagent 2>&1
   $has=($out | Select-String -Pattern 'Recovery Agent' -SimpleMatch)
@@ -282,7 +282,7 @@ Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: low
 Tags: Essential
-Uses: None.
+Uses: Get-CimInstance.
 #>
   $bad=$false
   $items=@()

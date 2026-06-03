@@ -142,7 +142,7 @@ Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time)
 Tags: Essential
-Uses: Get-DaysSinceLastVirusScan, Get-WindowsOriginalInstallDate.
+Uses: Get-MpComputerStatus, Get-ItemProperty, Get-CimInstance.
 
 Checks the Microsoft Defender scan-history subsystem for recent quick-scan activity.
 It collects the number of days since the last virus scan from Defender status data
@@ -190,7 +190,7 @@ Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time)
 Tags: Essential
-Uses: None.
+Uses: Test-Path, Get-ItemProperty.
 #>
   $base='HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols'
   function Get-EffState($proto,$role){
@@ -323,7 +323,7 @@ Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: low
 Tags: Essential
-Uses: None.
+Uses: winmgmt.exe.
 #>
   $out=& winmgmt /verifyrepository 2>&1
   $ok=($out -match 'consistent')
@@ -338,7 +338,7 @@ AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: High(Time)
-Uses: None.
+Uses: vssadmin.exe.
 #>
 
   $out=& vssadmin list writers 2>&1
@@ -357,7 +357,7 @@ AppliesTo: All
 Scope: Computer
 Category: Security & Stability Risks
 Impact: Medium(Time)
-Uses: Get-PnpPropertyDataValue, Resolve-InfPath, Get-PnpPropertiesCached.
+Uses: Get-CimInstance, Get-PnpDeviceProperty, Get-AuthenticodeSignature.
 #>
   [CmdletBinding()]
   param([string[]]$WhitelistDeviceIdRegex = @('^BTHENUM\\'))
@@ -791,7 +791,7 @@ Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Disk), Medium(Time)
 Tags: Essential
-Uses: None.
+Uses: Get-ChildItem.
 #>
     param([int]$Hours = 48)
 
@@ -1138,7 +1138,7 @@ Scope: Computer
 Category: Security & Stability Risks
 Impact: Medium(Time)
 Tags: Essential
-Uses: None.
+Uses: Get-ItemProperty.
 #>
   $lsa = 'HKLM:\SYSTEM\CurrentControlSet\Control\Lsa'
 
@@ -1169,7 +1169,7 @@ Scope: Computer
 Category: Security & Stability Risks
 Impact: Medium(Network)
 Tags: Essential
-Uses: Get-LiveSessionInfo, Get-WtsServerHandle, Get-WtsString.
+Uses: Get-ItemProperty, Get-CimInstance.
 #>
   $k = 'HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp'
 
@@ -1740,7 +1740,7 @@ AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Network)
-Uses: Get-LiveSessionInfo.
+Uses: None.
 #>
     [CmdletBinding()]
     param(
@@ -1803,7 +1803,7 @@ Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: low
 Tags: Essential
-Uses: get-service, Set-Service, Stop-Service.
+Uses: Get-Service, Get-CimInstance.
 #>
   # 0(Workstation standalone),  1(Workstation domain joined), 2(Server standalone), 3(Server joined), 4(DC non-FSMO), 5(DC with FSMO role)
   $domainRole = (Get-CimInstance Win32_ComputerSystem).DomainRole
@@ -1836,7 +1836,7 @@ Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: low
 Tags: Essential
-Uses: None.
+Uses: Get-CimInstance.
 #>
     $ok = $true
     $no_req_pass_accounts=Get-CimInstance -Class Win32_UserAccount -Filter `
@@ -1861,7 +1861,7 @@ Scope: Computer
 Category: Security & Stability Risks
 Impact: Medium(Time)
 Tags: Essential
-Uses: None.
+Uses: Get-ItemProperty.
 #>
   $p  = 'HKLM:\SYSTEM\CurrentControlSet\Control\Lsa'
   $ra = (Get-ItemProperty $p -Name restrictanonymous      -ErrorAction SilentlyContinue).restrictanonymous
@@ -1886,7 +1886,7 @@ Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: low
 Tags: Essential
-Uses: None.
+Uses: Get-ItemProperty.
 #>
     # see https://newbedev.com/how-can-i-manually-determine-the-codepage-and-locale-of-the-current-os
     $loc = Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Nls\CodePage' | Select-Object ACP,OEMCP
@@ -1908,7 +1908,7 @@ Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: low
 Tags: Essential
-Uses: None.
+Uses: Test-Path, Get-ItemProperty.
 #>
     $pending = $false
     if (Test-Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending') { $pending = $true }
@@ -1950,7 +1950,7 @@ Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: High(Disk), Medium(Time)
 Tags: Essential
-Uses: None.
+Uses: Get-CimInstance.
 #>
   [CmdletBinding()]
   param(
@@ -2224,7 +2224,7 @@ AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: High(Time), Medium(Network)
-Uses: Get-NetTCPConnection, Get-Process, Resolve-ExecutablePath.
+Uses: Get-NetTCPConnection, Get-Process.
 #>
     [CmdletBinding()] param(
         [int[]]$AllowedPorts = @(53, 88, 123, 135, 139, 389, 445, 464, 636, 3268, 3269, 5722, 5985, 5986, 9389),
@@ -2483,7 +2483,7 @@ Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time)
 Tags: Policy
-Uses: Get-InstalledSW, Get-NormalizedSoftwareName, Get-InstalledSoftwareFindingLevel.
+Uses: Get-AppxPackage.
 #>
     $seen = 0
     foreach ($sw in (Get-InstalledSW)) {
@@ -2511,8 +2511,8 @@ function HealthTest-RunningProcesses {
 Description: Emits a suppressed inventory notice for each running process.
 AppliesTo: All
 Scope: Computer
-Category: Operational Inventory
-Impact: Low
+Category: Audit/Compliance/Informational
+Impact: low
 Tags: Suppressed
 Uses: Get-Process.
 

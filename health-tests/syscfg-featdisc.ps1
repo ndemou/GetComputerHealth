@@ -4,13 +4,13 @@ System Configuration & Feature Discovery
 
 function HealthTest-MalwareProtectionFeatures {
 <#
-Description: Checks Microsoft Defender malware protection status and updates signatures when needed.
+Description: Checks Microsoft Defender malware protection status and signature freshness.
 AppliesTo: All
 Scope: Computer
 Category: Security & Stability Risks
 Impact: Medium(Time)
 Tags: Essential
-Uses: Get-MpComputerStatus, Update-MpSignature.
+Uses: Get-MpComputerStatus.
 
 Checks the Microsoft Defender malware protection subsystem. It collects the
 Get-MpComputerStatus state and verifies that signatures are current, the anti-malware
@@ -46,7 +46,7 @@ Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: low
 Tags: Essential
-Uses: None.
+Uses: Test-Path, Get-ItemProperty.
 #>
   $paths=@(
     'HKLM:\Software\Microsoft\Windows\CurrentVersion\Run',

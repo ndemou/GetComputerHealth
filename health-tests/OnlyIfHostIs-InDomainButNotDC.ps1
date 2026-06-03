@@ -10,7 +10,7 @@ Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Network)
 Tags: Essential
-Uses: None.
+Uses: Get-CimInstance.
 
 Checks the DNS suffix configuration for domain-joined member computers. It collects
 the computer's domain role and AD domain name from Win32_ComputerSystem, skips hosts

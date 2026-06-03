@@ -9,7 +9,7 @@ AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time)
-Uses: Get-ScheduledTask, Get-ScheduledTaskInfo, Get-ScheduledTaskDeepInfo.
+Uses: Get-ScheduledTask, Get-ScheduledTaskInfo, Export-ScheduledTask.
 #>
     $task_name_paterns_to_ignore = @(
       'OneDrive Per-Machine Standalone Update Task*',
@@ -101,7 +101,7 @@ AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time)
-Uses: Get-ScheduledTask, Get-ScheduledTaskInfo, Get-ScheduledTaskDeepInfo.
+Uses: Get-ScheduledTask, Get-ScheduledTaskInfo, Export-ScheduledTask.
 #>
   [CmdletBinding()] param(
     [string[]]$MustBeEnabled = @(),  # exact paths or regex
@@ -398,7 +398,7 @@ AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: High(Time)
-Uses: ConvertFrom-Csv.
+Uses: schtasks.exe, ConvertFrom-Csv.
 #>
 
   $mapHresult = @{

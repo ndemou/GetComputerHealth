@@ -53,7 +53,7 @@ Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time), Medium(Network)
 Tags: Essential
-Uses: Get-DnsDomainControllers, Resolve-DnsName, Test-IsLaptopOrMobile.
+Uses: Get-CimInstance, Resolve-DnsName, w32tm.exe.
 #>
     [CmdletBinding()]
     param()
@@ -333,7 +333,7 @@ Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time)
 Tags: Essential
-Uses: Windows Update Agent history with fallback to registry/Get-HotFix.
+Uses: Get-HotFix, Get-ItemProperty.
 #>
     param([int]$WarnDays=30,[int]$FailDays=45)
     $lastUpdateDate = $null
@@ -392,7 +392,7 @@ Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time)
 Tags: Essential
-Uses: None.
+Uses: Get-ChildItem.
 #>
     param([int]$WarnDays=60,[int]$FailDays=30)
     $now = Get-Date
@@ -471,7 +471,7 @@ AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: High(RAM), Medium(CPU)
-Uses: Get-AvailMB, Get-Counter.
+Uses: Get-CimInstance, Get-Counter.
 #>
   [CmdletBinding()]
   [OutputType([bool])]
@@ -725,7 +725,7 @@ Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Disk)
 Tags: Essential
-Uses: Test-DiskHasFreeSpace.
+Uses: Resolve-Path, Get-PSDrive.
 #>
     foreach ($d in [System.IO.DriveInfo]::GetDrives()) {
         if (-not $d.IsReady) { continue }
@@ -813,7 +813,7 @@ AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: High(Time)
-Uses: Get-SoftwareLicensing.
+Uses: Get-CimInstance.
 #>
 
     Get-SoftwareLicensing | %{
@@ -830,7 +830,7 @@ AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time)
-Uses: None.
+Uses: w32tm.exe.
 #>
   param(
     [int]$WarnOffsetSeconds=15,
@@ -913,7 +913,7 @@ Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Disk), Medium(Time)
 Tags: Essential
-Uses: None.
+Uses: Get-CimInstance, Get-ItemProperty.
 #>
   [CmdletBinding()] param([int]$MinMB=1024,[switch]$RequireOnSystemDrive)
   $cs   = Get-CimInstance Win32_ComputerSystem -ErrorAction Stop
@@ -1043,7 +1043,7 @@ Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Disk)
 Tags: Essential
-Uses: Get-Volume, Get-FreeGB, Get-PSDrive.
+Uses: Get-Volume, Get-PSDrive, fsutil.exe.
 #>
     $dirty = @()
     $drives = Get-Volume -FileSystem NTFS -ErrorAction SilentlyContinue

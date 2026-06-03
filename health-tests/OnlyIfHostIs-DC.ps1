@@ -190,7 +190,7 @@ AppliesTo: DC
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time)
-Uses: None.
+Uses: dcdiag.exe.
 #>
   $out=& dcdiag /test:ridmanager /v 2>&1
   $fail=($out | Select-String -Pattern 'failed test RidManager','is low' -SimpleMatch)
@@ -205,7 +205,7 @@ AppliesTo: DC
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time)
-Uses: None.
+Uses: Get-CimInstance.
 #>
   $stateNames = @{0='Uninitialized';1='Initialized';2='Initial_Sync';3='Auto_Recovery';4='Normal';5='Error'}
 
@@ -410,7 +410,7 @@ AppliesTo: DC
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: High(Time)
-Uses: None.
+Uses: dfsdiag.exe.
 #>
 
     write-progress "Runing 'DFSDIAG /TestDCs'"
@@ -880,7 +880,7 @@ AppliesTo: DC
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Disk)
-Uses: None.
+Uses: Get-ItemProperty, Get-Item, Get-CimInstance.
 #>
   [CmdletBinding()] param([int]$MinFreeGB=5)
   $p='HKLM:\SYSTEM\CurrentControlSet\Services\NTDS\Parameters'
@@ -908,7 +908,7 @@ AppliesTo: DC
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: low
-Uses: None.
+Uses: Get-ItemProperty.
 #>
   [CmdletBinding()]
   param(
@@ -1078,7 +1078,7 @@ AppliesTo: DC
 Scope: Domain
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time)
-Uses: repadmin.exe, Get-MaxTimeSpan, Invoke-LocalRsatCrossCheck.
+Uses: repadmin.exe, Get-ADReplicationPartnerMetadata, Get-CimInstance.
 #>
   [CmdletBinding()]
   param(

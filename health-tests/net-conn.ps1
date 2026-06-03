@@ -21,7 +21,7 @@ Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: low
 Tags: Essential
-Uses: Get-NetConnectionProfile, Test-NetConnectivityToNetwork.
+Uses: Get-NetConnectionProfile, Test-Connection.
 #>
   [CmdletBinding()]
   param()
@@ -78,7 +78,7 @@ AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: High(Time), Medium(Network)
-Uses: Get-NetIPConfiguration, Test-MultipleGatewayConfiguration, Test-NetConnectionFast.
+Uses: Get-NetIPConfiguration, Get-NetRoute, Get-NetIPInterface.
 #>
   [CmdletBinding()] param([switch]$AllowOnePerFamily)
 
