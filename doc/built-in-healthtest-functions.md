@@ -48,8 +48,21 @@ The `Field: Value` lines follow this exact order (note that some are optional):
    4. `Category:` primary plus optional secondary category. Options are: `Availability/Server Down Signals`,`Security & Stability Risks`,`Configuration Hygiene & Best Practices`,`Audit/Compliance/Informational`
    5. `Impact:` either "low" when all dimensions have low impact, or one or more "<level>(<dimension>)" pairs. In those pairs, <level> is either "Medium" or "High", and <dimension> is one of "CPU", "Disk", "Network", "RAM", or "Time".
    6. `Tags:` optional comma-separated values. Supported values: `Essential`, `Policy`, `Suppressed`.
-   7. `Uses:` optional, up to three essential external cmdlets or executables if any.
+   7. `Uses:` optional, up to three essential non-built-in commands or helper functions used by the test.
    8. `FalsePositives:` optional short note, only if false positives are expected.
+
+  Use `Uses:` to list the main non-built-in commands or helper functions the HealthTest depends on, for example:
+
+  - module cmdlets such as `Get-ADUser`, `Get-DnsServerZone`, `Get-WindowsFeature`
+  - external executables such as `dcdiag.exe`, `repadmin.exe`, `w32tm.exe`, `certutil.exe`
+  - repo helper functions such as `Get-ServiceVendors`, `Test-NetConnectionFast`, `Get-InstalledSW`
+  - helper functions defined elsewhere in the same file or repo, as long as they are not defined inside the `HealthTest-*` function body itself
+
+  Do not list:
+
+  - built-in PowerShell language constructs or common built-in cmdlets
+  - helper functions defined inside the `HealthTest-*` function itself
+  - vague prose descriptions instead of concrete command/function names
 
 ### About the Tags field
 

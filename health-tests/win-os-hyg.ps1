@@ -142,7 +142,7 @@ Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time)
 Tags: Essential
-Uses: Get-MpComputerStatus, Get-ItemProperty, Get-CimInstance.
+Uses: Get-DaysSinceLastVirusScan, Get-WindowsOriginalInstallDate.
 
 Checks the Microsoft Defender scan-history subsystem for recent quick-scan activity.
 It collects the number of days since the last virus scan from Defender status data
@@ -190,7 +190,7 @@ Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time)
 Tags: Essential
-Uses: Test-Path, Get-ItemProperty.
+Uses: None.
 #>
   $base='HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols'
   function Get-EffState($proto,$role){
@@ -285,7 +285,7 @@ AppliesTo: All
 Scope: Computer
 Category: Security & Stability Risks
 Impact: High(Time)
-Uses: Get-Service, Get-NetFirewallProfile.
+Uses: Get-NetFirewallProfile.
 #>
 
     Write-BasedOnTestResult "Is mpssvc (the firewall service) enabled?" -Test ((Get-Service -name mpssvc).status -eq 'Running')
@@ -357,7 +357,7 @@ AppliesTo: All
 Scope: Computer
 Category: Security & Stability Risks
 Impact: Medium(Time)
-Uses: Get-CimInstance, Get-PnpDeviceProperty, Get-AuthenticodeSignature.
+Uses: Get-PnpDeviceProperty, Get-AuthenticodeSignature.
 #>
   [CmdletBinding()]
   param([string[]]$WhitelistDeviceIdRegex = @('^BTHENUM\\'))
@@ -791,7 +791,7 @@ Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Disk), Medium(Time)
 Tags: Essential
-Uses: Get-ChildItem.
+Uses: None.
 #>
     param([int]$Hours = 48)
 
@@ -1105,7 +1105,7 @@ Scope: Computer
 Category: Security & Stability Risks
 Impact: Medium(Time)
 Tags: Essential
-Uses: Get-Command, Get-BitLockerVolume.
+Uses: Get-BitLockerVolume.
 #>
     if (Test-IsVirtualMachine) {
         Write-Warning "[info] Computer is a VM; skipping HealthTest-BitLockerStatus"
@@ -1138,7 +1138,7 @@ Scope: Computer
 Category: Security & Stability Risks
 Impact: Medium(Time)
 Tags: Essential
-Uses: Get-ItemProperty.
+Uses: None.
 #>
   $lsa = 'HKLM:\SYSTEM\CurrentControlSet\Control\Lsa'
 
@@ -1169,7 +1169,7 @@ Scope: Computer
 Category: Security & Stability Risks
 Impact: Medium(Network)
 Tags: Essential
-Uses: Get-ItemProperty, Get-CimInstance.
+Uses: None.
 #>
   $k = 'HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp'
 
@@ -1740,7 +1740,7 @@ AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Network)
-Uses: None.
+Uses: Get-LiveSessionInfo.
 #>
     [CmdletBinding()]
     param(
@@ -1803,7 +1803,7 @@ Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: low
 Tags: Essential
-Uses: Get-Service, Get-CimInstance.
+Uses: None.
 #>
   # 0(Workstation standalone),  1(Workstation domain joined), 2(Server standalone), 3(Server joined), 4(DC non-FSMO), 5(DC with FSMO role)
   $domainRole = (Get-CimInstance Win32_ComputerSystem).DomainRole
@@ -1836,7 +1836,7 @@ Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: low
 Tags: Essential
-Uses: Get-CimInstance.
+Uses: None.
 #>
     $ok = $true
     $no_req_pass_accounts=Get-CimInstance -Class Win32_UserAccount -Filter `
@@ -1861,7 +1861,7 @@ Scope: Computer
 Category: Security & Stability Risks
 Impact: Medium(Time)
 Tags: Essential
-Uses: Get-ItemProperty.
+Uses: None.
 #>
   $p  = 'HKLM:\SYSTEM\CurrentControlSet\Control\Lsa'
   $ra = (Get-ItemProperty $p -Name restrictanonymous      -ErrorAction SilentlyContinue).restrictanonymous
@@ -1886,7 +1886,7 @@ Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: low
 Tags: Essential
-Uses: Get-ItemProperty.
+Uses: None.
 #>
     # see https://newbedev.com/how-can-i-manually-determine-the-codepage-and-locale-of-the-current-os
     $loc = Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Nls\CodePage' | Select-Object ACP,OEMCP
@@ -1908,7 +1908,7 @@ Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: low
 Tags: Essential
-Uses: Test-Path, Get-ItemProperty.
+Uses: None.
 #>
     $pending = $false
     if (Test-Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending') { $pending = $true }
@@ -1927,7 +1927,7 @@ Scope: Computer
 Category: Security & Stability Risks
 Impact: Medium(Time)
 Tags: Essential
-Uses: Get-Service, Get-SmbServerConfiguration.
+Uses: Get-SmbServerConfiguration.
 #>
   if ((Get-PropValue -obj (Get-Service -Name LanmanServer) -name Status) -ne 'running') {
       Write-Warning "[PASS] Skipping HealthTest-SmbSigningRequired; LanmanServer service not running."
@@ -1950,7 +1950,7 @@ Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: High(Disk), Medium(Time)
 Tags: Essential
-Uses: Get-CimInstance.
+Uses: None.
 #>
   [CmdletBinding()]
   param(
@@ -2140,7 +2140,7 @@ Scope: Computer
 Category: Security & Stability Risks
 Impact: High(Network)
 Tags: Essential
-Uses: Get-Service.
+Uses: None.
 #>
   $s=Get-Service Dnscache -ErrorAction Stop
   if($s.Status -eq 'Running'){ Write-Warning "[PASS] DNS Client service running" } else { Write-Warning "[FAILURE] DNS Client service is not running`nStatus=$($s.Status)" }
@@ -2224,7 +2224,7 @@ AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: High(Time), Medium(Network)
-Uses: Get-NetTCPConnection, Get-Process.
+Uses: Get-NetTCPConnection, Resolve-ExecutablePath, Get-ExeVendor.
 #>
     [CmdletBinding()] param(
         [int[]]$AllowedPorts = @(53, 88, 123, 135, 139, 389, 445, 464, 636, 3268, 3269, 5722, 5985, 5986, 9389),
@@ -2483,7 +2483,7 @@ Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time)
 Tags: Policy
-Uses: Get-AppxPackage.
+Uses: Get-InstalledSW, Get-NormalizedSoftwareName, Get-InstalledSoftwareFindingLevel.
 #>
     $seen = 0
     foreach ($sw in (Get-InstalledSW)) {
@@ -2514,7 +2514,7 @@ Scope: Computer
 Category: Audit/Compliance/Informational
 Impact: low
 Tags: Suppressed
-Uses: Get-Process.
+Uses: None.
 
 Lists every process currently running on the computer as suppressed NOTICE
 messages. These messages are intended for inventory and auditing workflows, not

@@ -46,7 +46,7 @@ Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: low
 Tags: Essential
-Uses: Test-Path, Get-ItemProperty.
+Uses: None.
 #>
   $paths=@(
     'HKLM:\Software\Microsoft\Windows\CurrentVersion\Run',

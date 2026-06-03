@@ -156,7 +156,7 @@ AppliesTo: Server
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Network)
-Uses: Get-Command, Get-DnsServerRecursion, Get-DnsServerCache.
+Uses: Get-DnsServerRecursion, Get-DnsServerCache, Get-DnsServerEDns.
 #>
     if (-not (Get-Command Get-DnsServerRecursion -ErrorAction SilentlyContinue)) {
         Write-Warning "[NOTICE] DNS Server tools not available`nDNS role/RSAT missing?"

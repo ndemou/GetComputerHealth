@@ -53,7 +53,7 @@ Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time), Medium(Network)
 Tags: Essential
-Uses: Get-CimInstance, Resolve-DnsName, w32tm.exe.
+Uses: Resolve-DnsName, w32tm.exe, Test-IsLaptopOrMobile.
 #>
     [CmdletBinding()]
     param()
@@ -333,7 +333,7 @@ Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time)
 Tags: Essential
-Uses: Get-HotFix, Get-ItemProperty.
+Uses: Get-HotFix.
 #>
     param([int]$WarnDays=30,[int]$FailDays=45)
     $lastUpdateDate = $null
@@ -392,7 +392,7 @@ Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time)
 Tags: Essential
-Uses: Get-ChildItem.
+Uses: None.
 #>
     param([int]$WarnDays=60,[int]$FailDays=30)
     $now = Get-Date
@@ -424,7 +424,7 @@ Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: low
 Tags: Essential
-Uses: Get-Command, Get-WindowsFeature, Get-Service.
+Uses: Get-WindowsFeature, Get-Website, Get-WebBinding.
 #>
     $iisInstalled = $false
 
@@ -471,7 +471,7 @@ AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: High(RAM), Medium(CPU)
-Uses: Get-CimInstance, Get-Counter.
+Uses: Get-Counter.
 #>
   [CmdletBinding()]
   [OutputType([bool])]
@@ -531,7 +531,7 @@ AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: High(Time)
-Uses: Get-Service, Get-SmbShare.
+Uses: Get-SmbShare, Get-SmbShareAccess, Get-SmbServerConfiguration.
 #>
   [CmdletBinding()]param(
     [string[]]$BroadPrincipals = @(
@@ -725,7 +725,7 @@ Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Disk)
 Tags: Essential
-Uses: Resolve-Path, Get-PSDrive.
+Uses: Test-DiskHasFreeSpace.
 #>
     foreach ($d in [System.IO.DriveInfo]::GetDrives()) {
         if (-not $d.IsReady) { continue }
@@ -813,7 +813,7 @@ AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: High(Time)
-Uses: Get-CimInstance.
+Uses: Get-SoftwareLicensing.
 #>
 
     Get-SoftwareLicensing | %{
@@ -913,7 +913,7 @@ Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Disk), Medium(Time)
 Tags: Essential
-Uses: Get-CimInstance, Get-ItemProperty.
+Uses: None.
 #>
   [CmdletBinding()] param([int]$MinMB=1024,[switch]$RequireOnSystemDrive)
   $cs   = Get-CimInstance Win32_ComputerSystem -ErrorAction Stop
@@ -1043,7 +1043,7 @@ Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Disk)
 Tags: Essential
-Uses: Get-Volume, Get-PSDrive, fsutil.exe.
+Uses: Get-Volume, fsutil.exe.
 #>
     $dirty = @()
     $drives = Get-Volume -FileSystem NTFS -ErrorAction SilentlyContinue

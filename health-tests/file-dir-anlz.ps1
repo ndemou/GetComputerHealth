@@ -23,7 +23,7 @@ AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: High(Time), Medium(Disk)
-Uses: Get-ChildItem.
+Uses: None.
 #>
 
 	$PATHS_TO_SKIP=@("C:\windows\servicing","C:\windows\WinSxS","C:\Windows\SoftwareDistribution\Download")

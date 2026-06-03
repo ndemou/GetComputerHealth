@@ -14,20 +14,6 @@ Describe 'HealthTest help blocks' {
     $allowedTags = @('Essential', 'Policy', 'Suppressed')
     $functionPattern = '(?ms)^[ \t]*function[ \t]+(?<Name>HealthTest-[\w-]+)[ \t]*\{'
     $helpBlocks = @()
-    $repoFunctionNames = New-Object System.Collections.Generic.HashSet[string] ([System.StringComparer]::OrdinalIgnoreCase)
-
-    Get-ChildItem -Path $repoRoot -Recurse -Filter *.ps1 -File |
-      Where-Object {
-        $_.Extension -eq '.ps1' -and
-        $_.Name -notlike '*.bak' -and
-        $_.FullName -notmatch '\\(\.git|temp|tests)\\'
-      } |
-      ForEach-Object {
-        $repoContent = Get-Content -Path $_.FullName -Raw
-        foreach ($repoFunctionMatch in [regex]::Matches($repoContent, '(?im)^[ \t]*function[ \t]+(?<Name>[A-Za-z0-9_-]+)')) {
-          [void]$repoFunctionNames.Add($repoFunctionMatch.Groups['Name'].Value)
-        }
-      }
 
     Get-ChildItem -Path $healthTestsPath -Filter *.ps1 -File | ForEach-Object {
       $content = Get-Content -Path $_.FullName -Raw
@@ -167,11 +153,6 @@ Describe 'HealthTest help blocks' {
               "$($helpBlock.FunctionName) in $($helpBlock.FilePath) lists more than three Uses entries."
             }
 
-            foreach ($useEntry in $useEntries) {
-              if ($repoFunctionNames.Contains($useEntry)) {
-                "$($helpBlock.FunctionName) in $($helpBlock.FilePath) lists internal helper '$useEntry' in Uses. List only external cmdlets or executables."
-              }
-            }
           }
         }
       }

@@ -841,7 +841,7 @@ AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: High(Time)
-Uses: Get-CimInstance, Get-AuthenticodeSignature, Get-FileHash.
+Uses: Get-ServiceVendors.
 #>
 
     $ok = $true

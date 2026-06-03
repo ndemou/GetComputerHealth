@@ -10,7 +10,7 @@ Scope: Computer
 Category: Security & Stability Risks
 Impact: Medium(Time)
 Tags: Essential
-Uses: Get-ItemProperty.
+Uses: None.
 #>
     $p = 'HKLM:\SYSTEM\CurrentControlSet\Services\NTDS\Parameters'
 
@@ -205,7 +205,7 @@ AppliesTo: DC
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time)
-Uses: Get-CimInstance.
+Uses: None.
 #>
   $stateNames = @{0='Uninitialized';1='Initialized';2='Initial_Sync';3='Auto_Recovery';4='Normal';5='Error'}
 
@@ -242,7 +242,7 @@ AppliesTo: DC
 Scope: Domain
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time)
-Uses: Get-Service, Get-Command, Get-DfsrBacklog.
+Uses: Get-DfsrBacklog, Get-DfsrConnection.
 #>
     param([string]$RGName='Domain System Volume')
     if (-not(Get-Service DFSR -ErrorAction SilentlyContinue)) {
@@ -554,7 +554,7 @@ AppliesTo: DC
 Scope: Domain
 Category: Configuration Hygiene & Best Practices
 Impact: High(Time)
-Uses: Get-Command, Get-GPO, Get-ADDomain.
+Uses: Get-GPO, Get-ADDomain.
 #>
 
   if(-not (Get-Command Get-GPO -ErrorAction SilentlyContinue)){
@@ -688,7 +688,7 @@ AppliesTo: DC
 Scope: Domain
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Network)
-Uses: Resolve-DnsName.
+Uses: Get-DomainControllers.
 #>
     $dcs = Get-DomainControllers
     $bad = @()
@@ -880,7 +880,7 @@ AppliesTo: DC
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Disk)
-Uses: Get-ItemProperty, Get-Item, Get-CimInstance.
+Uses: None.
 #>
   [CmdletBinding()] param([int]$MinFreeGB=5)
   $p='HKLM:\SYSTEM\CurrentControlSet\Services\NTDS\Parameters'
@@ -908,7 +908,7 @@ AppliesTo: DC
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: low
-Uses: Get-ItemProperty.
+Uses: None.
 #>
   [CmdletBinding()]
   param(
@@ -1078,7 +1078,7 @@ AppliesTo: DC
 Scope: Domain
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time)
-Uses: repadmin.exe, Get-ADReplicationPartnerMetadata, Get-CimInstance.
+Uses: repadmin.exe, Get-ADReplicationPartnerMetadata.
 #>
   [CmdletBinding()]
   param(

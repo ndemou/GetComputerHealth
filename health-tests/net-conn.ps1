@@ -21,7 +21,7 @@ Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: low
 Tags: Essential
-Uses: Get-NetConnectionProfile, Test-Connection.
+Uses: Get-NetConnectionProfile, Test-NetConnectivityToNetwork.
 #>
   [CmdletBinding()]
   param()
@@ -78,7 +78,7 @@ AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: High(Time), Medium(Network)
-Uses: Get-NetIPConfiguration, Get-NetRoute, Get-NetIPInterface.
+Uses: Get-NetIPConfiguration, Test-MultipleGatewayConfiguration.
 #>
   [CmdletBinding()] param([switch]$AllowOnePerFamily)
 
@@ -396,7 +396,7 @@ Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: High(Network)
 Tags: Essential
-Uses: Get-Service, Test-WSMan.
+Uses: Test-WSMan.
 #>
   $svc=Get-Service WinRM -ErrorAction Stop
   if($svc.Status -ne 'Running'){ Write-Warning "[FAILURE] WinRM service is not running`nStatus=$($svc.Status)"; return }

@@ -103,7 +103,7 @@ Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Network)
 Tags: Essential
-Uses: Get-CimInstance, ipconfig.exe.
+Uses: ipconfig.exe.
 #>
   [CmdletBinding()] param()
   $cs = Get-CimInstance Win32_ComputerSystem
@@ -189,7 +189,7 @@ Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: High(Network)
 Tags: Essential
-Uses: Resolve-DnsName, Get-CimInstance.
+Uses: Get-DomainControllers, Resolve-DnsName, Test-NetConnectionFast.
 #>
   $dcs  = Get-DomainControllers
 
@@ -282,7 +282,7 @@ Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: low
 Tags: Essential
-Uses: Get-CimInstance.
+Uses: None.
 #>
   $bad=$false
   $items=@()

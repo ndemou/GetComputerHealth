@@ -28,7 +28,7 @@ Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Network)
 Tags: Essential
-Uses: Get-Service, Get-Command, Get-DhcpServerv4ScopeStatistics.
+Uses: Get-DhcpServerv4ScopeStatistics.
 #>
     $svc = Get-Service -Name 'DHCPServer' -ErrorAction SilentlyContinue
     if (-not $svc) {
