@@ -184,32 +184,35 @@ It returns $true if the final count is between MinCount and MaxCount (inclusive)
 
 If the path does not exist, the function always returns $false, regardless of MinCount/MaxCount.
 
-PARAMETERS
- -Path
-    The directory to search. Must exist; otherwise the function returns $false.
+.PARAMETER Path
+One or more directories to search.
 
- -Pattern
+Example:
+ -Path 'C:\Backups'
+ -Path 'C:\Backups1','D:\Backups2'
+ 
+.PARAMETER Pattern
     One or more DOS wildcards (e.g. "*.vbk", "*.vib").
     A single string or an array of strings is allowed.
     Files matching ANY of the patterns are counted (logical OR).
 
- -MinBytes
+.PARAMETER MinBytes
     Minimum file size in bytes. Only files with Length -ge MinBytes are counted.
     If omitted, size is not checked.
 
- -MaxAgeHours
+.PARAMETER MaxAgeHours
     Only files with CreationTime within the last MaxAgeHours hours are counted.
     If omitted, age is not checked.
 
- -MinCount
+.PARAMETER MinCount
     Minimum number of matching files required (inclusive).
     Defaults to 1 if not specified.
 
- -MaxCount
+.PARAMETER MaxCount
     Maximum number of matching files allowed (inclusive).
     Defaults to [int]::MaxValue if not specified.
 
- -Recurse
+.PARAMETER Recurse
     If supplied, search subfolders recursively; otherwise only the top-level folder is searched.
 
 RETURN VALUE
@@ -239,49 +242,56 @@ EXAMPLE
 #>
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory)][string]  $Path,
-    [string[]]                      $Pattern    = '*',
-    [Nullable[long]]                $MinBytes,
-    [Nullable[double]]              $MaxAgeHours,
-    [Nullable[int]]                 $MinCount,
-    [Nullable[int]]                 $MaxCount,
-    [switch]                        $Recurse
-)
+    [Parameter(Mandatory)]
+    [string[]] $Path,
 
-    if (-not (Test-Path -LiteralPath $Path)) {
-        return $false
-    }
+    [string[]] $Pattern = '*',
+    [Nullable[long]] $MinBytes,
+    [Nullable[double]] $MaxAgeHours,
+    [Nullable[int]] $MinCount,
+    [Nullable[int]] $MaxCount,
+    [switch] $Recurse
+)
 
     if ($MinCount -eq $null) { $MinCount = 1 }
     if ($MaxCount -eq $null) { $MaxCount = [int]::MaxValue }
 
     $items = @()
-    foreach ($p in $Pattern) {
-        if ([string]::IsNullOrWhiteSpace($p)) { continue }
-        $items += Get-ChildItem -LiteralPath $Path -Filter $p -File -Recurse:$Recurse -ErrorAction SilentlyContinue
+
+    foreach ($onePath in $Path) {
+        if ([string]::IsNullOrWhiteSpace($onePath)) { continue }
+        if (-not (Test-Path -LiteralPath $onePath -PathType Container)) { continue }
+
+        foreach ($p in $Pattern) {
+            if ([string]::IsNullOrWhiteSpace($p)) { continue }
+
+            $items += Get-ChildItem `
+                -LiteralPath $onePath `
+                -Filter $p `
+                -File `
+                -Recurse:$Recurse `
+                -ErrorAction SilentlyContinue
+        }
     }
 
-    if (-not $items) {
-        $count = 0
-        return ($count -ge $MinCount -and $count -le $MaxCount)
+    if ($items) {
+        $items = $items | Sort-Object FullName -Unique
+
+        if ($MinBytes -ne $null) {
+            $items = $items | Where-Object { $_.Length -ge $MinBytes }
+        }
+
+        if ($MaxAgeHours -ne $null) {
+            $cutoff = (Get-Date).AddHours(-$MaxAgeHours)
+            $items = $items | Where-Object { $_.LastWriteTime -ge $cutoff }
+        }
     }
 
-    $items = $items | Sort-Object FullName -Unique
-
-    if ($MinBytes -ne $null) {
-        $items = $items | Where-Object { $_.Length -ge $MinBytes }
-    }
-
-    if ($MaxAgeHours -ne $null) {
-        $cutoff = (Get-Date).AddHours(-$MaxAgeHours)
-        $items = $items | Where-Object { $_.CreationTime -ge $cutoff }
-    }
-
-    $count = ($items | Measure-Object | Select-Object -ExpandProperty Count)
+    $count = ($items | Measure-Object).Count
 
     if ($count -ge $MinCount -and $count -le $MaxCount) {
         return ($items | Sort-Object -Property LastWriteTime)
-    } else {
-        return $null
     }
+
+    return $null
 }
