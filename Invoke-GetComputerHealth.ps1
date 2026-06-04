@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
 Updates and then runs Get-ComputerHealth locally and/or via PowerShell remoting across multiple target computers, exports CLIXML plus HTML reports, and emails a summary.
 
