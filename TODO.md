@@ -181,6 +181,31 @@ Get-ComputerHealth.ps1 -SetAsRequired -Test 'UnexpectedListeningPorts' -Signatur
 
 This functionality will be very useful for ports, installed software, services, and roles.
 
+## Set of changes regarding reporting
+
+### Move the reporting code to a separate script
+
+This will allow us to experiment with reporting without running Get-ComputerHealth (we just use some saved findings)
+
+### Lighter html code 
+
+Interactive reports: Instead of including the findings in this fat "fieldname:value" format:
+```
+[
+  {"Computer":"AUDIT2","Suppressed":true,"Level":"warning","EffectiveLevel":"postponed","Message":"SMB signing is not required","Comment":"...","Hash":"cdf936f1"},
+  {"Computer":"AUDIT2","Suppressed":true,"Level":"warning","EffectiveLevel":"postponed","Message":"NTLM is not fully hardened ...","Comment":"...","Hash":"1b752537"}
+]
+```
+
+Prefer this lighter csv-like format:
+```
+[
+  ["AUDIT2",true,"warning","postponed","SMB signing is not required","...","cdf936f1"],
+  ["AUDIT2",true,"warning","postponed","NTLM is not fully hardened ...","...","1b752537"]
+]
+```
+So every finding is represented by a list of ordered values and all these lists are also bundled in a list (so a list of lists).
+
 ## Find redundant health tests
 
 Do a quick first pass to group health tests into clusters that seem to check the same things.
