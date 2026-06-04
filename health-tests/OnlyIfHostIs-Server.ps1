@@ -1,4 +1,4 @@
-﻿<#
+<#
 Tests that are only applicable to Windows Server O.S.
 #>
 

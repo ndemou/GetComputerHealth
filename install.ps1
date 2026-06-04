@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
 Installs or updates GetComputerHealth into the current `bin` folder.
 

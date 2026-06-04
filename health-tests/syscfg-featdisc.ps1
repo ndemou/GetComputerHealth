@@ -1,4 +1,4 @@
-﻿<#
+<#
 System Configuration & Feature Discovery
 #>
 

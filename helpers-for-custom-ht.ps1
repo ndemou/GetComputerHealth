@@ -1,4 +1,4 @@
-﻿<#
+<#
 Helper functions for Custom Health Tests
 #>
 

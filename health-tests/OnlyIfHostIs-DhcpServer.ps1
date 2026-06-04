@@ -1,4 +1,4 @@
-﻿function HealthTest-DhcpDnsCredential{
+function HealthTest-DhcpDnsCredential{
 <#
 Description: Verifies that DHCP dynamic DNS update credentials are configured and resolve to a valid AD account.
 AppliesTo: Server

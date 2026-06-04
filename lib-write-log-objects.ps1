@@ -1,4 +1,4 @@
-﻿<# 
+<# 
 Helper functions that create, return, and optionally display structured Log Objects.
 
 Messages are emitted (Write-Output) as PSCustomObjects with the following properties:

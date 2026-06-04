@@ -1,4 +1,4 @@
-﻿<#
+<#
 Tests for domain joined computers, including DC/PDC
 #>
 
