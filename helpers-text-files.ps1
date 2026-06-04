@@ -231,6 +231,27 @@ data are skipped. Substitutions are evaluated sequentially.
     $replacementsToProcess[$Pattern] = $Replacement
   }
 
+  # Validate regex/replacement pairs before touching any files so invalid
+  # input fails as a terminating error instead of returning a soft result.
+  $compiledReplacements = [System.Collections.Generic.List[object]]::new()
+  foreach ($pat in $replacementsToProcess.Keys) {
+    $rep = $replacementsToProcess[$pat]
+    $effectivePattern = if($Literal){ [regex]::Escape($pat) } else { $pat }
+
+    try {
+      $rx = [regex]::new($effectivePattern)
+      $null = $rx.Replace('', $rep)
+      $compiledReplacements.Add([pscustomobject]@{
+        Pattern = $pat
+        Regex = $rx
+        Replacement = $rep
+      })
+    }
+    catch {
+      throw "Invalid regex or replace failed on pattern '$pat': $($_.Exception.Message)"
+    }
+  }
+
   $backupSuffix = _Etf_NormalizeBackupSuffix -Backup $Backup
 
   $targets = @()
@@ -1163,17 +1184,17 @@ error when building the hashtable.
 
                 $res1 = Edit-TextFile -File $target -ReplaceMap $batch1 `
 					-Literal -Backup $activeBackup -MaxFileSize $MaxFileSize `
-					-PreferISOEncodings $PreferISOEncodings
-                if ($res1.Changed) { $activeBackup = "" } 
+					-PreferISOEncodings:$PreferISOEncodings
+                if ($res1.Changed) { $activeBackup = "" }
 
                 $res2 = Edit-TextFile -File $target -ReplaceMap $batch2 `
 					-Literal -Backup $activeBackup -MaxFileSize $MaxFileSize `
-					-PreferISOEncodings $PreferISOEncodings
-                if ($res2.Changed) { $activeBackup = "" } 
+					-PreferISOEncodings:$PreferISOEncodings
+                if ($res2.Changed) { $activeBackup = "" }
 
                 $res3 = Edit-TextFile -File $target -ReplaceMap $batch3 `
 					-Literal -Backup $activeBackup -MaxFileSize $MaxFileSize `
-					-PreferISOEncodings $PreferISOEncodings
+					-PreferISOEncodings:$PreferISOEncodings
 
                 $anyChanged = ($res1.Changed -or $res2.Changed -or $res3.Changed)
                 $details = if ($anyChanged) { "Changes made across typography batches" } else { "Pattern(s) not found" }
