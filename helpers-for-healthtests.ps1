@@ -1,4 +1,4 @@
-function Test-IsVirtualMachine {
+﻿function Test-IsVirtualMachine {
   # returns $true if it guesses the computer is VM
   [CmdletBinding()]
   [OutputType([bool])]

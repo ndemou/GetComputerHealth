@@ -1,4 +1,4 @@
-<#
+﻿<#
 .DESCRIPTION
 Converts legacy custom health test scripts so they can be executed directly.
 

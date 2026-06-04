@@ -1,4 +1,4 @@
-Describe 'HealthTest help blocks' {
+﻿Describe 'HealthTest help blocks' {
   It 'all HealthTest-* functions have the required help block format' {
     $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
     $healthTestsPath = Join-Path $repoRoot 'health-tests'

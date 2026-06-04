@@ -1,4 +1,4 @@
-<#
+﻿<#
 .DESCRIPTION
 Converts legacy Excel message archives under the data folder to CLIXML archives.
 

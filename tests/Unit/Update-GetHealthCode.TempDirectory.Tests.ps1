@@ -1,4 +1,4 @@
-Describe 'Update-GetHealthCode temporary directory selection' {
+﻿Describe 'Update-GetHealthCode temporary directory selection' {
   BeforeAll {
     $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
     $scriptPath = Join-Path $repoRoot 'Update-GetHealthCode.ps1'

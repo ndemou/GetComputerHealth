@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
 Collects sample Hyper-V replication data from one host for debugging.
 

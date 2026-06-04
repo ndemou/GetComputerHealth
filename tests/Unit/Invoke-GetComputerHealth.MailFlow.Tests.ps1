@@ -1,4 +1,4 @@
-Describe 'Invoke-GetComputerHealth mail flow helpers' {
+﻿Describe 'Invoke-GetComputerHealth mail flow helpers' {
   BeforeAll {
     $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
     $scriptPath = Join-Path $repoRoot 'Invoke-GetComputerHealth.ps1'

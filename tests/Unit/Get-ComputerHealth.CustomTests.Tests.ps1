@@ -1,4 +1,4 @@
-Describe 'Get-ComputerHealth custom test scripts' {
+﻿Describe 'Get-ComputerHealth custom test scripts' {
   BeforeAll {
     $script:RepoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
     $script:GetComputerHealthScript = Join-Path $script:RepoRoot 'Get-ComputerHealth.ps1'

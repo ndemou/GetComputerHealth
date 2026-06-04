@@ -1,4 +1,4 @@
-<#
+﻿<#
 .DESCRIPTION
 Creates the data folder and moves existing Excel health result workbooks from temp to data.
 

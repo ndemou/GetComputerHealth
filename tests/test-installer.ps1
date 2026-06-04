@@ -1,4 +1,4 @@
-# Provides:
+﻿# Provides:
 #  - New-ZipFromFolder: Creates a zip file from a folder keeping that folder as the top-level entry in the zip.
 param(
   [switch]$IncludeVersionlessZipScenario = ($env:GCH_TEST_INSTALLER_INCLUDE_VERSIONLESS -eq '1')
