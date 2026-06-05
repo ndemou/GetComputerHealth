@@ -606,8 +606,8 @@ if (-not $NoUpdate) {
       $versionBeforeUpdate -ne $versionAfterUpdate
     ) {
       Write-Host -ForegroundColor Yellow "Get-ComputerHealth was updated from version $versionBeforeUpdate to $versionAfterUpdate. Re-running Invoke-GetComputerHealth.ps1 once."
+      # Do not continue in the pre-update process after the updated copy has been invoked.
       Invoke-SelfAfterUpdate -BoundParameters $PSBoundParameters -PassThruArgs $PassThruArgs
-      # Do not continue in the pre-update process after the updated copy has been invoked. 
       return
     }
   }
