@@ -669,7 +669,7 @@ function Get-HealthInteractiveHtmlReport {
   $jsonRows = @($Rows) | ConvertTo-Json -Depth 6 -Compress
   $jsonRows = $jsonRows -replace '</script>', '<\/script>'
 
-  $templatePath = Join-Path $script:GetComputerHealthReportingScriptDir 'interactive-report-template.html'
+  $templatePath = Join-Path $script:GetComputerHealthReportingScriptDir 'reporting-template.html'
   $template = Get-Content -LiteralPath $templatePath -Raw -Encoding UTF8
   $template = $template.Replace('__GCH_REPORT_TITLE__', $safeTitle)
   $template = $template.Replace('__GCH_REPORT_FOOTER_HTML__', $safeFooterHtml)
