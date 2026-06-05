@@ -1,6 +1,6 @@
 ﻿# Invoke-GetComputerHealth execution flow
 
-*(Interface-level guide for operators and developers)*
+*(Interface-level guide mainly for developers)*
 
 This document explains what happens when you run `Invoke-GetComputerHealth.ps1`.
 It focuses on observable behavior, inputs, outputs, and handoffs between scripts.
@@ -18,8 +18,7 @@ It wraps `Get-ComputerHealth.ps1` so a run can:
 - create an interactive HTML report
 - decide whether to send an email report
 
-If you only want to run the health tests for the current machine and inspect objects or console output directly, `Get-ComputerHealth.ps1` is the lower-level script.
-If you want scheduled monitoring, remote targets, report files, and email behavior, use `Invoke-GetComputerHealth.ps1`.
+If you only want to run the health tests for the current machine and just inspect PS objects or console output, `Get-ComputerHealth.ps1` is enough.
 
 ## Inputs at the command line
 
@@ -50,9 +49,9 @@ Configuration is combined with command-line arguments. Explicit command-line swi
 
 A typical invocation follows this flow:
 
-1. **Prepare runtime folders**
+1. **Prepare runtime folders and perform light housekeeping**
    - The script makes sure expected log, data, and temp folders exist.
-   - Old transcript logs may be cleaned up.
+   - Old transcript logs, if any, are cleaned up.
 
 2. **Read local configuration**
    - The wrapper reads available configuration files.
@@ -61,7 +60,7 @@ A typical invocation follows this flow:
 3. **Check for an update**
    - Unless update behavior is disabled, the wrapper runs the updater before health checks.
    - If the installed script version changes, the wrapper starts itself again once so the rest of the run uses the updated code.
-   - After starting the updated copy, the original pre-update process exits instead of continuing. This prevents duplicate reports from one scheduled task run.
+   - After starting the updated copy, the original pre-update process exits instead of continuing. 
 
 4. **Start run logging**
    - The wrapper starts a transcript log for the run.
@@ -90,12 +89,12 @@ A typical invocation follows this flow:
 9. **Write report artifacts**
    - All collected messages are saved as data.
    - Notable messages are saved separately.
-   - An interactive HTML report is generated when there is report data to show.
+   - An interactive HTML report is generated when there is report data to send to the operator.
 
 10. **Decide whether to send email**
     - Explicit email switches and configuration determine whether the report should be sent.
-    - In non-interactive scheduled contexts, email is normally enabled by default.
-    - In interactive contexts, email is normally disabled by default unless explicitly requested.
+    - In non-interactive contexts (e.g. run from scheduled tasks), email is normally enabled by default.
+    - In interactive contexts (e.g. running from the terminal), email is normally disabled by default unless explicitly requested.
 
 11. **Send the report or finish quietly**
     - If notable messages exist and email is enabled, the wrapper sends a report email with the summary and report artifact.
@@ -104,7 +103,7 @@ A typical invocation follows this flow:
 
 ## The self-update rerun handoff
 
-The update handoff is the easiest part of the flow to misunderstand.
+The update handoff is the easiest part of the flow to get wrong and introduce subtle bugs.
 When the wrapper updates itself, continuing in the original process is unsafe because that process has already loaded and evaluated old code.
 The intended behavior is:
 
@@ -114,10 +113,7 @@ The intended behavior is:
 4. it exits immediately
 5. the second invocation performs target checks and report delivery
 
-That one-time marker is internal to `Invoke-GetComputerHealth.ps1`.
-It is not a `Get-ComputerHealth.ps1` option and must not be forwarded to the child health script.
-If that internal marker reaches the child script, PowerShell can bind it in surprising ways and produce misleading parameter errors.
-For that reason, the wrapper guards the boundary before invoking `Get-ComputerHealth.ps1` and fails loudly if an internal wrapper-only argument is about to cross it.
+That one-time marker (`-AlreadyReranAfterUpdate`) is internal to `Invoke-GetComputerHealth.ps1`. If it reaches the child script(`Get-ComputerHealth.ps1`), PowerShell can bind it in surprising ways and produce misleading parameter errors.
 
 ## Local target flow
 
