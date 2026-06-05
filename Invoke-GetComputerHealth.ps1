@@ -2187,6 +2187,7 @@ function Invoke-SelfAfterUpdate {
   $rerunArgs = @(
     Convert-BoundParametersToInvocationArguments -BoundParameters $BoundParameters -Exclude @('AlreadyReranAfterUpdate', 'PassThruArgs')
   )
+  # AlreadyReranAfterUpdate is for Invoke-GetComputerHealth.ps1 only.
   $rerunArgs += '-AlreadyReranAfterUpdate'
   $rerunArgs += @($PassThruArgs)
 
@@ -2230,6 +2231,8 @@ if (-not $NoUpdate) {
     ) {
       Write-Host -ForegroundColor Yellow "Get-ComputerHealth was updated from version $versionBeforeUpdate to $versionAfterUpdate. Re-running Invoke-GetComputerHealth.ps1 once."
       Invoke-SelfAfterUpdate -BoundParameters $PSBoundParameters -PassThruArgs $PassThruArgs
+      # Do not continue in the pre-update process after the updated copy has been invoked. 
+      return
     }
   }
   catch {
@@ -2399,6 +2402,26 @@ foreach ($target in $targets) {
       return $realLevel
     }
 
+    function Assert-NoInvokeGetComputerHealthOnlyPassThruArguments {
+      # PassThruArgs are appended to the child Get-ComputerHealth.ps1 call.
+      # Wrapper-only markers must never reach that child script; if they do,
+      # fail loudly instead of silently dropping them and hiding a binding bug.
+      [CmdletBinding()]
+      param(
+        [object[]]$Arguments = @(),
+        [string]$DestinationScriptPath = 'Get-ComputerHealth.ps1'
+      )
+
+      foreach ($argument in @($Arguments)) {
+        if ($null -eq $argument) { continue }
+
+        $argumentText = [string]$argument
+        if (($argumentText -ieq '-AlreadyReranAfterUpdate') -or ($argumentText -ieq '/AlreadyReranAfterUpdate')) {
+          throw ("Internal Invoke-GetComputerHealth.ps1 argument '{0}' was about to be forwarded to {1}. This indicates an argument-binding bug in Invoke-GetComputerHealth.ps1." -f $argumentText, $DestinationScriptPath)
+        }
+      }
+    }
+
     if (-not (Test-Path -LiteralPath $logLibPath)) {
       throw "Logging helper file not found: $logLibPath"
     }
@@ -2452,6 +2475,8 @@ foreach ($target in $targets) {
         RunWithoutElevation    = $RunWithoutElevation
         IpsOfAllDcs            = $IpsOfAllDcs
       }
+      # Guard the argument interface between the wrapper and Get-ComputerHealth.ps1.
+      Assert-NoInvokeGetComputerHealthOnlyPassThruArguments -Arguments $PassThruArgs -DestinationScriptPath $getHealthScriptPath
       $healthOutput = & $getHealthScriptPath @getHealthParams @PassThruArgs 2>&1
       $suppressionExpiryMap = Get-HealthSuppressionExpiryMapLocal -Path $suppressionFilePath
 
