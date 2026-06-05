@@ -185,6 +185,13 @@ $results | ogv
 
 The toolkit operates on a **Controller–Agent** model, though it is agentless via PowerShell Remoting. You run the orchestration script on your management machine (the Controller). It executes tests on your servers or workstations (the Targets), aggregates the results into CLIXML and HTML reports, and emails them.
 
+Think of the scripts as three layers:
+
+ 0. (**Only for multiple domain joined targets**) `Invoke-GetHealthDomainComputers.ps1` is a very light wrapper around `Invoke-GetComputerHealth.ps1`.
+ 1. `Invoke-GetComputerHealth.ps1` orchestrates update, target selection, remoting, collection, artifacts, and email.
+ 2. `Get-ComputerHealth.ps1` runs the actual health tests for one target context.
+ 3. `Health-test\*` scripts produce individual health messages.
+
 ## Relationship Diagram
 
 ```mermaid
@@ -194,12 +201,13 @@ config:
   theme: redux
 ---
 flowchart BT
+ Operator["Operator (you@yourdomain.com)"]
  subgraph Controller["Controller"]
         Orchestrator["Invoke-GetComputerHealth.ps1"]
         Entry["Invoke-GetHealthDomainComputers.ps1"]
-        TargetServers["Target Servers"]
         Report["CLIXML + HTML files"]
         Mailer["Send-Message.ps1"]
+        Files[".\data\*.clixml"]
  end
  subgraph Target["Target Computer"]
         LocalRunner["Get-ComputerHealth.ps1"]
@@ -210,14 +218,19 @@ flowchart BT
     Entry --> Orchestrator
     Orchestrator -- "1. Connects via WinRM" --> Target
     Orchestrator -- "4. Aggregates results" --> Report
-    Report -- "5. Emails results using" --> Mailer
+    Report -- "5. Send HTML reports" --> Mailer
+    Mailer -.-> Operator
+    Report -- "Keep *.clixml data" --> Files
     Updater -- "2. Updates Scripts" --> LocalRunner
     LocalRunner -- "3. Executes" --> Tests
-    Config -.-> LocalRunner
+    Config --> LocalRunner
 
      Report:::Rose
      Config:::Rose
+     Files:::Rose
+     Operator:::Olive
      classDef Rose stroke-width:1px, stroke-dasharray:none, stroke:#FF5978, fill:#FFDFE5, color:#8E2236
+     classDef Olive stroke-width:1px, stroke-dasharray:none, stroke:#80dd80, fill:#80dd80, color:#000000
      style Target fill:#FFF9C4
 ```
 
@@ -248,27 +261,6 @@ These are the scripts you actually execute.
   4. Collects output, saves it in CLIXML, generates HTML reports, and emails *notable* (non-success) messages.
 * **Key Parameters:** `-Computers` (list of targets, local host by default), `-ExcludeServers`, `-Hide` (defines which message types to hide from console output, usually "DIPS").
 * **Email default caveat:** `Invoke-GetComputerHealth.ps1` sends email by default in non-interactive contexts, and does not send by default in interactive contexts. If you first connect with `Enter-PSSession` and then run the script on the remote host, that remote PowerShell host can still appear non-interactive to the script. Use `-NoSendReport` inside `Enter-PSSession` when you do not want the default email report.
-
-## B. The Worker (Runs on Targets)
-
-These scripts run locally on the servers being checked.
-
-* **`Get-ComputerHealth.ps1`**
-  * **Role:** The Local Runner.
-  * **Function:** It loads the test library and executes the tests. It handles **permitlisting** (suppressing known failures) and generates clean, colorized console output.
-  * **Usage:** Can be run interactively on a specific server for troubleshooting (e.g., `.\Get-ComputerHealth.ps1 -OutputConsoleMessages`).
-
-* **`health-tests\*.ps1`**
-  * **Role:** The Logic Library.
-  * **Function:** Contains the actual code for checks like `DiskSpace` and `TimeSyncPolicy`. These scripts reside in `health-tests\` and are dot-sourced by the Runner.
-
-* **`Update-GetHealthCode.ps1`**
-  * **Role:** The Updater.
-  * **Function:** Ensures the local `C:\IT\Get-ComputerHealth\bin` folder has the latest version of all scripts by downloading them from the central repository. It runs automatically before tests begin, unless `-NoUpdate` is used.
-
-## C. Utilities
-
-* **`Send-Message.ps1`**: A utility wrapper for sending SMTP emails (configured via `C:\IT\Get-ComputerHealth\config\Send-Message.conf`).
 
 # 5. Directory Structure Reference
 
