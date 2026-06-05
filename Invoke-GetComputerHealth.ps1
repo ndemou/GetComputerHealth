@@ -2187,9 +2187,7 @@ function Invoke-SelfAfterUpdate {
   $rerunArgs = @(
     Convert-BoundParametersToInvocationArguments -BoundParameters $BoundParameters -Exclude @('AlreadyReranAfterUpdate', 'PassThruArgs')
   )
-  # This marker is for Invoke-GetComputerHealth.ps1 only. Keep it before
-  # pass-through arguments so PowerShell binds it to this wrapper instead of
-  # letting it fall through to Get-ComputerHealth.ps1.
+  # AlreadyReranAfterUpdate is for Invoke-GetComputerHealth.ps1 only.
   $rerunArgs += '-AlreadyReranAfterUpdate'
   $rerunArgs += @($PassThruArgs)
 
@@ -2233,8 +2231,7 @@ if (-not $NoUpdate) {
     ) {
       Write-Host -ForegroundColor Yellow "Get-ComputerHealth was updated from version $versionBeforeUpdate to $versionAfterUpdate. Re-running Invoke-GetComputerHealth.ps1 once."
       Invoke-SelfAfterUpdate -BoundParameters $PSBoundParameters -PassThruArgs $PassThruArgs
-      # Do not continue in the pre-update process after the updated copy has
-      # been invoked. Continuing here sends a second report from the old run.
+      # Do not continue in the pre-update process after the updated copy has been invoked. 
       return
     }
   }
@@ -2478,9 +2475,7 @@ foreach ($target in $targets) {
         RunWithoutElevation    = $RunWithoutElevation
         IpsOfAllDcs            = $IpsOfAllDcs
       }
-      # Guard the boundary between the wrapper and Get-ComputerHealth.ps1.
-      # A leaked internal marker can be mis-bound by the child script as -Hide,
-      # producing a confusing validation failure instead of the real bug.
+      # Guard the argument interface between the wrapper and Get-ComputerHealth.ps1.
       Assert-NoInvokeGetComputerHealthOnlyPassThruArguments -Arguments $PassThruArgs -DestinationScriptPath $getHealthScriptPath
       $healthOutput = & $getHealthScriptPath @getHealthParams @PassThruArgs 2>&1
       $suppressionExpiryMap = Get-HealthSuppressionExpiryMapLocal -Path $suppressionFilePath
