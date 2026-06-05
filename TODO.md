@@ -183,9 +183,9 @@ This functionality will be very useful for ports, installed software, services, 
 
 ## Set of changes regarding reporting
 
-### Move the reporting code to a separate script
+### Make the code that generates and sends reports intepended
 
-This will allow us to experiment with reporting without running Get-ComputerHealth (we just use some saved findings)
+We must make it easy to experiment with changes in reporting and emailing without running Get-ComputerHealth (we should be able to reuse saved CLIXML findings)
 
 ### Lighter html code 
 
