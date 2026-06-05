@@ -2,25 +2,27 @@
   BeforeAll {
     $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
     $scriptPath = Join-Path $repoRoot 'Invoke-GetComputerHealth.ps1'
+    $reportingPath = Join-Path $repoRoot 'reporting.ps1'
     $script:InvokeGetComputerHealthScriptPath = $scriptPath
+
+    . $reportingPath
 
     $parseErrors = $null
     $tokens = $null
     $ast = [System.Management.Automation.Language.Parser]::ParseFile($scriptPath, [ref]$tokens, [ref]$parseErrors)
 
-    foreach ($functionName in @('Get-HealthEmailSignature', 'Add-HealthEmailSignature', 'Get-EmbeddedGetComputerHealthVersion')) {
-      $funcAst = $ast.Find({
-          param($node)
-          $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
-          $node.Name -eq $functionName
-        }, $true)
+    $functionName = 'Get-EmbeddedGetComputerHealthVersion'
+    $funcAst = $ast.Find({
+        param($node)
+        $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+        $node.Name -eq $functionName
+      }, $true)
 
-      if ($null -eq $funcAst) {
-        throw "Function not found in ${scriptPath}: $functionName"
-      }
-
-      . ([scriptblock]::Create($funcAst.Extent.Text))
+    if ($null -eq $funcAst) {
+      throw "Function not found in ${scriptPath}: $functionName"
     }
+
+    . ([scriptblock]::Create($funcAst.Extent.Text))
   }
 
   It 'prefers the VERSION file contents and timestamp' {

@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>__GCH_REPORT_TITLE__</title>
+  <style>
+    :root {
+      --bg: #eef3ee;
+      --bg-accent: #dce8df;
+      --panel: rgba(255,255,255,0.92);
+      --panel-strong: #ffffff;
+      --ink: #172126;
+      --muted: #607179;
+      --line: #d4ddd8;
+      --accent: #0f766e;
+      --accent-strong: #0b5c56;
+      --accent-soft: #d7f0ea;
+      --failure: #ff4d4f;
+      --warning: #ffb300;
+      --notice: #1e88e5;
+      --postponed: #2e7d32;
+      --pass: #3cb371;
+      --debug: #9aa7ad;
+      --mustfix: #b42318;
+      --suppress: #475467;
+      --postpone: #2e7d32;
+      --notsure: #8a6f00;
+      --shadow: 0 18px 48px rgba(23,33,38,0.10);
+    }
+    body {
+      margin: 0;
+      font-family: Segoe UI, Arial, sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(15,118,110,0.12), transparent 28%),
+        radial-gradient(circle at top right, rgba(30,136,229,0.10), transparent 22%),
+        linear-gradient(180deg, var(--bg) 0%, var(--bg-accent) 100%);
+      color: var(--ink);
+    }
+    .shell {
+      max-width: 1500px;
+      margin: 0 auto;
+      padding: 5px 24px 40px 24px;
+    }
+    .hero {
+      background: linear-gradient(180deg, rgba(255,255,255,0.96) 0%, rgba(248,251,249,0.92) 100%);
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      padding: 12px 24px 20px 24px;
+      box-shadow: var(--shadow);
+      margin-bottom: 5px;
+      backdrop-filter: blur(10px);
+    }
+    h1 {
+      margin: 0 0 8px 0;
+      font-size: 16px;
+      letter-spacing: -0.03em;
+    }
+    .controls, .column-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      margin-top: 14px;
+    }
+    .controls input[type=text], .controls select {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 10px 14px;
+      font-size: 14px;
+      background: rgba(255,255,255,0.92);
+      color: var(--ink);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.7);
+    }
+    .controls input[type=text] {
+      min-width: 190px;
+      flex: 0 1 210px;
+    }
+    button, .pill {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 9px 14px;
+      background: rgba(255,255,255,0.94);
+      color: var(--ink);
+      cursor: pointer;
+      font-size: 13px;
+      transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease, background-color 0.12s ease;
+      box-shadow: 0 4px 14px rgba(23,33,38,0.06);
+    }
+    button:hover, .pill:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 18px rgba(23,33,38,0.10);
+    }
+    button.active-filter {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+    .show-postponed-status {
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .footer {
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 10px;
+      font-family: Segoe UI, Arial, sans-serif;
+    }
+    .utility-button {
+      background: linear-gradient(180deg, #2f80ed 0%, #1f62c4 100%);
+      color: #ffffff;
+      border-color: #1d55a6;
+      margin-left: auto;
+    }
+    .utility-button:hover {
+      background: linear-gradient(180deg, #3689f2 0%, #255fb3 100%);
+    }
+    .utility-button strong {
+      font-weight: 700;
+    }
+    .utility-button.hidden {
+      display: none;
+    }
+    .toggle-track {
+      position: relative;
+      width: 42px;
+      height: 24px;
+      border-radius: 999px;
+      background: #c7d4cf;
+      transition: background-color 0.15s ease;
+      flex: 0 0 auto;
+      display: inline-block;
+    }
+    .toggle-track::after {
+      content: '';
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #fff;
+      box-shadow: 0 2px 6px rgba(23,33,38,0.18);
+      transition: transform 0.15s ease;
+    }
+    .plain-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--ink);
+      user-select: none;
+    }
+    .plain-toggle input {
+      position: absolute;
+      opacity: 0;
+      width: 1px;
+      height: 1px;
+      pointer-events: none;
+    }
+    .plain-toggle input:checked + .toggle-track {
+      background: var(--accent);
+    }
+    .plain-toggle input:checked + .toggle-track::after {
+      transform: translateX(18px);
+    }
+    .plain-toggle .toggle-text {
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .controls-label {
+      font-size: 13px;
+      color: var(--muted);
+      font-weight: 600;
+    }
+    .column-controls label {
+      font-size: 13px;
+      color: var(--ink);
+    }
+    .table-wrap {
+      background: var(--panel-strong);
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      box-shadow: var(--shadow);
+      overflow: auto;
+      backdrop-filter: blur(10px);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: auto;
+    }
+    col.col-width-computer { width: 1%; }
+    col.col-width-level { width: 1%; }
+    col.col-width-action { width: 1%; }
+    col.col-width-message { width: 28%; }
+    col.col-width-emitter { width: 1%; }
+    col.col-width-command { width: 24%; }
+    thead {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+    }
+    thead th {
+      background: linear-gradient(180deg, #eef6f3 0%, #e7f0ec 100%);
+      text-align: left;
+      font-size: 12px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--muted);
+      border-bottom: 1px solid var(--line);
+      padding: 14px 12px;
+      white-space: nowrap;
+    }
+    .sort-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: 0;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      padding: 0;
+      font-size: 11px;
+      line-height: 1;
+      box-shadow: none;
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+    .sort-toggle:hover {
+      transform: none;
+      box-shadow: none;
+      color: var(--ink);
+    }
+    .sort-toggle.active {
+      color: var(--accent-strong);
+    }
+    .sort-toggle .sort-label {
+      font-size: 12px;
+      letter-spacing: 0.04em;
+    }
+    .sort-toggle .sort-glyph {
+      font-size: 11px;
+      line-height: 1;
+    }
+    tbody td {
+      padding: 12px;
+      border-bottom: 1px solid #edf1ef;
+      vertical-align: top;
+      font-size: 13px;
+      overflow-wrap: anywhere;
+    }
+    tbody tr:hover {
+      background: #f7fbf9;
+    }
+    .col-computer, .col-level, .col-action {
+      white-space: nowrap;
+      width: 1%;
+    }
+    thead th.col-computer {
+      padding-left: 10px;
+      padding-right: 2px;
+    }
+    tbody td.col-computer {
+      padding-left: 10px;
+      padding-right: 2px;
+    }
+    thead th.col-level, thead th.col-action {
+      padding-left: 2px;
+      padding-right: 2px;
+    }
+    tbody td.col-level, tbody td.col-action {
+      padding-left: 2px;
+      padding-right: 2px;
+    }
+    .col-message {
+      font-size: 13px;
+    }
+    .col-emitter {
+      white-space: nowrap;
+      width: 1%;
+    }
+    .message-block {
+      display: block;
+    }
+    .message-main {
+      display: flex;
+      align-items: flex-start;
+      gap: 6px;
+    }
+    .message-info {
+      border: 0;
+      background: transparent;
+      color: #355f8c;
+      cursor: pointer;
+      padding: 0;
+      margin: 0;
+      font-size: 13px;
+      line-height: 1.2;
+      box-shadow: none;
+      flex: 0 0 auto;
+    }
+    .message-info:hover {
+      transform: none;
+      box-shadow: none;
+      color: #22476a;
+    }
+    .message-comment {
+      margin-top: 6px;
+      margin-left: 19px;
+      color: #1f4268;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 12px;
+      line-height: 1.45;
+      white-space: pre-wrap;
+    }
+    .message-comment.hidden-column {
+      display: none;
+    }
+    .postponed-text {
+      color: #7a7f87;
+    }
+    .level-badge, .what-badge {
+      display: inline-block;
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-weight: 700;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    .level-failure { background: var(--failure); color: #fff; }
+    .level-warning { background: var(--warning); color: #111; }
+    .level-notice { background: var(--notice); color: #fff; }
+    .level-postponed { background: #767676; color: #fff; }
+    .level-pass { background: var(--pass); color: #fff; }
+    .level-debug, .level-info { background: var(--debug); color: #fff; }
+    .what-suppress { background: var(--suppress); color: #fff; }
+    .what-postpone { background: var(--postpone); color: #fff; }
+    .what-must-fix { background: var(--mustfix); color: #fff; }
+    .what-not-sure { background: var(--notsure); color: #fff; }
+    .cmd {
+      color: #41515a;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 12px;
+      white-space: pre-wrap;
+      line-height: 1.45;
+    }
+    .hidden-column {
+      display: none;
+    }
+    .muted {
+      color: var(--muted);
+    }
+    .copy-status {
+      font-size: 12px;
+      color: var(--muted);
+      min-height: 18px;
+      margin-left: 4px;
+    }
+    .copy-status.success {
+      color: var(--accent-strong);
+    }
+    .copy-status.error {
+      color: var(--mustfix);
+    }
+    @media (max-width: 1100px) {
+      .shell {
+        padding: 5px 18px 18px 18px;
+      }
+      .controls input[type=text] {
+        min-width: 240px;
+        flex-basis: 100%;
+      }
+      table {
+        min-width: 980px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="hero">
+      <h1>__GCH_REPORT_TITLE__</h1>
+      <div class="controls">
+        <span class="controls-label">Filters:</span>
+        <input id="textFilter" type="text" placeholder="Filter text. Example: foo -bar">
+        <select id="actionFilter">
+          <option value="">All actions</option>
+          <option value="suppress">Suppress</option>
+          <option value="postpone">Postpone</option>
+          <option value="must-fix">Must-fix</option>
+          <option value="not-sure">Not-sure</option>
+        </select>
+        <label class="plain-toggle" for="showPostponed">
+          <span class="toggle-text">Show Postponed</span>
+          <input id="showPostponed" type="checkbox">
+          <span class="toggle-track" aria-hidden="true"></span>
+        </label>
+        <span id="showPostponedStatus" class="show-postponed-status"></span>
+      </div>
+      <div class="column-controls">
+        <span class="controls-label">Visible Columns:</span>
+        <label><input class="column-toggle" type="checkbox" data-column="computer" checked> Computer</label>
+        <label><input class="column-toggle" type="checkbox" data-column="level" checked> Level</label>
+        <label><input class="column-toggle" type="checkbox" data-column="action" checked> Action</label>
+        <label><input class="column-toggle" type="checkbox" data-column="message" checked> Message</label>
+        <label><input class="column-toggle" type="checkbox" data-column="emitter"> Emitter</label>
+        <label><input class="column-toggle" type="checkbox" data-column="command"> Action Command</label>
+        <button id="copyVisibleCommands" type="button" class="utility-button hidden"><strong>Copy Action Commands</strong></button>
+        <span id="copyStatus" class="copy-status"></span>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <colgroup>
+          <col class="col-computer col-width-computer">
+          <col class="col-level col-width-level">
+          <col class="col-action col-width-action">
+          <col class="col-message col-width-message">
+          <col class="col-emitter col-width-emitter">
+          <col class="col-command col-width-command">
+        </colgroup>
+        <thead>
+          <tr>
+            <th class="col-computer"><button type="button" class="sort-toggle" data-sort-field="Computer" data-sort-direction="" aria-label="Toggle sort for Computer" title="Toggle sort for Computer"><span class="sort-label">Computer</span><span class="sort-glyph">&#9679;</span></button></th>
+            <th class="col-level"><button type="button" class="sort-toggle" data-sort-field="EffectiveLevel" data-sort-direction="" aria-label="Toggle sort for Level" title="Toggle sort for Level"><span class="sort-label">Level</span><span class="sort-glyph">&#9679;</span></button></th>
+            <th class="col-action"><button type="button" class="sort-toggle" data-sort-field="WhatToDo" data-sort-direction="" aria-label="Toggle sort for Action" title="Toggle sort for Action"><span class="sort-label">Action</span><span class="sort-glyph">&#9679;</span></button></th>
+            <th class="col-message"><button type="button" class="sort-toggle" data-sort-field="Message" data-sort-direction="" aria-label="Toggle sort for Message" title="Toggle sort for Message"><span class="sort-label">Message</span><span class="sort-glyph">&#9679;</span></button></th>
+            <th class="col-emitter"><button type="button" class="sort-toggle" data-sort-field="Emitter" data-sort-direction="" aria-label="Toggle sort for Emitter" title="Toggle sort for Emitter"><span class="sort-label">Emitter</span><span class="sort-glyph">&#9679;</span></button></th>
+            <th class="col-command">Action Command</th>
+          </tr>
+        </thead>
+        <tbody id="reportRows"></tbody>
+      </table>
+    </div>
+    <div class="footer">__GCH_REPORT_FOOTER_HTML__</div>
+  </div>
+  <script>
+    (function () {
+      var storageKey = 'gch-report-actions-v2';
+      var expandedComments = {};
+      var rows = __GCH_REPORT_ROWS_JSON__;
+      if (!Array.isArray(rows)) {
+        rows = rows ? [rows] : [];
+      }
+      var levelOrder = { failure: 1, warning: 2, notice: 3, postponed: 4, info: 5, pass: 6, debug: 7 };
+      var actionState = {};
+      var actionHistory = [];
+      try {
+        var saved = window.localStorage.getItem(storageKey);
+        if (saved) {
+          var parsedState = JSON.parse(saved) || {};
+          if (Array.isArray(parsedState)) {
+            actionHistory = parsedState.slice(-100);
+          } else {
+            if (parsedState.ActionHistory && Array.isArray(parsedState.ActionHistory)) {
+              actionHistory = parsedState.ActionHistory.slice(-100);
+            }
+            if (parsedState.ActionState && parsedState.ActionState.constructor === Object) {
+              actionState = parsedState.ActionState;
+            }
+          }
+        }
+      } catch (error) {
+        actionState = {};
+        actionHistory = [];
+      }
+
+      function keyForRow(row) {
+        return [row.Computer || '', row.Hash || ''].join('|');
+      }
+
+      if (!Object.keys(actionState).length && actionHistory.length) {
+        actionHistory.forEach(function (entry) {
+          if (!entry || !entry.ComputerName || !entry.FindingHash || !entry.WhatToDo) {
+            return;
+          }
+          actionState[[entry.ComputerName, entry.FindingHash].join('|')] = entry.WhatToDo;
+        });
+      }
+
+      function saveState() {
+        try {
+          window.localStorage.setItem(storageKey, JSON.stringify({
+            ActionHistory: actionHistory.slice(-100),
+            ActionState: actionState
+          }));
+        } catch (error) {
+        }
+      }
+
+      function htmlEncode(value) {
+        return String(value || '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+      }
+
+      function actionClass(value) {
+        return 'what-' + String(value || 'not-sure').replace(/[^a-z-]/g, '');
+      }
+
+      function levelClass(value) {
+        return 'level-' + String(value || 'info').toLowerCase().replace(/[^a-z-]/g, '');
+      }
+
+      function normalizeAction(row) {
+        var key = keyForRow(row);
+        if (actionState[key]) {
+          row.WhatToDo = actionState[key];
+        } else {
+          row.WhatToDo = 'not-sure';
+        }
+      }
+
+      function rememberActionChoice(row) {
+        var choice = {
+          ComputerName: String(row.Computer || ''),
+          FindingHash: String(row.Hash || ''),
+          WhatToDo: String(row.WhatToDo || 'not-sure')
+        };
+        actionHistory = actionHistory.filter(function (entry) {
+          return !(
+            entry &&
+            entry.ComputerName === choice.ComputerName &&
+            entry.FindingHash === choice.FindingHash
+          );
+        });
+        actionHistory.push(choice);
+        if (actionHistory.length > 100) {
+          actionHistory = actionHistory.slice(actionHistory.length - 100);
+        }
+      }
+
+      function rotateAction(current) {
+        var values = ['suppress', 'postpone', 'must-fix', 'not-sure'];
+        var index = values.indexOf(current);
+        if (index < 0) { index = values.length - 1; }
+        return values[(index + 1) % values.length];
+      }
+
+      function parseFilterTokens(text) {
+        var tokens = [];
+        var source = String(text || '');
+        var current = '';
+        var inQuotes = false;
+        var isNegated = false;
+        var i;
+
+        function pushCurrent() {
+          if (!current) {
+            return;
+          }
+          tokens.push({
+            value: current.toLowerCase(),
+            negated: isNegated
+          });
+          current = '';
+          isNegated = false;
+        }
+
+        for (i = 0; i < source.length; i++) {
+          var ch = source.charAt(i);
+          if (ch === '"') {
+            inQuotes = !inQuotes;
+            continue;
+          }
+          if (!inQuotes && /\s/.test(ch)) {
+            pushCurrent();
+            continue;
+          }
+          if (!inQuotes && !current && ch === '-') {
+            isNegated = true;
+            continue;
+          }
+          current += ch;
+        }
+
+        pushCurrent();
+        return tokens;
+      }
+
+      function rowSearchText(row) {
+        return [
+          row.Computer || '',
+          row.EffectiveLevel || row.Level || '',
+          row.Message || '',
+          row.Comment || '',
+          row.Emitter || ''
+        ].join(' ').toLowerCase();
+      }
+
+      function currentWhatFilter() {
+        return document.getElementById('actionFilter').value || '';
+      }
+
+      function sortButtonText(direction) {
+        if (direction === 'asc') {
+          return '\u25B2';
+        }
+        if (direction === 'desc') {
+          return '\u25BC';
+        }
+        return '\u25CF';
+      }
+
+      function currentSort() {
+        var active = document.querySelector('.sort-toggle.active');
+        if (!active) {
+          return { field: '', direction: '' };
+        }
+        return {
+          field: active.getAttribute('data-sort-field') || '',
+          direction: active.getAttribute('data-sort-direction') || ''
+        };
+      }
+
+      function setCopyStatus(message, cssClass) {
+        var status = document.getElementById('copyStatus');
+        status.textContent = message || '';
+        status.className = 'copy-status' + (cssClass ? ' ' + cssClass : '');
+      }
+
+      function compareRows(left, right, field, ascending) {
+        var a = left[field] || '';
+        var b = right[field] || '';
+        if (field === 'EffectiveLevel') {
+          a = levelOrder[String(a).toLowerCase()] || 999;
+          b = levelOrder[String(b).toLowerCase()] || 999;
+        } else {
+          a = String(a).toLowerCase();
+          b = String(b).toLowerCase();
+        }
+        if (a === b) { return 0; }
+        var result = a > b ? 1 : -1;
+        return ascending ? result : result * -1;
+      }
+
+      function buildWhitelistCommand(row) {
+        var level = String(row.Level || '').toLowerCase();
+        var hash = String(row.Hash || '');
+        var computer = String(row.Computer || '');
+        var message = String(row.Message || '');
+        var whatToDo = String(row.WhatToDo || '').toLowerCase();
+        if (!hash || !computer || !message) {
+          return '';
+        }
+        if (String(row.Suppressed).toLowerCase() === 'true') {
+          return '';
+        }
+        if (level === 'info' || level === 'debug') {
+          return '';
+        }
+        if (whatToDo === 'must-fix' || whatToDo === 'not-sure' || !whatToDo) {
+          return '';
+        }
+        var until = '2999-12-31';
+        if (whatToDo === 'postpone') {
+          var untilDate = new Date();
+          untilDate.setDate(untilDate.getDate() + 30);
+          until = untilDate.getFullYear()
+            + '-' + String(untilDate.getMonth() + 1).padStart(2, '0')
+            + '-' + String(untilDate.getDate()).padStart(2, '0');
+        }
+        else if (whatToDo !== 'suppress') {
+          return '';
+        }
+        var safeComment = (level + ' - ' + message).replace(/"/g, '"');
+        return "Invoke-Command " + computer
+          + " {& \"c:\\it\\Get-ComputerHealth\\bin\\Get-ComputerHealth.ps1\" -AddWhitelisting -until "
+          + until
+          + " -sig '"
+          + hash
+          + "' -ComputerName "
+          + computer
+          + " -comment \""
+          + safeComment
+          + "\"}";
+      }
+
+      function commandsShareSingleComputer(commands) {
+        if (!commands || commands.length < 1) {
+          return false;
+        }
+        var firstMatch = /^Invoke-Command\s+(\S+)\s+\{/i.exec(commands[0] || '');
+        if (!firstMatch) {
+          return false;
+        }
+        var computer = firstMatch[1];
+        for (var i = 1; i < commands.length; i++) {
+          var match = /^Invoke-Command\s+(\S+)\s+\{/i.exec(commands[i] || '');
+          if (!match || match[1] !== computer) {
+            return false;
+          }
+        }
+        return true;
+      }
+
+      function simplifyCommandsForSingleComputer(commands) {
+        if (!commandsShareSingleComputer(commands)) {
+          return commands;
+        }
+        return commands.map(function (command) {
+          return String(command || '')
+            .replace(/^Invoke-Command\s+\S+\s+\{/i, '')
+            .replace(/\}$/, '');
+        });
+      }
+
+      function render() {
+        var filterText = document.getElementById('textFilter').value;
+        var tokens = parseFilterTokens(filterText);
+        var showPostponed = document.getElementById('showPostponed').checked;
+        var sort = currentSort();
+        var whatFilter = currentWhatFilter();
+        var body = document.getElementById('reportRows');
+        var filtered = rows.filter(function (row) {
+          normalizeAction(row);
+          if (!showPostponed && String(row.EffectiveLevel || row.Level || '').toLowerCase() === 'postponed') {
+            return false;
+          }
+          if (whatFilter && row.WhatToDo !== whatFilter) {
+            return false;
+          }
+          var haystack = rowSearchText(row);
+          for (var i = 0; i < tokens.length; i++) {
+            var token = tokens[i];
+            if (!token || !token.value) {
+              continue;
+            }
+            if (token.negated) {
+              if (haystack.indexOf(token.value) !== -1) {
+                return false;
+              }
+            } else if (haystack.indexOf(token.value) === -1) {
+              return false;
+            }
+          }
+          return true;
+        });
+
+        if (sort.field && sort.direction) {
+          filtered.sort(function (left, right) {
+            return compareRows(left, right, sort.field, sort.direction === 'asc');
+          });
+        }
+
+        body.innerHTML = filtered.map(function (row, index) {
+          var key = htmlEncode(keyForRow(row));
+          var isPostponed = String(row.EffectiveLevel || row.Level || '').toLowerCase() === 'postponed';
+          var postponedClass = isPostponed ? ' postponed-text' : '';
+          var commentHtml = htmlEncode(row.Comment || '').replace(/\r?\n/g, '<br>');
+          var commandHtml = htmlEncode(buildWhitelistCommand(row)).replace(/\r?\n/g, '<br>');
+          var actionHtml = '';
+          var hasComment = Boolean(row.Comment);
+          var showComment = Boolean(expandedComments[keyForRow(row)]);
+          var messageCommentClass = 'message-comment' + (showComment ? '' : ' hidden-column') + postponedClass;
+          var infoButtonHtml = '';
+          if (hasComment) {
+            infoButtonHtml = '<button type="button" class="message-info" data-comment-key="' + key + '" title="Show or hide comment" aria-label="Show or hide comment">&#8505;&#65039;</button>';
+          }
+          if (!isPostponed) {
+            actionHtml = '<button type="button" class="what-badge ' + actionClass(row.WhatToDo) + '" data-row-key="' + key + '" data-index="' + index + '">' + htmlEncode(row.WhatToDo) + '</button>';
+          }
+          return ''
+            + '<tr>'
+            + '<td class="col-computer">' + htmlEncode(row.Computer || '') + '</td>'
+            + '<td class="col-level"><span class="level-badge ' + levelClass((row.EffectiveLevel || row.Level || '').toLowerCase()) + '">' + htmlEncode(row.EffectiveLevel || row.Level || '') + '</span></td>'
+            + '<td class="col-action">' + actionHtml + '</td>'
+            + '<td class="col-message' + postponedClass + '"><div class="message-block"><div class="message-main">' + infoButtonHtml + '<span>' + htmlEncode(row.Message || '') + '</span></div><div class="' + messageCommentClass + '">' + commentHtml + '</div></div></td>'
+            + '<td class="col-emitter">' + htmlEncode(row.Emitter || '') + '</td>'
+            + '<td class="col-command cmd">' + commandHtml + '</td>'
+            + '</tr>';
+        }).join('');
+
+        document.querySelectorAll('.what-badge').forEach(function (button) {
+          button.addEventListener('click', function () {
+            var matchingRow = filtered[parseInt(button.getAttribute('data-index'), 10)];
+            if (!matchingRow) {
+              return;
+            }
+            matchingRow.WhatToDo = rotateAction(matchingRow.WhatToDo);
+            actionState[keyForRow(matchingRow)] = matchingRow.WhatToDo;
+            rememberActionChoice(matchingRow);
+            saveState();
+            render();
+          });
+        });
+
+        document.querySelectorAll('.message-info').forEach(function (button) {
+          button.addEventListener('click', function () {
+            var commentKey = button.getAttribute('data-comment-key') || '';
+            expandedComments[commentKey] = !expandedComments[commentKey];
+            render();
+          });
+        });
+
+        document.getElementById('showPostponedStatus').textContent = '(showing ' + filtered.length + ' of ' + rows.length + ' findings)';
+
+        window.__gchVisibleCommands = filtered.map(function (row) {
+          return buildWhitelistCommand(row);
+        }).filter(function (command) {
+          return Boolean(command);
+        });
+        document.getElementById('copyVisibleCommands').classList.toggle('hidden', window.__gchVisibleCommands.length === 0);
+        if (window.__gchVisibleCommands.length === 0) {
+          setCopyStatus('', '');
+        }
+
+        document.querySelectorAll('.column-toggle').forEach(function (checkbox) {
+          var columnClass = '.col-' + checkbox.getAttribute('data-column');
+          document.querySelectorAll(columnClass).forEach(function (cell) {
+            cell.classList.toggle('hidden-column', !checkbox.checked);
+          });
+        });
+        document.querySelectorAll('.sort-toggle').forEach(function (button) {
+          var direction = button.getAttribute('data-sort-direction') || '';
+          var glyph = button.querySelector('.sort-glyph');
+          if (glyph) {
+            glyph.textContent = sortButtonText(direction);
+          }
+        });
+      }
+
+      document.querySelectorAll('.sort-toggle').forEach(function (button) {
+        button.addEventListener('click', function () {
+          var current = this.getAttribute('data-sort-direction') || '';
+          var next = '';
+          if (current === '') {
+            next = 'asc';
+          } else if (current === 'asc') {
+            next = 'desc';
+          }
+          document.querySelectorAll('.sort-toggle').forEach(function (item) {
+            item.classList.remove('active');
+            item.setAttribute('data-sort-direction', '');
+          });
+          if (next) {
+            this.classList.add('active');
+            this.setAttribute('data-sort-direction', next);
+          }
+          render();
+        });
+      });
+
+      document.getElementById('textFilter').addEventListener('input', render);
+      document.getElementById('actionFilter').addEventListener('change', render);
+      document.getElementById('showPostponed').addEventListener('change', render);
+      document.getElementById('copyVisibleCommands').addEventListener('click', function () {
+        var commands = window.__gchVisibleCommands || [];
+        if (!commands.length) {
+          setCopyStatus('No visible commands to copy.', 'error');
+          return;
+        }
+        commands = simplifyCommandsForSingleComputer(commands);
+        var text = commands.join('\r\n');
+        var copyPromise = null;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          copyPromise = navigator.clipboard.writeText(text);
+        } else {
+          copyPromise = new Promise(function (resolve, reject) {
+            var textArea = document.createElement('textarea');
+            textArea.value = text;
+            textArea.setAttribute('readonly', 'readonly');
+            textArea.style.position = 'absolute';
+            textArea.style.left = '-9999px';
+            document.body.appendChild(textArea);
+            textArea.select();
+            try {
+              if (document.execCommand('copy')) {
+                resolve();
+              } else {
+                reject(new Error('copy failed'));
+              }
+            } catch (error) {
+              reject(error);
+            } finally {
+              document.body.removeChild(textArea);
+            }
+          });
+        }
+        copyPromise.then(function () {
+          setCopyStatus(commands.length + ' visible command(s) copied.', 'success');
+        }).catch(function () {
+          setCopyStatus('Could not copy action commands.', 'error');
+        });
+      });
+      document.querySelectorAll('.column-toggle').forEach(function (checkbox) {
+        checkbox.addEventListener('change', render);
+      });
+
+      render();
+    }());
+  </script>
+</body>
+</html>

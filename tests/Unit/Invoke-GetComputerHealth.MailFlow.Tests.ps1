@@ -2,40 +2,24 @@
   BeforeAll {
     $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
     $scriptPath = Join-Path $repoRoot 'Invoke-GetComputerHealth.ps1'
+    $reportingPath = Join-Path $repoRoot 'reporting.ps1'
     $script:InvokeGetComputerHealthScriptText = Get-Content -LiteralPath $scriptPath -Raw
+
+    . $reportingPath
 
     $parseErrors = $null
     $tokens = $null
     $ast = [System.Management.Automation.Language.Parser]::ParseFile($scriptPath, [ref]$tokens, [ref]$parseErrors)
 
     foreach ($functionName in @(
-        'Test-IsNonInteractiveContext',
-        'Resolve-HealthEmailPreference',
-        'Get-HealthEmailDecision',
-        'Get-HealthSuppressionCommand',
-        'Convert-HealthSynopsisToHtml',
-        'Convert-HealthMessagesToHtmlTable',
-        'Get-RelaxHtmlBody',
-        'Convert-HealthMessagesToReportRows',
-        'Export-HealthMessagesReportData',
-        'Compress-HealthReportDataFile',
-        'Convert-HealthReportRowsToInteractiveRows',
-        'Get-HealthReportArtifactPaths',
-        'Import-HealthMessagesReportData',
-        'Get-HealthInteractiveHtmlReport',
         'Get-CachedIpsOfAllDcs',
         'Set-CachedIpsOfAllDcs',
         'Resolve-IpsOfAllDcs',
-        'Save-HealthHtmlReport',
-        'Move-HealthReportFile',
         'Remove-OldInvokeTranscriptLogs',
         'Read-GchConfigFile',
         'Test-GchConfigKey',
         'Get-GchConfigValue',
-        'Resolve-GchConfiguredNonNegativeInteger',
-        'Get-HealthSuppressionExpiryMap',
-        'Get-HealthEffectiveLevel',
-        'Convert-HealthTimeValueToUtcIsoString'
+        'Resolve-GchConfiguredNonNegativeInteger'
       )) {
       $funcAst = $ast.Find({
           param($node)

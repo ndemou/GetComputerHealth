@@ -1,23 +1,9 @@
 ﻿Describe 'Invoke-GetComputerHealth notable subject selection' {
   BeforeAll {
     $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-    $scriptPath = Join-Path $repoRoot 'Invoke-GetComputerHealth.ps1'
+    $reportingPath = Join-Path $repoRoot 'reporting.ps1'
 
-    $parseErrors = $null
-    $tokens = $null
-    $ast = [System.Management.Automation.Language.Parser]::ParseFile($scriptPath, [ref]$tokens, [ref]$parseErrors)
-
-    $funcAst = $ast.Find({
-        param($node)
-        $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
-        $node.Name -eq 'Get-HealthNotableSubject'
-      }, $true)
-
-    if ($null -eq $funcAst) {
-      throw "Function not found in ${scriptPath}: Get-HealthNotableSubject"
-    }
-
-    . ([scriptblock]::Create($funcAst.Extent.Text))
+    . $reportingPath
   }
 
   It 'uses Notice(s) when notice is the highest notable level' {
