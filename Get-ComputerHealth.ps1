@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
 Runs a suite of built-in and optional custom "HealthTest-*" checks and reports their findings; can also whitelist/suppress expected messages by signature.
 
@@ -214,7 +214,7 @@ param(
   [switch]$ListAllBuiltInTests
 )
 
-$VERSION="8.0.18"
+$VERSION="8.0.19"
 
 if ($null -ne $Hide) {
   $Hide = ([string]$Hide).ToUpperInvariant()
