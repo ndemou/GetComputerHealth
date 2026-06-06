@@ -52,8 +52,17 @@
   It 'checks the remote embedded version before copying and running the updater' {
     $script:ScriptText | Should -Match '\$remoteEmbeddedVersion = Invoke-Command -Session \$session -ScriptBlock \{'
     $script:ScriptText | Should -Match '\$skipTargetUpdate = \$NoUpdate'
+    $script:ScriptText | Should -Match '\$pushTargetUpdate = \$false'
     $script:ScriptText | Should -Match '\(\[string\]\$remoteEmbeddedVersion\)\.Trim\(\) -eq \$localEmbeddedVersion'
+    $script:ScriptText | Should -Match 'elseif \(\(-not \$skipTargetUpdate\) -and \$controllerCanPushUpdate\) \{'
     $script:ScriptText | Should -Match 'if \(-not \$skipTargetUpdate\) \{\s*Copy-Item -Path \$localUpdaterPath -Destination \$remoteUpdaterPath -ToSession \$session -Force'
-    $script:ScriptText | Should -Match 'Invoke-Command -Session \$session -ScriptBlock \$healthCheckBlock -ArgumentList .* \$skipTargetUpdate, \$RunWithoutElevation'
+    $script:ScriptText | Should -Match 'if \(\(-not \$skipTargetUpdate\) -and \$pushTargetUpdate -and \$localReleaseZip\) \{'
+    $script:ScriptText | Should -Match 'Invoke-Command -Session \$session -ScriptBlock \$healthCheckBlock -ArgumentList .* \$skipTargetUpdate, \$RunWithoutElevation, \$IpsOfAllDcs, \$pushTargetUpdate, \$remoteZipPath'
+  }
+
+  It 'uses a local zip for remote push only when the zip version matches the controller version' {
+    $script:ScriptText | Should -Match '\$localReleaseZipEmbeddedVersion = Get-UpdateZipEmbeddedVersion -ZipPath \$localReleaseZip -FallbackVersion \$localEmbeddedVersion'
+    $script:ScriptText | Should -Match '\$controllerCanPushUpdate = \$true'
+    $script:ScriptText | Should -Match 'Local update zip.*does not match the controller''s Get-ComputerHealth version'
   }
 }

@@ -494,6 +494,29 @@ function Get-UpdateZipVersionArgument {
   return $FallbackVersion
 }
 
+function Get-UpdateZipEmbeddedVersion {
+  [CmdletBinding()]
+  param(
+    [string]$ZipPath,
+    [string]$FallbackVersion
+  )
+
+  if ([string]::IsNullOrWhiteSpace($ZipPath)) {
+    return $null
+  }
+
+  $zipLeaf = Split-Path -Path $ZipPath -Leaf
+  if (-not [string]::IsNullOrWhiteSpace($zipLeaf) -and ($zipLeaf -match '(?i)\bv(?<Version>\d+\.\d+\.\d+)\b')) {
+    return $Matches['Version']
+  }
+
+  if ([string]::IsNullOrWhiteSpace($FallbackVersion)) {
+    return $null
+  }
+
+  return $FallbackVersion
+}
+
 function Convert-BoundParametersToInvocationArguments {
   [CmdletBinding()]
   param(
@@ -614,14 +637,30 @@ $targets = @($targets | Sort-Object)
 
 write-verbose "Targets: $($targets -join ';')"
 
+$hasRemoteTargets = @($targets | Where-Object { $_ -ne $env:COMPUTERNAME }).Count -gt 0
 $localReleaseZip = $null
 $localReleaseZipVersion = $null
-  if ($PushUpdate) {
+$localReleaseZipEmbeddedVersion = $null
+$controllerCanPushUpdate = $false
+if ((-not $NoUpdate) -and $hasRemoteTargets) {
   $localReleaseZip = Get-LatestLocalReleaseZip
   if (-not $localReleaseZip) {
-    Write-Warning "-PushUpdate was requested but no local update zip was found (metadata marker or cached zip in ${TEMP_DIR}). Falling back to normal update behavior."
+    if ($PushUpdate) {
+      Write-Warning "-PushUpdate was requested but no local update zip was found (metadata marker or cached zip in ${TEMP_DIR}). Falling back to normal update behavior."
+    }
   } else {
     $localReleaseZipVersion = Get-UpdateZipVersionArgument -ZipPath $localReleaseZip -FallbackVersion $localEmbeddedVersion
+    $localReleaseZipEmbeddedVersion = Get-UpdateZipEmbeddedVersion -ZipPath $localReleaseZip -FallbackVersion $localEmbeddedVersion
+    if (
+      (-not [string]::IsNullOrWhiteSpace($localReleaseZipEmbeddedVersion)) -and
+      (-not [string]::IsNullOrWhiteSpace($localEmbeddedVersion)) -and
+      ($localReleaseZipEmbeddedVersion -eq $localEmbeddedVersion)
+    ) {
+      $controllerCanPushUpdate = $true
+    }
+    else {
+      Write-Warning ("Local update zip '{0}' does not match the controller's Get-ComputerHealth version {1}. Falling back to normal remote update behavior." -f $localReleaseZip, $localEmbeddedVersion)
+    }
   }
 }
 
@@ -915,6 +954,7 @@ foreach ($target in $targets) {
         } -ArgumentList $remoteExecutionRoot
 
         $skipTargetUpdate = $NoUpdate
+        $pushTargetUpdate = $false
         if (
           (-not $skipTargetUpdate) -and
           (-not [string]::IsNullOrWhiteSpace($localEmbeddedVersion)) -and
@@ -923,6 +963,10 @@ foreach ($target in $targets) {
         ) {
           $skipTargetUpdate = $true
           Write-Verbose ("Skipping updater copy/run on {0} because Get-ComputerHealth version {1} already matches local." -f $target, $localEmbeddedVersion)
+        }
+        elseif ((-not $skipTargetUpdate) -and $controllerCanPushUpdate) {
+          $pushTargetUpdate = $true
+          Write-Verbose ("Pushing validated local update zip to {0} because remote Get-ComputerHealth version '{1}' differs from local version '{2}'." -f $target, ([string]$remoteEmbeddedVersion).Trim(), $localEmbeddedVersion)
         }
 
         $localUpdaterPath = $UPDATE_SCRIPT_PATH
@@ -937,12 +981,12 @@ foreach ($target in $targets) {
         }
 
         $remoteZipPath = $null
-        if ((-not $skipTargetUpdate) -and $PushUpdate -and $localReleaseZip) {
+        if ((-not $skipTargetUpdate) -and $pushTargetUpdate -and $localReleaseZip) {
           $remoteZipPath = Join-Path (Join-Path $remoteExecutionRoot 'temp') (Split-Path -Path $localReleaseZip -Leaf)
           Copy-Item -Path $localReleaseZip -Destination $remoteZipPath -ToSession $session -Force
         }
 
-        $output = Invoke-Command -Session $session -ScriptBlock $healthCheckBlock -ArgumentList $remoteExecutionRoot, $Hide, $OnlyTheseTests, $ExcludeTests, $WhitelistSigs, $SkipSlowTests, $SkipPolicyTests, $SkipNonEssentialTests, $skipTargetUpdate, $RunWithoutElevation, $IpsOfAllDcs, $PushUpdate, $remoteZipPath, $localReleaseZipVersion, $SHOW_AS_POSTPONED_WINDOW_DAYS, $PassThruArgs
+        $output = Invoke-Command -Session $session -ScriptBlock $healthCheckBlock -ArgumentList $remoteExecutionRoot, $Hide, $OnlyTheseTests, $ExcludeTests, $WhitelistSigs, $SkipSlowTests, $SkipPolicyTests, $SkipNonEssentialTests, $skipTargetUpdate, $RunWithoutElevation, $IpsOfAllDcs, $pushTargetUpdate, $remoteZipPath, $localReleaseZipVersion, $SHOW_AS_POSTPONED_WINDOW_DAYS, $PassThruArgs
       }
       catch {
         $comment = (($_ | Out-String).Trim())
