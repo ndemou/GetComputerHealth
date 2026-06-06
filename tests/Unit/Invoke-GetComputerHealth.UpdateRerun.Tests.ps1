@@ -55,7 +55,7 @@
     $script:ScriptText | Should -Match '\$pushTargetUpdate = \$false'
     $script:ScriptText | Should -Match '\(\[string\]\$remoteEmbeddedVersion\)\.Trim\(\) -eq \$localEmbeddedVersion'
     $script:ScriptText | Should -Match 'elseif \(\(-not \$skipTargetUpdate\) -and \$controllerCanPushUpdate\) \{'
-    $script:ScriptText | Should -Match 'if \(-not \$skipTargetUpdate\) \{\s*Copy-Item -Path \$localUpdaterPath -Destination \$remoteUpdaterPath -ToSession \$session -Force'
+    $script:ScriptText | Should -Match 'if \(-not \$skipTargetUpdate\) \{[\s\S]*?Copy-Item -Path \$localUpdaterPath -Destination \$remoteUpdaterPath -ToSession \$session -Force'
     $script:ScriptText | Should -Match 'if \(\(-not \$skipTargetUpdate\) -and \$pushTargetUpdate -and \$localReleaseZip\) \{'
     $script:ScriptText | Should -Match 'Invoke-Command -Session \$session -ScriptBlock \$healthCheckBlock -ArgumentList .* \$skipTargetUpdate, \$RunWithoutElevation, \$IpsOfAllDcs, \$pushTargetUpdate, \$remoteZipPath'
   }

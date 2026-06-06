@@ -667,7 +667,7 @@ if ((-not $NoUpdate) -and $hasRemoteTargets) {
 $all_messages = @()
 Write-host "`n`n`n"
 foreach ($target in $targets) {
-  Write-Progress -Activity "Checking $target" -Status "Phase #1 (copy Get-ComputerHealth.ps1)"
+  Write-Progress -Activity "Checking $target" -Status "Phase #1 (preparing check)"
   if ($targets.count -gt 1) {
     Write-Host ""
     Write-Host -ForegroundColor DarkGray "Checking " -NoNewline
@@ -904,13 +904,14 @@ foreach ($target in $targets) {
     $output = & $healthCheckBlock $ROOT_DIR $Hide $OnlyTheseTests $ExcludeTests $WhitelistSigs $SkipSlowTests $SkipPolicyTests $SkipNonEssentialTests $skipTargetUpdate $RunWithoutElevation $IpsOfAllDcs $PushUpdate $localReleaseZip $localReleaseZipVersion $SHOW_AS_POSTPONED_WINDOW_DAYS $PassThruArgs
   }
   else {
+    Write-Progress -Activity "Checking $target" -Status "Phase #1 (probing reachability)"
     if (Get-TcpPortStateFast $target @(5985, 5986, 80, 443, 88, 135, 389, 636, 445, 3268, 3269) | Where-Object { $_.Open }) {
-      Write-Progress -Activity "Checking $target" -Status "Phase #2 (copying updater and running Get-ComputerHealth.ps1)"
-
       $session = $null
       try {
+        Write-Progress -Activity "Checking $target" -Status "Phase #1 (opening PowerShell session)"
         $session = New-PSSession -ComputerName $target
 
+        Write-Progress -Activity "Checking $target" -Status "Phase #1 (preparing remote folders)"
         $remoteExecutionRoot = Invoke-Command -Session $session -ScriptBlock {
           param($RootDir)
           $resolvedRootDir = $RootDir
@@ -931,6 +932,7 @@ foreach ($target in $targets) {
           return $resolvedRootDir
         } -ArgumentList $ROOT_DIR
 
+        Write-Progress -Activity "Checking $target" -Status "Phase #1 (reading remote Get-ComputerHealth version)"
         $remoteEmbeddedVersion = Invoke-Command -Session $session -ScriptBlock {
           param($ExecutionRoot)
 
@@ -977,15 +979,18 @@ foreach ($target in $targets) {
         }
 
         if (-not $skipTargetUpdate) {
+          Write-Progress -Activity "Checking $target" -Status "Phase #1 (copying updater)"
           Copy-Item -Path $localUpdaterPath -Destination $remoteUpdaterPath -ToSession $session -Force
         }
 
         $remoteZipPath = $null
         if ((-not $skipTargetUpdate) -and $pushTargetUpdate -and $localReleaseZip) {
           $remoteZipPath = Join-Path (Join-Path $remoteExecutionRoot 'temp') (Split-Path -Path $localReleaseZip -Leaf)
+          Write-Progress -Activity "Checking $target" -Status "Phase #1 (copying update package)"
           Copy-Item -Path $localReleaseZip -Destination $remoteZipPath -ToSession $session -Force
         }
 
+        Write-Progress -Activity "Checking $target" -Status "Phase #2 (running remote update and health checks)"
         $output = Invoke-Command -Session $session -ScriptBlock $healthCheckBlock -ArgumentList $remoteExecutionRoot, $Hide, $OnlyTheseTests, $ExcludeTests, $WhitelistSigs, $SkipSlowTests, $SkipPolicyTests, $SkipNonEssentialTests, $skipTargetUpdate, $RunWithoutElevation, $IpsOfAllDcs, $pushTargetUpdate, $remoteZipPath, $localReleaseZipVersion, $SHOW_AS_POSTPONED_WINDOW_DAYS, $PassThruArgs
       }
       catch {
