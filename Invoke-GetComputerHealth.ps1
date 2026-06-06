@@ -563,13 +563,15 @@ if (Test-GchConfigKey -Config $gchConfig -Key 'ShowAsPostponedWindowDays') {
   $SHOW_AS_POSTPONED_WINDOW_DAYS = Resolve-GchConfiguredNonNegativeInteger -Value (Get-GchConfigValue -Config $gchConfig -Key 'ShowAsPostponedWindowDays') -Key 'ShowAsPostponedWindowDays'
 }
 
+$localEmbeddedVersion = Get-EmbeddedGetComputerHealthVersion -ScriptPath $GET_HEALTH_SCRIPT_PATH
 $localUpdateAlreadyRan = $false
 if (-not $NoUpdate) {
-  $versionBeforeUpdate = Get-EmbeddedGetComputerHealthVersion -ScriptPath $GET_HEALTH_SCRIPT_PATH
+  $versionBeforeUpdate = $localEmbeddedVersion
   try {
     & $UPDATE_SCRIPT_PATH
     $localUpdateAlreadyRan = $true
     $versionAfterUpdate = Get-EmbeddedGetComputerHealthVersion -ScriptPath $GET_HEALTH_SCRIPT_PATH
+    $localEmbeddedVersion = $versionAfterUpdate
 
     if (
       -not $AlreadyReranAfterUpdate -and
@@ -614,12 +616,12 @@ write-verbose "Targets: $($targets -join ';')"
 
 $localReleaseZip = $null
 $localReleaseZipVersion = $null
-if ($PushUpdate) {
+  if ($PushUpdate) {
   $localReleaseZip = Get-LatestLocalReleaseZip
   if (-not $localReleaseZip) {
     Write-Warning "-PushUpdate was requested but no local update zip was found (metadata marker or cached zip in ${TEMP_DIR}). Falling back to normal update behavior."
   } else {
-    $localReleaseZipVersion = Get-UpdateZipVersionArgument -ZipPath $localReleaseZip -FallbackVersion $embeddedVersion
+    $localReleaseZipVersion = Get-UpdateZipVersionArgument -ZipPath $localReleaseZip -FallbackVersion $localEmbeddedVersion
   }
 }
 
@@ -890,22 +892,57 @@ foreach ($target in $targets) {
           return $resolvedRootDir
         } -ArgumentList $ROOT_DIR
 
+        $remoteEmbeddedVersion = Invoke-Command -Session $session -ScriptBlock {
+          param($ExecutionRoot)
+
+          $remoteMainScriptPath = Join-Path (Join-Path $ExecutionRoot 'bin') 'Get-ComputerHealth.ps1'
+          if (-not (Test-Path -LiteralPath $remoteMainScriptPath -PathType Leaf)) {
+            return ''
+          }
+
+          try {
+            $content = Get-Content -LiteralPath $remoteMainScriptPath -Raw -ErrorAction Stop
+            $match = [regex]::Match($content, '(?m)^\$VERSION\s*=\s*"(?<Version>[^"]+)"')
+            if ($match.Success) {
+              return $match.Groups['Version'].Value
+            }
+          }
+          catch {
+            return ''
+          }
+
+          return ''
+        } -ArgumentList $remoteExecutionRoot
+
+        $skipTargetUpdate = $NoUpdate
+        if (
+          (-not $skipTargetUpdate) -and
+          (-not [string]::IsNullOrWhiteSpace($localEmbeddedVersion)) -and
+          (-not [string]::IsNullOrWhiteSpace([string]$remoteEmbeddedVersion)) -and
+          ([string]$remoteEmbeddedVersion).Trim() -eq $localEmbeddedVersion
+        ) {
+          $skipTargetUpdate = $true
+          Write-Verbose ("Skipping updater copy/run on {0} because Get-ComputerHealth version {1} already matches local." -f $target, $localEmbeddedVersion)
+        }
+
         $localUpdaterPath = $UPDATE_SCRIPT_PATH
         $remoteUpdaterPath = Join-Path (Join-Path $remoteExecutionRoot 'bin') 'Update-GetHealthCode.ps1'
 
-        if (-not (Test-Path -LiteralPath $localUpdaterPath)) {
+        if ((-not $skipTargetUpdate) -and (-not (Test-Path -LiteralPath $localUpdaterPath))) {
           throw "Local updater file not found: $localUpdaterPath"
         }
 
-        Copy-Item -Path $localUpdaterPath -Destination $remoteUpdaterPath -ToSession $session -Force
+        if (-not $skipTargetUpdate) {
+          Copy-Item -Path $localUpdaterPath -Destination $remoteUpdaterPath -ToSession $session -Force
+        }
 
         $remoteZipPath = $null
-        if ($PushUpdate -and $localReleaseZip) {
+        if ((-not $skipTargetUpdate) -and $PushUpdate -and $localReleaseZip) {
           $remoteZipPath = Join-Path (Join-Path $remoteExecutionRoot 'temp') (Split-Path -Path $localReleaseZip -Leaf)
           Copy-Item -Path $localReleaseZip -Destination $remoteZipPath -ToSession $session -Force
         }
 
-        $output = Invoke-Command -Session $session -ScriptBlock $healthCheckBlock -ArgumentList $remoteExecutionRoot, $Hide, $OnlyTheseTests, $ExcludeTests, $WhitelistSigs, $SkipSlowTests, $SkipPolicyTests, $SkipNonEssentialTests, $NoUpdate, $RunWithoutElevation, $IpsOfAllDcs, $PushUpdate, $remoteZipPath, $localReleaseZipVersion, $SHOW_AS_POSTPONED_WINDOW_DAYS, $PassThruArgs
+        $output = Invoke-Command -Session $session -ScriptBlock $healthCheckBlock -ArgumentList $remoteExecutionRoot, $Hide, $OnlyTheseTests, $ExcludeTests, $WhitelistSigs, $SkipSlowTests, $SkipPolicyTests, $SkipNonEssentialTests, $skipTargetUpdate, $RunWithoutElevation, $IpsOfAllDcs, $PushUpdate, $remoteZipPath, $localReleaseZipVersion, $SHOW_AS_POSTPONED_WINDOW_DAYS, $PassThruArgs
       }
       catch {
         $comment = (($_ | Out-String).Trim())

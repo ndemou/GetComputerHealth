@@ -48,4 +48,12 @@
   It 'stops the original invocation after handing off to the update rerun' {
     $script:ScriptText | Should -Match 'Invoke-SelfAfterUpdate -BoundParameters \$PSBoundParameters -PassThruArgs \$PassThruArgs\s+return'
   }
+
+  It 'checks the remote embedded version before copying and running the updater' {
+    $script:ScriptText | Should -Match '\$remoteEmbeddedVersion = Invoke-Command -Session \$session -ScriptBlock \{'
+    $script:ScriptText | Should -Match '\$skipTargetUpdate = \$NoUpdate'
+    $script:ScriptText | Should -Match '\(\[string\]\$remoteEmbeddedVersion\)\.Trim\(\) -eq \$localEmbeddedVersion'
+    $script:ScriptText | Should -Match 'if \(-not \$skipTargetUpdate\) \{\s*Copy-Item -Path \$localUpdaterPath -Destination \$remoteUpdaterPath -ToSession \$session -Force'
+    $script:ScriptText | Should -Match 'Invoke-Command -Session \$session -ScriptBlock \$healthCheckBlock -ArgumentList .* \$skipTargetUpdate, \$RunWithoutElevation'
+  }
 }
