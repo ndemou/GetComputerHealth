@@ -86,6 +86,8 @@ Tests with the `Suppressed` tag are for inventory/audit data that should be retu
 
 Use `Suppressed` only when every message from the test is expected inventory data rather than an actionable health problem. Operators can still see those messages unless they hide suppressed output with `-Hide S`; automation that uses `-OutputObjects` still receives the log objects.
 
+Suppressed Inventory Tests can be extremely useful for "Required findings".
+
 ### Policy Inventory Tests
 
 Tests with the `Policy` tag inventory a system aspect where the initial controlled state is accepted as a baseline. For example, this can cover open ports, installed software, and enabled services after a clean server installation.
