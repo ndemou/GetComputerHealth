@@ -349,7 +349,7 @@ If you only want to add a few custom tests, you do not need to modify the core c
 | HyperVReplicationHealth          | Checks Hyper-V VM replication health, missing replication, and running replica VMs |
 | HyperVRunningVMs                 | Lists running Hyper-V virtual machines on the host |
 | IisBindings                      | Checks IIS bindings for wildcard or otherwise risky binding configurations |
-| InstalledRolesFeatures           | Checks for installed Windows roles or features that are outside the intended baseline |
+| ListRoleFeatures                 | Lists installed Windows roles and features |
 | InstalledSW                      | Reports installed software not present in the baseline inventory |
 | InterfaceDnsServersUseDcs        | Checks whether member-server network interfaces use domain controllers as DNS servers |
 | IPv6Binding                      | Checks whether IPv6 is bound on network adapters as expected |
@@ -359,7 +359,7 @@ If you only want to add a few custom tests, you do not need to modify the core c
 | LargeDirectories                 | Finds directories with more than 10000 child items |
 | LdapSigningChannelBinding        | Checks whether LDAP signing and channel binding enforcement are enabled |
 | LocalAcntRequirePass             | Checks whether local accounts require passwords |
-| LocalAdminsBaseline              | Checks for unexpected members in the local Administrators group |
+| ListLocalAdmins                 | Lists members of the local Administrators group |
 | MalwareProtectionFeatures        | Checks Microsoft Defender malware protection status and updates signatures when needed |
 | NetworkConnectionProfiles        | Checks network connection profiles and basic connectivity expectations for each active network |
 | Nic                              | Checks network adapters for unhealthy status or suspicious error counters |

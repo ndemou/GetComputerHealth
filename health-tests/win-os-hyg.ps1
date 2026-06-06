@@ -2147,29 +2147,20 @@ Uses: None.
 }
 
 
-function HealthTest-LocalAdminsBaseline {
+function HealthTest-ListLocalAdmins {
 <#
-Description: Checks for unexpected members in the local Administrators group.
+Description: Lists members of the local Administrators group.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time)
+Tags: Policy
 Uses: None.
 #>
-    param(
-        [string[]]$Allowed = @(
-            'BUILTIN\Administrators',
-            'NT AUTHORITY\SYSTEM',
-            'Domain Admins',
-            'Enterprise Admins'
-        )
-    )
-
     $pass = $true
 
     $grp = [ADSI]"WinNT://$env:COMPUTERNAME/Administrators,group"
     $members = @(@($grp.psbase.Invoke('Members')) | ForEach-Object { [ADSI]$_ })
-    $unexpected = @()
 
     foreach ($m in $members) {
         $name = $m.InvokeGet('Name')
@@ -2184,37 +2175,12 @@ Uses: None.
         }
 
         $full = if ($dom) { "$dom\$acct" } else { $acct }
-
-        $isAllowed = $false
-        # 1) Built-in Administrator: SID ends with -500
-        try {
-            $sidBytes = $m.InvokeGet('ObjectSid')
-            if ($sidBytes) {
-                $sid = New-Object System.Security.Principal.SecurityIdentifier($sidBytes, 0)
-                if ($sid.Value -match '-500$') {
-                    $isAllowed = $true
-                }
-            }
-        } catch {
-            # If SID lookup fails we just fall back to name-based checks
-        }
-        # 2) Name-based allow list (if not already allowed by SID)
-        if (-not $isAllowed) {
-            foreach ($a in $Allowed) {
-                if ($full -ieq $a -or $full -like "*\$a") {
-                    $isAllowed = $true
-                    break
-                }
-            }
-        }
-
-        if (-not $isAllowed) {
-            Write-Warning "[WARNING] Unexpected Local Administrator: $full"
-            $pass = $false
-        }
+        Write-Warning "[WARNING] Local Administrator group member: $full"
+        $pass = $false
     }
     if ($pass) {
-        Write-Warning "[PASS] No unexpected accounts in Local Administrators"}
+        Write-Warning "[PASS] No accounts in Local Administrators"
+    }
 }
 
 function HealthTest-UnexpectedListeningPorts {

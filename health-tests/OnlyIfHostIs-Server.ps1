@@ -61,18 +61,17 @@ Uses: Get-DhcpServerv4ScopeStatistics.
 
 }
 
-function HealthTest-InstalledRolesFeatures {
+function HealthTest-ListRoleFeatures {
 <#
-Description: Checks for installed Windows roles or features that are outside the intended baseline.
+Description: Lists installed Windows roles and features.
 AppliesTo: Server
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: low
+Tags: Policy
 Uses: Get-WindowsFeature.
 #>
   [CmdletBinding()]
-  param([string[]]$DisallowedRoles = @('Web-Server','DHCP','WDS'))
-
   $roles = $null
   try { $roles = Get-WindowsFeature -ErrorAction Stop | Where-Object { $_.Installed } }
   catch {
@@ -80,10 +79,9 @@ Uses: Get-WindowsFeature.
     return
   }
 
-  $hit = @($roles | Where-Object { $DisallowedRoles -contains $_.Name })
-  if ($hit.Count -gt 0) {
-    foreach ($h in $hit) { Write-Warning "[FAILURE] Unintended role/feature installed: $($h.Name)" }
+  if (@($roles).Count -gt 0) {
+    foreach ($role in $roles) { Write-Warning "[WARNING] Installed role/feature: $($role.Name)" }
   } else {
-    Write-Warning "[PASS] No unintended roles/features installed"
+    Write-Warning "[PASS] No installed roles/features found"
   }
 }
