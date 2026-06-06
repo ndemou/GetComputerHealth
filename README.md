@@ -162,6 +162,35 @@ By default, health tests flag any deviation from a pristine Windows installation
 > **Tip:** You can also permitlist findings manually:
 > `C:\IT\Get-ComputerHealth\bin\Get-ComputerHealth.ps1 -AddWhitelisting -ComputerName $env:computername -Signature 12345678 -Comment "Usually the description of the finding" -Until 2099-12-31`
 
+## How to Require a Finding That Proves Something Good Is Present
+
+Sometimes the important question is not "what bad thing was detected?" but "did the expected good thing appear at all?". This is often useful for policy-style tests such as:
+
+* open TCP ports that should be listening
+* installed software that should be present
+* services that should be running
+* roles or features that should exist
+
+Required findings are stored in `C:\IT\Get-ComputerHealth\config\required_findings.psd1`.
+
+When a configured test runs, Get-ComputerHealth records the signatures it emitted. If one of that test's required signatures is missing, Get-ComputerHealth emits a new failure explaining that the required finding was not produced.
+
+1. Run the relevant health test and identify the signature of the finding you want to require.
+2. Mark it as required on the target computer:
+
+> `C:\IT\Get-ComputerHealth\bin\Get-ComputerHealth.ps1 -SetAsRequired -ComputerName $env:computername -Test UnexpectedListeningPorts -Signature bfc162fa -Comment "Port 443(IIS) should be listening but is not"`
+
+Example `required_findings.psd1` content:
+
+```powershell
+@{
+    'UnexpectedListeningPorts' = @{
+        'bfc162fa' = @{Description = 'Port 443(IIS) should be listening but is not'; Ts = [datetime]'2025-11-01 12:42'; User = 'ndemou-admin'};
+        '98c134de' = @{Description = 'Port 80(IIS) should be listening but is not'; Ts = [datetime]'2025-11-01 12:42'; User = 'ndemou-admin'};
+    };
+}
+```
+
 ## How to Add Custom Tests
 
 [Follow these instructions](./doc/how-to-add-custom-tests.md)
@@ -268,6 +297,7 @@ These are the scripts you actually execute.
 | --- | --- |
 | `C:\IT\Get-ComputerHealth\bin\`    | All script files (`.ps1`). |
 | `C:\IT\Get-ComputerHealth\config\` | Configuration files. |
+| `C:\IT\Get-ComputerHealth\config\required_findings.psd1` | Optional required findings that must be emitted by selected built-in tests. |
 | `C:\IT\Get-ComputerHealth\config\Custom-HealthTests` | [Optional custom health tests.](./doc/how-to-add-custom-tests.md)  |
 | `C:\IT\Get-ComputerHealth\temp\`   | Temp files like downloads and generated email HTML. |
 | `C:\IT\Get-ComputerHealth\log\`    | Logs of script execution. |

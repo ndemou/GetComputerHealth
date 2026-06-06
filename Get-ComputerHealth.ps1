@@ -10,6 +10,7 @@ Supports:
 - Running only selected tests (`-OnlyTheseTests`) and/or skipping specific tests (`-ExcludeTests`).
 - Running custom tests by executing `.ps1` files directly. `-IncludeTestsFromFolder` remains as a deprecated compatibility parameter that selects which custom scripts to run.
 - Suppressing expected notices/warnings/failures by 8-hex "signature" hashes, either temporarily for the current run (`-WhitelistSigs`) or by appending a permanent suppression entry (`-AddWhitelisting`) to a suppression file.
+- Requiring specific findings from selected tests. If a required signature is not emitted when that test runs, a failure is emitted. Required findings are stored in `.\config\required_findings.psd1` and can be updated with `-SetAsRequired`.
 
 
 When `-OutputObjects` is used, each emitted log object includes these fields:
@@ -22,14 +23,16 @@ Notable side effects:
 
 Idempotency:
 - `-AddWhitelisting` is append-only (not strictly idempotent): repeated runs add additional lines; last matching line "wins" when loading suppressions.
+- `-SetAsRequired` updates or creates a single required-finding entry for the specified test/signature pair.
 
 Dependencies & execution context:
 - Requires elevation.
 - Relies on companion scripts: `lib-write-log-objects.ps1`, `helpers-for-healthtests.ps1`, and the modules under `health-tests\*.ps1` dot-sourced below.
 - Uses a suppression config file at `.\config\Get-ComputerHealth.sigs-to-suppress.txt`.
+- Uses a required-findings config file at `.\config\required_findings.psd1`.
 
 .PARAMETER RunWithoutElevation
-(Parameter sets: Run, AddWhitelist, List) Bypasses the normal elevation requirement. Default behavior still requires running as Administrator.
+(Parameter sets: Run, AddWhitelist, SetRequired, List) Bypasses the normal elevation requirement. Default behavior still requires running as Administrator.
 
 .PARAMETER OutputConsoleMessages
 (Parameter set: Run) If set, writes colorized log/messages to the console while executing tests.
@@ -81,14 +84,20 @@ Default: empty (show all). Typical value: `DIP`
 .PARAMETER AddWhitelisting
 (Parameter set: AddWhitelist) Appends a suppression entry for a specific signature to the suppression file and exits (does not run health tests).
 
+.PARAMETER SetAsRequired
+(Parameter set: SetRequired) Adds or updates a required-finding entry in `.\config\required_findings.psd1` and exits (does not run health tests).
+
 .PARAMETER ComputerName
-(Parameter set: AddWhitelist; Mandatory) Target computer name for the suppression entry. Must match the current computer `$env:COMPUTERNAME`.
+(Parameter sets: AddWhitelist, SetRequired; Mandatory) Target computer name for the change. Must match the current computer `$env:COMPUTERNAME`.
 
 .PARAMETER Signature
-(Parameter set: AddWhitelist; Mandatory) 8-hex signature to suppress (case-insensitive). Alias: `-Sig`.
+(Parameter sets: AddWhitelist, SetRequired; Mandatory) 8-hex signature to suppress or require (case-insensitive). Alias: `-Sig`.
+
+.PARAMETER Test
+(Parameter set: SetRequired; Mandatory) Health test name that must emit the required signature. You can use the short test name (for example `UnexpectedListeningPorts`) or the full function name (`HealthTest-UnexpectedListeningPorts`).
 
 .PARAMETER Comment
-(Parameter set: AddWhitelist) Optional text appended to the suppression line (non-ASCII characters are replaced with `?`).
+(Parameter sets: AddWhitelist, SetRequired) Optional free text. For `-AddWhitelisting`, it is appended to the suppression line (non-ASCII characters are replaced with `?`). For `-SetAsRequired`, it becomes the stored description and the emitted failure message when the required signature is missing.
 
 .PARAMETER Until
 (Parameter set: AddWhitelist) Optional expiry date for the suppression entry in `yyyy-MM-dd` format. After this date passes, the entry is treated as expired when loading.
@@ -117,10 +126,15 @@ $out | Out-GridView
 # Permanently suppress a known-expected signature on this computer (optionally with expiry):
 .\Get-ComputerHealth.ps1 -AddWhitelisting -ComputerName CONTOSO-SRV01 -Signature 1a2b3c4d -Comment "Known baseline deviation" -Until 2026-12-31
 
+.EXAMPLE
+# Mark a finding as required for a health test on this computer:
+.\Get-ComputerHealth.ps1 -SetAsRequired -ComputerName CONTOSO-SRV01 -Test UnexpectedListeningPorts -Signature bfc162fa -Comment "Port 443(IIS) should be listening but is not"
+
 .NOTES
-- Elevation is enforced for normal runs and for whitelisting operations.
+- Elevation is enforced for normal runs, whitelisting operations, and required-finding updates.
 - `-RunWithoutElevation` bypasses the elevation guard; some health tests may still fail or produce incomplete results when run non-elevated.
 - Permanent suppression file: `.\config\Get-ComputerHealth.sigs-to-suppress.txt`.
+- Required findings file: `.\config\required_findings.psd1`.
 - Custom tests: scripts may execute arbitrary code when run.
 #>
 
@@ -182,6 +196,7 @@ param(
 
   [Parameter(ParameterSetName = 'Run')]
   [Parameter(ParameterSetName = 'AddWhitelist')]
+  [Parameter(ParameterSetName = 'SetRequired')]
   [Parameter(ParameterSetName = 'List')]
   [switch]$RunWithoutElevation,
 
@@ -191,21 +206,31 @@ param(
   [Parameter(ParameterSetName = 'AddWhitelist', Mandatory)]
   [switch]$AddWhitelisting,
 
+  [Parameter(ParameterSetName = 'SetRequired', Mandatory)]
+  [switch]$SetAsRequired,
+
   [Parameter(ParameterSetName = 'AddWhitelist', Mandatory)]
+  [Parameter(ParameterSetName = 'SetRequired', Mandatory)]
   [ValidateNotNullOrEmpty()]
   [string]$ComputerName,
 
   [Parameter(ParameterSetName = 'AddWhitelist', Mandatory)]
+  [Parameter(ParameterSetName = 'SetRequired', Mandatory)]
   [Alias('Sig')]
   [ValidatePattern('^[0-9A-Fa-f]{8}$')]
   [string]$Signature,
 
   [Parameter(ParameterSetName = 'AddWhitelist')]
+  [Parameter(ParameterSetName = 'SetRequired')]
   [string]$Comment,
 
   [Parameter(ParameterSetName = 'AddWhitelist')]
   [ValidatePattern('^\d{4}-\d{2}-\d{2}$')]
   [string]$Until,
+
+  [Parameter(ParameterSetName = 'SetRequired', Mandatory)]
+  [ValidateNotNullOrEmpty()]
+  [string]$Test,
 
   # ----------------------------
   # List tests
@@ -231,6 +256,7 @@ $CONFIG_DIR = Join-Path $ROOT_DIR 'config'
 
 $script:Config = [pscustomobject]@{
   SuppressSignaturesPath = Join-Path $CONFIG_DIR 'Get-ComputerHealth.sigs-to-suppress.txt'
+  RequiredFindingsPath = Join-Path $CONFIG_DIR 'required_findings.psd1'
   DefaultCustomTestsPath = Join-Path $CONFIG_DIR 'Custom-HealthTests'
 }
 
@@ -254,6 +280,334 @@ function Add-AsciiLine {
   $safeLine = ($Line -replace '[^\u0000-\u007F]', '?')
   # Append using ASCII encoding
   Add-Content -LiteralPath $Path -Value $safeLine -Encoding ASCII
+}
+
+function Get-RequiredFindingConfigKeys {
+  [CmdletBinding()]
+  param($Config)
+
+  if ($null -eq $Config) {
+    return @()
+  }
+
+  if ($Config -is [System.Collections.IDictionary]) {
+    return @($Config.Keys)
+  }
+
+  return @($Config.PSObject.Properties.Name)
+}
+
+function Test-RequiredFindingConfigKey {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)]$Config,
+    [Parameter(Mandatory)][string]$Key
+  )
+
+  if ($Config -is [System.Collections.IDictionary]) {
+    return $Config.Contains($Key)
+  }
+
+  return ($Config.PSObject.Properties[$Key] -ne $null)
+}
+
+function Get-RequiredFindingConfigValue {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)]$Config,
+    [Parameter(Mandatory)][string]$Key
+  )
+
+  if ($Config -is [System.Collections.IDictionary]) {
+    return $Config[$Key]
+  }
+
+  return $Config.$Key
+}
+
+function Normalize-RequiredFindingTestName {
+  [CmdletBinding()]
+  param(
+    [AllowEmptyString()][string]$TestName
+  )
+
+  $normalized = [string]$TestName
+  if ([string]::IsNullOrWhiteSpace($normalized)) {
+    return ''
+  }
+
+  $normalized = $normalized.Trim()
+  if ($normalized -match '^(?i)HealthTest-(.+)$') {
+    $normalized = $Matches[1]
+  }
+
+  return $normalized.Trim()
+}
+
+function Convert-RequiredFindingEntryToHashtable {
+  [CmdletBinding()]
+  param(
+    $Entry
+  )
+
+  $description = ''
+  if (($null -ne $Entry) -and (Test-RequiredFindingConfigKey -Config $Entry -Key 'Description')) {
+    $description = [string](Get-RequiredFindingConfigValue -Config $Entry -Key 'Description')
+  }
+
+  $timestamp = $null
+  if (($null -ne $Entry) -and (Test-RequiredFindingConfigKey -Config $Entry -Key 'Ts')) {
+    $timestampValue = Get-RequiredFindingConfigValue -Config $Entry -Key 'Ts'
+    if ($timestampValue -is [datetime]) {
+      $timestamp = [datetime]$timestampValue
+    }
+    elseif ($null -ne $timestampValue) {
+      $parsedTimestamp = [datetime]::MinValue
+      if ([datetime]::TryParse([string]$timestampValue, [ref]$parsedTimestamp)) {
+        $timestamp = $parsedTimestamp
+      }
+    }
+  }
+
+  $user = ''
+  if (($null -ne $Entry) -and (Test-RequiredFindingConfigKey -Config $Entry -Key 'User')) {
+    $user = [string](Get-RequiredFindingConfigValue -Config $Entry -Key 'User')
+  }
+
+  return [ordered]@{
+    Description = $description
+    Ts = $timestamp
+    User = $user
+  }
+}
+
+function Read-RequiredFindingsConfig {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)][string]$Path
+  )
+
+  if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+    return [ordered]@{}
+  }
+
+  try {
+    $rawText = Get-Content -LiteralPath $Path -Raw -ErrorAction Stop
+    $scriptBlock = [scriptblock]::Create($rawText)
+    $rawConfig = & $scriptBlock
+  }
+  catch {
+    throw "Failed reading required findings configuration file '$Path': $($_.Exception.Message)"
+  }
+
+  $config = [ordered]@{}
+  foreach ($testKey in @(Get-RequiredFindingConfigKeys -Config $rawConfig | Sort-Object)) {
+    $normalizedTestName = Normalize-RequiredFindingTestName -TestName ([string]$testKey)
+    if ([string]::IsNullOrWhiteSpace($normalizedTestName)) {
+      continue
+    }
+
+    $rawTestFindings = Get-RequiredFindingConfigValue -Config $rawConfig -Key $testKey
+    $testFindings = [ordered]@{}
+
+    foreach ($signatureKey in @(Get-RequiredFindingConfigKeys -Config $rawTestFindings | Sort-Object)) {
+      $signatureText = ([string]$signatureKey).Trim().ToLowerInvariant()
+      if ($signatureText -notmatch '^[0-9a-f]{8}$') {
+        throw "Invalid required finding signature '$signatureKey' in '$Path' for test '$normalizedTestName'."
+      }
+
+      $rawEntry = Get-RequiredFindingConfigValue -Config $rawTestFindings -Key $signatureKey
+      $testFindings[$signatureText] = Convert-RequiredFindingEntryToHashtable -Entry $rawEntry
+    }
+
+    if ($testFindings.Count -gt 0) {
+      $config[$normalizedTestName] = $testFindings
+    }
+  }
+
+  return $config
+}
+
+function ConvertTo-RequiredFindingsPowerShellString {
+  [CmdletBinding()]
+  param(
+    [AllowNull()][string]$Text
+  )
+
+  $value = [string]$Text
+  return ("'" + ($value -replace "'", "''") + "'")
+}
+
+function Save-RequiredFindingsConfig {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)][string]$Path,
+    [Parameter(Mandatory)]$RequiredFindings
+  )
+
+  $lines = New-Object System.Collections.Generic.List[string]
+  $lines.Add('@{') | Out-Null
+
+  foreach ($testName in @(Get-RequiredFindingConfigKeys -Config $RequiredFindings | Sort-Object)) {
+    $testFindings = Get-RequiredFindingConfigValue -Config $RequiredFindings -Key $testName
+    $lines.Add(("    {0} = @{{" -f (ConvertTo-RequiredFindingsPowerShellString -Text ([string]$testName)))) | Out-Null
+
+    foreach ($signature in @(Get-RequiredFindingConfigKeys -Config $testFindings | Sort-Object)) {
+      $entry = Convert-RequiredFindingEntryToHashtable -Entry (Get-RequiredFindingConfigValue -Config $testFindings -Key $signature)
+      $timestamp = $entry.Ts
+      if ($null -eq $timestamp) {
+        $timestamp = Get-Date
+      }
+
+      $lines.Add((
+          "        {0} = @{{Description = {1}; Ts = [datetime]{2}; User = {3}}};" -f
+          (ConvertTo-RequiredFindingsPowerShellString -Text ([string]$signature).ToLowerInvariant()),
+          (ConvertTo-RequiredFindingsPowerShellString -Text $entry.Description),
+          (ConvertTo-RequiredFindingsPowerShellString -Text ($timestamp.ToString('yyyy-MM-dd HH:mm'))),
+          (ConvertTo-RequiredFindingsPowerShellString -Text $entry.User)
+        )) | Out-Null
+    }
+
+    $lines.Add('    };') | Out-Null
+  }
+
+  $lines.Add('}') | Out-Null
+
+  $parentDir = Split-Path -Parent $Path
+  if (-not [string]::IsNullOrWhiteSpace($parentDir) -and (-not (Test-Path -LiteralPath $parentDir -PathType Container))) {
+    New-Item -ItemType Directory -Path $parentDir -Force | Out-Null
+  }
+
+  Set-Content -LiteralPath $Path -Value $lines -Encoding UTF8
+}
+
+function Set-RequiredFindingEntry {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)][string]$Path,
+    [Parameter(Mandatory)][string]$TestName,
+    [Parameter(Mandatory)][string]$Signature,
+    [string]$Description,
+    [datetime]$Timestamp = (Get-Date),
+    [string]$User = $(
+      try {
+        [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
+      }
+      catch {
+        [string]$env:USERNAME
+      }
+    )
+  )
+
+  $normalizedTestName = Normalize-RequiredFindingTestName -TestName $TestName
+  if ([string]::IsNullOrWhiteSpace($normalizedTestName)) {
+    throw "You must supply a -Test"
+  }
+
+  $normalizedSignature = ([string]$Signature).Trim().ToLowerInvariant()
+  if ($normalizedSignature -notmatch '^[0-9a-f]{8}$') {
+    throw "Invalid -Signature: $Signature"
+  }
+
+  $config = Read-RequiredFindingsConfig -Path $Path
+  if (-not (Test-RequiredFindingConfigKey -Config $config -Key $normalizedTestName)) {
+    $config[$normalizedTestName] = [ordered]@{}
+  }
+
+  $config[$normalizedTestName][$normalizedSignature] = [ordered]@{
+    Description = [string]$Description
+    Ts = $Timestamp
+    User = [string]$User
+  }
+
+  Save-RequiredFindingsConfig -Path $Path -RequiredFindings $config
+}
+
+function Get-RequiredFindingsForTest {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)]$RequiredFindings,
+    [Parameter(Mandatory)][string]$FunctionName
+  )
+
+  $shortName = Normalize-RequiredFindingTestName -TestName $FunctionName
+  $keysToTry = @($FunctionName, "HealthTest-$shortName", $shortName)
+
+  foreach ($key in $keysToTry) {
+    if ([string]::IsNullOrWhiteSpace($key)) {
+      continue
+    }
+
+    if (Test-RequiredFindingConfigKey -Config $RequiredFindings -Key $key) {
+      return (Get-RequiredFindingConfigValue -Config $RequiredFindings -Key $key)
+    }
+  }
+
+  return $null
+}
+
+function Get-MissingRequiredFindings {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)][object[]]$Records,
+    [Parameter(Mandatory)]$RequiredFindingsForTest
+  )
+
+  $emittedSignatures = @(
+    $Records |
+      Where-Object { $_ -and $_.PSObject.Properties['Hash'] } |
+      ForEach-Object { ([string]$_.Hash).Trim().ToLowerInvariant() } |
+      Where-Object { $_ -match '^[0-9a-f]{8}$' } |
+      Sort-Object -Unique
+  )
+
+  $missing = New-Object System.Collections.Generic.List[object]
+  foreach ($signature in @(Get-RequiredFindingConfigKeys -Config $RequiredFindingsForTest | Sort-Object)) {
+    $normalizedSignature = ([string]$signature).Trim().ToLowerInvariant()
+    if ($normalizedSignature -notin $emittedSignatures) {
+      $entry = Convert-RequiredFindingEntryToHashtable -Entry (Get-RequiredFindingConfigValue -Config $RequiredFindingsForTest -Key $signature)
+      $missing.Add([pscustomobject]@{
+          Signature = $normalizedSignature
+          Description = [string]$entry.Description
+          Ts = $entry.Ts
+          User = [string]$entry.User
+        }) | Out-Null
+    }
+  }
+
+  return $missing.ToArray()
+}
+
+function Invoke-RequiredFindingsValidation {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)][string]$FunctionName,
+    [Parameter(Mandatory)][object[]]$Records,
+    [Parameter(Mandatory)]$RequiredFindings
+  )
+
+  $requiredFindingsForTest = Get-RequiredFindingsForTest -RequiredFindings $RequiredFindings -FunctionName $FunctionName
+  if ($null -eq $requiredFindingsForTest) {
+    return @($Records)
+  }
+
+  $shortName = Normalize-RequiredFindingTestName -TestName $FunctionName
+  $missingFindings = @(Get-MissingRequiredFindings -Records $Records -RequiredFindingsForTest $requiredFindingsForTest)
+  if ($missingFindings.Count -eq 0) {
+    return @($Records)
+  }
+
+  $validationFailures = @()
+  foreach ($missingFinding in $missingFindings) {
+    $failureMessage = [string]$missingFinding.Description
+    if ([string]::IsNullOrWhiteSpace($failureMessage)) {
+      $failureMessage = "Required finding with signature $($missingFinding.Signature) was not emitted."
+    }
+
+    $validationFailures += Log-Failure $failureMessage -Comment "Required finding with signature $($missingFinding.Signature) was not emitted by $shortName" -Emitter $FunctionName
+  }
+
+  return @($Records) + @($validationFailures)
 }
 
 function Invoke-HealthTest {
@@ -869,6 +1223,8 @@ function Invoke-HealthTestWithPolicyAutoset {
     Add-AsciiLine -Line "POLICY_TEST_WAS_RUN: $policyTestName" -Path $script:Config.SuppressSignaturesPath
   }
 
+  $records = @(Invoke-RequiredFindingsValidation -FunctionName $FunctionName -Records $records -RequiredFindings $script:RequiredFindings)
+
   $records
 }
 
@@ -977,8 +1333,10 @@ if ($ListAllBuiltInTests) {
   return
 }
 
-# if we were called with -AddWhitelisting we skip some uneeded work to save time
-if (-not $AddWhitelisting ) {
+$script:RequiredFindings = Read-RequiredFindingsConfig -Path $script:Config.RequiredFindingsPath
+
+# if we were called with -AddWhitelisting or -SetAsRequired we skip some uneeded work to save time
+if ((-not $AddWhitelisting) -and (-not $SetAsRequired)) {
     #+-----------------------------------------------------------
     #| Collect system information
     #|
@@ -1155,6 +1513,25 @@ if ($AddWhitelisting ) {
     $line = "$Signature # $(Get-Date -format yyyy-MM-dd` HH:mm) # $Comment"
     Add-AsciiLine -Line $line -Path $script:Config.SuppressSignaturesPath
   }
+  return
+}
+
+if ($SetAsRequired) {
+  if (-not $Signature) { throw "You must supply a -Signature" }
+  if (-not $ComputerName) { throw "You must supply a -ComputerName" }
+  if (-not $Test) { throw "You must supply a -Test" }
+  if ($Signature -notmatch '^[0-9A-Fa-f]{8}$') {
+    throw "Invalid -Signature: $Signature"
+  }
+  if ($ComputerName -ne $env:COMPUTERNAME) {
+    throw "Running on $($env:COMPUTERNAME) but required finding is for $ComputerName"
+  }
+
+  Set-RequiredFindingEntry `
+    -Path $script:Config.RequiredFindingsPath `
+    -TestName $Test `
+    -Signature $Signature `
+    -Description $Comment
   return
 }
 
