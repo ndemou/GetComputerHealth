@@ -97,89 +97,59 @@ Also describe this usage scenario in the README: The operator receives an email 
 
 It would be useful to include the suppression reason in the findings that are reported to the operator and saved to disk. It would also be useful to include the `-Until` date, which is the date until which the finding is suppressed.
 
-## New format for Get-ComputerHealth.sigs-to-suppress.txt
+## Save POLICY_TEST_WAS_RUN to `.\state\policy_test_was_run.psd1` instead of `Get-ComputerHealth.sigs-to-suppress.txt`
 
-Must use clixml for the configuration/state file of Get-ComputerHealth.
+This is an example for `.\state\policy_test_was_run.psd1`:
+```powershelll
+@{
+    InstalledSW = @{ Ts = [datetime]'2025-11-01 12:42'; User = 'ndemou-admin' }
+    UnexpectedListeningPorts = @{Ts = [datetime]'2025-11-01 12:45'; User = 'ndemou-admin' }
+}
+```
+
+This change needs an On-Disk format change so we also need a migration. 
+
+The migration will initialize `policy_test_was_run.psd1` with any  existing lines from `Get-ComputerHealth.sigs-to-suppress.txt` (the lines must not be removed). If `policy_test_was_run.psd1` already exists the migration is skiped.
+
+For example a like like this:
+```
+POLICY_TEST_WAS_RUN: InstalledSW
+```
+Will result in this entry in `policy_test_was_run.psd1`:
+```powershelll
+InstalledSW = @{Ts = <current time>; User = <current user>}
+```
+
+## Save suppressed findings to `.\config\suppressed_findings.psd1` instead of `Get-ComputerHealth.sigs-to-suppress.txt`
+
+This is an example for `.\config\suppressed_findings.psd1`:
 
 ```powershelll
-$ConfigAndState = @{
-    'POLICY_TEST_WAS_RUN' = @{
-        'InstalledSW' = [pscustomobject]@{
-            Ts   = [datetime]'2025-11-01 12:42'
-            User = 'ndemou-admin'
-        }
-
-        'UnexpectedListeningPorts' = [pscustomobject]@{
-            Ts   = [datetime]'2025-11-01 12:45'
-            User = 'ndemou-admin'
-        }
+@{
+    'bfc162fa' = [pscustomobject]@{
+        TestName    = 'UnexpectedListeningPorts'
+        Description = 'Computer is listening to port 443'
+        Reason      = 'business need'
+        Ts          = [datetime]'2025-11-01 12:42'
+        Until       = [datetime]'2026-05-06'
+        User        = 'ndemou-admin'
     }
 
-    'SUPPRESSED_FINDING' = @{
-        'bfc162fa' = [pscustomobject]@{
-            TestName    = 'UnexpectedListeningPorts'
-            Description = 'Computer is listening to port 443'
-            Reason      = 'business need'
-            Ts          = [datetime]'2025-11-01 12:42'
-            Until       = [datetime]'2026-05-06'
-            User        = 'ndemou-admin'
-        }
-
-        'a7d91c03' = [pscustomobject]@{
-            TestName    = 'InstalledSW'
-            Description = 'Legacy software 7zip is installed'
-            Reason      = 'business need'
-            Ts          = [datetime]'2025-11-01 12:44'
-            Until       = [datetime]'2026-06-15'
-            User        = 'ndemou-admin'
-        }
-    }
-
-    'REQUIRED_FINDING' = @{
-       'UnexpectedListeningPorts' = [pscustomobject]@{
-        'bfc162fa' = [pscustomobject]@{
-            Description = 'Listening port 443'
-            Ts          = [datetime]'2025-11-01 12:42'
-            User        = 'ndemou-admin'
-        }
-        '98c134de' = [pscustomobject]@{
-            Description = 'Listening port 443'
-            Ts          = [datetime]'2025-11-01 12:42'
-            User        = 'ndemou-admin'
-        }
-     }
+    'a7d91c03' = [pscustomobject]@{
+        TestName    = 'InstalledSW'
+        Description = 'Legacy software 7zip is installed'
+        Reason      = 'business need'
+        Ts          = [datetime]'2025-11-01 12:44'
+        Until       = [datetime]'2026-06-15'
+        User        = 'ndemou-admin'
     }
 }
 ```
 
-Also rename it from `Get-ComputerHealth.sigs-to-suppress.txt` to `Get-ComputerHealth.conf`
+This change needs an On-Disk format change so we also need a migration. 
 
-In order to not break existing systems, we need an On-Disk Format migration(see relevant dev documentation):
- - If the new `.state` file does not exist: create it by translating the old `.txt` file (and deleting it)
+The migration will initialize `.\config\suppressed_findings.psd1` with any  existing lines from `Get-ComputerHealth.sigs-to-suppress.txt` (the lines must not be removed). If `.\config\suppressed_findings.psd1` already exists the migration is skiped.
 
-## New feature: "*Required* Findings"
-
-I want a test that verifies a TCP port is indeed open. This is often a very important indicator that "everything is good."
-
-Imagine this rule in `Get-ComputerHealth.conf`:
-```powershell
-'REQUIRED_FINDING' = @{
-       'UnexpectedListeningPorts' = [pscustomobject]@{
-        'bfc162fa' = [pscustomobject]@{
-            Description = 'Listening port 443'
-            Ts          = [datetime]'2025-11-01 12:42'
-            User        = 'ndemou-admin'
-        }
-}
-```
-Rules like this are loaded at the start of the program. When the specified HealthTest function (`UnexpectedListeningPorts`) runs, all finding signatures it emits are recorded. If they do not include the REQUIRED signature, a failure is emitted: `[failure] This finding that must appear in a healthy system did not: Computer is listening to port 443`. If the function is not executed, nothing happens.
-
-Also implement a new `-SetAsRequired` option so the user can mark a finding as required. It is similar to `AddWhiteList`. Example:
-```
-Get-ComputerHealth.ps1 -SetAsRequired -Test 'UnexpectedListeningPorts' -Signature '12345678' -Comment 'Listening port 443' -ComputerName 'Server1'
-```
-
-This functionality will be very useful for ports, installed software, services, and roles.
 
 ## Set of changes regarding reporting
 
