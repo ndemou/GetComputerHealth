@@ -61,7 +61,7 @@ Uses: Get-DhcpServerv4ScopeStatistics.
 
 }
 
-function HealthTest-ListRoleFeatures {
+function HealthTest-ListRolesFeatures {
 <#
 Description: Lists installed Windows roles and features.
 AppliesTo: Server

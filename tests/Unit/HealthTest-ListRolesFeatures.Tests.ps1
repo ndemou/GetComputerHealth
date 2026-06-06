@@ -1,12 +1,12 @@
-Describe 'HealthTest-ListRoleFeatures source' {
+Describe 'HealthTest-ListRolesFeatures source' {
   BeforeAll {
     $scriptPath = Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) 'health-tests\OnlyIfHostIs-Server.ps1'
     $scriptText = Get-Content -LiteralPath $scriptPath -Raw
   }
 
   It 'renames the function and marks it as Policy' {
-    $scriptText | Should -Match 'function HealthTest-ListRoleFeatures \{'
-    $scriptText | Should -Match '(?ms)function HealthTest-ListRoleFeatures \{.*?Tags: Policy'
+    $scriptText | Should -Match 'function HealthTest-ListRolesFeatures \{'
+    $scriptText | Should -Match '(?ms)function HealthTest-ListRolesFeatures \{.*?Tags: Policy'
   }
 
   It 'removes disallowed-role filtering and reports installed roles as warnings' {

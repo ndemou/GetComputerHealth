@@ -349,7 +349,7 @@ If you only want to add a few custom tests, you do not need to modify the core c
 | HyperVReplicationHealth          | Checks Hyper-V VM replication health, missing replication, and running replica VMs |
 | HyperVRunningVMs                 | Lists running Hyper-V virtual machines on the host |
 | IisBindings                      | Checks IIS bindings for wildcard or otherwise risky binding configurations |
-| ListRoleFeatures                 | Lists installed Windows roles and features |
+| ListRolesFeatures                | Lists installed Windows roles and features |
 | InstalledSW                      | Reports installed software not present in the baseline inventory |
 | InterfaceDnsServersUseDcs        | Checks whether member-server network interfaces use domain controllers as DNS servers |
 | IPv6Binding                      | Checks whether IPv6 is bound on network adapters as expected |
