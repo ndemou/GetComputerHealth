@@ -151,13 +151,7 @@ This change needs an On-Disk format change so we also need a migration.
 The migration will initialize `.\config\suppressed_findings.psd1` with any  existing lines from `Get-ComputerHealth.sigs-to-suppress.txt` (the lines must not be removed). If `.\config\suppressed_findings.psd1` already exists the migration is skiped.
 
 
-## Set of changes regarding reporting
-
-### Make the code that generates and sends reports intepended
-
-We must make it easy to experiment with changes in reporting and emailing without running Get-ComputerHealth (we should be able to reuse saved CLIXML findings)
-
-### Lighter html code 
+## Lighter html code 
 
 Interactive reports: Instead of including the findings in this fat "fieldname:value" format:
 ```
