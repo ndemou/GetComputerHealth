@@ -1795,14 +1795,14 @@ Uses: Get-LiveSessionInfo.
     }
 }
 
-function HealthTest-NonDefaultShares {
+function HealthTest-ListShares {
 <#
-Description: Detects non-default SMB shares and notes when file and print sharing is unnecessarily enabled.
+Description: Lists SMB shares and notes when file and print sharing is unnecessarily enabled.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: low
-Tags: Essential
+Tags: Essential, Policy
 Uses: None.
 #>
   # 0(Workstation standalone),  1(Workstation domain joined), 2(Server standalone), 3(Server joined), 4(DC non-FSMO), 5(DC with FSMO role)
@@ -1810,13 +1810,13 @@ Uses: None.
   $isHostDC = ($domainRole -in 4,5)
 
     $lanManServer_service = (get-service -Name "LanmanServer")
-    $shares_beside_the_system_ones = Get-CimInstance -ClassName Win32_Share | Select-Object Name, Path | ?{$_.name -notlike '*$' -and $_.path -notlike 'C:\Windows\SYSVOL\sysvol*'}
-    if ($shares_beside_the_system_ones) {
-        $shares_beside_the_system_ones | %{Write-Warning "[WARNING] Found a share named '$($_.name)' that shares '$($_.Path)'"}
+    $shares = Get-CimInstance -ClassName Win32_Share | Select-Object Name, Path
+    if ($shares) {
+        $shares | ForEach-Object { Write-Warning "[WARNING] Found a share named '$($_.name)' that shares '$($_.Path)'" }
     } else {
         if ((Get-Service  -Name "LanmanServer").status -eq 'Stopped') {
-            Write-Warning "[PASS] No shares except the defaults and LanMan service is stopped."} else {
-            Write-Warning "[PASS] Found no shares except the default ones (like C$, ADMIN$)."; if (!$isHostDC -and ($lanManServer_service.status -ne 'stopped' -or $lanManServer_service.StartType -ne 'Disabled')) {
+            Write-Warning "[PASS] Found no shares and LanMan service is stopped."} else {
+            Write-Warning "[PASS] Found no shares."; if (!$isHostDC -and ($lanManServer_service.status -ne 'stopped' -or $lanManServer_service.StartType -ne 'Disabled')) {
                 if ((Get-CimInstance Win32_ComputerSystem).DomainRole -ge 2) { # server
                     Write-Warning "[WARNING] File & print sharing is enabled. It's recomended to disable it unless you really need it`nRun this if you want to disable:`n   Set-Service -Name 'LanmanServer' -StartupType Disabled; Stop-Service -Name 'LanmanServer'"
                 } else { # workstation
