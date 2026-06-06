@@ -216,3 +216,67 @@ Describe 'HealthTest-AutoStartServicesRunning' {
     }
   }
 }
+
+Describe 'HealthTest-ListServices' {
+  BeforeAll {
+    . (Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) 'health-tests\srvc-exe-resolve.ps1')
+  }
+
+  It 'reports Microsoft services instead of filtering them out' {
+    Mock Get-CimInstance {
+      [pscustomobject]@{
+        DomainRole = 1
+      }
+    } -ParameterFilter { $ClassName -eq 'Win32_ComputerSystem' }
+
+    Mock Get-ServiceVendors {
+      @(
+        [pscustomobject]@{
+          ServiceName = 'WinDefend'
+          DisplayName = 'Microsoft Defender Antivirus Service'
+          Vendor = 'Microsoft Corporation'
+          ExePath = 'C:\Windows\System32\MsMpEng.exe'
+          ExeSHA256 = $null
+          ExceptionsThrown = ''
+        }
+      )
+    }
+
+    Mock Write-Warning {}
+
+    HealthTest-ListServices
+
+    Should -Invoke Write-Warning -Times 1 -Exactly -ParameterFilter {
+      $Message -eq "[NOTICE] Found Microsoft service: Vendor='Microsoft Corporation' Name='WinDefend'`nAdmin must verify if service is legit and needed. Service Description: 'Microsoft Defender Antivirus Service'`nExecutable: 'C:\Windows\System32\MsMpEng.exe'."
+    }
+  }
+
+  It 'uses FAILURE only for serious service-vendor resolution problems' {
+    Mock Get-CimInstance {
+      [pscustomobject]@{
+        DomainRole = 1
+      }
+    } -ParameterFilter { $ClassName -eq 'Win32_ComputerSystem' }
+
+    Mock Get-ServiceVendors {
+      @(
+        [pscustomobject]@{
+          ServiceName = 'BrokenSvc'
+          DisplayName = 'Broken Service'
+          Vendor = $null
+          ExePath = 'C:\Broken\BrokenSvc.exe'
+          ExeSHA256 = $null
+          ExceptionsThrown = 'Service BrokenSvc points to missing executable.'
+        }
+      )
+    }
+
+    Mock Write-Warning {}
+
+    HealthTest-ListServices
+
+    Should -Invoke Write-Warning -Times 1 -Exactly -ParameterFilter {
+      $Message -eq "[FAILURE] Either something's wrong with service 'BrokenSvc' or there's a bug in Get-ServiceVendors.`nError(s): Service BrokenSvc points to missing executable."
+    }
+  }
+}

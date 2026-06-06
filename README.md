@@ -365,7 +365,7 @@ If you only want to add a few custom tests, you do not need to modify the core c
 | Nic                              | Checks network adapters for unhealthy status or suspicious error counters |
 | NltestSiteDiscovery              | Checks whether site discovery returns a valid AD site for the computer |
 | NonDefaultShares                 | Detects non-default SMB shares and notes when file and print sharing is unnecessarily enabled |
-| NonMicrosoftServices             | Identifies non-core Microsoft services and highlights unusual or suspicious service vendors |
+| ListServices                     | Lists services and highlights unusual or suspicious service vendors |
 | NtdsLogVolumeFree                | Checks whether the NTDS log volume has enough free space |
 | NtdsPathsLocation                | Checks whether the NTDS database and log paths are on expected volumes |
 | NtfsDirtyBit                     | Checks whether any NTFS volumes have the dirty bit set |

@@ -834,13 +834,14 @@ Uses: cmd.exe.
         Write-Warning "[PASS] All services that are set to automatically start are running"}
 }
 
-function HealthTest-NonMicrosoftServices {
+function HealthTest-ListServices {
 <#
-Description: Identifies non-core Microsoft services and highlights unusual or suspicious service vendors.
+Description: Lists services and highlights unusual or suspicious service vendors.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: High(Time)
+Tags: Policy
 Uses: Get-ServiceVendors.
 #>
 
@@ -849,22 +850,23 @@ Uses: Get-ServiceVendors.
     $COMMON_VENDORS_FOR_WORKSTATIONS = @('Adobe Inc.', 'Cisco Systems, Inc.', 'Google LLC', 'Lenovo', 'Mozilla Corporation')
     $domainRole = (Get-CimInstance Win32_ComputerSystem).DomainRole
     $isHostServer = ($domainRole  -in 3,4,5)
-    Get-ServiceVendors | ?{$_.Vendor -notin $CORE_MICROSOFT_VENDORS -or $_.ExceptionsThrown} | %{
+    Get-ServiceVendors | ForEach-Object {
         if ($_.ExeSHA256) {$extra_msg = " (SHA256 of '$($_.ExePath)' is $($_.ExeSHA256))"} else {$extra_msg=""}
-        $TrimmdServiceName = $_.ServiceName -replace '[0-9]+[.][0-9][0-9.]*$','[VERSION]'
+        $trimmedServiceName = $_.ServiceName -replace '[0-9]+[.][0-9][0-9.]*$','[VERSION]'
         $ok = $false
         if ($_.ExceptionsThrown) {
-            Write-Warning "[WARNING] Either something's wrong with service '$($_.ServiceName)' or there's a bug in Get-ServiceVendors.`nError(s): $($_.ExceptionsThrown)"
+            Write-Warning "[FAILURE] Either something's wrong with service '$($_.ServiceName)' or there's a bug in Get-ServiceVendors.`nError(s): $($_.ExceptionsThrown)"
         } else {
-            if ($isHostServer -or ($_.Vendor -notin $COMMON_VENDORS_FOR_WORKSTATIONS)) {
-                $comment = "Admin must verify if service is legit and needed. Service Description: '$($_.DisplayName)'`nExecutable: '$($_.ExePath)'."
-                Write-Warning "[WARNING] Found service that is not a core Microsoft service: Vendor='$($_.Vendor)' Name='$TrimmdServiceName'$extra_msg`n$comment"
+            $comment = "Admin must verify if service is legit and needed. Service Description: '$($_.DisplayName)'`nExecutable: '$($_.ExePath)'."
+            if ($_.Vendor -in $CORE_MICROSOFT_VENDORS) {
+                Write-Warning "[NOTICE] Found Microsoft service: Vendor='$($_.Vendor)' Name='$trimmedServiceName'$extra_msg`n$comment"
+            } elseif ((-not $isHostServer) -and ($_.Vendor -in $COMMON_VENDORS_FOR_WORKSTATIONS)) {
+                Write-Warning "[NOTICE] Found service from a common workstation vendor: Vendor='$($_.Vendor)' Name='$trimmedServiceName'$extra_msg`n$comment"
             } else {
-                $comment = "It is however from a common vendor. Admin must verify if service is legit and needed. Service Description: '$($_.DisplayName)'`nExecutable: '$($_.ExePath)'."
-                Write-Warning "[NOTICE] Found service that is not a core Microsoft service: Vendor='$($_.Vendor)' Name='$TrimmdServiceName'$extra_msg`n$comment"
+                Write-Warning "[WARNING] Found service from an unusual or higher-risk vendor: Vendor='$($_.Vendor)' Name='$trimmedServiceName'$extra_msg`n$comment"
             }
         }
     }
-    if ($ok) {Write-Warning "[PASS] Found no service except Microsoft ones"}
+    if ($ok) {Write-Warning "[PASS] Found no services"}
 }
 

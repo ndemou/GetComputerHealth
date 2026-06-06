@@ -19,7 +19,7 @@ try {
     $data = & (Join-Path $paths.InstallRoot 'Get-ComputerHealth.ps1') -Hide DIPSNWFC `
       -OutputConsoleMessages -OutputObjects -RunWithoutElevation `
       -ExcludeTests ("HealthTest-LargeDirectories,HealthTest-SoftwareLicensing," + `
-                     "HealthTest-ScheduledTasks,HealthTest-ScheduledTasksLastResult,HealthTest-NonMicrosoftServices," + `
+                     "HealthTest-ScheduledTasks,HealthTest-ScheduledTasksLastResult,HealthTest-ListServices," + `
                      "HealthTest-UnsignedDrivers,HealthTest-IisBindings")
   } catch {
     $inv = $_.InvocationInfo
