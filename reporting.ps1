@@ -3,6 +3,26 @@ if ([string]::IsNullOrWhiteSpace($script:GetComputerHealthReportingScriptDir)) {
   $script:GetComputerHealthReportingScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 }
 
+function Get-EmbeddedGetComputerHealthVersion {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)][string]$ScriptPath
+  )
+
+  try {
+    $content = Get-Content -LiteralPath $ScriptPath -Raw -ErrorAction Stop
+    $match = [regex]::Match($content, '(?m)^\$VERSION\s*=\s*"(?<Version>[^"]+)"')
+    if ($match.Success) {
+      return $match.Groups['Version'].Value
+    }
+  }
+  catch {
+    # Fall back to unknown if the file cannot be read.
+  }
+
+  return 'unknown'
+}
+
 function Invoke-HealthEmail {
   # Send the final report via email (except if -NoSendReport is passed)
   [CmdletBinding()]
@@ -28,6 +48,7 @@ function Invoke-HealthEmail {
     Write-Host -for Yellow ("Will not send email report. Reason: send-message.ps1 is not configured. If you want to configure it run ``Send-Message.ps1 -GenerateConfig '{0}'``." -f $ConfigFile)
     return
   }
+  $sendMessageScriptPath = Join-Path $script:GetComputerHealthReportingScriptDir 'Send-Message.ps1'
   $mailParams = @{
     Subject    = $Subject
     Body       = $Body
@@ -38,7 +59,7 @@ function Invoke-HealthEmail {
   Write-host -for gray   ("Attempting to send email report. Subject: {0}" -f $Subject)
   Write-host -for gray   "Sending email... " -NoNewLine
   try {
-    & $SEND_MESSAGE_SCRIPT_PATH @mailParams
+    & $sendMessageScriptPath @mailParams
     Write-host -for gray   "email sent."
   }
   catch {
@@ -713,4 +734,222 @@ function Get-HealthNotableSubject {
   }
 
   return $FallbackSubject
+}
+
+function Get-HealthReportingTargets {
+  [CmdletBinding()]
+  param(
+    [AllowEmptyCollection()][string[]]$Targets,
+    [Parameter(Mandatory)][AllowEmptyCollection()][object[]]$Messages
+  )
+
+  if ($Targets -and $Targets.Count -gt 0) {
+    return @(
+      $Targets |
+        ForEach-Object { [string]$_ } |
+        Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+        Sort-Object -Unique
+    )
+  }
+
+  $derivedTargets = New-Object System.Collections.Generic.List[string]
+  foreach ($message in $Messages) {
+    if ($null -eq $message) {
+      continue
+    }
+
+    if (-not $message.PSObject.Properties['Computer']) {
+      continue
+    }
+
+    $computer = ([string]$message.Computer).Trim()
+    if (-not [string]::IsNullOrWhiteSpace($computer)) {
+      $derivedTargets.Add($computer)
+    }
+  }
+
+  return @($derivedTargets | Sort-Object -Unique)
+}
+
+function Get-HealthReportingSubjects {
+  [CmdletBinding()]
+  param(
+    [AllowEmptyCollection()][string[]]$Targets
+  )
+
+  $targetText = @($Targets) -join ','
+  $notableSubject = 'Notable Messages from Get-ComputerHealth of LIST_OF_COMPUTERS'
+  $allGoodSubject = 'RELAX. No notable Messages from Get-ComputerHealth of LIST_OF_COMPUTERS'
+
+  $notableSubject = $notableSubject -replace 'LIST_OF_COMPUTERS', $targetText
+  $allGoodSubject = $allGoodSubject -replace 'LIST_OF_COMPUTERS', $targetText
+
+  return [pscustomobject]@{
+    NotableSubject = $notableSubject
+    AllGoodSubject = $allGoodSubject
+  }
+}
+
+function Normalize-HealthMessagesForReporting {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)][AllowEmptyCollection()][object[]]$Messages
+  )
+
+  $normalized = New-Object System.Collections.Generic.List[object]
+  foreach ($message in $Messages) {
+    if ($null -eq $message) {
+      continue
+    }
+
+    $effectiveLevel = ''
+    if ($message.PSObject.Properties['EffectiveLevel']) {
+      $effectiveLevel = [string]$message.EffectiveLevel
+    }
+    elseif ($message.PSObject.Properties['Level']) {
+      $effectiveLevel = [string]$message.Level
+    }
+
+    $copy = $message | Select-Object -Property *
+    if ($copy.PSObject.Properties['EffectiveLevel']) {
+      $copy.EffectiveLevel = $effectiveLevel
+    }
+    else {
+      $copy | Add-Member -NotePropertyName EffectiveLevel -NotePropertyValue $effectiveLevel
+    }
+
+    $normalized.Add($copy)
+  }
+
+  return $normalized.ToArray()
+}
+
+function Invoke-GetComputerHealthReporting {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)]
+    [AllowEmptyCollection()]
+    [object[]]$Messages,
+
+    [switch]$NoSendReport,
+
+    [switch]$SendReport,
+
+    [string]$Timestamp,
+
+    [string[]]$Targets
+  )
+
+  if (-not $Messages -or $Messages.Count -eq 0) {
+    return
+  }
+
+  if ([string]::IsNullOrWhiteSpace($Timestamp)) {
+    $Timestamp = Get-Date -Format 'yyyy-MM-dd_HH.mm'
+  }
+
+  $scriptBinDir = (Resolve-Path -LiteralPath $script:GetComputerHealthReportingScriptDir).Path
+  $rootDir = Split-Path -Parent $scriptBinDir
+  $configDir = Join-Path $rootDir 'config'
+  $tempDir = Join-Path $rootDir 'temp'
+  $dataDir = Join-Path $rootDir 'data'
+  $versionFilePath = Join-Path $scriptBinDir 'VERSION'
+  $getHealthScriptPath = Join-Path $scriptBinDir 'Get-ComputerHealth.ps1'
+  $lastReportHtmlPath = Join-Path $tempDir 'last-report.html'
+  $smtpConfig = Join-Path $configDir 'Send-Message.conf'
+  $smtpConfigPsd1 = Join-Path $configDir 'Send-Message.psd1'
+  if ((-not (Test-Path -LiteralPath $smtpConfig -PathType Leaf)) -and (Test-Path -LiteralPath $smtpConfigPsd1 -PathType Leaf)) {
+    $smtpConfig = $smtpConfigPsd1
+  }
+
+  $normalizedMessages = @(Normalize-HealthMessagesForReporting -Messages $Messages)
+  $Targets = @(Get-HealthReportingTargets -Targets $Targets -Messages $normalizedMessages)
+  $subjects = Get-HealthReportingSubjects -Targets $Targets
+  $reportArtifacts = Get-HealthReportArtifactPaths -DataDir $dataDir -TempDir $tempDir -Timestamp $Timestamp
+  $allMessagesClixmlTempPath = $reportArtifacts.AllMessagesClixmlTempPath
+  $allMessagesZipPath = $reportArtifacts.AllMessagesZipPath
+  $lastAllFindingsClixmlPath = $reportArtifacts.LastAllFindingsClixmlPath
+  $embeddedVersion = Get-EmbeddedGetComputerHealthVersion -ScriptPath $getHealthScriptPath
+  $emailSignature = Get-HealthEmailSignature -VersionFilePath $versionFilePath -FallbackVersion $embeddedVersion -FallbackTimestampPath $getHealthScriptPath
+  $emailDecision = Get-HealthEmailDecision -NoSendReport:$NoSendReport -SendReport:$SendReport -NonInteractiveContext:(Test-IsNonInteractiveContext)
+  $sendMailByDefault = [bool]$emailDecision.ShouldSend
+  $sortOrder = @{ 'failure' = 1; 'warning' = 2; 'notice' = 3; 'postponed' = 4; 'info' = 5; 'pass' = 6; 'debug' = 7 }
+
+  Export-HealthMessagesReportData -Messages $normalizedMessages -FileName $allMessagesClixmlTempPath
+  Copy-Item -LiteralPath $allMessagesClixmlTempPath -Destination $lastAllFindingsClixmlPath -Force
+  Compress-HealthReportDataFile -SourcePath $allMessagesClixmlTempPath -DestinationPath $allMessagesZipPath
+
+  $notableMessages = @(
+    $normalizedMessages |
+      Where-Object { (-not $_.Suppressed -and $_.Level -notin @('debug', 'help', 'pass', 'info')) -or ($_.EffectiveLevel -eq 'postponed') } |
+      Sort-Object -Property @{ Expression = { $sortOrder[$_.EffectiveLevel] } }, Computer
+  )
+
+  $synopsis = " " + ($notableMessages |
+    Where-Object { $_.EffectiveLevel } |
+    Group-Object EffectiveLevel -NoElement |
+    Sort-Object -Property @{ Expression = { $sortOrder[$_.Name] } } |
+    ForEach-Object {
+      if ($_.Count) {
+        "    $($_.Count.ToString().PadRight(5)) $($_.Name)`r`n"
+      }
+    })
+
+  Write-Host ""
+  Write-Host -for White "Synopsis of notable messages per level"
+  Write-Host -for Gray $synopsis
+  Write-Host ""
+
+  if ($notableMessages) {
+    Write-Host -for Yellow "Found notable messages. I have saved them in these files:"
+    Write-Host -for Yellow "    $($reportArtifacts.LastInteractiveReportHtmlPath)"
+    Write-Host -for Gray "    $lastAllFindingsClixmlPath"
+    Write-Host -for Gray "    $allMessagesZipPath"
+    Write-Host -for Gray "Open the HTML report in a browser or load the CLIXML findings in PowerShell like this:"
+    Write-Host -for Gray "    `$data = Import-Clixml $lastAllFindingsClixmlPath"
+    Write-Host -for Gray '    $data|ogv # GUI review'
+    Write-Host -for Gray '    $data|select -Property Computer,Level,Message # Console review'
+    Write-Host -for Gray ""
+    Write-Host -for Gray "Preparing notable report"
+
+    $htmlParts = @()
+    $htmlSynopsis = Convert-HealthSynopsisToHtml -Messages @($notableMessages)
+    if (-not [string]::IsNullOrWhiteSpace($htmlSynopsis)) {
+      $htmlParts += $htmlSynopsis
+    }
+    $htmlParts += Convert-HealthMessagesToHtmlTable -Messages @(
+      $notableMessages | Sort-Object -Property @{ Expression = { $sortOrder[$_.EffectiveLevel] } }, Computer
+    )
+    $html = $htmlParts -join ''
+    $interactiveRows = @(Convert-HealthReportRowsToInteractiveRows -Rows $notableMessages)
+    $interactiveLocationLine = (($emailSignature.Text -split "\r?\n")[0]).Trim()
+    $interactiveLocationSuffix = $interactiveLocationLine -replace '^Tests started from\s+\S+\s+', ''
+    if ([string]::IsNullOrWhiteSpace($interactiveLocationSuffix)) {
+      $interactiveLocationSuffix = ($Targets -join ', ')
+    }
+    $interactiveReportTitle = "Test findings for {0} — {1}" -f (($Targets -join ', '), $interactiveLocationSuffix)
+    $interactiveReportHtml = Get-HealthInteractiveHtmlReport -Rows $interactiveRows -Title $interactiveReportTitle -FooterHtml $emailSignature.HtmlBottom
+    Save-HealthHtmlReport -Path $reportArtifacts.InteractiveReportTempPath -Html $interactiveReportHtml
+
+    $signedHtml = Add-HealthEmailSignature -Body $html -BodyAsHtml -Signature $emailSignature
+    Save-HealthHtmlReport -Path $reportArtifacts.LastEmailBodyHtmlPath -Html $signedHtml
+    $smtpNotableSubject = Get-HealthNotableSubject -FallbackSubject $subjects.NotableSubject -NotableMessages $notableMessages
+    Write-Host -for Gray ("Email report decision: {0}" -f $emailDecision.Reason)
+    try {
+      Invoke-HealthEmail -Subject $smtpNotableSubject -Body $signedHtml -BodyAsHtml -Attachments $reportArtifacts.InteractiveReportTempPath -ConfigFile $smtpConfig -NoSendReport:(-not $sendMailByDefault) -SkipReason $emailDecision.Reason
+    }
+    finally {
+      if (Test-Path -LiteralPath $reportArtifacts.InteractiveReportTempPath -PathType Leaf) {
+        Move-HealthReportFile -SourcePath $reportArtifacts.InteractiveReportTempPath -DestinationPath $reportArtifacts.LastInteractiveReportHtmlPath
+      }
+    }
+    return
+  }
+
+  Write-Host -for Green "GOOD, Nothing notable to record. I have saved less notable messages here:"
+  Write-Host -for Gray "    $allMessagesZipPath"
+  $signedBody = Add-HealthEmailSignature -Body (Get-RelaxHtmlBody) -BodyAsHtml -Signature $emailSignature
+  Save-HealthHtmlReport -Path $lastReportHtmlPath -Html $signedBody
+  Write-Host -for Gray ("Email report decision: {0}" -f $emailDecision.Reason)
+  Invoke-HealthEmail -Subject $subjects.AllGoodSubject -Body $signedBody -BodyAsHtml -ConfigFile $smtpConfig -NoSendReport:(-not $sendMailByDefault) -SkipReason $emailDecision.Reason
 }

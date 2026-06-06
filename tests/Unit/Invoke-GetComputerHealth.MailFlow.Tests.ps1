@@ -658,4 +658,136 @@
       Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
     }
   }
+
+  It 'derives targets from messages and computes a timestamp when omitted' {
+    $tempRoot = Join-Path $env:TEMP ('gch-reporting-invoke-' + [guid]::NewGuid().ToString())
+    $binDir = Join-Path $tempRoot 'bin'
+    $configDir = Join-Path $tempRoot 'config'
+    $tempDir = Join-Path $tempRoot 'temp'
+    $dataDir = Join-Path $tempRoot 'data'
+    $script:GetComputerHealthReportingScriptDir = $binDir
+
+    try {
+      New-Item -ItemType Directory -Path $binDir, $configDir, $tempDir, $dataDir -Force | Out-Null
+      Set-Content -LiteralPath (Join-Path $binDir 'Get-ComputerHealth.ps1') -Value '$VERSION="4.5.6"' -Encoding UTF8
+      Set-Content -LiteralPath (Join-Path $binDir 'VERSION') -Value '9.9.9' -Encoding UTF8
+
+      Mock Get-EmbeddedGetComputerHealthVersion { '9.9.9' }
+      Mock Get-HealthEmailSignature {
+        [pscustomobject]@{
+          Text = 'Tests started from RUNNER1 Domain contoso.local 10.0.0.10'
+          Html = '<div>sig</div>'
+          HtmlTop = 'Tests started from RUNNER1 Domain contoso.local 10.0.0.10'
+          HtmlBottom = 'signature footer'
+        }
+      }
+      Mock Get-HealthEmailDecision { [pscustomobject]@{ ShouldSend = $true; Reason = 'Email sending forced by -SendReport.' } }
+      Mock Test-IsNonInteractiveContext { $false }
+      Mock Export-HealthMessagesReportData {}
+      Mock Copy-Item {}
+      Mock Compress-HealthReportDataFile {}
+      Mock Get-HealthInteractiveHtmlReport { '<html>interactive</html>' }
+      Mock Save-HealthHtmlReport {}
+      Mock Move-HealthReportFile {}
+      Mock Invoke-HealthEmail {}
+
+      Invoke-GetComputerHealthReporting -Messages @(
+        [pscustomobject]@{
+          Computer = 'SRV2'
+          Level = 'warning'
+          EffectiveLevel = 'warning'
+          Suppressed = $false
+          Message = 'Disk free space is low'
+          Comment = ''
+          Hash = 'deadbeef'
+          Emitter = 'UnitTest'
+        },
+        [pscustomobject]@{
+          Computer = 'SRV1'
+          Level = 'notice'
+          EffectiveLevel = 'notice'
+          Suppressed = $false
+          Message = 'A few failed login attempts'
+          Comment = ''
+          Hash = 'feedbead'
+          Emitter = 'UnitTest'
+        }
+      ) -SendReport
+
+      Assert-MockCalled Export-HealthMessagesReportData -Times 1 -ParameterFilter {
+        $FileName -match [regex]::Escape((Join-Path $tempDir 'all-messages-')) -and
+        $FileName -match 'all-messages-\d{4}-\d{2}-\d{2}_\d{2}\.\d{2}\.clixml$'
+      }
+      Assert-MockCalled Invoke-HealthEmail -Times 1 -ParameterFilter {
+        $Subject -eq 'Warning(s) from Get-ComputerHealth of SRV1,SRV2'
+      }
+    }
+    finally {
+      Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
+    }
+  }
+
+  It 'uses provided targets for the subject instead of deriving them from messages' {
+    $tempRoot = Join-Path $env:TEMP ('gch-reporting-invoke-' + [guid]::NewGuid().ToString())
+    $binDir = Join-Path $tempRoot 'bin'
+    $configDir = Join-Path $tempRoot 'config'
+    $tempDir = Join-Path $tempRoot 'temp'
+    $dataDir = Join-Path $tempRoot 'data'
+    $script:GetComputerHealthReportingScriptDir = $binDir
+
+    try {
+      New-Item -ItemType Directory -Path $binDir, $configDir, $tempDir, $dataDir -Force | Out-Null
+      Set-Content -LiteralPath (Join-Path $binDir 'Get-ComputerHealth.ps1') -Value '$VERSION="4.5.6"' -Encoding UTF8
+      Set-Content -LiteralPath (Join-Path $binDir 'VERSION') -Value '9.9.9' -Encoding UTF8
+
+      Mock Get-EmbeddedGetComputerHealthVersion { '9.9.9' }
+      Mock Get-HealthEmailSignature {
+        [pscustomobject]@{
+          Text = 'Tests started from RUNNER1 Domain contoso.local 10.0.0.10'
+          Html = '<div>sig</div>'
+          HtmlTop = 'Tests started from RUNNER1 Domain contoso.local 10.0.0.10'
+          HtmlBottom = 'signature footer'
+        }
+      }
+      Mock Get-HealthEmailDecision { [pscustomobject]@{ ShouldSend = $true; Reason = 'Email sending forced by -SendReport.' } }
+      Mock Test-IsNonInteractiveContext { $false }
+      Mock Export-HealthMessagesReportData {}
+      Mock Copy-Item {}
+      Mock Compress-HealthReportDataFile {}
+      Mock Get-HealthInteractiveHtmlReport { '<html>interactive</html>' }
+      Mock Save-HealthHtmlReport {}
+      Mock Move-HealthReportFile {}
+      Mock Invoke-HealthEmail {}
+
+      Invoke-GetComputerHealthReporting -Messages @(
+        [pscustomobject]@{
+          Computer = 'MESSAGEHOST'
+          Level = 'warning'
+          EffectiveLevel = 'warning'
+          Suppressed = $false
+          Message = 'Disk free space is low'
+          Comment = ''
+          Hash = 'deadbeef'
+          Emitter = 'UnitTest'
+        }
+      ) -Targets @('TARGET2', 'TARGET1') -Timestamp '2026-06-06_12.30' -SendReport
+
+      Assert-MockCalled Invoke-HealthEmail -Times 1 -ParameterFilter {
+        $Subject -eq 'Warning(s) from Get-ComputerHealth of TARGET1,TARGET2'
+      }
+    }
+    finally {
+      Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
+    }
+  }
+
+  It 'does nothing when reporting is invoked with an empty message array' {
+    Mock Export-HealthMessagesReportData {}
+    Mock Invoke-HealthEmail {}
+
+    Invoke-GetComputerHealthReporting -Messages @()
+
+    Assert-MockCalled Export-HealthMessagesReportData -Times 0
+    Assert-MockCalled Invoke-HealthEmail -Times 0
+  }
 }

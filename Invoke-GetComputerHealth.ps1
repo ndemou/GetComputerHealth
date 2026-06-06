@@ -140,19 +140,9 @@ $SEND_MESSAGE_SCRIPT_PATH = Join-Path $SCRIPT_BIN_DIR 'Send-Message.ps1'
 $LIB_LOG_OBJECTS_PATH = Join-Path $SCRIPT_BIN_DIR 'lib-write-log-objects.ps1'
 $VERSION_FILE_PATH = Join-Path $SCRIPT_BIN_DIR 'VERSION'
 $IPS_OF_ALL_DCS_CACHE_PATH = Join-Path $TEMP_DIR 'cache.IpsOfAllDcs.clixml'
-$LAST_INTERACTIVE_REPORT_HTML_PATH = Join-Path $TEMP_DIR 'last-interactive-report.html'
-$LAST_REPORT_HTML_PATH = Join-Path $TEMP_DIR 'last-report.html'
 $PROJECT_URL = 'https://github.com/ndemou/GetComputerHealth'
 $GCH_CONFIG_PATH = Join-Path $CONFIG_DIR 'gch.psd1'
 $SHOW_AS_POSTPONED_WINDOW_DAYS = 150
-
-$SmtpSubject = 'Notable Messages from Get-ComputerHealth of LIST_OF_COMPUTERS'
-$SmtpSubjectAllGood = 'RELAX. No notable Messages from Get-ComputerHealth of LIST_OF_COMPUTERS'
-$SmtpConfig = Join-Path $CONFIG_DIR 'Send-Message.conf'
-$SmtpConfigPsd1 = Join-Path $CONFIG_DIR 'Send-Message.psd1'
-if ((-not (Test-Path -LiteralPath $SmtpConfig -PathType Leaf)) -and (Test-Path -LiteralPath $SmtpConfigPsd1 -PathType Leaf)) {
-  $SmtpConfig = $SmtpConfigPsd1
-}
 $REPORTING_SCRIPT_PATH = Join-Path $SCRIPT_BIN_DIR 'reporting.ps1'
 . $REPORTING_SCRIPT_PATH
 #------------------------------------------------------------------------
@@ -321,24 +311,6 @@ function Resolve-GchConfiguredNonNegativeInteger {
   }
 
   return $number
-}
-
-function Get-EmbeddedGetComputerHealthVersion {
-  [CmdletBinding()]
-  param([Parameter(Mandatory)][string]$ScriptPath)
-
-  try {
-    $content = Get-Content -LiteralPath $ScriptPath -Raw -ErrorAction Stop
-    $match = [regex]::Match($content, '(?m)^\$VERSION\s*=\s*"(?<Version>[^"]+)"')
-    if ($match.Success) {
-      return $match.Groups['Version'].Value
-    }
-  }
-  catch {
-    # Fall back to unknown if the file cannot be read.
-  }
-
-  return 'unknown'
 }
 
 function Resolve-GetComputerHealthRuntimeRoot {
@@ -618,10 +590,6 @@ if (-not $NoUpdate) {
 
 Start-Transcript (Join-Path $LOG_DIR "Invoke-GetHealthDomainComputers-$timestamp.log")
 . $LIB_LOG_OBJECTS_PATH
-$embeddedVersion = Get-EmbeddedGetComputerHealthVersion -ScriptPath $GET_HEALTH_SCRIPT_PATH
-$emailSignature = Get-HealthEmailSignature -VersionFilePath $VERSION_FILE_PATH -FallbackVersion $embeddedVersion -FallbackTimestampPath $GET_HEALTH_SCRIPT_PATH
-$emailDecision = Get-HealthEmailDecision -NoSendReport:$NoSendReport -SendReport:$SendReport -NonInteractiveContext:(Test-IsNonInteractiveContext)
-$sendMailByDefault = [bool]$emailDecision.ShouldSend
 $IpsOfAllDcs = Resolve-IpsOfAllDcs -IpsOfAllDcs $IpsOfAllDcs -WasProvided:$PSBoundParameters.ContainsKey('IpsOfAllDcs') -CachePath $IPS_OF_ALL_DCS_CACHE_PATH
 
 if ($ExcludeServers) {
@@ -643,8 +611,6 @@ if ('ALL_DOMAIN_SERVERS' -in $targets) {
 $targets = @($targets | Sort-Object)
 
 write-verbose "Targets: $($targets -join ';')"
-$SmtpSubject = $SmtpSubject -replace 'LIST_OF_COMPUTERS', ($targets -join ',')
-$SmtpSubjectAllGood = $SmtpSubjectAllGood -replace 'LIST_OF_COMPUTERS', ($targets -join ',')
 
 $localReleaseZip = $null
 $localReleaseZipVersion = $null
@@ -988,97 +954,11 @@ foreach ($target in $targets) {
   Write-Progress -Activity "Checking $target" -Completed
 }
 
-$SortOrder = @{'failure' = 1; 'warning' = 2; 'notice' = 3; 'postponed' = 4; 'info' = 5; 'pass' = 6; 'debug' = 7 }
-$notable_msgs = @()
-if ($all_messages) {
-  foreach ($message in $all_messages) {
-    if ($message -and (-not $message.PSObject.Properties['EffectiveLevel'])) {
-      $level = if ($message.PSObject.Properties['Level']) { [string]$message.Level } else { '' }
-      $message | Add-Member -NotePropertyName EffectiveLevel -NotePropertyValue $level -Force
-    }
-  }
-
-  # save
-  $reportArtifacts = Get-HealthReportArtifactPaths -DataDir $DATA_DIR -TempDir $TEMP_DIR -Timestamp $timestamp
-  $allMessagesClixmlTempPath = $reportArtifacts.AllMessagesClixmlTempPath
-  $allMessagesZipPath = $reportArtifacts.AllMessagesZipPath
-  $lastAllFindingsClixmlPath = $reportArtifacts.LastAllFindingsClixmlPath
-  Export-HealthMessagesReportData -Messages $all_messages -FileName $allMessagesClixmlTempPath
-  Copy-Item -LiteralPath $allMessagesClixmlTempPath -Destination $lastAllFindingsClixmlPath -Force
-  Compress-HealthReportDataFile -SourcePath $allMessagesClixmlTempPath -DestinationPath $allMessagesZipPath
-  $notable_msgs = @(`
-      $all_messages `
-    | Where-Object { (-not($_.Suppressed) -and $_.level -notin @('debug', 'help', 'pass', 'info')) -or ($_.EffectiveLevel -eq 'postponed') } `
-    | Sort-Object -Property @{ Expression = { $SortOrder[$_.EffectiveLevel] } }, Computer `
-  )
-
-  $synopsis = " " + ($notable_msgs | Where-Object { $_.EffectiveLevel } |
-    Group-Object EffectiveLevel -NoElement |
-    Sort-Object -Property @{ Expression = { $SortOrder[$_.Name] } } | ForEach-Object {
-      if ($_.Count) {
-        "    $($_.Count.ToString().PadRight(5)) $($_.Name)`r`n"
-      }
-    })
-
-  write-host ""
-  Write-host -for white    "Synopsis of notable messages per level"
-  Write-host -for gray   $synopsis
-  write-host ""
-  if ($notable_msgs) {
-    Write-host -for yellow "Found notable messages. I have saved them in these files:"
-    Write-host -for yellow "    $($reportArtifacts.LastInteractiveReportHtmlPath)"
-    Write-host -for gray   "    $lastAllFindingsClixmlPath"
-    Write-host -for gray   "    $allMessagesZipPath"
-    Write-host -for gray   "Open the HTML report in a browser or load the CLIXML findings in PowerShell like this:"
-    Write-host -for gray   "    `$data = Import-Clixml $lastAllFindingsClixmlPath"
-    Write-host -for gray   '    $data|ogv # GUI review'
-    Write-host -for gray   '    $data|select -Property Computer,Level,Message # Console review'
-
-    Write-host -for gray   ""
-    Write-host -for gray   "Preparing notable report"
-
-    $htmlParts = @()
-    $htmlSynopsis = Convert-HealthSynopsisToHtml -Messages @($notable_msgs)
-    if (-not [string]::IsNullOrWhiteSpace($htmlSynopsis)) {
-      $htmlParts += $htmlSynopsis
-    }
-    $htmlParts += Convert-HealthMessagesToHtmlTable -Messages @(
-      $notable_msgs | Sort-Object -Property @{ Expression = { $SortOrder[$_.EffectiveLevel] } }, Computer
-    )
-    $html = $htmlParts -join ''
-    $interactiveRows = @(Convert-HealthReportRowsToInteractiveRows -Rows $notable_msgs)
-    $interactiveLocationLine = (($emailSignature.Text -split "\r?\n")[0]).Trim()
-    $interactiveLocationSuffix = $interactiveLocationLine -replace '^Tests started from\s+\S+\s+', ''
-    if ([string]::IsNullOrWhiteSpace($interactiveLocationSuffix)) {
-      $interactiveLocationSuffix = ($targets -join ', ')
-    }
-    $interactiveReportTitle = "Test findings for {0} — {1}" -f (($targets -join ', '), $interactiveLocationSuffix)
-    $interactiveReportHtml = Get-HealthInteractiveHtmlReport -Rows $interactiveRows -Title $interactiveReportTitle -FooterHtml $emailSignature.HtmlBottom
-    Save-HealthHtmlReport -Path $reportArtifacts.InteractiveReportTempPath -Html $interactiveReportHtml
-
-    $signedHtml = Add-HealthEmailSignature -Body $html -BodyAsHtml -Signature $emailSignature
-    Save-HealthHtmlReport -Path $reportArtifacts.LastEmailBodyHtmlPath -Html $signedHtml
-    $smtpNotableSubject = Get-HealthNotableSubject -FallbackSubject $SmtpSubject -NotableMessages $notable_msgs
-    Write-Host -for Gray ("Email report decision: {0}" -f $emailDecision.Reason)
-    try {
-      Invoke-HealthEmail -Subject $smtpNotableSubject -Body $signedHtml -BodyAsHtml -Attachments $reportArtifacts.InteractiveReportTempPath -ConfigFile $SmtpConfig -NoSendReport:(-not $sendMailByDefault) -SkipReason $emailDecision.Reason
-    }
-    finally {
-      if (Test-Path -LiteralPath $reportArtifacts.InteractiveReportTempPath -PathType Leaf) {
-        Move-HealthReportFile -SourcePath $reportArtifacts.InteractiveReportTempPath -DestinationPath $reportArtifacts.LastInteractiveReportHtmlPath
-      }
-    }
-  }
-  else {
-    Write-host -for green    "GOOD, Nothing notable to record. I have saved less notable messages here:"
-    Write-host -for gray     "    $allMessagesZipPath"
-    $signedBody = Add-HealthEmailSignature -Body (Get-RelaxHtmlBody) -BodyAsHtml -Signature $emailSignature
-    Save-HealthHtmlReport -Path $LAST_REPORT_HTML_PATH -Html $signedBody
-    Write-Host -for Gray ("Email report decision: {0}" -f $emailDecision.Reason)
-    Invoke-HealthEmail -Subject $SmtpSubjectAllGood -Body $signedBody -BodyAsHtml -ConfigFile $SmtpConfig -NoSendReport:(-not $sendMailByDefault) -SkipReason $emailDecision.Reason
-  }
-}
-else {
-}
+Invoke-GetComputerHealthReporting `
+  -Messages $all_messages `
+  -NoSendReport:$NoSendReport `
+  -SendReport:$SendReport `
+  -Timestamp $timestamp `
+  -Targets $targets
 
 Stop-Transcript
