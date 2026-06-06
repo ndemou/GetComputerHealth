@@ -64,22 +64,6 @@ https://docs.sigstore.dev/quickstart/quickstart-cosign/
 
 Review /doc/test-suite-guide.md and improve our test suite if needed.
 
-## For a few functions, 1) add the "Policy" Tag and 2) remove some exceptions
-
-These are the functions:
-  - HealthTest-NonMicrosoftServices
-  - HealthTest-NonDefaultShares
-  - HealthTest-LocalAdminsBaseline
-  - HealthTest-InstalledRolesFeatures
-
-Phase 1)
-Add the "Policy" tag to these functions. These tests should not emit [Failure] when they find services, shares, admins, or roles. They should use [Failure] only for other serious failures. For example, "[failure] Unintended role/feature installed" should become "[warning] Unintended role/feature installed".
-
-Phase 2)
-For these functions, remove any exceptions for findings that are currently ignored as benign, such as Microsoft services or default shares.
-After this change, all services should be reported, including Microsoft ones. All shares, including default ones, all administrators, and all roles should also be reported.
-Adjust the function names accordingly: NonMicrosoftServices -> Services; NonDefaultShares -> Shares.
-
 ## Enhance -AddWhitelisting with reason
 
 Current interface:
