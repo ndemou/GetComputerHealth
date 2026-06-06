@@ -514,6 +514,13 @@ function Set-RequiredFindingEntry {
     $config[$normalizedTestName] = [ordered]@{}
   }
 
+  if (Test-RequiredFindingConfigKey -Config $config[$normalizedTestName] -Key $normalizedSignature) {
+    $existingEntry = Convert-RequiredFindingEntryToHashtable -Entry $config[$normalizedTestName][$normalizedSignature]
+    if ([string]$existingEntry.Description -ceq [string]$Description) {
+      return
+    }
+  }
+
   $config[$normalizedTestName][$normalizedSignature] = [ordered]@{
     Description = [string]$Description
     Ts = $Timestamp

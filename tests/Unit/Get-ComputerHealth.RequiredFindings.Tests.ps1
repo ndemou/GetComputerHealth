@@ -90,6 +90,43 @@ Describe 'Get-ComputerHealth required findings' {
     }
   }
 
+  It 'does not rewrite the psd1 file when the same required finding is set twice' {
+    $tempRoot = Join-Path $env:TEMP ('gch-required-idempotent-' + [guid]::NewGuid().ToString())
+    $path = Join-Path $tempRoot 'required_findings.psd1'
+
+    try {
+      Set-RequiredFindingEntry -Path $path -TestName 'UnexpectedListeningPorts' -Signature '7bc98807' -Description 'This TCP port should be listening but is not: 10050 (zabbix_agent2, Zabbix SIA)' -Timestamp ([datetime]'2025-11-01 12:42') -User 'ndemou-admin'
+      $firstContent = Get-Content -LiteralPath $path -Raw
+
+      Start-Sleep -Milliseconds 20
+      Set-RequiredFindingEntry -Path $path -TestName 'UnexpectedListeningPorts' -Signature '7bc98807' -Description 'This TCP port should be listening but is not: 10050 (zabbix_agent2, Zabbix SIA)' -Timestamp ([datetime]'2025-11-01 12:43') -User 'another-user'
+      $secondContent = Get-Content -LiteralPath $path -Raw
+
+      $secondContent | Should -Be $firstContent
+    }
+    finally {
+      Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
+    }
+  }
+
+  It 'overrides the existing required finding when the description changes' {
+    $tempRoot = Join-Path $env:TEMP ('gch-required-override-' + [guid]::NewGuid().ToString())
+    $path = Join-Path $tempRoot 'required_findings.psd1'
+
+    try {
+      Set-RequiredFindingEntry -Path $path -TestName 'UnexpectedListeningPorts' -Signature '7bc98807' -Description 'This TCP port should be listening but is not: 10050 (zabbix_agent2, Zabbix SIA)' -Timestamp ([datetime]'2025-11-01 12:42') -User 'ndemou-admin'
+      Set-RequiredFindingEntry -Path $path -TestName 'UnexpectedListeningPorts' -Signature '7bc98807' -Description 'This TCP port should be listening but is not: 10050 (zabbix agent)' -Timestamp ([datetime]'2025-11-01 12:43') -User 'ndemou-admin'
+
+      $config = Read-RequiredFindingsConfig -Path $path
+
+      $config['UnexpectedListeningPorts']['7bc98807'].Description | Should -Be 'This TCP port should be listening but is not: 10050 (zabbix agent)'
+      $config['UnexpectedListeningPorts']['7bc98807'].Ts | Should -Be ([datetime]'2025-11-01 12:43')
+    }
+    finally {
+      Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
+    }
+  }
+
   It 'resolves required findings by short or full health test name' {
     $requiredFindings = [ordered]@{
       UnexpectedListeningPorts = [ordered]@{
