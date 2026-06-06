@@ -171,25 +171,13 @@ Sometimes the important question is not "what bad thing was detected?" but "did 
 * services that should be running
 * roles or features that should exist
 
-Required findings are stored in `C:\IT\Get-ComputerHealth\config\required_findings.psd1`.
-
-When a configured test runs, Get-ComputerHealth records the signatures it emitted. If one of that test's required signatures is missing, Get-ComputerHealth emits a new failure explaining that the required finding was not produced.
-
-1. Run the relevant health test and identify the signature of the finding you want to require.
-2. Mark it as required on the target computer:
+You can acomplish this in two steps:
+1. Identify the signature of the finding you want to require.
+2. Mark it as required and provide a description for future-you:
 
 > `C:\IT\Get-ComputerHealth\bin\Get-ComputerHealth.ps1 -SetAsRequired -ComputerName $env:computername -Test UnexpectedListeningPorts -Signature bfc162fa -Comment "Port 443(IIS) should be listening but is not"`
 
-Example `required_findings.psd1` content:
-
-```powershell
-@{
-    'UnexpectedListeningPorts' = @{
-        'bfc162fa' = @{Description = 'Port 443(IIS) should be listening but is not'; Ts = [datetime]'2025-11-01 12:42'; User = 'ndemou-admin'};
-        '98c134de' = @{Description = 'Port 80(IIS) should be listening but is not'; Ts = [datetime]'2025-11-01 12:42'; User = 'ndemou-admin'};
-    };
-}
-```
+> **IMPLEMENTATION DETAILS**: Required findings are stored in `C:\IT\Get-ComputerHealth\config\required_findings.psd1`. When a configured test runs, Get-ComputerHealth records the signatures it emitted. If one of that test's required signatures is missing, Get-ComputerHealth emits a new failure explaining that the required finding was not produced.
 
 ## How to Add Custom Tests
 
