@@ -58,7 +58,11 @@
     $html = Add-HealthEmailSignature -Body '<pre>body</pre>' -BodyAsHtml -Signature $signature
 
     $plain | Should -Be "Relax :-)`r`n`r`nTests started from RUNNER1 Domain contoso.local 10.0.0.10`r`nGet-ComputerHealth version 1.2.3, last update 2026-01-02 03:04, domain contoso.local"
-    $html | Should -Be "<pre>body</pre><div style='margin-top:12px; font-family:Aptos, Arial, sans-serif'><div style='color:#000; font-size:12px'>Tests started from RUNNER1 Domain contoso.local 10.0.0.10</div><div style='color:#666; font-size:10px'>Get-ComputerHealth version 1.2.3, last update 2026-01-02 03:04</div></div>"
+    $html | Should -Match '<!DOCTYPE html>'
+    $html | Should -Match '<style>'
+    $html | Should -Match '\.gch-signature \{'
+    $html | Should -Match '<body class="gch-root" style="margin:0; padding:12px; width:100%; font-family:Aptos, Arial, sans-serif; font-size:11pt; color:#000;">'
+    $html | Should -Match '<pre>body</pre><div class="gch-signature"><div class="gch-signature-top">Tests started from RUNNER1 Domain contoso.local 10.0.0.10</div><div class="gch-signature-bottom">Get-ComputerHealth version 1.2.3, last update 2026-01-02 03:04</div></div>'
   }
 
   It 'renders a project link in the html signature footer' {

@@ -88,19 +88,19 @@
             [pscustomobject]@{ Level = 'notice' }
         )
 
-        $html | Should -Match '^<div style=''margin:0 0 8px 0;'
+        $html | Should -Match '^<div class=''gch-synopsis''>'
         $html | Should -Not -Match 'Synopsis:'
         $html | Should -Match 'background-color:#ff4d4f; color:#fff'
         $html | Should -Match 'background-color:#ffb300; color:#111'
         $html | Should -Match 'background-color:#1e88e5; color:#fff'
-        $html | Should -Match "font-weight:700; font-size:120%'>3</span>"
-        $html | Should -Match '>failure</span>   <span style=''font-weight:700; font-size:120%''>2</span>'
-        $html | Should -Match '>warning</span>   <span style=''font-weight:700; font-size:120%''>1</span>'
-        $html | Should -Match '>notice</span></div>'
+        $html | Should -Match ">3 failure</span>"
+        $html | Should -Match ">3 failure</span>   <span class='gch-pill'.+>2 warning</span>"
+        $html | Should -Match ">2 warning</span>   <span class='gch-pill'.+>1 notice</span>"
+        $html | Should -Match '>1 notice</span></div>'
         $html | Should -Not -Match '>failure</span>,'
         $html | Should -Not -Match '>warning</span>,'
         $html | Should -Not -Match '>notice</span>\.'
-        $html | Should -Match "border-top:1px solid #cfcfcf; margin:0 0 12px 0"
+        $html | Should -Match "<div class='gch-divider'></div>"
         $html | Should -Not -Match '<pre'
     }
 
@@ -118,18 +118,33 @@
     $html | Should -Not -Match '<table'
     $html | Should -Match '>SRV1</span>'
     $html | Should -Match 'background-color:#ffb300; color:#111'
-    $html | Should -Match '>Warning</span><span style=''margin-left:8px''>Disk free space is low</span>'
-    $html | Should -Match 'margin-bottom:10px; font-family:Aptos, Arial, sans-serif; font-size:16px; color:#000'
-    $html | Should -Match 'color:#0D60A8; font-size:8px; font-family:Aptos, Arial, sans-serif'
-    $html | Should -Match ([regex]::Escape('Drive C: has only 4% free ◆ Investigate temp usage'))
+    $html | Should -Match '>Warning</span><span class=''gch-message''>Disk free space is low</span><span class=''gch-comment''>'
+    $html | Should -Match "<div class='gch-root'><div class='gch-row'>"
+    $html | Should -Match ([regex]::Escape('◆ Drive C: has only 4% free ◆ Investigate temp usage'))
     $html | Should -Not -Match 'border:1px solid'
     $html | Should -Match ([regex]::Escape('&amp; &quot;c:\it\Get-ComputerHealth\bin\Get-ComputerHealth.ps1&quot; -AddWhitelisting -until 2999-12-31 -sig &#39;deadbeef&#39; -ComputerName SRV1 -comment &quot;warning - Disk free space is low&quot;'))
     $html | Should -Not -Match ([regex]::Escape('Invoke-Command SRV1 {'))
     $html | Should -Not -Match ([regex]::Escape("Drive C: has only 4% free`nInvestigate temp usage"))
+    $css = Get-HealthEmailCss
+    $css | Should -Match '\.gch-root \{[\s\S]*font-size: 11pt;'
+    $css | Should -Match '\.gch-divider-postponed \{[\s\S]*margin: 12px 0;'
+    $css | Should -Match '\.gch-postponed \{[\s\S]*font-size: 10pt;'
+    $css | Should -Match '\.gch-comment \{[\s\S]*font-family: "Aptos Narrow", Aptos, Arial, sans-serif;[\s\S]*font-size: 9pt;'
+    $css | Should -Match '\.gch-command \{[\s\S]*font-size: 6pt;'
+    $css | Should -Match '\.gch-signature-top \{[\s\S]*font-size: 9pt;'
+    $css | Should -Match '\.gch-signature-bottom \{[\s\S]*font-size: 8pt;'
   }
 
-  It 'renders postponed findings with a green effective level and postponement detail' {
+  It 'renders postponed findings with a separated muted postponed style' {
     $html = Convert-HealthMessagesToHtmlTable -Messages @(
+      [pscustomobject]@{
+        Level = 'warning'
+        EffectiveLevel = 'warning'
+        Computer = 'SRV0'
+        Message = 'CPU load is high'
+        Comment = ''
+        Hash = '11111111'
+      },
       [pscustomobject]@{
         Level = 'warning'
         EffectiveLevel = 'postponed'
@@ -142,11 +157,14 @@
       }
     )
 
-    $html | Should -Match 'background-color:#2e7d32; color:#fff'
+    $html | Should -Match "<div class='gch-divider gch-divider-postponed'></div><div class='gch-row'><div><span class='gch-computer' style='color:#30510c'>SRV1</span>"
+    $html | Should -Match "</div><div class='gch-divider gch-divider-postponed'></div>"
+    $html | Should -Match 'background-color:#30510c; color:#fff'
     $html | Should -Match '>Postponed</span>'
-    $html | Should -Match 'font-size:13px; font-family:Aptos, Arial, sans-serif'
-    $html | Should -Match '\(Warning postponed until 2026-06-01\)'
-    $html | Should -Not -Match ([regex]::Escape('&amp; &quot;c:\it\Get-ComputerHealth\bin\Get-ComputerHealth.ps1&quot; -AddWhitelisting'))
+    $html | Should -Match "<span class='gch-computer' style='color:#30510c'>SRV1</span>"
+    $html | Should -Match "<span class='gch-message' style='color:#30510c'>Disk free space is low</span><span class='gch-postponed' style='color:#30510c'>"
+    $html | Should -Match '\(Warning postponed until 2026-06-01\)</span></div>'
+    $html | Should -Not -Match 'Postponed</span>[\s\S]*AddWhitelisting'
   }
 
   It 'summarizes postponed findings after active notable levels' {
@@ -156,9 +174,8 @@
       [pscustomobject]@{ Level = 'failure'; EffectiveLevel = 'failure' }
     )
 
-    $html | Should -Match 'background-color:#2e7d32; color:#fff'
-    $html | Should -Match 'font-size:16px; color:#000'
-    $html | Should -Match "font-weight:700; font-size:120%'>1</span> <span.+>failure</span>   <span style='font-weight:700; font-size:120%'>1</span> <span.+>warning</span>   <span style='font-weight:700; font-size:120%'>1</span> <span.+>postponed</span>"
+    $html | Should -Match 'background-color:#30510c; color:#fff'
+    $html | Should -Match "class='gch-pill'.+>1 failure</span>   <span class='gch-pill'.+>1 warning</span>   <span class='gch-pill'.+>1 postponed</span>"
   }
 
   It 'keeps plain suppression commands in html when multiple computers are present' {

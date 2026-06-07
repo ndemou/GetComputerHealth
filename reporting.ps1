@@ -205,7 +205,25 @@ function Add-HealthEmailSignature {
 
   if ($BodyAsHtml) {
     $baseBody = if ([string]::IsNullOrEmpty($Body)) { '' } else { $Body }
-    return ($baseBody + "<div style='margin-top:12px; font-family:Aptos, Arial, sans-serif'><div style='color:#000; font-size:12px'>$($Signature.HtmlTop)</div><div style='color:#666; font-size:10px'>$($Signature.HtmlBottom)</div></div>")
+    if ($baseBody -match '(?is)<html\b') {
+      return ($baseBody -replace '(?is)</body\s*>', "<div style='margin-top:12px; font-family:Aptos, Arial, sans-serif'><div style='color:#000; font-size:12px'>$($Signature.HtmlTop)</div><div style='color:#666; font-size:10px'>$($Signature.HtmlBottom)</div></div></body>")
+    }
+
+    return @"
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+$(Get-HealthEmailCss)
+  </style>
+</head>
+<body class="gch-root" style="margin:0; padding:12px; width:100%; font-family:Aptos, Arial, sans-serif; font-size:11pt; color:#000;">
+$baseBody<div class="gch-signature"><div class="gch-signature-top">$($Signature.HtmlTop)</div><div class="gch-signature-bottom">$($Signature.HtmlBottom)</div></div>
+</body>
+</html>
+"@
   }
 
   if ([string]::IsNullOrEmpty($Body)) {
@@ -213,6 +231,95 @@ function Add-HealthEmailSignature {
   }
 
   return ($Body.TrimEnd() + "`r`n`r`n" + $Signature.Text)
+}
+function Get-HealthEmailCss {
+  [CmdletBinding()]
+  param()
+
+  return @'
+.gch-root {
+  width: 100%;
+  font-family: Aptos, Arial, sans-serif;
+  font-size: 11pt;
+  color: #000;
+}
+
+.gch-synopsis {
+  margin: 0 0 8px 0;
+}
+
+.gch-divider {
+  border-top: 1px solid #cfcfcf;
+  margin: 0 0 12px 0;
+}
+
+.gch-divider-postponed {
+  margin: 12px 0;
+}
+
+.gch-pill {
+  display: inline-block;
+  margin: 0 12px 0 4px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-weight: 700;
+}
+
+.gch-row {
+  margin-bottom: 10px;
+}
+
+.gch-computer {
+  font-weight: 700;
+  color: rgba(0,0,0,0.8);
+}
+
+.gch-level {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 6px;
+  border-radius: 999px;
+}
+
+.gch-message {
+  margin-left: 8px;
+}
+
+.gch-comment {
+  margin-left: 8px;
+  color: #0D60A8;
+  font-family: "Aptos Narrow", Aptos, Arial, sans-serif;
+  font-size: 9pt;
+}
+
+.gch-postponed {
+  color: #2e7d32;
+  font-size: 10pt;
+  margin-left: 8px;
+}
+
+.gch-command {
+  margin-top: 4px;
+  color: #666;
+  font-size: 6pt;
+  font-family: "Arial Narrow", Arial, sans-serif;
+}
+
+.gch-signature {
+  margin-top: 12px;
+  font-family: Aptos, Arial, sans-serif;
+}
+
+.gch-signature-top {
+  color: #000;
+  font-size: 9pt;
+}
+
+.gch-signature-bottom {
+  color: #666;
+  font-size: 8pt;
+}
+'@
 }
 function Get-HealthSuppressionCommand {
   [CmdletBinding()]
@@ -252,7 +359,7 @@ function Convert-HealthSynopsisToHtml {
     'failure' = @{ Label = 'failure'; Background = '#ff4d4f'; Foreground = '#fff' }
     'warning' = @{ Label = 'warning'; Background = '#ffb300'; Foreground = '#111' }
     'notice'  = @{ Label = 'notice'; Background = '#1e88e5'; Foreground = '#fff' }
-    'postponed' = @{ Label = 'postponed'; Background = '#2e7d32'; Foreground = '#fff' }
+    'postponed' = @{ Label = 'postponed'; Background = '#30510c'; Foreground = '#fff' }
     'info'    = @{ Label = 'info'; Background = '#c7d0d9'; Foreground = '#111' }
     'pass'    = @{ Label = 'passes'; Background = '#3cb371'; Foreground = '#fff' }
     'debug'   = @{ Label = 'debug'; Background = '#c7d0d9'; Foreground = '#111' }
@@ -267,9 +374,7 @@ function Convert-HealthSynopsisToHtml {
         $levelKey = ([string]$_.Name).ToLowerInvariant()
         if (-not $levelMeta.ContainsKey($levelKey)) { return }
         $meta = $levelMeta[$levelKey]
-        $countHtml = "<span style='font-weight:700; font-size:120%'>" + ([System.Net.WebUtility]::HtmlEncode([string]$_.Count)) + "</span>"
-        $labelHtml = "<span style='display:inline-block; margin:0 12px 0 4px; padding:1px 6px; border-radius:999px; background-color:$($meta.Background); color:$($meta.Foreground)'>$([System.Net.WebUtility]::HtmlEncode($meta.Label))</span>"
-        $countHtml + ' ' + $labelHtml
+        "<span class='gch-pill' style='background-color:$($meta.Background); color:$($meta.Foreground)'>" + ([System.Net.WebUtility]::HtmlEncode([string]$_.Count)) + ' ' + ([System.Net.WebUtility]::HtmlEncode($meta.Label)) + "</span>"
       }
   )
 
@@ -277,7 +382,7 @@ function Convert-HealthSynopsisToHtml {
     return ''
   }
 
-    return "<div style='margin:0 0 8px 0; font-family:Aptos, Arial, sans-serif; font-size:16px; color:#000'>" + ($parts -join '   ') + "</div><div style='border-top:1px solid #cfcfcf; margin:0 0 12px 0'></div>"
+    return "<div class='gch-synopsis'>" + ($parts -join '   ') + "</div><div class='gch-divider'></div>"
 }
 
 function Get-HealthCommentPreviewText {
@@ -306,7 +411,8 @@ function Convert-HealthMessagesToHtmlTable {
     [Parameter(Mandatory)][object[]]$Messages
   )
 
-  $rows = foreach ($message in $Messages) {
+  $rows = for ($messageIndex = 0; $messageIndex -lt $Messages.Count; $messageIndex++) {
+    $message = $Messages[$messageIndex]
     $realLevel = if ($message.PSObject.Properties['Level']) { [string]$message.Level } else { '' }
     $level = if ($message.PSObject.Properties['EffectiveLevel']) { [string]$message.EffectiveLevel } else { $realLevel }
     $computer = if ($message.PSObject.Properties['Computer']) { [string]$message.Computer } else { '' }
@@ -318,7 +424,7 @@ function Convert-HealthMessagesToHtmlTable {
       'failure' { '#ff4d4f' }
       'warning' { '#ffb300' }
       'notice'  { '#1e88e5' }
-      'postponed' { '#2e7d32' }
+      'postponed' { '#30510c' }
       default   { '#c7d0d9' }
     }
     $levelForeground = switch ($level.ToLowerInvariant()) {
@@ -328,9 +434,17 @@ function Convert-HealthMessagesToHtmlTable {
 
     $messageHtml = [System.Net.WebUtility]::HtmlEncode($text)
     $commentPreviewText = Get-HealthCommentPreviewText -Comment $comment
-    $headerHtml = "<div><span style='font-weight:700; color:rgba(0,0,0,0.8)'>" + ([System.Net.WebUtility]::HtmlEncode($computer)) + "</span><span style='display:inline-block; margin-left:8px; padding:1px 6px; border-radius:999px; background-color:$levelBackground; color:$levelForeground'>" + ([System.Net.WebUtility]::HtmlEncode($displayLevel)) + "</span><span style='margin-left:8px'>$messageHtml</span></div>"
-    $detailsHtml = $headerHtml
+    $headerComputerStyle = ''
+    $headerMessageStyle = ''
+    if ($level -ieq 'postponed') {
+      $headerComputerStyle = " style='color:#30510c'"
+      $headerMessageStyle = " style='color:#30510c'"
+    }
 
+    $headerHtml = "<div><span class='gch-computer'$headerComputerStyle>" + ([System.Net.WebUtility]::HtmlEncode($computer)) + "</span><span class='gch-level' style='background-color:$levelBackground; color:$levelForeground'>" + ([System.Net.WebUtility]::HtmlEncode($displayLevel)) + "</span><span class='gch-message'$headerMessageStyle>$messageHtml</span>"
+    if (($level -ine 'postponed') -and (-not [string]::IsNullOrWhiteSpace($suppressionCommand)) -and (-not [string]::IsNullOrWhiteSpace($commentPreviewText))) {
+      $headerHtml += "<span class='gch-comment'>" + ([System.Net.WebUtility]::HtmlEncode('◆ ' + $commentPreviewText)) + "</span>"
+    }
     if (($level -ieq 'postponed') -and (-not [string]::IsNullOrWhiteSpace($realLevel))) {
       $postponedUntilText = 'unknown date'
       if ($message.PSObject.Properties['SuppressedUntil']) {
@@ -341,22 +455,43 @@ function Convert-HealthMessagesToHtmlTable {
       }
 
       $displayRealLevel = $realLevel.Substring(0, 1).ToUpperInvariant() + $realLevel.Substring(1).ToLowerInvariant()
-      $detailsHtml += "<div style='margin-top:4px; color:#2e7d32; font-size:13px; font-family:Aptos, Arial, sans-serif'>(" + ([System.Net.WebUtility]::HtmlEncode($displayRealLevel)) + " postponed until " + ([System.Net.WebUtility]::HtmlEncode($postponedUntilText)) + ")</div>"
+      $headerHtml += "<span class='gch-postponed' style='color:#30510c'>(" + ([System.Net.WebUtility]::HtmlEncode($displayRealLevel)) + " postponed until " + ([System.Net.WebUtility]::HtmlEncode($postponedUntilText)) + ")</span>"
     }
-
-    if (($level -ine 'postponed') -and (-not [string]::IsNullOrWhiteSpace($suppressionCommand)) -and (-not [string]::IsNullOrWhiteSpace($commentPreviewText))) {
-      $detailsHtml += "<div style='margin-top:4px; color:#0D60A8; font-size:8px; font-family:Aptos, Arial, sans-serif'>" + ([System.Net.WebUtility]::HtmlEncode($commentPreviewText)) + "</div>"
-    }
+    $headerHtml += "</div>"
+    $detailsHtml = $headerHtml
 
     if (($level -ine 'postponed') -and (-not [string]::IsNullOrWhiteSpace($suppressionCommand))) {
-      $detailsHtml += "<div style='margin-top:4px; color:#666; font-size:6pt; font-family:""Arial Narrow"", Arial, sans-serif'>" + ([System.Net.WebUtility]::HtmlEncode($suppressionCommand)) + "</div>"
+      $detailsHtml += "<div class='gch-command'>" + ([System.Net.WebUtility]::HtmlEncode($suppressionCommand)) + "</div>"
     }
 
-    "<div style='margin-bottom:10px; font-family:Aptos, Arial, sans-serif; font-size:16px; color:#000'>$detailsHtml</div>"
+    $rowHtml = "<div class='gch-row'>$detailsHtml</div>"
+    $nextLevel = ''
+    if (($messageIndex + 1) -lt $Messages.Count) {
+      $nextMessage = $Messages[$messageIndex + 1]
+      $nextRealLevel = if ($nextMessage.PSObject.Properties['Level']) { [string]$nextMessage.Level } else { '' }
+      $nextLevel = if ($nextMessage.PSObject.Properties['EffectiveLevel']) { [string]$nextMessage.EffectiveLevel } else { $nextRealLevel }
+    }
+
+    $previousLevel = ''
+    if ($messageIndex -gt 0) {
+      $previousMessage = $Messages[$messageIndex - 1]
+      $previousRealLevel = if ($previousMessage.PSObject.Properties['Level']) { [string]$previousMessage.Level } else { '' }
+      $previousLevel = if ($previousMessage.PSObject.Properties['EffectiveLevel']) { [string]$previousMessage.EffectiveLevel } else { $previousRealLevel }
+    }
+
+    if (($level -ieq 'postponed') -and ($previousLevel -ne 'postponed') -and ($messageIndex -gt 0)) {
+      $rowHtml = "<div class='gch-divider gch-divider-postponed'></div>" + $rowHtml
+    }
+
+    if (($level -ieq 'postponed') -and ($nextLevel -ine 'postponed')) {
+      $rowHtml += "<div class='gch-divider gch-divider-postponed'></div>"
+    }
+
+    $rowHtml
   }
 
   return @(
-    "<div style='width:100%; font-family:Aptos, Arial, sans-serif; font-size:16px'>"
+    "<div class='gch-root'>"
     ($rows -join '')
     "</div>"
   ) -join ''
