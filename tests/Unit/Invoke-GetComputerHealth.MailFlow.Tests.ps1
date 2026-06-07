@@ -119,11 +119,13 @@
     $html | Should -Match '>SRV1</span>'
     $html | Should -Match 'background-color:#ffb300; color:#111'
     $html | Should -Match '>Warning</span><span style=''margin-left:8px''>Disk free space is low</span>'
-    $html | Should -Match 'margin-bottom:10px; font-family:Segoe UI, Arial, sans-serif; font-size:16px; color:#000'
+    $html | Should -Match 'margin-bottom:10px; font-family:Aptos, Arial, sans-serif; font-size:16px; color:#000'
+    $html | Should -Match 'color:#0D60A8; font-size:8px; font-family:Aptos, Arial, sans-serif'
+    $html | Should -Match ([regex]::Escape('Drive C: has only 4% free ◆ Investigate temp usage'))
     $html | Should -Not -Match 'border:1px solid'
     $html | Should -Match ([regex]::Escape('&amp; &quot;c:\it\Get-ComputerHealth\bin\Get-ComputerHealth.ps1&quot; -AddWhitelisting -until 2999-12-31 -sig &#39;deadbeef&#39; -ComputerName SRV1 -comment &quot;warning - Disk free space is low&quot;'))
     $html | Should -Not -Match ([regex]::Escape('Invoke-Command SRV1 {'))
-    $html | Should -Not -Match 'Drive C: has only 4% free'
+    $html | Should -Not -Match ([regex]::Escape("Drive C: has only 4% free`nInvestigate temp usage"))
   }
 
   It 'renders postponed findings with a green effective level and postponement detail' {
@@ -142,8 +144,8 @@
 
     $html | Should -Match 'background-color:#2e7d32; color:#fff'
     $html | Should -Match '>Postponed</span>'
-    $html | Should -Match 'font-size:13px; font-family:Segoe UI, Arial, sans-serif'
-    $html | Should -Match 'Postponed until 2026-06-01, real level warning'
+    $html | Should -Match 'font-size:13px; font-family:Aptos, Arial, sans-serif'
+    $html | Should -Match '\(Warning postponed until 2026-06-01\)'
     $html | Should -Not -Match ([regex]::Escape('&amp; &quot;c:\it\Get-ComputerHealth\bin\Get-ComputerHealth.ps1&quot; -AddWhitelisting'))
   }
 

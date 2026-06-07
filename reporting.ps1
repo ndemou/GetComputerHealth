@@ -205,7 +205,7 @@ function Add-HealthEmailSignature {
 
   if ($BodyAsHtml) {
     $baseBody = if ([string]::IsNullOrEmpty($Body)) { '' } else { $Body }
-    return ($baseBody + "<div style='margin-top:12px; font-family:Segoe UI, Arial, sans-serif'><div style='color:#000; font-size:12px'>$($Signature.HtmlTop)</div><div style='color:#666; font-size:10px'>$($Signature.HtmlBottom)</div></div>")
+    return ($baseBody + "<div style='margin-top:12px; font-family:Aptos, Arial, sans-serif'><div style='color:#000; font-size:12px'>$($Signature.HtmlTop)</div><div style='color:#666; font-size:10px'>$($Signature.HtmlBottom)</div></div>")
   }
 
   if ([string]::IsNullOrEmpty($Body)) {
@@ -277,8 +277,29 @@ function Convert-HealthSynopsisToHtml {
     return ''
   }
 
-    return "<div style='margin:0 0 8px 0; font-family:Segoe UI, Arial, sans-serif; font-size:16px; color:#000'>" + ($parts -join '   ') + "</div><div style='border-top:1px solid #cfcfcf; margin:0 0 12px 0'></div>"
+    return "<div style='margin:0 0 8px 0; font-family:Aptos, Arial, sans-serif; font-size:16px; color:#000'>" + ($parts -join '   ') + "</div><div style='border-top:1px solid #cfcfcf; margin:0 0 12px 0'></div>"
 }
+
+function Get-HealthCommentPreviewText {
+  [CmdletBinding()]
+  param(
+    [AllowEmptyString()][string]$Comment,
+    [int]$MaxLength = 200
+  )
+
+  $text = [string]$Comment
+  if ([string]::IsNullOrWhiteSpace($text)) {
+    return ''
+  }
+
+  $normalized = $text.Trim() -replace "(`r`n|`n|`r)", ' ◆ '
+  if ($normalized.Length -gt $MaxLength) {
+    return $normalized.Substring(0, $MaxLength)
+  }
+
+  return $normalized
+}
+
 function Convert-HealthMessagesToHtmlTable {
   [CmdletBinding()]
   param(
@@ -290,6 +311,7 @@ function Convert-HealthMessagesToHtmlTable {
     $level = if ($message.PSObject.Properties['EffectiveLevel']) { [string]$message.EffectiveLevel } else { $realLevel }
     $computer = if ($message.PSObject.Properties['Computer']) { [string]$message.Computer } else { '' }
     $text = if ($message.PSObject.Properties['Message']) { [string]$message.Message } else { '' }
+    $comment = if ($message.PSObject.Properties['Comment']) { [string]$message.Comment } else { '' }
     $suppressionCommand = Get-HealthSuppressionCommand -MessageRecord $message -WrapInInvokeCommand:$false
     $displayLevel = if ([string]::IsNullOrWhiteSpace($level)) { '' } else { $level.Substring(0, 1).ToUpperInvariant() + $level.Substring(1).ToLowerInvariant() }
     $levelBackground = switch ($level.ToLowerInvariant()) {
@@ -305,6 +327,7 @@ function Convert-HealthMessagesToHtmlTable {
     }
 
     $messageHtml = [System.Net.WebUtility]::HtmlEncode($text)
+    $commentPreviewText = Get-HealthCommentPreviewText -Comment $comment
     $headerHtml = "<div><span style='font-weight:700; color:rgba(0,0,0,0.8)'>" + ([System.Net.WebUtility]::HtmlEncode($computer)) + "</span><span style='display:inline-block; margin-left:8px; padding:1px 6px; border-radius:999px; background-color:$levelBackground; color:$levelForeground'>" + ([System.Net.WebUtility]::HtmlEncode($displayLevel)) + "</span><span style='margin-left:8px'>$messageHtml</span></div>"
     $detailsHtml = $headerHtml
 
@@ -317,18 +340,23 @@ function Convert-HealthMessagesToHtmlTable {
         }
       }
 
-      $detailsHtml += "<div style='margin-top:4px; color:#2e7d32; font-size:13px; font-family:Segoe UI, Arial, sans-serif'>Postponed until " + ([System.Net.WebUtility]::HtmlEncode($postponedUntilText)) + ", real level " + ([System.Net.WebUtility]::HtmlEncode($realLevel.ToLowerInvariant())) + "</div>"
+      $displayRealLevel = $realLevel.Substring(0, 1).ToUpperInvariant() + $realLevel.Substring(1).ToLowerInvariant()
+      $detailsHtml += "<div style='margin-top:4px; color:#2e7d32; font-size:13px; font-family:Aptos, Arial, sans-serif'>(" + ([System.Net.WebUtility]::HtmlEncode($displayRealLevel)) + " postponed until " + ([System.Net.WebUtility]::HtmlEncode($postponedUntilText)) + ")</div>"
+    }
+
+    if (($level -ine 'postponed') -and (-not [string]::IsNullOrWhiteSpace($suppressionCommand)) -and (-not [string]::IsNullOrWhiteSpace($commentPreviewText))) {
+      $detailsHtml += "<div style='margin-top:4px; color:#0D60A8; font-size:8px; font-family:Aptos, Arial, sans-serif'>" + ([System.Net.WebUtility]::HtmlEncode($commentPreviewText)) + "</div>"
     }
 
     if (($level -ine 'postponed') -and (-not [string]::IsNullOrWhiteSpace($suppressionCommand))) {
       $detailsHtml += "<div style='margin-top:4px; color:#666; font-size:6pt; font-family:""Arial Narrow"", Arial, sans-serif'>" + ([System.Net.WebUtility]::HtmlEncode($suppressionCommand)) + "</div>"
     }
 
-    "<div style='margin-bottom:10px; font-family:Segoe UI, Arial, sans-serif; font-size:16px; color:#000'>$detailsHtml</div>"
+    "<div style='margin-bottom:10px; font-family:Aptos, Arial, sans-serif; font-size:16px; color:#000'>$detailsHtml</div>"
   }
 
   return @(
-    "<div style='width:100%; font-family:Segoe UI, Arial, sans-serif; font-size:16px'>"
+    "<div style='width:100%; font-family:Aptos, Arial, sans-serif; font-size:16px'>"
     ($rows -join '')
     "</div>"
   ) -join ''
@@ -357,7 +385,7 @@ function Get-RelaxHtmlBody {
         }
     </style>
 </head>
-<body style="background-color: #eef2f5; margin: 0; padding: 50px 20px; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+<body style="background-color: #eef2f5; margin: 0; padding: 50px 20px; text-align: center; font-family: Aptos, Arial, sans-serif;">
     <table align="center" border="0" cellpadding="0" cellspacing="0" width="220" style="background-color: #ffffff; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; margin: 0 auto;">
         <tr>
             <td align="center" valign="middle" height="150" style="padding: 20px;">

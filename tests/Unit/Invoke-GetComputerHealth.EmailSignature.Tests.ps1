@@ -58,7 +58,7 @@
     $html = Add-HealthEmailSignature -Body '<pre>body</pre>' -BodyAsHtml -Signature $signature
 
     $plain | Should -Be "Relax :-)`r`n`r`nTests started from RUNNER1 Domain contoso.local 10.0.0.10`r`nGet-ComputerHealth version 1.2.3, last update 2026-01-02 03:04, domain contoso.local"
-    $html | Should -Be "<pre>body</pre><div style='margin-top:12px; font-family:Segoe UI, Arial, sans-serif'><div style='color:#000; font-size:12px'>Tests started from RUNNER1 Domain contoso.local 10.0.0.10</div><div style='color:#666; font-size:10px'>Get-ComputerHealth version 1.2.3, last update 2026-01-02 03:04</div></div>"
+    $html | Should -Be "<pre>body</pre><div style='margin-top:12px; font-family:Aptos, Arial, sans-serif'><div style='color:#000; font-size:12px'>Tests started from RUNNER1 Domain contoso.local 10.0.0.10</div><div style='color:#666; font-size:10px'>Get-ComputerHealth version 1.2.3, last update 2026-01-02 03:04</div></div>"
   }
 
   It 'renders a project link in the html signature footer' {
