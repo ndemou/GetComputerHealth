@@ -1,5 +1,11 @@
 ﻿# TODO
 
+## HealtTest-UnexpectedListeningPorts -> HealtTest-ListListeningPorts
+
+Follow the spirit of the change that gave us HealtTest-ListServices, ListShares, ListLocalAdmins, ListLocalAdmins a few commits ago.
+
+Also: are there other HealthTests that fit this style (a function that emits a list of findings where some items are accepted and some are not based on policy)
+
 ## Option IpsOfAllDcs in gch.psd1
 The trick with `cache.IpsOfAllDcs.clixml` is a hack. I should incorporate it into gch.psd1. An on-disk format migration can populate the new setting if the file is found, and then remove the old file.
 
