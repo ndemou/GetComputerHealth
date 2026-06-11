@@ -76,19 +76,7 @@ Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/ndemou/Get
 }
 ```
 
-In the example above:
-
-* Each child of `ConfigFiles` becomes one PowerShell data file in `config`. For example, `ConfigFiles['gch.psd1']` writes `C:\IT\GetComputerHealth\config\gch.psd1`.
-* Passing `AutomaticUpdates = $false` in `gch.psd1` disables future automatic updates.
-
-If you prefer to edit a file instead of embedding a hashtable in the command, generate a template, customize it, and pass the path to `-Config`:
-
-```powershell
-Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/ndemou/GetComputerHealth/refs/heads/main/install.ps1" -OutFile ".\install.ps1"
-& .\install.ps1 -GenerateConfigPsd1
-notepad .\GetComputerHealth-install-config.psd1
-& .\install.ps1 -Config .\GetComputerHealth-install-config.psd1
-```
+(You can also pass a file to  `-Config`.)
 
 
 ## Quick Run
@@ -101,16 +89,17 @@ C:\IT\Get-ComputerHealth\bin\Invoke-GetComputerHealth.ps1
 
 ## Automatic Daily Monitoring of One Computer
 
-Run these commands from an elevated PowerShell terminal:
+TLDR: Verify you can send emails and schedule running `Invoke-GetComputerHealth.ps1` once a day. 
+
+To test email delivery:
+```powershell
+C:\IT\Get-ComputerHealth\bin\Send-Message.ps1 -Subject "First test from $($env:COMPUTERNAME)" -ConfigFile "C:\IT\Get-ComputerHealth\config\Send-Message.conf" -Verbose
+```
+
+
+To schedule daily execution of `Invoke-GetComputerHealth.ps1` (change the time to one that suits you):
 
 ```powershell
-# Test email delivery
-C:\IT\Get-ComputerHealth\bin\Send-Message.ps1 -Subject "First test from $($env:COMPUTERNAME)" -ConfigFile "C:\IT\Get-ComputerHealth\config\Send-Message.conf" -Verbose
-
-# Perform your first health test manually
-C:\IT\Get-ComputerHealth\bin\Invoke-GetComputerHealth.ps1
-
-# Schedule automatic execution of daily health tests
 . C:\IT\Get-ComputerHealth\bin\helpers-processes.ps1 # Imports the New-ScheduledTaskForPSScript command
 New-ScheduledTaskForPSScript -ScriptPath "C:\IT\Get-ComputerHealth\bin\Invoke-GetComputerHealth.ps1" -ScheduleType Daily -Time 07:12
 ```
@@ -152,24 +141,25 @@ Run `C:\IT\bin\Invoke-GetHealthDomainComputers.ps1`.
 > The options mentioned above can also be used.
 > Extra options like `-NoUpdate` and `-NoSendMessage` are particularly handy here.
 
-## How to Suppress a False Positive (Permitlisting)
+## How to Suppress a finding (Permitlisting)
 
-By default, health tests flag any deviation from a pristine Windows installation. Examples include a custom service, an extra member in the Administrators group, or an additional listening TCP port. If the finding is expected, permitlist it.
+By default, health tests flag any deviation from a pristine Windows installation. Examples include a custom service, an extra member in the Administrators group, or an additional listening TCP port. 
+
+If a finding is expected or a false positive, you can permitlist it.
 
 1. **Identify the permitlisting command:** Open the generated HTML report or import the matching CLIXML file. Every message includes the exact command needed to permitlist it.
-2. **Apply the permitlist:** Run that command on the **target machine** (or via Remote PowerShell).
+2. **Run that command** on the target machine.
 
-> **Tip:** You can also permitlist findings manually:
+> Advanced Tip: You can also permitlist findings manually:
 > `C:\IT\Get-ComputerHealth\bin\Get-ComputerHealth.ps1 -AddWhitelisting -ComputerName $env:computername -Signature 12345678 -Comment "Usually the description of the finding" -Until 2099-12-31`
 
 ## How to Require a Finding That Proves Something Good Is Present
 
-Sometimes the important question is not "what bad thing was detected?" but "did the expected good thing appear at all?". This is often useful for policy-style tests such as:
+Sometimes a question equally important as "was any bad thing detected?" is "was the expected thing detected?". For example:
 
-* open TCP ports that should be listening
-* installed software that should be present
-* services that should be running
-* roles or features that should exist
+* was this TCP port listening? 
+* was this process of service running?
+* was this role or feature installed?
 
 You can acomplish this in two steps:
 1. Identify the signature of the finding you want to require.
@@ -183,7 +173,7 @@ You can acomplish this in two steps:
 
 [Follow these instructions](./doc/how-to-add-custom-tests.md)
 
-## Tips for fine-tuned control
+## Interactive execution of tests
 
 ```powershell
 $results = C:\IT\Get-ComputerHealth\bin\Get-ComputerHealth.ps1 -OutputConsoleMessages -OutputObjects -Hide DIP
@@ -194,7 +184,7 @@ $results | ogv
 > * `-OutputConsoleMessages` generates the colorful output in your console.
 > * `-OutputObjects` is what populates `$results`.
 > * `-Hide DIP` hides **D**ebug, **I**nfo, and **P**ass messages from the console, showing only **N**otices, **W**arnings, **F**ailures, and **S**uppressed messages.
-> * Available options let you skip slow tests (`-SkipSlowTests`), skip non-essential tests (`-SkipNonEssentialTests`), exclude specific tests (`-ExcludeTests`), or run specific tests (`-OnlyTheseTests`). Autocomplete using `-` + `TAB` is your friend.
+> * Available options let you skip slow tests (`-SkipSlowTests`), skip non-essential tests (`-SkipNonEssentialTests`), exclude specific tests (`-ExcludeTests`), or run specific tests (`-OnlyTheseTests`). Autocomplete using `-` + `TAB` is your friend. `-ListAllBuiltInTests` will give you a list of all tests.
 
 ---
 
