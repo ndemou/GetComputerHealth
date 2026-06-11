@@ -81,23 +81,20 @@ Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/ndemou/Get
 
 ## Quick Run
 
-Run these commands from an elevated PowerShell terminal:
-
 ```powershell
 C:\IT\Get-ComputerHealth\bin\Invoke-GetComputerHealth.ps1
 ```
 
 ## Automatic Daily Monitoring of One Computer
 
-TLDR: Verify you can send emails and schedule running `Invoke-GetComputerHealth.ps1` once a day. 
-
-To test email delivery:
+1. Test email delivery:
 ```powershell
 C:\IT\Get-ComputerHealth\bin\Send-Message.ps1 -Subject "First test from $($env:COMPUTERNAME)" -ConfigFile "C:\IT\Get-ComputerHealth\config\Send-Message.conf" -Verbose
 ```
 
+> If it doesn't work, check the settings in `.\config\Send-Message.psd1`.
 
-To schedule daily execution of `Invoke-GetComputerHealth.ps1` (change the time to one that suits you):
+2. Schedule daily execution of `Invoke-GetComputerHealth.ps1` (change `-Time 07:12`):
 
 ```powershell
 . C:\IT\Get-ComputerHealth\bin\helpers-processes.ps1 # Imports the New-ScheduledTaskForPSScript command
@@ -107,6 +104,7 @@ New-ScheduledTaskForPSScript -ScriptPath "C:\IT\Get-ComputerHealth\bin\Invoke-Ge
 ## Automatic Daily Monitoring of Multiple Domain-Joined Computers
 
 1. Follow the instructions for monitoring a single computer on the management machine (the controller).
+
 2. Copy the code below into your editor and fill in the proper values on the three lines under `CONFIGURATION`:
 
 ```powershell
@@ -127,6 +125,7 @@ if (-not $NoUpdate) {
 ```
 
 3. Save it as `C:\IT\bin\Invoke-GetHealthDomainComputers.ps1`.
+   
 4. Edit the scheduled task to execute this script instead of `C:\IT\Get-ComputerHealth\bin\Invoke-GetComputerHealth.ps1`.
 
 ---
