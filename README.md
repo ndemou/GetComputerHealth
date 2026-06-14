@@ -94,11 +94,10 @@ C:\IT\Get-ComputerHealth\bin\Send-Message.ps1 -Subject "First test from $($env:C
 
 > If it doesn't work, check the settings in `.\config\Send-Message.psd1`.
 
-2. Schedule daily execution of `Invoke-GetComputerHealth.ps1` (change `-Time 07:12`):
+2. Schedule daily execution of `Invoke-GetComputerHealth.ps1` (change `07:12`):
 
 ```powershell
-. C:\IT\Get-ComputerHealth\bin\helpers-processes.ps1 # Imports the New-ScheduledTaskForPSScript command
-New-ScheduledTaskForPSScript -ScriptPath "C:\IT\Get-ComputerHealth\bin\Invoke-GetComputerHealth.ps1" -ScheduleType Daily -Time 07:12
+C:\IT\Get-ComputerHealth\bin\Update-GetHealthCode.ps1 -ScheduleDailyInvokationAt 07:12
 ```
 
 ## Automatic Daily Monitoring of Multiple Domain-Joined Computers
