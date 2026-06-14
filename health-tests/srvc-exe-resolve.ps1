@@ -157,6 +157,42 @@ function Test-ServiceTypeLooksLikePerUserInstance {
   return ($ServiceType -match '(^|,\s*)User (Own|Share) Process($|,\s*)')
 }
 
+function Get-ServiceExecutableFromRegistry {
+  [CmdletBinding()]
+  param([Parameter(Mandatory)][string]$ServiceName)
+
+  if (-not (Get-Variable -Name GetServiceExecutableFromRegistry_Cache -Scope Script -ErrorAction SilentlyContinue)) {
+    $script:GetServiceExecutableFromRegistry_Cache = @{}
+  }
+
+  if ($script:GetServiceExecutableFromRegistry_Cache.ContainsKey($ServiceName)) {
+    return $script:GetServiceExecutableFromRegistry_Cache[$ServiceName]
+  }
+
+  $svcKey = "Registry::HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\$ServiceName"
+  $imagePath = $null
+  try {
+    $imagePath = (Get-ItemProperty -Path $svcKey -Name ImagePath -ErrorAction SilentlyContinue).ImagePath
+  } catch {
+    $imagePath = $null
+  }
+
+  $exePath = $null
+  if (-not [string]::IsNullOrWhiteSpace($imagePath)) {
+    try {
+      $resolved = Resolve-ServiceExecutable -LaunchCommand $imagePath -ServiceName $ServiceName
+      if ($resolved) {
+        $exePath = $resolved.PayloadPath
+      }
+    } catch {
+      $exePath = $null
+    }
+  }
+
+  $script:GetServiceExecutableFromRegistry_Cache[$ServiceName] = $exePath
+  $exePath
+}
+
 function Split-FirstTokenSmart {
 
   [CmdletBinding()]
@@ -880,15 +916,21 @@ Uses: Get-ServiceVendors.
         if ($servicesByName.ContainsKey($baseServiceName)) {
             $baseService = $servicesByName[$baseServiceName]
         }
+        $baseServiceExePath = $null
+        if ($null -ne $baseService) {
+            $baseServiceExePath = $baseService.ExePath
+        } else {
+            $baseServiceExePath = Get-ServiceExecutableFromRegistry -ServiceName $baseServiceName
+        }
         $baseHasSameExecutablePath = $false
-        if (($null -ne $baseService) -and
+        if (($null -ne $baseServiceExePath) -and
             (-not [string]::IsNullOrWhiteSpace($service.ExePath)) -and
-            (-not [string]::IsNullOrWhiteSpace($baseService.ExePath)) -and
-            ($service.ExePath -ieq $baseService.ExePath)) {
+            (-not [string]::IsNullOrWhiteSpace($baseServiceExePath)) -and
+            ($service.ExePath -ieq $baseServiceExePath)) {
             $baseHasSameExecutablePath = $true
         }
         $serviceTypeLooksPerUser = Test-ServiceTypeLooksLikePerUserInstance -ServiceType $serviceType
-        $isPerUserServiceInstance = ($baseServiceName -ne $service.ServiceName) -and (($null -ne $baseService) -and ($baseHasSameExecutablePath -or $serviceTypeLooksPerUser))
+        $isPerUserServiceInstance = ($baseServiceName -ne $service.ServiceName) -and (($baseHasSameExecutablePath) -or (($null -ne $baseService) -and $serviceTypeLooksPerUser))
         $normalizedServiceName = $service.ServiceName
         if ($isPerUserServiceInstance) {
             $normalizedServiceName = $baseServiceName
@@ -917,15 +959,21 @@ Uses: Get-ServiceVendors.
         if ($servicesByName.ContainsKey($baseServiceName)) {
             $baseService = $servicesByName[$baseServiceName]
         }
+        $baseServiceExePath = $null
+        if ($null -ne $baseService) {
+            $baseServiceExePath = $baseService.ExePath
+        } else {
+            $baseServiceExePath = Get-ServiceExecutableFromRegistry -ServiceName $baseServiceName
+        }
         $baseHasSameExecutablePath = $false
-        if (($null -ne $baseService) -and
+        if (($null -ne $baseServiceExePath) -and
             (-not [string]::IsNullOrWhiteSpace($_.ExePath)) -and
-            (-not [string]::IsNullOrWhiteSpace($baseService.ExePath)) -and
-            ($_.ExePath -ieq $baseService.ExePath)) {
+            (-not [string]::IsNullOrWhiteSpace($baseServiceExePath)) -and
+            ($_.ExePath -ieq $baseServiceExePath)) {
             $baseHasSameExecutablePath = $true
         }
         $serviceTypeLooksPerUser = Test-ServiceTypeLooksLikePerUserInstance -ServiceType $serviceType
-        $isPerUserServiceInstance = ($baseServiceName -ne $_.ServiceName) -and (($null -ne $baseService) -and ($baseHasSameExecutablePath -or $serviceTypeLooksPerUser))
+        $isPerUserServiceInstance = ($baseServiceName -ne $_.ServiceName) -and (($baseHasSameExecutablePath) -or (($null -ne $baseService) -and $serviceTypeLooksPerUser))
         if ($isPerUserServiceInstance) {
             $trimmedServiceName = $baseServiceName
         } else {

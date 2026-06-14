@@ -465,4 +465,55 @@ Describe 'HealthTest-ListServices' {
       $Message -eq "[NOTICE] Found service from a common workstation vendor: Vendor='Google LLC' Name='ChromeUserSvc_*' (Per-user service of base service 'ChromeUserSvc')`nAdmin must verify if service is legit and needed. Service Description: 'Chrome User Service_147c46f'`nExecutable: 'C:\Program Files\Google\Chrome\chrome-user-service.exe'.`nFull service name: 'ChromeUserSvc_147c46f'."
     }
   }
+
+  It 'collapses per-user Microsoft services when only the base registry entry exists but the executable matches' {
+    Mock Get-CimInstance {
+      [pscustomobject]@{
+        DomainRole = 1
+      }
+    } -ParameterFilter { $ClassName -eq 'Win32_ComputerSystem' }
+
+    Mock Test-Path { $true } -ParameterFilter {
+      $LiteralPath -eq 'Registry::HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\WpnUserService'
+    }
+
+    Mock Get-ItemProperty {
+      [pscustomobject]@{
+        ImagePath = '%SystemRoot%\System32\svchost.exe -k UnistackSvcGroup'
+      }
+    } -ParameterFilter {
+      $Path -eq 'Registry::HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\WpnUserService' -and
+      $Name -eq 'ImagePath'
+    }
+
+    Mock Resolve-ServiceExecutable {
+      [pscustomobject]@{
+        PayloadPath = 'C:\WINDOWS\System32\WpnUserService.dll'
+      }
+    } -ParameterFilter {
+      $ServiceName -eq 'WpnUserService'
+    }
+
+    Mock Get-ServiceVendors {
+      @(
+        [pscustomobject]@{
+          ServiceName = 'WpnUserService_147c46f'
+          DisplayName = 'Windows Push Notifications User Service_147c46f'
+          Vendor = 'Microsoft Windows'
+          ExePath = 'C:\WINDOWS\System32\WpnUserService.dll'
+          ExeSHA256 = $null
+          ServiceType = 'Share Process'
+          ExceptionsThrown = ''
+        }
+      )
+    }
+
+    Mock Write-Warning {}
+
+    HealthTest-ListServices
+
+    Should -Invoke Write-Warning -Times 1 -Exactly -ParameterFilter {
+      $Message -eq "[NOTICE] Found Microsoft service: Vendor='Microsoft Windows' Name='WpnUserService_*' (Per-user service of base service 'WpnUserService')`nAdmin must verify if service is legit and needed. Service Description: 'Windows Push Notifications User Service_147c46f'`nExecutable: 'C:\WINDOWS\System32\WpnUserService.dll'.`nFull service name: 'WpnUserService_147c46f'."
+    }
+  }
 }
