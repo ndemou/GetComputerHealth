@@ -555,11 +555,12 @@ function Invoke-SelfAfterUpdate {
     [object[]]$PassThruArgs = @()
   )
 
-  $rerunArgs = @(
+  $rerunArgs = @()
+  # Put the internal rerun marker first so it cannot be consumed as a value of a preceding multi-value argument.
+  $rerunArgs += '-AlreadyReranAfterUpdate'
+  $rerunArgs += @(
     Convert-BoundParametersToInvocationArguments -BoundParameters $BoundParameters -Exclude @('AlreadyReranAfterUpdate', 'PassThruArgs')
   )
-  # AlreadyReranAfterUpdate is for Invoke-GetComputerHealth.ps1 only.
-  $rerunArgs += '-AlreadyReranAfterUpdate'
   $rerunArgs += @($PassThruArgs)
 
   $powerShellExe = (Get-Process -Id $PID).Path

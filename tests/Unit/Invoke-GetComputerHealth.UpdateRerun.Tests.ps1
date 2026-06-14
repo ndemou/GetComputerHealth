@@ -49,6 +49,10 @@
     $script:ScriptText | Should -Match 'Invoke-SelfAfterUpdate -BoundParameters \$PSBoundParameters -PassThruArgs \$PassThruArgs\s+return'
   }
 
+  It 'places the internal rerun marker before forwarded invocation arguments' {
+    $script:ScriptText | Should -Match '\$rerunArgs = @\(\)\s+# Put the internal rerun marker first[\s\S]*?\$rerunArgs \+= ''-AlreadyReranAfterUpdate''[\s\S]*?Convert-BoundParametersToInvocationArguments'
+  }
+
   It 'checks the remote embedded version before copying and running the updater' {
     $script:ScriptText | Should -Match '\$remoteEmbeddedVersion = Invoke-Command -Session \$session -ScriptBlock \{'
     $script:ScriptText | Should -Match '\$skipTargetUpdate = \$NoUpdate'
