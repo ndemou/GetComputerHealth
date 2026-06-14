@@ -115,9 +115,7 @@ param(
   [string[]]$IpsOfAllDcs = @(),
   [string[]]$Computers,
   [Parameter(DontShow = $true)]
-  [switch]$AlreadyReranAfterUpdate,
-  [Parameter(ValueFromRemainingArguments = $true)]
-  [object[]]$PassThruArgs = @()
+  [switch]$AlreadyReranAfterUpdate
 )
 
 if ($null -ne $Hide) {
@@ -517,58 +515,68 @@ function Get-UpdateZipEmbeddedVersion {
   return $FallbackVersion
 }
 
-function Convert-BoundParametersToInvocationArguments {
+function Get-ChildHealthInvocationParameters {
   [CmdletBinding()]
   param(
-    [Parameter(Mandatory)][hashtable]$BoundParameters,
-    [string[]]$Exclude = @()
+    [string]$Hide,
+    [string]$OnlyTheseTests,
+    [string]$ExcludeTests,
+    [string]$WhitelistSigs,
+    [switch]$SkipSlowTests,
+    [switch]$SkipPolicyTests,
+    [switch]$SkipNonEssentialTests,
+    [switch]$RunWithoutElevation,
+    [string[]]$IpsOfAllDcs = @(),
+    [string]$IncludeTestsFromFolder
   )
 
-  $arguments = @()
-  foreach ($entry in $BoundParameters.GetEnumerator() | Sort-Object -Property Name) {
-    if ($entry.Key -in $Exclude) { continue }
-
-    $value = $entry.Value
-    if ($value -is [System.Management.Automation.SwitchParameter]) {
-      if ($value.IsPresent) { $arguments += "-$($entry.Key)" }
-      continue
-    }
-
-    if ($null -eq $value) { continue }
-
-    $arguments += "-$($entry.Key)"
-    if ($value -is [array]) {
-      $arguments += @($value)
-    }
-    else {
-      $arguments += $value
-    }
+  $childParams = @{
+    OutputObjects         = $true
+    OutputConsoleMessages = $true
+    Hide                  = $Hide
+    OnlyTheseTests        = $OnlyTheseTests
+    ExcludeTests          = $ExcludeTests
+    SuppressSigs          = $WhitelistSigs
+    SkipSlowTests         = [bool]$SkipSlowTests
+    SkipPolicyTests       = [bool]$SkipPolicyTests
+    SkipNonEssentialTests = [bool]$SkipNonEssentialTests
+    RunWithoutElevation   = [bool]$RunWithoutElevation
+    IpsOfAllDcs           = @($IpsOfAllDcs)
   }
 
-  return $arguments
+  if (-not [string]::IsNullOrWhiteSpace($IncludeTestsFromFolder)) {
+    $childParams['IncludeTestsFromFolder'] = $IncludeTestsFromFolder
+  }
+
+  return $childParams
+}
+
+function Get-InvokeGetComputerHealthRerunParameters {
+  [CmdletBinding()]
+  param([Parameter(Mandatory)][hashtable]$BoundParameters)
+
+  $rerunParams = @{}
+  foreach ($entry in $BoundParameters.GetEnumerator()) {
+    if ($entry.Key -eq 'AlreadyReranAfterUpdate') { continue }
+    $rerunParams[$entry.Key] = $entry.Value
+  }
+
+  $rerunParams['AlreadyReranAfterUpdate'] = $true
+  return $rerunParams
 }
 
 function Invoke-SelfAfterUpdate {
   [CmdletBinding()]
-  param(
-    [Parameter(Mandatory)][hashtable]$BoundParameters,
-    [object[]]$PassThruArgs = @()
-  )
+  param([Parameter(Mandatory)][hashtable]$BoundParameters)
 
-  $rerunArgs = @()
-  # Put the internal rerun marker first so it cannot be consumed as a value of a preceding multi-value argument.
-  $rerunArgs += '-AlreadyReranAfterUpdate'
-  $rerunArgs += @(
-    Convert-BoundParametersToInvocationArguments -BoundParameters $BoundParameters -Exclude @('AlreadyReranAfterUpdate', 'PassThruArgs')
-  )
-  $rerunArgs += @($PassThruArgs)
+  $rerunParams = Get-InvokeGetComputerHealthRerunParameters -BoundParameters $BoundParameters
 
   $powerShellExe = (Get-Process -Id $PID).Path
   if ([string]::IsNullOrWhiteSpace($powerShellExe)) {
     $powerShellExe = 'powershell.exe'
   }
 
-  & $PSCommandPath @rerunArgs
+  & $PSCommandPath @rerunParams
   return
 }
 
@@ -605,7 +613,7 @@ if (-not $NoUpdate) {
     ) {
       Write-Host -ForegroundColor Yellow "Get-ComputerHealth was updated from version $versionBeforeUpdate to $versionAfterUpdate. Re-running Invoke-GetComputerHealth.ps1 once."
       # Do not continue in the pre-update process after the updated copy has been invoked.
-      Invoke-SelfAfterUpdate -BoundParameters $PSBoundParameters -PassThruArgs $PassThruArgs
+      Invoke-SelfAfterUpdate -BoundParameters $PSBoundParameters
       return
     }
   }
@@ -678,24 +686,7 @@ foreach ($target in $targets) {
 
   # The code to run on the target Computer
   $healthCheckBlock = {
-    param(
-      $RootDir,
-      $Hide,
-      $OnlyTheseTests,
-      $ExcludeTests,
-      $WhitelistSigs,
-      $SkipSlowTests,
-      $SkipPolicyTests,
-      $SkipNonEssentialTests,
-      $NoUpdate,
-      $RunWithoutElevation,
-      $IpsOfAllDcs,
-      $PushUpdate,
-      $UpdateZipPath,
-      $UpdateZipVersion,
-      $ShowAsPostponedWindowDays,
-      $PassThruArgs
-    )
+    param([Parameter(Mandatory)][hashtable]$Payload)
 
     function Resolve-GetComputerHealthRuntimeRootLocal {
       param([Parameter(Mandatory)][string]$CandidateRootDir)
@@ -714,7 +705,19 @@ foreach ($target in $targets) {
       return $CandidateRootDir
     }
 
-    $resolvedRootDir = Resolve-GetComputerHealthRuntimeRootLocal -CandidateRootDir $RootDir
+    $rootDir = [string]$Payload.RootDir
+    $wrapperState = @{}
+    if ($Payload.ContainsKey('WrapperState') -and $Payload.WrapperState) {
+      $wrapperState = $Payload.WrapperState
+    }
+    $childHealthParams = @{}
+    if ($Payload.ContainsKey('ChildHealthParams') -and $Payload.ChildHealthParams) {
+      foreach ($entry in $Payload.ChildHealthParams.GetEnumerator()) {
+        $childHealthParams[$entry.Key] = $entry.Value
+      }
+    }
+
+    $resolvedRootDir = Resolve-GetComputerHealthRuntimeRootLocal -CandidateRootDir $rootDir
     $binDir = Join-Path $resolvedRootDir 'bin'
     $configDir = Join-Path $resolvedRootDir 'config'
     $updateScriptPath = Join-Path $binDir 'Update-GetHealthCode.ps1'
@@ -723,6 +726,13 @@ foreach ($target in $targets) {
     $customTestsDir = Join-Path $configDir 'Custom-HealthTests'
     $suppressionFilePath = Join-Path $configDir 'Get-ComputerHealth.sigs-to-suppress.txt'
     $records = New-Object System.Collections.Generic.List[object]
+    $showAsPostponedWindowDays = [int]$wrapperState.ShowAsPostponedWindowDays
+    $noUpdate = [bool]$wrapperState.NoUpdate
+    $pushUpdate = [bool]$wrapperState.PushUpdate
+    $updateZipPath = [string]$wrapperState.UpdateZipPath
+    $updateZipVersion = [string]$wrapperState.UpdateZipVersion
+
+    $childHealthParams['IncludeTestsFromFolder'] = $customTestsDir
 
     function Get-HealthSuppressionExpiryMapLocal {
       param(
@@ -786,38 +796,18 @@ foreach ($target in $targets) {
       return $realLevel
     }
 
-    function Assert-NoInvokeGetComputerHealthOnlyPassThruArguments {
-      # PassThruArgs are appended to the child Get-ComputerHealth.ps1 call.
-      # Wrapper-only markers must never reach that child script; if they do,
-      # fail loudly instead of silently dropping them and hiding a binding bug.
-      [CmdletBinding()]
-      param(
-        [object[]]$Arguments = @(),
-        [string]$DestinationScriptPath = 'Get-ComputerHealth.ps1'
-      )
-
-      foreach ($argument in @($Arguments)) {
-        if ($null -eq $argument) { continue }
-
-        $argumentText = [string]$argument
-        if (($argumentText -ieq '-AlreadyReranAfterUpdate') -or ($argumentText -ieq '/AlreadyReranAfterUpdate')) {
-          throw ("Internal Invoke-GetComputerHealth.ps1 argument '{0}' was about to be forwarded to {1}. This indicates an argument-binding bug in Invoke-GetComputerHealth.ps1." -f $argumentText, $DestinationScriptPath)
-        }
-      }
-    }
-
     if (-not (Test-Path -LiteralPath $logLibPath)) {
       throw "Logging helper file not found: $logLibPath"
     }
     . $logLibPath
 
-    if (-not $NoUpdate) {
+    if (-not $noUpdate) {
       try {
-        $updateOutput = if ($PushUpdate -and $UpdateZipPath) {
-          if ([string]::IsNullOrWhiteSpace($UpdateZipVersion)) {
-            & $updateScriptPath -UpdateFromZip $UpdateZipPath 2>&1
+        $updateOutput = if ($pushUpdate -and $updateZipPath) {
+          if ([string]::IsNullOrWhiteSpace($updateZipVersion)) {
+            & $updateScriptPath -UpdateFromZip $updateZipPath 2>&1
           } else {
-            & $updateScriptPath -UpdateFromZip $UpdateZipPath -Version $UpdateZipVersion 2>&1
+            & $updateScriptPath -UpdateFromZip $updateZipPath -Version $updateZipVersion 2>&1
           }
         }
         else {
@@ -837,6 +827,7 @@ foreach ($target in $targets) {
         $getHealthScriptPath = Join-Path $binDir 'Get-ComputerHealth.ps1'
         $customTestsDir = Join-Path $configDir 'Custom-HealthTests'
         $suppressionFilePath = Join-Path $configDir 'Get-ComputerHealth.sigs-to-suppress.txt'
+        $childHealthParams['IncludeTestsFromFolder'] = $customTestsDir
       }
       catch {
         $records.Add((Log-Failure "Terminating error while running Update-GetHealthCode.ps1" -Comment (($_ | Out-String).Trim()))) | Out-Null
@@ -845,23 +836,7 @@ foreach ($target in $targets) {
     }
 
     try {
-      $getHealthParams = @{
-        OutputObjects          = $true
-        OutputConsoleMessages  = $true
-        Hide                   = $Hide
-        OnlyTheseTests         = $OnlyTheseTests
-        ExcludeTests           = $ExcludeTests
-        IncludeTestsFromFolder = $customTestsDir
-        SuppressSigs           = $WhitelistSigs
-        SkipSlowTests          = $SkipSlowTests
-        SkipPolicyTests        = $SkipPolicyTests
-        SkipNonEssentialTests  = $SkipNonEssentialTests
-        RunWithoutElevation    = $RunWithoutElevation
-        IpsOfAllDcs            = $IpsOfAllDcs
-      }
-      # Guard the argument interface between the wrapper and Get-ComputerHealth.ps1.
-      Assert-NoInvokeGetComputerHealthOnlyPassThruArguments -Arguments $PassThruArgs -DestinationScriptPath $getHealthScriptPath
-      $healthOutput = & $getHealthScriptPath @getHealthParams @PassThruArgs 2>&1
+      $healthOutput = & $getHealthScriptPath @childHealthParams 2>&1
       $suppressionExpiryMap = Get-HealthSuppressionExpiryMapLocal -Path $suppressionFilePath
 
       foreach ($item in @($healthOutput)) {
@@ -882,7 +857,7 @@ foreach ($target in $targets) {
               TimeUtc    = if ($item.PSObject.Properties['TimeUtc']) { $item.TimeUtc } else { $null }
               Computer   = if ($item.PSObject.Properties['Computer']) { [string]$item.Computer } else { $env:COMPUTERNAME }
               Level      = $level
-              EffectiveLevel = Get-HealthEffectiveLevelLocal -Level $level -Suppressed:$suppressed -SuppressedUntil $suppressedUntil -ShowAsPostponedWindowDays $ShowAsPostponedWindowDays
+              EffectiveLevel = Get-HealthEffectiveLevelLocal -Level $level -Suppressed:$suppressed -SuppressedUntil $suppressedUntil -ShowAsPostponedWindowDays $showAsPostponedWindowDays
               Hash       = $hash
               Suppressed = $suppressed
               SuppressedUntil = $suppressedUntil
@@ -902,25 +877,19 @@ foreach ($target in $targets) {
 
   if ($target -eq $env:COMPUTERNAME) {
     $skipTargetUpdate = $NoUpdate -or $localUpdateAlreadyRan
-    $localHealthCheckParams = @{
-      RootDir                   = $ROOT_DIR
-      Hide                      = $Hide
-      OnlyTheseTests            = $OnlyTheseTests
-      ExcludeTests              = $ExcludeTests
-      WhitelistSigs             = $WhitelistSigs
-      SkipSlowTests             = $SkipSlowTests
-      SkipPolicyTests           = $SkipPolicyTests
-      SkipNonEssentialTests     = $SkipNonEssentialTests
-      NoUpdate                  = $skipTargetUpdate
-      RunWithoutElevation       = $RunWithoutElevation
-      IpsOfAllDcs               = $IpsOfAllDcs
-      PushUpdate                = $PushUpdate
-      UpdateZipPath             = $localReleaseZip
-      UpdateZipVersion          = $localReleaseZipVersion
-      ShowAsPostponedWindowDays = $SHOW_AS_POSTPONED_WINDOW_DAYS
-      PassThruArgs              = $PassThruArgs
+    $localChildHealthParams = Get-ChildHealthInvocationParameters -Hide $Hide -OnlyTheseTests $OnlyTheseTests -ExcludeTests $ExcludeTests -WhitelistSigs $WhitelistSigs -SkipSlowTests:$SkipSlowTests -SkipPolicyTests:$SkipPolicyTests -SkipNonEssentialTests:$SkipNonEssentialTests -RunWithoutElevation:$RunWithoutElevation -IpsOfAllDcs $IpsOfAllDcs
+    $localExecutionPayload = @{
+      RootDir = $ROOT_DIR
+      WrapperState = @{
+        NoUpdate                  = $skipTargetUpdate
+        PushUpdate                = [bool]$PushUpdate
+        UpdateZipPath             = $localReleaseZip
+        UpdateZipVersion          = $localReleaseZipVersion
+        ShowAsPostponedWindowDays = $SHOW_AS_POSTPONED_WINDOW_DAYS
+      }
+      ChildHealthParams = $localChildHealthParams
     }
-    $output = & $healthCheckBlock @localHealthCheckParams
+    $output = & $healthCheckBlock -Payload $localExecutionPayload
   }
   else {
     Write-Progress -Activity "Checking $target" -Status "Phase #1 (probing reachability)"
@@ -1010,7 +979,19 @@ foreach ($target in $targets) {
         }
 
         Write-Progress -Activity "Checking $target" -Status "Phase #2 (running remote update and health checks)"
-        $output = Invoke-Command -Session $session -ScriptBlock $healthCheckBlock -ArgumentList $remoteExecutionRoot, $Hide, $OnlyTheseTests, $ExcludeTests, $WhitelistSigs, $SkipSlowTests, $SkipPolicyTests, $SkipNonEssentialTests, $skipTargetUpdate, $RunWithoutElevation, $IpsOfAllDcs, $pushTargetUpdate, $remoteZipPath, $localReleaseZipVersion, $SHOW_AS_POSTPONED_WINDOW_DAYS, $PassThruArgs
+        $remoteChildHealthParams = Get-ChildHealthInvocationParameters -Hide $Hide -OnlyTheseTests $OnlyTheseTests -ExcludeTests $ExcludeTests -WhitelistSigs $WhitelistSigs -SkipSlowTests:$SkipSlowTests -SkipPolicyTests:$SkipPolicyTests -SkipNonEssentialTests:$SkipNonEssentialTests -RunWithoutElevation:$RunWithoutElevation -IpsOfAllDcs $IpsOfAllDcs
+        $remoteExecutionPayload = @{
+          RootDir = $remoteExecutionRoot
+          WrapperState = @{
+            NoUpdate                  = $skipTargetUpdate
+            PushUpdate                = $pushTargetUpdate
+            UpdateZipPath             = $remoteZipPath
+            UpdateZipVersion          = $localReleaseZipVersion
+            ShowAsPostponedWindowDays = $SHOW_AS_POSTPONED_WINDOW_DAYS
+          }
+          ChildHealthParams = $remoteChildHealthParams
+        }
+        $output = Invoke-Command -Session $session -ScriptBlock $healthCheckBlock -ArgumentList $remoteExecutionPayload
       }
       catch {
         $comment = (($_ | Out-String).Trim())

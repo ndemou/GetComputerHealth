@@ -1,60 +1,37 @@
-﻿Describe 'Invoke-GetComputerHealth update rerun handling' {
+Describe 'Invoke-GetComputerHealth update rerun handling' {
   BeforeAll {
     $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
     $script:ScriptPath = Join-Path $repoRoot 'Invoke-GetComputerHealth.ps1'
     $script:ScriptText = Get-Content -LiteralPath $script:ScriptPath -Raw
-
-    $parseErrors = $null
-    $tokens = $null
-    $ast = [System.Management.Automation.Language.Parser]::ParseFile($script:ScriptPath, [ref]$tokens, [ref]$parseErrors)
-
-    foreach ($functionName in @(
-        'Assert-NoInvokeGetComputerHealthOnlyPassThruArguments'
-      )) {
-      $funcAst = $ast.Find({
-          param($node)
-          $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
-          $node.Name -eq $functionName
-        }, $true)
-
-      if ($null -eq $funcAst) {
-        throw "Function not found in ${script:ScriptPath}: $functionName"
-      }
-
-      . ([scriptblock]::Create($funcAst.Extent.Text))
-    }
   }
 
-  It 'allows ordinary pass-through arguments to be forwarded to Get-ComputerHealth' {
-    {
-      Assert-NoInvokeGetComputerHealthOnlyPassThruArguments -Arguments @(
-        '-OnlyTheseTests',
-        'HealthTest-Sample',
-        '-OutputObjects'
-      ) -DestinationScriptPath 'Get-ComputerHealth.ps1'
-    } | Should -Not -Throw
-  }
-
-  It 'fails loudly before forwarding an internal rerun marker to Get-ComputerHealth' {
-    {
-      Assert-NoInvokeGetComputerHealthOnlyPassThruArguments -Arguments @(
-        '-OnlyTheseTests',
-        'HealthTest-Sample',
-        '-AlreadyReranAfterUpdate'
-      ) -DestinationScriptPath 'C:\IT\Get-ComputerHealth\bin\Get-ComputerHealth.ps1'
-    } | Should -Throw '*Internal Invoke-GetComputerHealth.ps1 argument*was about to be forwarded to C:\IT\Get-ComputerHealth\bin\Get-ComputerHealth.ps1*argument-binding bug*'
+  It 'no longer accepts trailing free-form pass-through arguments' {
+    $script:ScriptText | Should -Not -Match 'ValueFromRemainingArguments'
+    $script:ScriptText | Should -Not -Match '\$PassThruArgs'
   }
 
   It 'stops the original invocation after handing off to the update rerun' {
-    $script:ScriptText | Should -Match 'Invoke-SelfAfterUpdate -BoundParameters \$PSBoundParameters -PassThruArgs \$PassThruArgs\s+return'
+    $script:ScriptText | Should -Match 'Invoke-SelfAfterUpdate -BoundParameters \$PSBoundParameters\s+return'
   }
 
-  It 'places the internal rerun marker before forwarded invocation arguments' {
-    $script:ScriptText | Should -Match '\$rerunArgs = @\(\)\s+# Put the internal rerun marker first[\s\S]*?\$rerunArgs \+= ''-AlreadyReranAfterUpdate''[\s\S]*?Convert-BoundParametersToInvocationArguments'
+  It 'builds rerun parameters from declared wrapper parameters only' {
+    $script:ScriptText | Should -Match 'function Get-InvokeGetComputerHealthRerunParameters'
+    $script:ScriptText | Should -Match '\$rerunParams = @\{\}'
+    $script:ScriptText | Should -Match 'if \(\$entry\.Key -eq ''AlreadyReranAfterUpdate''\) \{ continue \}'
+    $script:ScriptText | Should -Match '\$rerunParams\[''AlreadyReranAfterUpdate''\] = \$true'
+    $script:ScriptText | Should -Match '& \$PSCommandPath @rerunParams'
   }
 
-  It 'invokes the local health-check block with named parameters so empty arrays cannot shift argument positions' {
-    $script:ScriptText | Should -Match '\$localHealthCheckParams = @\{[\s\S]*?IpsOfAllDcs\s*=\s*\$IpsOfAllDcs[\s\S]*?PassThruArgs\s*=\s*\$PassThruArgs[\s\S]*?\}\s*\$output = & \$healthCheckBlock @localHealthCheckParams'
+  It 'uses a dedicated child-parameter helper instead of forwarding arbitrary wrapper arguments' {
+    $script:ScriptText | Should -Match 'function Get-ChildHealthInvocationParameters'
+    $script:ScriptText | Should -Match 'IpsOfAllDcs\s*=\s*@\(\$IpsOfAllDcs\)'
+    $script:ScriptText | Should -Match 'RunWithoutElevation\s*=\s*\[bool\]\$RunWithoutElevation'
+    $script:ScriptText | Should -Not -Match '@getHealthParams @PassThruArgs'
+  }
+
+  It 'invokes the local health-check block with a single payload object' {
+    $script:ScriptText | Should -Match '\$localExecutionPayload = @\{[\s\S]*?WrapperState = @\{[\s\S]*?PushUpdate\s*=\s*\[bool\]\$PushUpdate[\s\S]*?ChildHealthParams = \$localChildHealthParams[\s\S]*?\}'
+    $script:ScriptText | Should -Match '\$output = & \$healthCheckBlock -Payload \$localExecutionPayload'
   }
 
   It 'checks the remote embedded version before copying and running the updater' {
@@ -65,7 +42,12 @@
     $script:ScriptText | Should -Match 'elseif \(\(-not \$skipTargetUpdate\) -and \$controllerCanPushUpdate\) \{'
     $script:ScriptText | Should -Match 'if \(-not \$skipTargetUpdate\) \{[\s\S]*?Copy-Item -Path \$localUpdaterPath -Destination \$remoteUpdaterPath -ToSession \$session -Force'
     $script:ScriptText | Should -Match 'if \(\(-not \$skipTargetUpdate\) -and \$pushTargetUpdate -and \$localReleaseZip\) \{'
-    $script:ScriptText | Should -Match 'Invoke-Command -Session \$session -ScriptBlock \$healthCheckBlock -ArgumentList .* \$skipTargetUpdate, \$RunWithoutElevation, \$IpsOfAllDcs, \$pushTargetUpdate, \$remoteZipPath'
+  }
+
+  It 'uses a single payload object for remote execution and invokes the child script only via named splatting' {
+    $script:ScriptText | Should -Match '\$remoteExecutionPayload = @\{[\s\S]*?WrapperState = @\{[\s\S]*?PushUpdate\s*=\s*\$pushTargetUpdate[\s\S]*?ChildHealthParams = \$remoteChildHealthParams[\s\S]*?\}'
+    $script:ScriptText | Should -Match 'Invoke-Command -Session \$session -ScriptBlock \$healthCheckBlock -ArgumentList \$remoteExecutionPayload'
+    $script:ScriptText | Should -Match '\$healthOutput = & \$getHealthScriptPath @childHealthParams 2>&1'
   }
 
   It 'uses a local zip for remote push only when the zip version matches the controller version' {
