@@ -186,6 +186,45 @@ function Set-CachedIpsOfAllDcs {
   @($IpsOfAllDcs) | Export-Clixml -LiteralPath $CachePath -Force
 }
 
+function Test-ValidCachedIpv4Address {
+  [CmdletBinding()]
+  param([Parameter(Mandatory)][string]$IpAddress)
+
+  $parsedAddress = $null
+  if (-not [System.Net.IPAddress]::TryParse($IpAddress, [ref]$parsedAddress)) {
+    return $false
+  }
+
+  if ($parsedAddress.AddressFamily -ne [System.Net.Sockets.AddressFamily]::InterNetwork) {
+    return $false
+  }
+
+  return ($parsedAddress.ToString() -eq $IpAddress)
+}
+
+function Normalize-IpsOfAllDcs {
+  [CmdletBinding()]
+  param(
+    [string[]]$IpsOfAllDcs = @(),
+    [string]$SourceLabel = 'input'
+  )
+
+  $normalizedIps = New-Object System.Collections.Generic.List[string]
+  foreach ($value in @($IpsOfAllDcs)) {
+    $text = [string]$value
+    if ([string]::IsNullOrWhiteSpace($text)) { continue }
+
+    $candidate = $text.Trim()
+    if (Test-ValidCachedIpv4Address -IpAddress $candidate) {
+      $normalizedIps.Add($candidate)
+    } else {
+      Write-Warning ("Ignoring invalid IPv4 value from {0}: '{1}'" -f $SourceLabel, $candidate)
+    }
+  }
+
+  return @($normalizedIps)
+}
+
 function Resolve-IpsOfAllDcs {
   [CmdletBinding()]
   param(
@@ -195,11 +234,7 @@ function Resolve-IpsOfAllDcs {
   )
 
   if ($WasProvided) {
-    $resolvedIps = @(
-      @($IpsOfAllDcs) |
-        ForEach-Object { [string]$_ } |
-        Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
-    )
+    $resolvedIps = @(Normalize-IpsOfAllDcs -IpsOfAllDcs $IpsOfAllDcs -SourceLabel '-IpsOfAllDcs')
 
     if ($resolvedIps.Count -gt 0) {
       Set-CachedIpsOfAllDcs -CachePath $CachePath -IpsOfAllDcs $resolvedIps
@@ -209,7 +244,10 @@ function Resolve-IpsOfAllDcs {
     return $resolvedIps
   }
 
-  $cachedIps = @(Get-CachedIpsOfAllDcs -CachePath $CachePath)
+  $cachedIps = @(Normalize-IpsOfAllDcs -IpsOfAllDcs (Get-CachedIpsOfAllDcs -CachePath $CachePath) -SourceLabel "cached IpsOfAllDcs file '$CachePath'")
+  if ($cachedIps.Count -gt 0) {
+    Set-CachedIpsOfAllDcs -CachePath $CachePath -IpsOfAllDcs $cachedIps
+  }
   if ($cachedIps.Count -gt 0) {
     Write-Verbose "Using cached IpsOfAllDcs from '$CachePath'"
   }

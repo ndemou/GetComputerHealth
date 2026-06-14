@@ -14,6 +14,8 @@
     foreach ($functionName in @(
         'Get-CachedIpsOfAllDcs',
         'Set-CachedIpsOfAllDcs',
+        'Test-ValidCachedIpv4Address',
+        'Normalize-IpsOfAllDcs',
         'Resolve-IpsOfAllDcs',
         'Remove-OldInvokeTranscriptLogs',
         'Read-GchConfigFile',
@@ -609,6 +611,25 @@
 
       $resolved | Should -Be @('10.1.0.1')
       $cached | Should -Be @('10.1.0.1')
+    }
+    finally {
+      Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
+    }
+  }
+
+  It 'drops invalid cached IpsOfAllDcs values and keeps valid ones' {
+    $tempRoot = Join-Path $env:TEMP ('gch-ips-cache-' + [guid]::NewGuid().ToString())
+    $cachePath = Join-Path $tempRoot 'cache.IpsOfAllDcs.clixml'
+
+    try {
+      New-Item -ItemType Directory -Path $tempRoot -Force | Out-Null
+      Set-CachedIpsOfAllDcs -CachePath $cachePath -IpsOfAllDcs @('10.0.0.1', '-PushUpdate', '10.0.0.2')
+
+      $resolved = Resolve-IpsOfAllDcs -CachePath $cachePath
+      $cached = Get-CachedIpsOfAllDcs -CachePath $cachePath
+
+      $resolved | Should -Be @('10.0.0.1', '10.0.0.2')
+      $cached | Should -Be @('10.0.0.1', '10.0.0.2')
     }
     finally {
       Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
