@@ -902,7 +902,25 @@ foreach ($target in $targets) {
 
   if ($target -eq $env:COMPUTERNAME) {
     $skipTargetUpdate = $NoUpdate -or $localUpdateAlreadyRan
-    $output = & $healthCheckBlock $ROOT_DIR $Hide $OnlyTheseTests $ExcludeTests $WhitelistSigs $SkipSlowTests $SkipPolicyTests $SkipNonEssentialTests $skipTargetUpdate $RunWithoutElevation $IpsOfAllDcs $PushUpdate $localReleaseZip $localReleaseZipVersion $SHOW_AS_POSTPONED_WINDOW_DAYS $PassThruArgs
+    $localHealthCheckParams = @{
+      RootDir                   = $ROOT_DIR
+      Hide                      = $Hide
+      OnlyTheseTests            = $OnlyTheseTests
+      ExcludeTests              = $ExcludeTests
+      WhitelistSigs             = $WhitelistSigs
+      SkipSlowTests             = $SkipSlowTests
+      SkipPolicyTests           = $SkipPolicyTests
+      SkipNonEssentialTests     = $SkipNonEssentialTests
+      NoUpdate                  = $skipTargetUpdate
+      RunWithoutElevation       = $RunWithoutElevation
+      IpsOfAllDcs               = $IpsOfAllDcs
+      PushUpdate                = $PushUpdate
+      UpdateZipPath             = $localReleaseZip
+      UpdateZipVersion          = $localReleaseZipVersion
+      ShowAsPostponedWindowDays = $SHOW_AS_POSTPONED_WINDOW_DAYS
+      PassThruArgs              = $PassThruArgs
+    }
+    $output = & $healthCheckBlock @localHealthCheckParams
   }
   else {
     Write-Progress -Activity "Checking $target" -Status "Phase #1 (probing reachability)"

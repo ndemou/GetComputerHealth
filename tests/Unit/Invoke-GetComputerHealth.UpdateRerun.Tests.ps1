@@ -53,6 +53,10 @@
     $script:ScriptText | Should -Match '\$rerunArgs = @\(\)\s+# Put the internal rerun marker first[\s\S]*?\$rerunArgs \+= ''-AlreadyReranAfterUpdate''[\s\S]*?Convert-BoundParametersToInvocationArguments'
   }
 
+  It 'invokes the local health-check block with named parameters so empty arrays cannot shift argument positions' {
+    $script:ScriptText | Should -Match '\$localHealthCheckParams = @\{[\s\S]*?IpsOfAllDcs\s*=\s*\$IpsOfAllDcs[\s\S]*?PassThruArgs\s*=\s*\$PassThruArgs[\s\S]*?\}\s*\$output = & \$healthCheckBlock @localHealthCheckParams'
+  }
+
   It 'checks the remote embedded version before copying and running the updater' {
     $script:ScriptText | Should -Match '\$remoteEmbeddedVersion = Invoke-Command -Session \$session -ScriptBlock \{'
     $script:ScriptText | Should -Match '\$skipTargetUpdate = \$NoUpdate'
