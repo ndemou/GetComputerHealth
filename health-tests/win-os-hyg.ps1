@@ -2033,7 +2033,7 @@ Uses: Get-LiveSessionInfo.
     }
 
     if (-not $issueFound) {
-        Write-Warning "[pass] No Desktop Sessions found idle or disconnected for more than $([int]$Threshold.TotalHours) hours"
+        Write-Warning "[pass] No Desktop Session isues founds (stales sesssions, or disconnected sessions consuming considerable resources)"
     }
 }
 
