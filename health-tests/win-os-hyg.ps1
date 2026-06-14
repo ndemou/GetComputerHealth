@@ -1240,11 +1240,26 @@ zero or more matching sessions.
 
 Intended for live state:
 who owns the session now, whether it is active or disconnected, where
-the client came from, and how long it has been idle or disconnected.
+the client came from, how long it has been idle or disconnected and
+what CPU, Memory, IO-Bandwidth it consumes.
 
 By default, CPU and process-I/O information are sampled for about one
 second before results are returned. Memory is gathered near the end of
 that sample.
+
+CPU and process-I/O usage are measured over the period specified by
+SampleSeconds. Consequently, the function waits for that period before
+returning results (see -FastDontSampleProcessCpuIo).
+
+Memory usage is captured near the end of the sampling period.
+
+The function is intended to provide session-level information similar to
+the Users tab in Windows Task Manager, but it does not use Task Manager's
+internal data-collection mechanisms.
+
+The returned measurements are approximations based on public Windows APIs
+and performance counters. They are suitable for monitoring and comparison,
+but should not be treated as exact reproductions of Task Manager's values.
 
 If SessionId is omitted, all sessions are considered. If SessionId is
 specified, only matching sessions are returned. Unknown session IDs
