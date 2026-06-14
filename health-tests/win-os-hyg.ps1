@@ -1947,7 +1947,7 @@ namespace Toula.WtsEx
   }
 }
 
-function HealthTest-StaleRdpSessions {
+function HealthTest-DesktopSessions {
 <#
 Description: Checks for idle or disconnected RDP sessions older than the allowed threshold.
 AppliesTo: All

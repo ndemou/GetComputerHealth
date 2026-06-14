@@ -1,4 +1,4 @@
-﻿Describe 'HealthTest-StaleRdpSessions message formatting' {
+﻿Describe 'HealthTest-DesktopSessions message formatting' {
   BeforeAll {
     $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
     . (Join-Path $repoRoot 'health-tests\win-os-hyg.ps1')
@@ -44,7 +44,7 @@
       $script:captured += $Message
     }
 
-    HealthTest-StaleRdpSessions -Threshold ([timespan]::FromHours(8))
+    HealthTest-DesktopSessions -Threshold ([timespan]::FromHours(8))
 
     $script:captured.Count | Should -BeGreaterThan 0
     ($script:captured -join "`n") | Should -Match 'User CONTOSO\\jane-admin has a disconnected session for more than 8 hours'
@@ -96,7 +96,7 @@
       $script:captured += $Message
     }
 
-    HealthTest-StaleRdpSessions -Threshold ([timespan]::FromHours(8))
+    HealthTest-DesktopSessions -Threshold ([timespan]::FromHours(8))
 
     $script:captured.Count | Should -Be 2
     $script:captured[0] | Should -Match 'materially impacting RAM availability'
