@@ -279,4 +279,190 @@ Describe 'HealthTest-ListServices' {
       $Message -eq "[FAILURE] Either something's wrong with service 'BrokenSvc' or there's a bug in Get-ServiceVendors.`nError(s): Service BrokenSvc points to missing executable."
     }
   }
+
+  It 'collapses per-user Microsoft service instances to one base-service notice' {
+    Mock Get-CimInstance {
+      [pscustomobject]@{
+        DomainRole = 1
+      }
+    } -ParameterFilter { $ClassName -eq 'Win32_ComputerSystem' }
+
+    Mock Test-Path { $true } -ParameterFilter {
+      $LiteralPath -eq 'Registry::HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\WpnUserService'
+    }
+
+    Mock Get-ServiceVendors {
+      @(
+        [pscustomobject]@{
+          ServiceName = 'WpnUserService'
+          DisplayName = 'Windows Push Notifications User Service'
+          Vendor = 'Microsoft Windows'
+          ExePath = 'C:\WINDOWS\System32\WpnUserService.dll'
+          ExeSHA256 = $null
+          ServiceType = 'Share Process'
+          ExceptionsThrown = ''
+        },
+        [pscustomobject]@{
+          ServiceName = 'WpnUserService_147c46f'
+          DisplayName = 'Windows Push Notifications User Service_147c46f'
+          Vendor = 'Microsoft Windows'
+          ExePath = 'C:\WINDOWS\System32\WpnUserService.dll'
+          ExeSHA256 = $null
+          ServiceType = 'User Share Process'
+          ExceptionsThrown = ''
+        },
+        [pscustomobject]@{
+          ServiceName = 'WpnUserService_8ab1234'
+          DisplayName = 'Windows Push Notifications User Service_8ab1234'
+          Vendor = 'Microsoft Windows'
+          ExePath = 'C:\WINDOWS\System32\WpnUserService.dll'
+          ExeSHA256 = $null
+          ServiceType = 'User Share Process'
+          ExceptionsThrown = ''
+        }
+      )
+    }
+
+    Mock Write-Warning {}
+
+    HealthTest-ListServices
+
+    Should -Invoke Write-Warning -Times 1 -Exactly -ParameterFilter {
+      $Message -eq "[NOTICE] Found Microsoft service: Vendor='Microsoft Windows' Name='WpnUserService_*' (Per-user service of base service 'WpnUserService')`nAdmin must verify if service is legit and needed. Service Description: 'Windows Push Notifications User Service'`nExecutable: 'C:\WINDOWS\System32\WpnUserService.dll'.`nFull service name: 'WpnUserService_147c46f'."
+    }
+  }
+
+  It 'does not collapse suffixed services when the base executable differs and type is not user-instance' {
+    Mock Get-CimInstance {
+      [pscustomobject]@{
+        DomainRole = 1
+      }
+    } -ParameterFilter { $ClassName -eq 'Win32_ComputerSystem' }
+
+    Mock Test-Path { $true } -ParameterFilter {
+      $LiteralPath -eq 'Registry::HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\ExampleSvc'
+    }
+
+    Mock Get-ServiceVendors {
+      @(
+        [pscustomobject]@{
+          ServiceName = 'ExampleSvc'
+          DisplayName = 'Example Base Service'
+          Vendor = 'Microsoft Windows'
+          ExePath = 'C:\Windows\System32\example-base.dll'
+          ExeSHA256 = $null
+          ServiceType = 'Share Process'
+          ExceptionsThrown = ''
+        },
+        [pscustomobject]@{
+          ServiceName = 'ExampleSvc_147c46f'
+          DisplayName = 'Example Instance Service'
+          Vendor = 'Microsoft Windows'
+          ExePath = 'C:\Windows\System32\example-instance.dll'
+          ExeSHA256 = $null
+          ServiceType = 'Share Process'
+          ExceptionsThrown = ''
+        }
+      )
+    }
+
+    Mock Write-Warning {}
+
+    HealthTest-ListServices
+
+    Should -Invoke Write-Warning -Times 2 -Exactly
+    Should -Invoke Write-Warning -Times 1 -Exactly -ParameterFilter {
+      $Message -eq "[NOTICE] Found Microsoft service: Vendor='Microsoft Windows' Name='ExampleSvc_147c46f'`nAdmin must verify if service is legit and needed. Service Description: 'Example Instance Service'`nExecutable: 'C:\Windows\System32\example-instance.dll'."
+    }
+  }
+
+  <#
+  It 'collapses suffixed services when service type marks a user-instance' {
+    Mock Get-CimInstance {
+      [pscustomobject]@{
+        DomainRole = 1
+      }
+    } -ParameterFilter { $ClassName -eq 'Win32_ComputerSystem' }
+
+    Mock Test-Path { $true } -ParameterFilter {
+      $LiteralPath -eq 'Registry::HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\TokenBrokerSvc'
+    }
+
+    Mock Get-ServiceVendors {
+      @(
+        [pscustomobject]@{
+          ServiceName = 'TokenBrokerSvc'
+          DisplayName = 'Web Account Manager'
+          Vendor = 'Microsoft Windows'
+          ExePath = 'C:\Windows\System32\tokenbroker.dll'
+          ExeSHA256 = $null
+          ServiceType = 'Share Process'
+          ExceptionsThrown = ''
+        },
+        [pscustomobject]@{
+          ServiceName = 'TokenBrokerSvc_147c46f'
+          DisplayName = 'Web Account Manager_147c46f'
+          Vendor = 'Microsoft Windows'
+          ExePath = 'C:\Windows\System32\different-user-host.dll'
+          ExeSHA256 = $null
+          ServiceType = 'User Own Process'
+          ExceptionsThrown = ''
+        }
+      )
+    }
+
+    Mock Write-Warning {}
+
+    HealthTest-ListServices
+
+    Should -Invoke Write-Warning -Times 2 -Exactly
+    Should -Invoke Write-Warning -Times 1 -Exactly -ParameterFilter {
+      $Message -eq "[NOTICE] Found Microsoft service: Vendor='Microsoft Windows' Name='TokenBrokerSvc_*' (Per-user service of base service 'TokenBrokerSvc')`nAdmin must verify if service is legit and needed. Service Description: 'Web Account Manager_147c46f'`nExecutable: 'C:\Windows\System32\different-user-host.dll'.`nFull service name: 'TokenBrokerSvc_147c46f'."
+    }
+  }
+  #>
+
+  It 'uses star-name in the headline and full name in details for non-Microsoft per-user services' {
+    Mock Get-CimInstance {
+      [pscustomobject]@{
+        DomainRole = 1
+      }
+    } -ParameterFilter { $ClassName -eq 'Win32_ComputerSystem' }
+
+    Mock Test-Path { $true } -ParameterFilter {
+      $LiteralPath -eq 'Registry::HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\ChromeUserSvc'
+    }
+
+    Mock Get-ServiceVendors {
+      @(
+        [pscustomobject]@{
+          ServiceName = 'ChromeUserSvc'
+          DisplayName = 'Chrome Base Service'
+          Vendor = 'Google LLC'
+          ExePath = 'C:\Program Files\Google\Chrome\chrome-user-service.exe'
+          ExeSHA256 = $null
+          ServiceType = 'Share Process'
+          ExceptionsThrown = ''
+        },
+        [pscustomobject]@{
+          ServiceName = 'ChromeUserSvc_147c46f'
+          DisplayName = 'Chrome User Service_147c46f'
+          Vendor = 'Google LLC'
+          ExePath = 'C:\Program Files\Google\Chrome\chrome-user-service.exe'
+          ExeSHA256 = $null
+          ServiceType = 'User Own Process'
+          ExceptionsThrown = ''
+        }
+      )
+    }
+
+    Mock Write-Warning {}
+
+    HealthTest-ListServices
+
+    Should -Invoke Write-Warning -Times 2 -Exactly
+    Should -Invoke Write-Warning -Times 1 -Exactly -ParameterFilter {
+      $Message -eq "[NOTICE] Found service from a common workstation vendor: Vendor='Google LLC' Name='ChromeUserSvc_*' (Per-user service of base service 'ChromeUserSvc')`nAdmin must verify if service is legit and needed. Service Description: 'Chrome User Service_147c46f'`nExecutable: 'C:\Program Files\Google\Chrome\chrome-user-service.exe'.`nFull service name: 'ChromeUserSvc_147c46f'."
+    }
+  }
 }

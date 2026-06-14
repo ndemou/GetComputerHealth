@@ -133,6 +133,30 @@ function Normalize-SystemRootPrefix {
   }
   $Text
 }
+
+function Get-BaseServiceName {
+  [CmdletBinding()]
+  param([Parameter(Mandatory)][string]$ServiceName)
+
+  $m = [regex]::Match($ServiceName,'^(?<base>.+?)_(?<hex>[0-9a-fA-F]{5,16})$')
+  if (-not $m.Success) { return $ServiceName }
+
+  $base = $m.Groups['base'].Value
+  $baseKey = "Registry::HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\$base"
+  if (Test-Path -LiteralPath $baseKey) { return $base }
+
+  $ServiceName
+}
+
+function Test-ServiceTypeLooksLikePerUserInstance {
+  [CmdletBinding()]
+  param([AllowNull()][string]$ServiceType)
+
+  if ([string]::IsNullOrWhiteSpace($ServiceType)) { return $false }
+
+  return ($ServiceType -match '(^|,\s*)User (Own|Share) Process($|,\s*)')
+}
+
 function Split-FirstTokenSmart {
 
   [CmdletBinding()]
@@ -349,19 +373,6 @@ function Resolve-ServiceExecutable {
     [Parameter(Mandatory)][AllowEmptyString()][string]$LaunchCommand,
     [Parameter(Mandatory)][string]$ServiceName
   )
-
-  function Get-BaseServiceName {
-    param([Parameter(Mandatory)][string]$ServiceName)
-
-    $m=[regex]::Match($ServiceName,'^(?<base>.+?)_(?<hex>[0-9a-fA-F]{5,16})$')
-    if(-not $m.Success){ return $ServiceName }
-
-    $base=$m.Groups['base'].Value
-    $baseKey="Registry::HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\$base"
-    if(Test-Path -LiteralPath $baseKey){ return $base }
-
-    $ServiceName
-  }
 
 
   $warnings = New-Object System.Collections.Generic.List[string]
@@ -682,7 +693,7 @@ Returns a list of objects with ServiceName, Vendor, and ExePath properties.
   [OutputType([pscustomobject])]
   param()
 
-  $services = Get-CimInstance Win32_Service | Select-Object Name,PathName,DisplayName
+  $services = Get-CimInstance Win32_Service | Select-Object Name,PathName,DisplayName,ServiceType
 
   foreach($s in $services){
     $ExceptionsThrown = ""
@@ -710,6 +721,7 @@ Returns a list of objects with ServiceName, Vendor, and ExePath properties.
       ExePath     = $exe
       ExeSHA256   = $exeSHA256
       DisplayName = $s.DisplayName
+      ServiceType = $s.ServiceType
       ExceptionsThrown  = $ExceptionsThrown
     }
   }
@@ -850,20 +862,117 @@ Uses: Get-ServiceVendors.
     $COMMON_VENDORS_FOR_WORKSTATIONS = @('Adobe Inc.', 'Cisco Systems, Inc.', 'Google LLC', 'Lenovo', 'Mozilla Corporation')
     $domainRole = (Get-CimInstance Win32_ComputerSystem).DomainRole
     $isHostServer = ($domainRole  -in 3,4,5)
-    Get-ServiceVendors | ForEach-Object {
+    $reportedServiceKeys = @{}
+    $services = @(Get-ServiceVendors)
+    $servicesByName = @{}
+    $perUserMicrosoftGroupFlags = @{}
+    $perUserMicrosoftGroupExampleNames = @{}
+    foreach ($service in $services) {
+        $servicesByName[$service.ServiceName] = $service
+    }
+    foreach ($service in $services) {
+        $serviceType = $null
+        if ($service.PSObject.Properties['ServiceType']) {
+            $serviceType = $service.ServiceType
+        }
+        $baseServiceName = Get-BaseServiceName -ServiceName $service.ServiceName
+        $baseService = $null
+        if ($servicesByName.ContainsKey($baseServiceName)) {
+            $baseService = $servicesByName[$baseServiceName]
+        }
+        $baseHasSameExecutablePath = $false
+        if (($null -ne $baseService) -and
+            (-not [string]::IsNullOrWhiteSpace($service.ExePath)) -and
+            (-not [string]::IsNullOrWhiteSpace($baseService.ExePath)) -and
+            ($service.ExePath -ieq $baseService.ExePath)) {
+            $baseHasSameExecutablePath = $true
+        }
+        $serviceTypeLooksPerUser = Test-ServiceTypeLooksLikePerUserInstance -ServiceType $serviceType
+        $isPerUserServiceInstance = ($baseServiceName -ne $service.ServiceName) -and (($null -ne $baseService) -and ($baseHasSameExecutablePath -or $serviceTypeLooksPerUser))
+        $normalizedServiceName = $service.ServiceName
+        if ($isPerUserServiceInstance) {
+            $normalizedServiceName = $baseServiceName
+        }
+        $normalizedServiceName = $normalizedServiceName -replace '[0-9]+[.][0-9][0-9.]*$','[VERSION]'
+        if ($service.Vendor -in $CORE_MICROSOFT_VENDORS) {
+            $groupKey = "ms|$($service.Vendor)|$normalizedServiceName|$($service.ExePath)"
+            if ($isPerUserServiceInstance) {
+                $perUserMicrosoftGroupFlags[$groupKey] = $true
+                if (-not $perUserMicrosoftGroupExampleNames.ContainsKey($groupKey)) {
+                    $perUserMicrosoftGroupExampleNames[$groupKey] = $service.ServiceName
+                }
+            } elseif (-not $perUserMicrosoftGroupFlags.ContainsKey($groupKey)) {
+                $perUserMicrosoftGroupFlags[$groupKey] = $false
+            }
+        }
+    }
+    $services | ForEach-Object {
         if ($_.ExeSHA256) {$extra_msg = " (SHA256 of '$($_.ExePath)' is $($_.ExeSHA256))"} else {$extra_msg=""}
-        $trimmedServiceName = $_.ServiceName -replace '[0-9]+[.][0-9][0-9.]*$','[VERSION]'
+        $serviceType = $null
+        if ($_.PSObject.Properties['ServiceType']) {
+            $serviceType = $_.ServiceType
+        }
+        $baseServiceName = Get-BaseServiceName -ServiceName $_.ServiceName
+        $baseService = $null
+        if ($servicesByName.ContainsKey($baseServiceName)) {
+            $baseService = $servicesByName[$baseServiceName]
+        }
+        $baseHasSameExecutablePath = $false
+        if (($null -ne $baseService) -and
+            (-not [string]::IsNullOrWhiteSpace($_.ExePath)) -and
+            (-not [string]::IsNullOrWhiteSpace($baseService.ExePath)) -and
+            ($_.ExePath -ieq $baseService.ExePath)) {
+            $baseHasSameExecutablePath = $true
+        }
+        $serviceTypeLooksPerUser = Test-ServiceTypeLooksLikePerUserInstance -ServiceType $serviceType
+        $isPerUserServiceInstance = ($baseServiceName -ne $_.ServiceName) -and (($null -ne $baseService) -and ($baseHasSameExecutablePath -or $serviceTypeLooksPerUser))
+        if ($isPerUserServiceInstance) {
+            $trimmedServiceName = $baseServiceName
+        } else {
+            $trimmedServiceName = $_.ServiceName
+        }
+        $trimmedServiceName = $trimmedServiceName -replace '[0-9]+[.][0-9][0-9.]*$','[VERSION]'
         $ok = $false
         if ($_.ExceptionsThrown) {
             Write-Warning "[FAILURE] Either something's wrong with service '$($_.ServiceName)' or there's a bug in Get-ServiceVendors.`nError(s): $($_.ExceptionsThrown)"
         } else {
             $comment = "Admin must verify if service is legit and needed. Service Description: '$($_.DisplayName)'`nExecutable: '$($_.ExePath)'."
+            if ($isPerUserServiceInstance) {
+                $comment = $comment + "`nFull service name: '$($_.ServiceName)'."
+            }
+            $displayServiceName = $trimmedServiceName
+            $perUserNote = ""
             if ($_.Vendor -in $CORE_MICROSOFT_VENDORS) {
-                Write-Warning "[NOTICE] Found Microsoft service: Vendor='$($_.Vendor)' Name='$trimmedServiceName'$extra_msg`n$comment"
+                $dedupeKey = "ms|$($_.Vendor)|$trimmedServiceName|$($_.ExePath)"
+                if (-not $reportedServiceKeys.ContainsKey($dedupeKey)) {
+                    $reportedServiceKeys[$dedupeKey] = $true
+                    if ($perUserMicrosoftGroupFlags[$dedupeKey]) {
+                        $displayServiceName = "$trimmedServiceName" + "_*"
+                        $perUserNote = " (Per-user service of base service '$trimmedServiceName')"
+                        if (-not $isPerUserServiceInstance) {
+                            $fullPerUserServiceName = $perUserMicrosoftGroupExampleNames[$dedupeKey]
+                            if ($fullPerUserServiceName) {
+                                $comment = $comment + "`nFull service name: '$fullPerUserServiceName'."
+                            }
+                        }
+                    } else {
+                        $displayServiceName = $trimmedServiceName
+                        $perUserNote = ""
+                    }
+                    Write-Warning "[NOTICE] Found Microsoft service: Vendor='$($_.Vendor)' Name='$displayServiceName'$perUserNote$extra_msg`n$comment"
+                }
             } elseif ((-not $isHostServer) -and ($_.Vendor -in $COMMON_VENDORS_FOR_WORKSTATIONS)) {
-                Write-Warning "[NOTICE] Found service from a common workstation vendor: Vendor='$($_.Vendor)' Name='$trimmedServiceName'$extra_msg`n$comment"
+                if ($isPerUserServiceInstance) {
+                    $displayServiceName = "$trimmedServiceName" + "_*"
+                    $perUserNote = " (Per-user service of base service '$trimmedServiceName')"
+                }
+                Write-Warning "[NOTICE] Found service from a common workstation vendor: Vendor='$($_.Vendor)' Name='$displayServiceName'$perUserNote$extra_msg`n$comment"
             } else {
-                Write-Warning "[WARNING] Found service from an unusual or higher-risk vendor: Vendor='$($_.Vendor)' Name='$trimmedServiceName'$extra_msg`n$comment"
+                if ($isPerUserServiceInstance) {
+                    $displayServiceName = "$trimmedServiceName" + "_*"
+                    $perUserNote = " (Per-user service of base service '$trimmedServiceName')"
+                }
+                Write-Warning "[WARNING] Found service from an unusual or higher-risk vendor: Vendor='$($_.Vendor)' Name='$displayServiceName'$perUserNote$extra_msg`n$comment"
             }
         }
     }
