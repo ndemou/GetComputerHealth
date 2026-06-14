@@ -1662,6 +1662,10 @@ or $null when no version-like token can be identified.
     return $matches[0].ToLowerInvariant()
   }
 
+  if ($Marker -match '(?i)(?:^|[^A-Za-z0-9])(?<Version>\d+\.\d+\.\d+)(?:$|[^A-Za-z0-9])') {
+    return ('v{0}' -f $matches['Version'])
+  }
+
   return $null
 }
 
@@ -1932,6 +1936,8 @@ Hashtable with keys: SourceFullPath, ZipLastWriteTimeIso, CachedZipPath, ZipSha2
     $manualMarker = ("manual-zip|{0}|{1}" -f $requestedVersionToken, $zipHash)
   } elseif ($requestedVersionToken -and ($requestedVersionToken -ine $markerVersionToken)) {
     throw "Provided -Version '$Version' does not match the semver '$markerVersionToken' embedded in zip file name '$($zipItem.Name)'."
+  } else {
+    $manualMarker = ("manual-zip|{0}|{1}" -f $markerVersionToken, $zipHash)
   }
 
   $cacheVersionToken = if ($markerVersionToken) { $markerVersionToken } else { $requestedVersionToken }
