@@ -264,7 +264,6 @@ $script:Config = [pscustomobject]@{
 # Dot source libraries of functions
 #
 . (Join-Path -Path $PSScriptRoot -ChildPath "lib-write-log-objects.ps1")
-. (Join-Path -Path $PSScriptRoot -ChildPath "helpers-networking.ps1")
 . (Join-Path -Path $PSScriptRoot -ChildPath "helpers-for-healthtests.ps1")
 
 #------------------------------------------
