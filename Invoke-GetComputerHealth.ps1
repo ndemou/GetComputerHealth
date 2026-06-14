@@ -143,6 +143,7 @@ $GCH_CONFIG_PATH = Join-Path $CONFIG_DIR 'gch.psd1'
 $SHOW_AS_POSTPONED_WINDOW_DAYS = 150
 $REPORTING_SCRIPT_PATH = Join-Path $SCRIPT_BIN_DIR 'reporting.ps1'
 . $REPORTING_SCRIPT_PATH
+$script:InvokeTranscriptStarted = $false
 #------------------------------------------------------------------------
 # Functions
 #------------------------------------------------------------------------
@@ -281,6 +282,50 @@ function Remove-OldInvokeTranscriptLogs {
     } catch {
       Write-Warning ("Failed deleting old Invoke-GetComputerHealth transcript log '{0}': {1}" -f $log.FullName, $_.Exception.Message)
     }
+  }
+}
+
+function Start-InvokeTranscript {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)][string]$Path
+  )
+
+  if ($script:InvokeTranscriptStarted) {
+    return
+  }
+
+  try {
+    Start-Transcript -Path $Path -Force -ErrorAction Stop | Out-Null
+    $script:InvokeTranscriptStarted = $true
+  }
+  catch {
+    try {
+      Stop-Transcript | Out-Null
+    }
+    catch {
+    }
+
+    Start-Transcript -Path $Path -Force -ErrorAction Stop | Out-Null
+    $script:InvokeTranscriptStarted = $true
+  }
+}
+
+function Stop-InvokeTranscript {
+  [CmdletBinding()]
+  param()
+
+  if (-not $script:InvokeTranscriptStarted) {
+    return
+  }
+
+  try {
+    Stop-Transcript | Out-Null
+  }
+  catch {
+  }
+  finally {
+    $script:InvokeTranscriptStarted = $false
   }
 }
 
@@ -660,7 +705,8 @@ if (-not $NoUpdate) {
   }
 }
 
-Start-Transcript (Join-Path $LOG_DIR "Invoke-GetHealthDomainComputers-$timestamp.log")
+Start-InvokeTranscript -Path (Join-Path $LOG_DIR "Invoke-GetHealthDomainComputers-$timestamp.log")
+try {
 . $LIB_LOG_OBJECTS_PATH
 $IpsOfAllDcs = Resolve-IpsOfAllDcs -IpsOfAllDcs $IpsOfAllDcs -WasProvided:$PSBoundParameters.ContainsKey('IpsOfAllDcs') -CachePath $IPS_OF_ALL_DCS_CACHE_PATH
 
@@ -1085,4 +1131,7 @@ Invoke-GetComputerHealthReporting `
   -Timestamp $timestamp `
   -Targets $targets
 
-Stop-Transcript
+}
+finally {
+  Stop-InvokeTranscript
+}

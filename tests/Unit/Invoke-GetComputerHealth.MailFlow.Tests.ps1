@@ -18,6 +18,8 @@
         'Normalize-IpsOfAllDcs',
         'Resolve-IpsOfAllDcs',
         'Remove-OldInvokeTranscriptLogs',
+        'Start-InvokeTranscript',
+        'Stop-InvokeTranscript',
         'Read-GchConfigFile',
         'Test-GchConfigKey',
         'Get-GchConfigValue',
@@ -697,6 +699,35 @@
     } finally {
       Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
     }
+  }
+
+  It 'restarts a transcript after stopping the previous active one' {
+    $script:InvokeTranscriptStarted = $false
+    $script:StartTranscriptCallCount = 0
+    $script:StopTranscriptCallCount = 0
+
+    Mock Start-Transcript {
+      $script:StartTranscriptCallCount++
+      if ($script:StartTranscriptCallCount -eq 1) {
+        throw [System.Management.Automation.RuntimeException]::new('Transcription cannot be started.')
+      }
+    }
+
+    Mock Stop-Transcript {
+      $script:StopTranscriptCallCount++
+    }
+
+    try {
+      { Start-InvokeTranscript -Path (Join-Path $env:TEMP ('gch-transcript-' + [guid]::NewGuid().ToString() + '.log')) } | Should -Not -Throw
+      $script:InvokeTranscriptStarted | Should -BeTrue
+      $script:StartTranscriptCallCount | Should -Be 2
+      $script:StopTranscriptCallCount | Should -Be 1
+    }
+    finally {
+      Stop-InvokeTranscript
+    }
+
+    $script:InvokeTranscriptStarted | Should -BeFalse
   }
 
   It 'derives targets from messages and computes a timestamp when omitted' {
