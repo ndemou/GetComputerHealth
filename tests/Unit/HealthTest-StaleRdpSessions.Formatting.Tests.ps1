@@ -59,7 +59,7 @@
     ($script:captured -join "`n") | Should -Match 'IO_MBps: 0.125'
   }
 
-  It 'adds independent warnings when a disconnected session heavily impacts RAM and CPU' {
+  It 'adds independent warnings when a disconnected session heavily impacts RAM and CPU even if it is not stale' {
     $script:captured = @()
 
     Mock Get-CimInstance {
@@ -78,8 +78,8 @@
           UserPrincipal = 'CONTOSO\jane-admin'
           LogonTime = [datetime]'2026-05-19 12:44:16'
           LastInputTime = [datetime]'2026-05-19 12:45:47'
-          DisconnectedTime = [timespan]::FromHours(9)
-          IdleTime = [timespan]::FromHours(9)
+          DisconnectedTime = [timespan]::FromHours(2)
+          IdleTime = [timespan]::FromHours(2)
           ClientName = 'ws-22'
           ClientAddress = '10.0.0.22'
           Protocol = 'RDP'
@@ -98,9 +98,9 @@
 
     HealthTest-StaleRdpSessions -Threshold ([timespan]::FromHours(8))
 
-    $script:captured.Count | Should -Be 3
-    $script:captured[1] | Should -Match 'materially impacting RAM availability'
-    $script:captured[2] | Should -Match 'considerable CPU usage'
+    $script:captured.Count | Should -Be 2
+    $script:captured[0] | Should -Match 'materially impacting RAM availability'
+    $script:captured[1] | Should -Match 'considerable CPU usage'
     ($script:captured -join "`n") | Should -Match 'ProcessCount: 8'
     ($script:captured -join "`n") | Should -Match 'CPUPercent: 27.4%'
     ($script:captured -join "`n") | Should -Match 'MemoryMB: 150'

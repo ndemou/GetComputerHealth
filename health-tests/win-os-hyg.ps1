@@ -1695,15 +1695,15 @@ namespace Toula.WtsEx
     param(
       [Parameter(Mandatory)][string]$ClassName,
       [string[]]$Property,
-      [System.Management.Automation.ActionPreference]$ErrorAction = [System.Management.Automation.ActionPreference]::Stop
+      [System.Management.Automation.ActionPreference]$CimErrorAction = [System.Management.Automation.ActionPreference]::Stop
     )
 
     if (Test-IsLocalComputerName -Name $ComputerName) {
-      Get-CimInstance -ClassName $ClassName -Property $Property -ErrorAction $ErrorAction
+      Get-CimInstance -ClassName $ClassName -Property $Property -ErrorAction $CimErrorAction
       return
     }
 
-    Get-CimInstance -ComputerName $ComputerName -ClassName $ClassName -Property $Property -ErrorAction $ErrorAction
+    Get-CimInstance -ComputerName $ComputerName -ClassName $ClassName -Property $Property -ErrorAction $CimErrorAction
   }
 
   $server = Get-WtsServerHandle -Name $ComputerName
@@ -1729,7 +1729,7 @@ namespace Toula.WtsEx
         Get-CimInstanceForSessionQueryTarget `
           -ClassName Win32_Processor `
           -Property NumberOfLogicalProcessors `
-          -ErrorAction Stop
+          -CimErrorAction Stop
       ).NumberOfLogicalProcessors |
         Measure-Object -Sum |
         Select-Object -ExpandProperty Sum
@@ -1750,7 +1750,7 @@ namespace Toula.WtsEx
           'ReadTransferCount',
           'WriteTransferCount'
         ) `
-        -ErrorAction Stop |
+        -CimErrorAction Stop |
         ForEach-Object {
           $before[[uint32]$_.ProcessId] = [pscustomobject]@{
             SessionId = [int]$_.SessionId
@@ -1779,7 +1779,7 @@ namespace Toula.WtsEx
       Get-CimInstanceForSessionQueryTarget `
         -ClassName Win32_Process `
         -Property $afterProcessProperties `
-        -ErrorAction Stop
+        -CimErrorAction Stop
     )
 
     $privateWorkingSets = @{}
@@ -1787,7 +1787,7 @@ namespace Toula.WtsEx
     Get-CimInstanceForSessionQueryTarget `
       -ClassName Win32_PerfFormattedData_PerfProc_Process `
       -Property IDProcess, WorkingSetPrivate `
-      -ErrorAction SilentlyContinue |
+      -CimErrorAction SilentlyContinue |
       ForEach-Object {
         $processId = [uint32]$_.IDProcess
 
@@ -1977,26 +1977,8 @@ Uses: Get-LiveSessionInfo.
         if (-not $session) { continue }
         if ([string]::IsNullOrWhiteSpace($session.UserName)) { continue }
 
-        $problemType = $null
-        $problemAge = $null
-
-        if ($session.State -eq 'WTSDisconnected' -and $session.DisconnectedTime -ge $Threshold) {
-            $problemType = 'disconnected'
-            $problemAge = $session.DisconnectedTime
-        }
-        elseif ($session.IdleTime -ge $Threshold) {
-            $problemType = 'idle'
-            $problemAge = $session.IdleTime
-        }
-
-        if (-not $problemType) { continue }
-
-        $issueFound = $true
-
         $who = $session.UserPrincipal
         if ([string]::IsNullOrWhiteSpace($who)) { $who = $session.UserName }
-
-        $issueSynopsis = "User $who has a $problemType session for more than $([int]$Threshold.TotalHours) hours"
 
         $detailLines = @()
         $detailLines += "State: $($session.State)"
@@ -2013,21 +1995,41 @@ Uses: Get-LiveSessionInfo.
         $detailLines += "IO_MBps: $(if ($null -ne $session.IO_MBps) { $session.IO_MBps } else { '(not sampled)' })"
 
         $details = $detailLines -join "`n"
-        Write-Warning ("[NOTICE] $issueSynopsis" + $(if ($details) { "`n$details" } else { '' }))
 
         if ($session.State -eq 'WTSDisconnected' -and
             $null -ne $availableRamMB -and
             $availableRamMB -gt 0 -and
             $null -ne $session.MemoryMB -and
             [double]$session.MemoryMB -gt ($availableRamMB * 0.2)) {
+            $issueFound = $true
             Write-Warning ("[WARNING] User $who has a disconnected session materially impacting RAM availability" + $(if ($details) { "`n$details" } else { '' }))
         }
 
         if ($session.State -eq 'WTSDisconnected' -and
             $null -ne $session.CPUPercent -and
             [double]$session.CPUPercent -gt 20) {
+            $issueFound = $true
             Write-Warning ("[WARNING] User $who has a disconnected session with considerable CPU usage" + $(if ($details) { "`n$details" } else { '' }))
         }
+
+        $problemType = $null
+        $problemAge = $null
+
+        if ($session.State -eq 'WTSDisconnected' -and $session.DisconnectedTime -ge $Threshold) {
+            $problemType = 'disconnected'
+            $problemAge = $session.DisconnectedTime
+        }
+        elseif ($session.IdleTime -ge $Threshold) {
+            $problemType = 'idle'
+            $problemAge = $session.IdleTime
+        }
+
+        if (-not $problemType) { continue }
+
+        $issueFound = $true
+
+        $issueSynopsis = "User $who has a $problemType session for more than $([int]$Threshold.TotalHours) hours"
+        Write-Warning ("[NOTICE] $issueSynopsis" + $(if ($details) { "`n$details" } else { '' }))
     }
 
     if (-not $issueFound) {
