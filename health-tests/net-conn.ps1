@@ -142,9 +142,8 @@ Same accepted shapes as Test-IpReachability -Ip.
   }
 }
 
-# Intentionally duplicated from helpers-networking.ps1. We could dot-source
-# that file, but this script is borrowed from another repo and
-# helpers-networking.ps1 contains many functions that are not needed here.
+# Intentionally duplicated from a helper ps1 script. 
+# Not dot-sourcing it because it contains too much unneeded code.
 function Test-NetConnectivityToNetwork {
 <#
 .SYNOPSIS

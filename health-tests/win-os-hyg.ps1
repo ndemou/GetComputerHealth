@@ -1226,6 +1226,13 @@ Produces one psCustomObject for each matching session:
                       available.
   DisconnectedTime  : Time since disconnect for disconnected sessions,
                       if available.
+  ProcessCount      : Number of processes observed in the session.
+  CPUPercent        : Approximate percentage of total logical CPU
+                      capacity used by the session over the sample.
+  MemoryMB          : Approximate private working-set memory in MiB
+                      attributed to the session.
+  IO_MBps           : Approximate combined process read/write
+                      throughput in MiB per second over the sample.
 
 .DESCRIPTION
 Queries the current session table of the target computer and returns
@@ -1234,6 +1241,10 @@ zero or more matching sessions.
 Intended for live state:
 who owns the session now, whether it is active or disconnected, where
 the client came from, and how long it has been idle or disconnected.
+
+By default, CPU and process-I/O information are sampled for about one
+second before results are returned. Memory is gathered near the end of
+that sample.
 
 If SessionId is omitted, all sessions are considered. If SessionId is
 specified, only matching sessions are returned. Unknown session IDs
@@ -1253,11 +1264,18 @@ Limits results to the specified session IDs.
 
 When set, only sessions whose ID is in this list are returned;
 otherwise all sessions are returned.
+
+.PARAMETER FastDontSampleProcessCpuIo
+Skips the CPU and process-I/O sampling step.
+
+When set, ProcessCount, CPUPercent, and IO_MBps are returned as null.
+MemoryMB is still populated.
 #>
   [CmdletBinding()]
   param(
     [string]$ComputerName = $env:COMPUTERNAME,
-    [int[]]$SessionId
+    [int[]]$SessionId,
+    [switch]$FastDontSampleProcessCpuIo
   )
 
   if (-not ('Toula.WtsEx.NativeMethods' -as [type])) {
@@ -1665,6 +1683,29 @@ namespace Toula.WtsEx
     "Other($Value)"
   }
 
+  function Test-IsLocalComputerName {
+    param([string]$Name)
+    [string]::IsNullOrWhiteSpace($Name) -or
+      $Name -eq '.' -or
+      $Name -eq 'localhost' -or
+      $Name -ieq $env:COMPUTERNAME
+  }
+
+  function Get-CimInstanceForSessionQueryTarget {
+    param(
+      [Parameter(Mandatory)][string]$ClassName,
+      [string[]]$Property,
+      [System.Management.Automation.ActionPreference]$ErrorAction = [System.Management.Automation.ActionPreference]::Stop
+    )
+
+    if (Test-IsLocalComputerName -Name $ComputerName) {
+      Get-CimInstance -ClassName $ClassName -Property $Property -ErrorAction $ErrorAction
+      return
+    }
+
+    Get-CimInstance -ComputerName $ComputerName -ClassName $ClassName -Property $Property -ErrorAction $ErrorAction
+  }
+
   $server = Get-WtsServerHandle -Name $ComputerName
   $sessionsPtr = [IntPtr]::Zero
   $count = 0
@@ -1672,6 +1713,143 @@ namespace Toula.WtsEx
   try {
     if (-not [Toula.WtsEx.NativeMethods]::WTSEnumerateSessions($server, 0, 1, [ref]$sessionsPtr, [ref]$count)) {
       throw "WTSEnumerateSessions failed for '$ComputerName'."
+    }
+
+    $usageBySession = @{}
+    $logicalProcessorCount = 1
+
+    $afterProcessProperties = @(
+      'ProcessId',
+      'SessionId',
+      'WorkingSetSize'
+    )
+
+    if (-not $FastDontSampleProcessCpuIo) {
+      $logicalProcessorCount = @(
+        Get-CimInstanceForSessionQueryTarget `
+          -ClassName Win32_Processor `
+          -Property NumberOfLogicalProcessors `
+          -ErrorAction Stop
+      ).NumberOfLogicalProcessors |
+        Measure-Object -Sum |
+        Select-Object -ExpandProperty Sum
+
+      if (-not $logicalProcessorCount) {
+        $logicalProcessorCount = 1
+      }
+
+      $before = @{}
+
+      Get-CimInstanceForSessionQueryTarget `
+        -ClassName Win32_Process `
+        -Property @(
+          'ProcessId',
+          'SessionId',
+          'KernelModeTime',
+          'UserModeTime',
+          'ReadTransferCount',
+          'WriteTransferCount'
+        ) `
+        -ErrorAction Stop |
+        ForEach-Object {
+          $before[[uint32]$_.ProcessId] = [pscustomobject]@{
+            SessionId = [int]$_.SessionId
+            Processor100ns = (
+              [uint64]$_.KernelModeTime +
+              [uint64]$_.UserModeTime
+            )
+            IoBytes = (
+              [uint64]$_.ReadTransferCount +
+              [uint64]$_.WriteTransferCount
+            )
+          }
+        }
+
+      Start-Sleep -Seconds 1
+
+      $afterProcessProperties += @(
+        'KernelModeTime',
+        'UserModeTime',
+        'ReadTransferCount',
+        'WriteTransferCount'
+      )
+    }
+
+    $afterProcesses = @(
+      Get-CimInstanceForSessionQueryTarget `
+        -ClassName Win32_Process `
+        -Property $afterProcessProperties `
+        -ErrorAction Stop
+    )
+
+    $privateWorkingSets = @{}
+
+    Get-CimInstanceForSessionQueryTarget `
+      -ClassName Win32_PerfFormattedData_PerfProc_Process `
+      -Property IDProcess, WorkingSetPrivate `
+      -ErrorAction SilentlyContinue |
+      ForEach-Object {
+        $processId = [uint32]$_.IDProcess
+
+        if ($processId -ne 0) {
+          $privateWorkingSets[$processId] = [uint64]$_.WorkingSetPrivate
+        }
+      }
+
+    foreach ($process in $afterProcesses) {
+      $processId = [uint32]$process.ProcessId
+      $processSessionId = [int]$process.SessionId
+
+      if (-not $usageBySession.ContainsKey($processSessionId)) {
+        $usageBySession[$processSessionId] = [pscustomobject]@{
+          ProcessCount      = 0
+          Processor100ns    = [uint64]0
+          PrivateWorkingSet = [uint64]0
+          IoBytes           = [uint64]0
+        }
+      }
+
+      $usage = $usageBySession[$processSessionId]
+      $usage.ProcessCount++
+
+      if ($privateWorkingSets.ContainsKey($processId)) {
+        $usage.PrivateWorkingSet += [uint64]$privateWorkingSets[$processId]
+      }
+      else {
+        $usage.PrivateWorkingSet += [uint64]$process.WorkingSetSize
+      }
+
+      if ($FastDontSampleProcessCpuIo) {
+        continue
+      }
+
+      if (-not $before.ContainsKey($processId)) {
+        continue
+      }
+
+      $old = $before[$processId]
+
+      if ($old.SessionId -ne $processSessionId) {
+        continue
+      }
+
+      $newProcessorTime = (
+        [uint64]$process.KernelModeTime +
+        [uint64]$process.UserModeTime
+      )
+
+      $newIoBytes = (
+        [uint64]$process.ReadTransferCount +
+        [uint64]$process.WriteTransferCount
+      )
+
+      if ($newProcessorTime -ge $old.Processor100ns) {
+        $usage.Processor100ns += $newProcessorTime - $old.Processor100ns
+      }
+
+      if ($newIoBytes -ge $old.IoBytes) {
+        $usage.IoBytes += $newIoBytes - $old.IoBytes
+      }
     }
 
     $structSize = [Runtime.InteropServices.Marshal]::SizeOf([type][Toula.WtsEx.WTS_SESSION_INFO])
@@ -1696,6 +1874,35 @@ namespace Toula.WtsEx
       $clientDirectory = Get-WtsString -Server $server -Id $session.SessionID -InfoClass ([Toula.WtsEx.WTS_INFO_CLASS]::WTSClientDirectory)
       $clientDisplay = Get-WtsClientDisplayText -Server $server -Id $session.SessionID
       $timing = Get-WtsSessionTiming -Server $server -Id $session.SessionID
+      $usage = $usageBySession[[int]$session.SessionID]
+
+      if (-not $usage) {
+        $usage = [pscustomobject]@{
+          ProcessCount      = 0
+          Processor100ns    = [uint64]0
+          PrivateWorkingSet = [uint64]0
+          IoBytes           = [uint64]0
+        }
+      }
+
+      $processCount = $null
+      $cpuPercent = $null
+      $ioMBps = $null
+
+      if (-not $FastDontSampleProcessCpuIo) {
+        $processCount = [int]$usage.ProcessCount
+        $cpuPercent = [math]::Round(
+          (
+            $usage.Processor100ns /
+            (10000000.0 * $logicalProcessorCount)
+          ) * 100,
+          1
+        )
+        $ioMBps = [math]::Round(
+          $usage.IoBytes / 1MB,
+          3
+        )
+      }
 
       [pscustomobject]@{
         ComputerName      = $ComputerName
@@ -1720,6 +1927,13 @@ namespace Toula.WtsEx
         SessionAge        = if ($timing) { $timing.SessionAge } else { $null }
         ConnectedDuration = if ($timing) { $timing.ConnectedDuration } else { $null }
         DisconnectedTime  = if ($timing) { $timing.DisconnectedTime } else { $null }
+        ProcessCount      = $processCount
+        CPUPercent        = $cpuPercent
+        MemoryMB          = [math]::Round(
+          $usage.PrivateWorkingSet / 1MB,
+          1
+        )
+        IO_MBps           = $ioMBps
       }
     }
   }
@@ -1748,6 +1962,14 @@ Uses: Get-LiveSessionInfo.
     )
 
     $issueFound = $false
+    $availableRamMB = $null
+
+    try {
+        $os = Get-CimInstance Win32_OperatingSystem -Property FreePhysicalMemory -ErrorAction Stop
+        $availableRamMB = [double]$os.FreePhysicalMemory / 1024
+    }
+    catch {
+    }
 
     $sessions = @(Get-LiveSessionInfo)
 
@@ -1785,9 +2007,27 @@ Uses: Get-LiveSessionInfo.
         if ($session.ClientName)       { $detailLines += "ClientName: $($session.ClientName)" }
         if ($session.ClientAddress)    { $detailLines += "ClientAddress: $($session.ClientAddress)" }
         if ($session.Protocol)         { $detailLines += "Protocol: $($session.Protocol)" }
+        $detailLines += "ProcessCount: $(if ($null -ne $session.ProcessCount) { $session.ProcessCount } else { '(not sampled)' })"
+        $detailLines += "CPUPercent: $(if ($null -ne $session.CPUPercent) { "$($session.CPUPercent)%" } else { '(not sampled)' })"
+        $detailLines += "MemoryMB: $(if ($null -ne $session.MemoryMB) { $session.MemoryMB } else { '(unknown)' })"
+        $detailLines += "IO_MBps: $(if ($null -ne $session.IO_MBps) { $session.IO_MBps } else { '(not sampled)' })"
 
         $details = $detailLines -join "`n"
         Write-Warning ("[NOTICE] $issueSynopsis" + $(if ($details) { "`n$details" } else { '' }))
+
+        if ($session.State -eq 'WTSDisconnected' -and
+            $null -ne $availableRamMB -and
+            $availableRamMB -gt 0 -and
+            $null -ne $session.MemoryMB -and
+            [double]$session.MemoryMB -gt ($availableRamMB * 0.2)) {
+            Write-Warning ("[WARNING] User $who has a disconnected session materially impacting RAM availability" + $(if ($details) { "`n$details" } else { '' }))
+        }
+
+        if ($session.State -eq 'WTSDisconnected' -and
+            $null -ne $session.CPUPercent -and
+            [double]$session.CPUPercent -gt 20) {
+            Write-Warning ("[WARNING] User $who has a disconnected session with considerable CPU usage" + $(if ($details) { "`n$details" } else { '' }))
+        }
     }
 
     if (-not $issueFound) {

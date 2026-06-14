@@ -45,9 +45,8 @@ Filters out ports listening only on the loopback addresses (127.0.0.1 and ::1) b
   return $false
 }
 
-# Intentionally duplicated from helpers-processes.ps1. We could dot-source that
-# file, but this script is borrowed from another repo and helpers-processes.ps1
-# contains many functions that are not needed here.
+# Intentionally duplicated from a helper ps1 script. 
+# Not dot-sourcing it because it contains too much unneeded code.
 function Get-TopRamProcess {
     <#
     .SYNOPSIS
