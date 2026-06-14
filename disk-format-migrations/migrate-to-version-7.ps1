@@ -65,10 +65,9 @@ function Write-TextPreservingEncoding {
 
 try {
   $rootDir = (Get-Location).Path
-  $repoRoot = Split-Path -Parent $PSScriptRoot
   $customTestsDir = Join-Path $rootDir 'config\Custom-HealthTests'
   $updaterPath = Join-Path $rootDir 'bin\Update-GetHealthCode.ps1'
-  $helperPath = Join-Path $repoRoot 'helpers-text-files.ps1'
+  $helperPath = Join-Path $PSScriptRoot 'helpers-text-files.ps1'
 
   if (-not (Test-Path -LiteralPath $customTestsDir -PathType Container)) {
     Write-Output 'No migration is needed'
