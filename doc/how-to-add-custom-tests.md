@@ -111,40 +111,23 @@ inside the already prepared `Get-ComputerHealth.ps1` session.
 That means your script runs in a **child script scope** of the same PowerShell
 session. This is only a light form of isolation:
 
-- your script does **not** pollute the parent scope unless it writes to broader
-  scopes explicitly
-- your script **can read and call** functions and variables that were already
-  loaded into the parent session before your script started
-
-In practice, custom tests can currently see these especially useful items:
-
-- `Write-Warning`, which is the preferred way to emit findings
-- `$Global:GchData`, which currently contains:
-  - `GetCurrentDomain`
-  - `SkipSlowTests`
-  - `IpsOfAllDcs`
-- functions from [`helpers-for-healthtests.ps1`](../helpers-for-healthtests.ps1)
-- logging functions from [`lib-write-log-objects.ps1`](../lib-write-log-objects.ps1), such as:
-  - `Log-Debug`
-  - `Log-Pass`
-  - `Log-Info`
-  - `Log-Notice`
-  - `Log-Warning`
-  - `Log-Failure`
-- built-in `HealthTest-*` functions and any helper functions that happened to be
-  loaded by the built-in health-test scripts for the current host
+- your script **can** write to the `global:` scope but it must not.  
+- your script **can read and call** functions and variables that are already
+  loaded. Most useful items are:
+    - `$Global:GchData`, which currently contains:
+      - `GetCurrentDomain`
+      - `SkipSlowTests`
+      - `IpsOfAllDcs`
+    - built-in functions that happened to be loaded by the built-in health-test 
+      scripts for the current host. Especially functions from 
+      [`helpers-for-healthtests.ps1`](../helpers-for-healthtests.ps1)
 
 Important cautions for developers:
 
-- The **recommended** contract for custom tests is still to emit findings with
-  `Write-Warning`, not with `Log-Pass`, `Log-Failure`, or other `Log-*`
-  functions.
 - Visibility of helper functions from built-in health-test scripts is an
   implementation detail of the current execution model, not a clean public API.
-  Those functions may change, move, or disappear.
-- If you need helper code that should be treated as an intentional dependency,
-  prefer explicitly dot-sourcing your own helper file or using documented helper
-  functions rather than depending on incidental session state.
+  Those functions may change, move, or disappear. Prefer explicitly dot-sourcing 
+  your own helper file or using documented helper functions.
 
 ## Optional Features You Might Find Useful
 
