@@ -657,6 +657,8 @@ FunctionName, Time, ElapsedMilliseconds, Output, Success, Error, Category, Reaso
     $cntImproperRecord = 0
     $cntPassRecord = 0
     $legacyLogDetected = $false
+    $supplementalOutputLines = New-Object 'System.Collections.Generic.List[string]'
+    $pendingOutputRecords = New-Object 'System.Collections.Generic.List[object]'
     $ErrorActionPreference = 'Stop'
 
     $result = & {
@@ -672,7 +674,10 @@ FunctionName, Time, ElapsedMilliseconds, Output, Success, Error, Category, Reaso
     foreach ($item in $result) {
       if ($item -is [System.Management.Automation.WarningRecord]) {
         $record = Convert-WarningLikeObjectToLogRecord -Value $item
-        Log-Msg -Level $record.Level -Msg $record.Msg -Comment $record.Comment -Emitter $FunctionName -Suppressed:$markTestMessagesSuppressed
+        [void]$pendingOutputRecords.Add([pscustomobject]@{
+            Type = 'warning'
+            Value = $record
+          })
         $cntProperRecord += 1
         if (($item.Message -as [string]) -match '^\s*\[\s*pass\s*\]') { $cntPassRecord += 1 }
       }
@@ -683,19 +688,64 @@ FunctionName, Time, ElapsedMilliseconds, Output, Success, Error, Category, Reaso
         if ($markTestMessagesSuppressed -and ([string]$item.level).ToLowerInvariant() -ne 'debug') {
           $item | Add-Member -NotePropertyName Suppressed -NotePropertyValue $true -Force
         }
-        Write-Output $item
+        [void]$pendingOutputRecords.Add([pscustomobject]@{
+            Type = 'legacy'
+            Value = $item
+          })
       }
       elseif ($item -is [string]) {
-        $parts = Convert-TextToLogRecord $item
-        $cntImproperRecord += 1
-        Log-Debug $parts.Message -Comment $parts.Comment
+        $text = [string]$item
+        if (-not [string]::IsNullOrWhiteSpace($text)) {
+          [void]$supplementalOutputLines.Add($text.Trim())
+        }
       }
       else {
-        $cntImproperRecord += 1
         $objType = $item.GetType().FullName
         $objText = ($item | Out-String).Trim()
         if ([string]::IsNullOrWhiteSpace($objText)) { $objText = '<empty object serialization>' }
-        Log-Debug "Converted output object of type $objType" -Comment $objText
+        [void]$supplementalOutputLines.Add("Converted output object of type $objType")
+        [void]$supplementalOutputLines.Add($objText)
+      }
+    }
+
+    $lastWarningEntry = $null
+    for ($i = $pendingOutputRecords.Count - 1; $i -ge 0; $i--) {
+      if ($pendingOutputRecords[$i].Type -eq 'warning') {
+        $lastWarningEntry = $pendingOutputRecords[$i]
+        break
+      }
+    }
+
+    if ($supplementalOutputLines.Count -gt 0) {
+      if ($null -ne $lastWarningEntry) {
+        $existingComment = [string]$lastWarningEntry.Value.Comment
+        $supplementalComment = ($supplementalOutputLines | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }) -join "`n"
+        if (-not [string]::IsNullOrWhiteSpace($supplementalComment)) {
+          if ([string]::IsNullOrWhiteSpace($existingComment)) {
+            $lastWarningEntry.Value.Comment = $supplementalComment
+          }
+          else {
+            $lastWarningEntry.Value.Comment = $existingComment.TrimEnd() + "`n" + $supplementalComment
+          }
+        }
+      }
+      else {
+        foreach ($supplementalLine in $supplementalOutputLines) {
+          if ([string]::IsNullOrWhiteSpace($supplementalLine)) { continue }
+          $parts = Convert-TextToLogRecord $supplementalLine
+          $cntImproperRecord += 1
+          Log-Debug $parts.Message -Comment $parts.Comment
+        }
+      }
+    }
+
+    foreach ($pendingRecord in $pendingOutputRecords) {
+      if ($pendingRecord.Type -eq 'warning') {
+        $record = $pendingRecord.Value
+        Log-Msg -Level $record.Level -Msg $record.Msg -Comment $record.Comment -Emitter $FunctionName -Suppressed:$markTestMessagesSuppressed
+      }
+      else {
+        Write-Output $pendingRecord.Value
       }
     }
 
