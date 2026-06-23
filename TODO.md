@@ -57,12 +57,6 @@ Example `gch.psd1`:
 }
 ```
 
-## New gch.psd1 option 'SendReports'
-```
-SendReports = "Auto" # "Never", "Always", "Auto"
-```
-The default is "Auto", which matches the current behavior: send when running in a non-interactive session, such as from a scheduled task, and do not send when running from an interactive session, such as a terminal.
-
 ## Send-Message.ps1 should support both JSON and PSD1 configuration files
 By default, prefer reading and generating the PSD1 configuration file (.\config\Send-Message.psd1).
 
