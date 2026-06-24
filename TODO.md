@@ -26,17 +26,19 @@ Email sending disabled by default because the script is running in an interactiv
 
 Move helpers-for-healthtests.ps1 under the `health-tests` folder.
 
-Update CONTRIBUTING.md with this goal/philosophy and the rules above that align with it (at leaset sections Placement and Repository Layout).
+Update CONTRIBUTING.md with this rule (at leaset sections Placement and Repository Layout).
 
-## If the user wants to run a specific HealthTest function they must be able to do it after dot-sourcing *as little code as possible*
+## If the user wants to run a specific HealthTest function they must be able to do it after dot-sourcing *as little code as possible*. Also every health test function should reside in it's own ps1 file
 
 First two definitions: Let's call a function, a "specific HealthTest helper function" if it is needed only for one health test. Let's call a function, a "domain helper function" if it is needed for a class of domain specific health tests (e.g. the function that returns the description of a scheduled task which is useful for the domain of health tests that check for issues in Scheduled tasks). Let's call a function, a "generic helper function" if it is needed for a range of unrelated health tests (e.g. the Get-PropValue function that returns the property X of object Y, with a default of $null if the property doesn't exist).
 
 Move all generic helper functions in helpers-for-healthtests.ps1 and dot-source it from each separate ps1 file that uses generic helpers.
 
-Move each HealthTest functions and its specific HealthTest helpers and domain helpers on its own ps1 file. Exception: if a group of HealthTest functions need the same domain-specific helper(s), move all of them in one file. 
+Move all domain helpers of a specific domain on their own ps1 file. 
 
-Update CONTRIBUTING.md with this goal/philosophy and the rules above that align with it (at leaset sections Placement and Repository Layout).
+Move each HealthTest functions and its specific HealthTest helpers on its own ps1 file. Conditionally dot source every needed ps1 file with domain helpers. (if definition for needed function foo is missing dot source bar.ps1)
+
+Update CONTRIBUTING.md with thesev rules (at leaset sections Placement and Repository Layout).
 
 ## HealthTest-UnexpectedListeningPorts -> HealthTest-ListListeningPorts
 
