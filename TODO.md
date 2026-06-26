@@ -24,7 +24,7 @@ Email sending disabled by default because the script is running in an interactiv
 
 ## Policy for health test function organization
 
-1. *All* code needed to run Health Tests and nothing but this code should be under folder health-tests
+1. *All* code needed to run Health Tests and nothing but that code should be under folder health-tests
 2. Every health test function should reside in it's own ps1 file with the same name as the function.
 3. If the user wants to run one specific HealthTest function they must be able to do it after dot-sourcing just that one file.
 
@@ -34,12 +34,13 @@ Move helpers-for-healthtests.ps1 under the `health-tests` folder.
 
 First two definitions: Let's call a function, a "specific HealthTest helper function" if it is needed only for one health test. Let's call a function, a "domain helper function" if it is needed for a class of domain specific health tests (e.g. the function that returns the description of a scheduled task which is useful for the domain of health tests that check for issues in Scheduled tasks). Let's call a function, a "generic helper function" if it is needed for a range of unrelated health tests (e.g. the Get-PropValue function that returns the property X of object Y, with a default of $null if the property doesn't exist).
 
-Move all generic helper functions in helpers-for-healthtests.ps1 and dot-source it from each separate ps1 file that uses generic helpers.
+Move all generic helper functions (all is maybe just Get-PropValue) in helpers-for-healthtests.ps1 and dot-source it from each separate ps1 file that uses generic helpers.
 
 Move all domain helpers of a specific domain on their own ps1 file.
 
 Move each HealthTest functions and its specific HealthTest helpers on its own ps1 file. Conditionally dot source every needed ps1 file with generic or domain helpers. Use this style: "if definition for foo is missing dot source bar.ps1" for every single needed helper function. This also works as an explicit definition of dependencies. 
 
+Before making this globally experiment with the scheduled tasks domain of health tests
 
 ## HealthTest-UnexpectedListeningPorts -> HealthTest-ListListeningPorts
 
