@@ -77,3 +77,59 @@ function Test-IsLaptopOrMobile {
 
   return $isMobile
 }
+
+function Compress-HealthDiagnosticOutputLines {
+  <#
+  .SYNOPSIS
+  Shortens noisy diagnostic output before adding it to health-test comments.
+
+  .DESCRIPTION
+  Use this when a health test includes command output that can repeat the same
+  sentence many times, such as dcdiag event-log detail. The function removes
+  blank lines, splits long sentence-like runs into separate lines, removes
+  duplicate lines while preserving first-seen order, caps the line count, and
+  truncates very long results.
+
+  .EXAMPLE
+  $summary = Compress-HealthDiagnosticOutputLines -Lines @($dcdiagLines) -join "`n"
+
+  .EXAMPLE
+  $summary = Compress-HealthDiagnosticOutputLines -Lines $lines -MaximumLines 20 -MaximumCharacters 1000
+  #>
+  [CmdletBinding()]
+  param(
+    [AllowEmptyCollection()][string[]]$Lines = @(),
+    [int]$MaximumLines = 50,
+    [int]$MaximumCharacters = 2000
+  )
+
+  $collectedLines = New-Object 'System.Collections.Generic.List[string]'
+  foreach ($line in @($Lines)) {
+    if ([string]::IsNullOrWhiteSpace($line)) { continue }
+
+    $lineText = ([string]$line).TrimEnd()
+    $candidateLines = @($lineText -replace '(([a-z]{2,30})(;|[.][)]?)) +', "`$1`n" -split "`n")
+    foreach ($candidateLine in $candidateLines) {
+      if ([string]::IsNullOrWhiteSpace($candidateLine)) { continue }
+      [void]$collectedLines.Add(([string]$candidateLine).Trim())
+    }
+  }
+
+  $uniqueLines = New-Object 'System.Collections.Generic.List[string]'
+  $seenLines = @{}
+  foreach ($collectedLine in $collectedLines) {
+    if ($seenLines.ContainsKey($collectedLine)) { continue }
+
+    $seenLines[$collectedLine] = $true
+    [void]$uniqueLines.Add($collectedLine)
+    if ($MaximumLines -gt 0 -and $uniqueLines.Count -ge $MaximumLines) { break }
+  }
+
+  $resultLines = @($uniqueLines)
+  $resultText = $resultLines -join "`n"
+  if ($MaximumCharacters -gt 0 -and $resultText.Length -gt $MaximumCharacters) {
+    return @($resultText.Substring(0, $MaximumCharacters - 3) + '...')
+  }
+
+  return $resultLines
+}

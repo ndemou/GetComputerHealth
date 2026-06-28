@@ -149,6 +149,40 @@ Uses: Get-ADDomainController, Get-ADDomain, Get-ADForest.
 }
 
 
+function Get-CompressedDcDiagInterestingLines {
+  [CmdletBinding()]
+  param(
+    [AllowEmptyCollection()][string[]]$Lines = @(),
+    [AllowEmptyString()][string]$BlockText = '',
+    [string]$IncludePattern = 'error|fail',
+    [string]$ExcludePattern = '\bno ([A-Za-z]+ )?errors?\b|\bPASS +FAIL\b|\.\.\.\.\.\..* failed test '
+  )
+
+  $candidateLines = New-Object 'System.Collections.Generic.List[string]'
+  foreach ($line in @($Lines)) {
+    if ([string]::IsNullOrWhiteSpace($line)) { continue }
+    [void]$candidateLines.Add([string]$line)
+  }
+
+  if (-not [string]::IsNullOrWhiteSpace($BlockText)) {
+    foreach ($line in ($BlockText -split "\r?\n")) {
+      if ([string]::IsNullOrWhiteSpace($line)) { continue }
+      [void]$candidateLines.Add([string]$line)
+    }
+  }
+
+  $interestingLines = New-Object 'System.Collections.Generic.List[string]'
+  foreach ($line in $candidateLines) {
+    $trimmedLine = ([string]$line).Trim()
+    if ([string]::IsNullOrWhiteSpace($trimmedLine)) { continue }
+    if ($trimmedLine -match $ExcludePattern) { continue }
+    if ($trimmedLine -notmatch $IncludePattern) { continue }
+    [void]$interestingLines.Add($trimmedLine)
+  }
+
+  return (Compress-HealthDiagnosticOutputLines -Lines @($interestingLines)) -join "`n"
+}
+
 function HealthTest-Dcdiag {
 <#
 Description: Runs DCDIAG and reports failing basic and extended Active Directory diagnostics.
@@ -166,8 +200,8 @@ Uses: dcdiag.exe.
       $BasicTestResults = Get-DcDiagFailures
       $AllTestResults | %{
           $testName = $_.failureline -replace '^[ .]*'
+          $interesting_lines = Get-CompressedDcDiagInterestingLines -BlockText $_.BlockText
           if($_.Test -in $BasicTestResults.Test){
-            $interesting_lines = (($_.BlockText -split "`n"|?{$_.trim()}|sls -NotMatch '\bno ([A-Za-z]+ )?errors?\b|\bPASS +FAIL\b|\.\.\.\.\.\..* failed test ').line|sls 'error|fail').line -replace '^ +'
             if ($testName -like '*DFSREvent*' -or $testName -like '*SystemLog*') {
                 Write-Warning "[NOTICE] 'DCDIAG /v' reports a failure in this basic test that examines the event log: $testName`nSince this test fails when warnings/errors appear in the event log, false positives are likely.`nRun DCDIAG /v, search for '$testName' and examine the detailed report above it.`nBelow are lines from that report that contain words like error/fail:`n$interesting_lines"
             } else {
@@ -194,7 +228,10 @@ Uses: dcdiag.exe.
 #>
   $out=& dcdiag /test:ridmanager /v 2>&1
   $fail=($out | Select-String -Pattern 'failed test RidManager','is low' -SimpleMatch)
-  if($fail){ Write-Warning "[FAILURE] RID Manager test reported issues`nReview dcdiag /test:ridmanager output"; } else { Write-Warning "[PASS] RID Manager health OK (dcdiag)" }
+  if($fail){
+    $interesting_lines = Get-CompressedDcDiagInterestingLines -Lines @($fail.Line) -IncludePattern 'low|fail'
+    Write-Warning "[FAILURE] RID Manager test reported issues`nReview dcdiag /test:ridmanager output`nBelow are lines from that output that contain words like low/fail:`n$interesting_lines"
+  } else { Write-Warning "[PASS] RID Manager health OK (dcdiag)" }
 }
 
 

@@ -2,12 +2,13 @@ Describe 'Invoke-HealthTest output stream comment capture' {
   BeforeAll {
     $script:RepoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
     $script:GetComputerHealthScript = Join-Path $script:RepoRoot 'Get-ComputerHealth.ps1'
+    . (Join-Path $script:RepoRoot 'helpers-for-healthtests.ps1')
 
     $parseErrors = $null
     $tokens = $null
     $ast = [System.Management.Automation.Language.Parser]::ParseFile($script:GetComputerHealthScript, [ref]$tokens, [ref]$parseErrors)
 
-    foreach ($functionName in @('Compress-HealthDiagnosticOutputLines', 'Convert-TextToLogRecord', 'Convert-WarningLikeObjectToLogRecord', 'Invoke-HealthTest')) {
+    foreach ($functionName in @('Convert-TextToLogRecord', 'Convert-WarningLikeObjectToLogRecord', 'Invoke-HealthTest')) {
       $funcAst = $ast.Find({
           param($node)
           $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
