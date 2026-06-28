@@ -1,27 +1,6 @@
 # DONE, Verification is pending
 
-## More consisse messages by Invoke-GetComputerHealth.ps1
-
-When I run Invoke-GetComputerHealth.ps1 all these messages should only appear if I use -Verbose:
-```
-[pass 1/2] Parameters: Reinstall=False UpdateFromZip='' Version='' ForceRefreshReleaseMetadata=False ConfigSupplied=False SelfRerunCount=0 PersistReleaseMarker=''
-[pass 1/2] Latest release marker is 'ndemou/GetComputerHealth|v8.5.8|339220809'
-Stored installed release marker is 'ndemou/GetComputerHealth|v8.5.8|339220809'
-Latest release already downloaded and -Reinstall was not specified; skipping update download
-...
-Preparing notable report
-```
-
-Also: the email report decision is extremely verbose. Look I get two lines of reporting:
-```
-Email report decision: Email sending disabled by default because the script is running in an interactive context.
-Will not send email report. Reason: Email sending disabled by default because the script is running in an interactive context.
-```
-This would be enough:
-```
-Email sending disabled by default because the script is running in an interactive context.
-```
-
+Nothing Yet
 
 # TODO
 
