@@ -1,5 +1,7 @@
 ﻿# TODO
 
+## DONE, Verification is pending
+
 ## More consisse messages by Invoke-GetComputerHealth.ps1
 
 When I run Invoke-GetComputerHealth.ps1 all these messages should only appear if I use -Verbose:
@@ -21,6 +23,34 @@ This would be enough:
 ```
 Email sending disabled by default because the script is running in an interactive context.
 ```
+
+
+## Post-processing of long diagnostic output that may have repetitions
+
+Look at this example output regarding a failed dcdiag:
+```
+  NOTICE : [3dafa4cb] 'DCDIAG /v' reports a failure in this basic test that examines the event log: DC02 failed test SystemLog
+  #       Since this test fails when warnings/errors appear in the event log, false positives are likely.
+  #       Run DCDIAG /v, search for 'DC02 failed test SystemLog' and examine the detailed report above it.
+  #       Below are lines from that report that contain words like error/fail:
+---start of diagnostic output---
+Windows failed to apply the MDM Policy settings. MDM Policy settings might have its own log file. Please click on the "More information" link. Windows failed to apply the MDM Policy settings. MDM Policy settings might have its own log file. Please click on the "More information" link. Windows failed to apply the MDM Policy settings. MDM Policy settings might have its own log file. Please click on the "More information" link. Windows failed to apply the MDM Policy settings. MDM Policy settings might have its own log file. Please click on the "More information" link. Windows failed to apply the MDM Policy settings. MDM Policy settings might have its own log file. Please click on the "More information" link. Windows failed to apply the MDM Policy settings. MDM Policy settings might have its own log file. Please click on the "More information" link. Windows failed to apply the MDM Policy settings. MDM Policy settings might have its own log file. Please click on the "More information" link. Windows failed to apply the MDM Policy settings. MDM Policy settings might have its own log file. Please click on the "More information" link. Windows failed to apply the MDM Policy settings. MDM Policy settings might have its own log file. Please click on the "More information" link. Windows failed to apply the MDM Policy settings. MDM Policy settings might have its own log file. Please click on the "More information" link. Windows failed to apply the MDM Policy settings. MDM Policy settings might have its own log file. Please click on the "More information" link. Windows failed to apply the MDM Policy settings. MDM Policy settings might have its own log file. Please click on the "More information" link. An error event occurred.  EventID: 0x80000013
+---end of diagnostic output---
+```
+
+Notice that the diagnostic output collected from dcdiag is a very long string of repeating sentences. We can make it much more succinct with these steps:
+ - Split lines (sentences) on anything that looks like "word. ", "word.) ", or "word; ". For example: `$output -replace '(([a-z]{2,30})(;|[.][)]?)) +','$1\r\n'`
+ - Keep the first 50 lines
+ - Remove duplicate lines (sentences)
+ - Join all lines back into one line
+ - If more than 2000 characters, keep the first 1997 suffixed with "...".
+
+For example, the diagnostic output above will become:
+```
+Windows failed to apply the MDM Policy settings. MDM Policy settings might have its own log file. Please click on the "More information" link. An error event occurred. EventID: 0x80000013
+```
+
+So far, I have only noticed a need for this post-processing on dcdiag output, but it is best to create a separate function for this post-processing.
 
 ## Policy for health test function organization
 
@@ -270,33 +300,6 @@ Then check each cluster by asking: “Which tests are merely different views of 
 4. `HealthTest-ScheduledTasks` + `HealthTest-ScheduledTasksLastResult` (plus overlap with `HealthTest-SystemScheduledTasks`)
 5. SRV-record portion of `HealthTest-ConnectivityToDCs` + `HealthTest-RequiredSrvRecords`
 
-
-## Post-processing of long diagnostic output that may have repetitions
-
-Look at this example output regarding a failed dcdiag:
-```
-  NOTICE : [3dafa4cb] 'DCDIAG /v' reports a failure in this basic test that examines the event log: DC02 failed test SystemLog
-  #       Since this test fails when warnings/errors appear in the event log, false positives are likely.
-  #       Run DCDIAG /v, search for 'DC02 failed test SystemLog' and examine the detailed report above it.
-  #       Below are lines from that report that contain words like error/fail:
----start of diagnostic output---
-Windows failed to apply the MDM Policy settings. MDM Policy settings might have its own log file. Please click on the "More information" link. Windows failed to apply the MDM Policy settings. MDM Policy settings might have its own log file. Please click on the "More information" link. Windows failed to apply the MDM Policy settings. MDM Policy settings might have its own log file. Please click on the "More information" link. Windows failed to apply the MDM Policy settings. MDM Policy settings might have its own log file. Please click on the "More information" link. Windows failed to apply the MDM Policy settings. MDM Policy settings might have its own log file. Please click on the "More information" link. Windows failed to apply the MDM Policy settings. MDM Policy settings might have its own log file. Please click on the "More information" link. Windows failed to apply the MDM Policy settings. MDM Policy settings might have its own log file. Please click on the "More information" link. Windows failed to apply the MDM Policy settings. MDM Policy settings might have its own log file. Please click on the "More information" link. Windows failed to apply the MDM Policy settings. MDM Policy settings might have its own log file. Please click on the "More information" link. Windows failed to apply the MDM Policy settings. MDM Policy settings might have its own log file. Please click on the "More information" link. Windows failed to apply the MDM Policy settings. MDM Policy settings might have its own log file. Please click on the "More information" link. Windows failed to apply the MDM Policy settings. MDM Policy settings might have its own log file. Please click on the "More information" link. An error event occurred.  EventID: 0x80000013
----end of diagnostic output---
-```
-
-Notice that the diagnostic output collected from dcdiag is a very long string of repeating sentences. We can make it much more succinct with these steps:
- - Split lines (sentences) on anything that looks like "word. ", "word.) ", or "word; ". For example: `$output -replace '(([a-z]{2,30})(;|[.][)]?)) +','$1\r\n'`
- - Keep the first 50 lines
- - Remove duplicate lines (sentences)
- - Join all lines back into one line
- - If more than 2000 characters, keep the first 1997 suffixed with "...".
-
-For example, the diagnostic output above will become:
-```
-Windows failed to apply the MDM Policy settings. MDM Policy settings might have its own log file. Please click on the "More information" link. An error event occurred. EventID: 0x80000013
-```
-
-So far, I have only noticed a need for this post-processing on dcdiag output, but it is best to create a separate function for this post-processing.
 
 ## Use the new installer (~\dev\TI)
 

@@ -616,6 +616,46 @@ function Invoke-RequiredFindingsValidation {
   return @($Records) + @($validationFailures)
 }
 
+
+function Compress-HealthDiagnosticOutputLines {
+  [CmdletBinding()]
+  param(
+    [AllowEmptyCollection()][string[]]$Lines = @(),
+    [int]$MaximumLines = 50,
+    [int]$MaximumCharacters = 2000
+  )
+
+  $collectedLines = New-Object 'System.Collections.Generic.List[string]'
+  foreach ($line in @($Lines)) {
+    if ([string]::IsNullOrWhiteSpace($line)) { continue }
+
+    $lineText = ([string]$line).TrimEnd()
+    $candidateLines = @($lineText -replace '(([a-z]{2,30})(;|[.][)]?)) +', "`$1`n" -split "`n")
+    foreach ($candidateLine in $candidateLines) {
+      if ([string]::IsNullOrWhiteSpace($candidateLine)) { continue }
+      [void]$collectedLines.Add(([string]$candidateLine).Trim())
+    }
+  }
+
+  $uniqueLines = New-Object 'System.Collections.Generic.List[string]'
+  $seenLines = @{}
+  foreach ($collectedLine in $collectedLines) {
+    if ($seenLines.ContainsKey($collectedLine)) { continue }
+
+    $seenLines[$collectedLine] = $true
+    [void]$uniqueLines.Add($collectedLine)
+    if ($MaximumLines -gt 0 -and $uniqueLines.Count -ge $MaximumLines) { break }
+  }
+
+  $resultLines = @($uniqueLines)
+  $resultText = $resultLines -join "`n"
+  if ($MaximumCharacters -gt 0 -and $resultText.Length -gt $MaximumCharacters) {
+    return @($resultText.Substring(0, $MaximumCharacters - 3) + '...')
+  }
+
+  return $resultLines
+}
+
 function Invoke-HealthTest {
   <#
 .SYNOPSIS
@@ -719,7 +759,7 @@ FunctionName, Time, ElapsedMilliseconds, Output, Success, Error, Category, Reaso
     if ($supplementalOutputLines.Count -gt 0) {
       if ($null -ne $lastWarningEntry) {
         $existingComment = [string]$lastWarningEntry.Value.Comment
-        $supplementalComment = ($supplementalOutputLines | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }) -join "`n"
+        $supplementalComment = (Compress-HealthDiagnosticOutputLines -Lines @($supplementalOutputLines)) -join "`n"
         if (-not [string]::IsNullOrWhiteSpace($supplementalComment)) {
           if ([string]::IsNullOrWhiteSpace($existingComment)) {
             $lastWarningEntry.Value.Comment = $supplementalComment
