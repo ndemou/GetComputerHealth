@@ -1,4 +1,4 @@
-﻿$script:GetComputerHealthReportingScriptDir = $PSScriptRoot
+$script:GetComputerHealthReportingScriptDir = $PSScriptRoot
 if ([string]::IsNullOrWhiteSpace($script:GetComputerHealthReportingScriptDir)) {
   $script:GetComputerHealthReportingScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 }
@@ -40,7 +40,7 @@ function Invoke-HealthEmail {
     if ([string]::IsNullOrWhiteSpace($SkipReason)) {
       $SkipReason = 'Email sending disabled.'
     }
-    Write-Host -for Yellow ("Will not send email report. Reason: {0}" -f $SkipReason)
+    Write-Host -for Yellow $SkipReason
     return
   }
 
@@ -1073,7 +1073,7 @@ function Invoke-GetComputerHealthReporting {
     Write-Host -for Gray '    $data|ogv # GUI review'
     Write-Host -for Gray '    $data|select -Property Computer,Level,Message # Console review'
     Write-Host -for Gray ""
-    Write-Host -for Gray "Preparing notable report"
+    Write-Verbose "Preparing notable report"
 
     $htmlParts = @()
     $htmlSynopsis = Convert-HealthSynopsisToHtml -Messages @($notableMessages)
@@ -1097,7 +1097,6 @@ function Invoke-GetComputerHealthReporting {
     $signedHtml = Add-HealthEmailSignature -Body $html -BodyAsHtml -Signature $emailSignature
     Save-HealthHtmlReport -Path $reportArtifacts.LastEmailBodyHtmlPath -Html $signedHtml
     $smtpNotableSubject = Get-HealthNotableSubject -FallbackSubject $subjects.NotableSubject -NotableMessages $notableMessages
-    Write-Host -for Gray ("Email report decision: {0}" -f $emailDecision.Reason)
     try {
       Invoke-HealthEmail -Subject $smtpNotableSubject -Body $signedHtml -BodyAsHtml -Attachments $reportArtifacts.InteractiveReportTempPath -ConfigFile $smtpConfig -NoSendReport:(-not $sendMailByDefault) -SkipReason $emailDecision.Reason
     }
@@ -1113,6 +1112,5 @@ function Invoke-GetComputerHealthReporting {
   Write-Host -for Gray "    $allMessagesZipPath"
   $signedBody = Add-HealthEmailSignature -Body (Get-RelaxHtmlBody) -BodyAsHtml -Signature $emailSignature
   Save-HealthHtmlReport -Path $lastReportHtmlPath -Html $signedBody
-  Write-Host -for Gray ("Email report decision: {0}" -f $emailDecision.Reason)
   Invoke-HealthEmail -Subject $subjects.AllGoodSubject -Body $signedBody -BodyAsHtml -ConfigFile $smtpConfig -NoSendReport:(-not $sendMailByDefault) -SkipReason $emailDecision.Reason
 }

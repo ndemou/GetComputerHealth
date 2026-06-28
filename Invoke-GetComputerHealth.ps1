@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
 Updates and then runs Get-ComputerHealth locally and/or via PowerShell remoting across multiple target computers, exports CLIXML plus HTML reports, and emails a summary.
 
@@ -683,7 +683,18 @@ $localUpdateAlreadyRan = $false
 if (-not $NoUpdate) {
   $versionBeforeUpdate = $localEmbeddedVersion
   try {
-    & $UPDATE_SCRIPT_PATH
+    $earlyUpdateOutput = & $UPDATE_SCRIPT_PATH 2>&1 3>&1 4>&1 5>&1 6>&1
+    foreach ($item in @($earlyUpdateOutput)) {
+      if ($item -is [System.Management.Automation.ErrorRecord]) {
+        Write-Error -ErrorRecord $item
+        continue
+      }
+
+      $text = ([string]$item).Trim()
+      if (-not [string]::IsNullOrWhiteSpace($text)) {
+        Write-Verbose $text
+      }
+    }
     $localUpdateAlreadyRan = $true
     $versionAfterUpdate = Get-EmbeddedGetComputerHealthVersion -ScriptPath $GET_HEALTH_SCRIPT_PATH
     $localEmbeddedVersion = $versionAfterUpdate
@@ -889,19 +900,25 @@ foreach ($target in $targets) {
       try {
         $updateOutput = if ($pushUpdate -and $updateZipPath) {
           if ([string]::IsNullOrWhiteSpace($updateZipVersion)) {
-            & $updateScriptPath -UpdateFromZip $updateZipPath 2>&1
+            & $updateScriptPath -UpdateFromZip $updateZipPath 2>&1 3>&1 4>&1 5>&1 6>&1
           } else {
-            & $updateScriptPath -UpdateFromZip $updateZipPath -Version $updateZipVersion 2>&1
+            & $updateScriptPath -UpdateFromZip $updateZipPath -Version $updateZipVersion 2>&1 3>&1 4>&1 5>&1 6>&1
           }
         }
         else {
-          & $updateScriptPath 2>&1
+          & $updateScriptPath 2>&1 3>&1 4>&1 5>&1 6>&1
         }
 
         foreach ($item in @($updateOutput)) {
           if ($item -is [System.Management.Automation.ErrorRecord]) {
             $comment = ($item | Out-String).Trim()
             $records.Add((Log-Failure "PowerShell error while running Update-GetHealthCode.ps1" -Comment $comment)) | Out-Null
+            continue
+          }
+
+          $text = ([string]$item).Trim()
+          if (-not [string]::IsNullOrWhiteSpace($text)) {
+            Write-Verbose $text
           }
         }
 

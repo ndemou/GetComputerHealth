@@ -7,7 +7,7 @@ Describe 'Invoke-HealthTest output stream comment capture' {
     $tokens = $null
     $ast = [System.Management.Automation.Language.Parser]::ParseFile($script:GetComputerHealthScript, [ref]$tokens, [ref]$parseErrors)
 
-    foreach ($functionName in @('Convert-TextToLogRecord', 'Convert-WarningLikeObjectToLogRecord', 'Invoke-HealthTest')) {
+    foreach ($functionName in @('Compress-HealthDiagnosticOutputLines', 'Convert-TextToLogRecord', 'Convert-WarningLikeObjectToLogRecord', 'Invoke-HealthTest')) {
       $funcAst = $ast.Find({
           param($node)
           $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
@@ -97,6 +97,21 @@ Describe 'Invoke-HealthTest output stream comment capture' {
     $records[1].Comment | Should -Be "Existing comment`ndetail one`ndetail two"
     @($script:DebugMessages | Where-Object { $_.Message -eq 'Starting test HealthTest-CommentCaptureA' }).Count | Should -Be 1
     @($script:DebugMessages | Where-Object { $_.Message -eq 'detail one' -or $_.Message -eq 'detail two' }).Count | Should -Be 0
+  }
+
+  It 'compresses repeated diagnostic output added to warning comments' {
+    function HealthTest-RepeatedDiagnosticOutput {
+      Write-Warning '[WARNING] Final message'
+      Write-Output 'same detail'
+      Write-Output 'same detail'
+      Write-Output 'same detail'
+      Write-Output 'next detail'
+    }
+
+    $records = @(Invoke-HealthTest -FunctionName 'HealthTest-RepeatedDiagnosticOutput')
+
+    $records | Should -HaveCount 1
+    $records[0].Comment | Should -Be "same detail`nnext detail"
   }
 
   It 'falls back to debug conversion when no warning-backed record exists' {
