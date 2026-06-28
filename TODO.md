@@ -324,14 +324,17 @@ See also : .\tests\script-analysis.ps1
     (because the last config line wins), but it's confusing to have
     conflicting lines.
 
-  - Use [string[]]$Arg1 everywhere for arguments that expect string arrays
+  - Use [string[]]$Arg1 everywhere for arguments that expect string arrays.
     This style works like this:
-         -Arg1 test,foo,bar             --> @("test","foo","bar")
-         -Arg1 test -Arg1 foo -Arg1 bar --> @("test","foo","bar")
-         -Arg1 @("test","foo","bar")    --> @("test","foo","bar")
-         -Arg1 "test,foo,bar"           --> "test,foo,bar"
-         -Arg1 "test foo bar"           --> "test foo bar"
-    If I do not expect the values to contain spaces or commas, I could fix the last two cases manually.
+```
+ -Arg1 test,foo,bar             --> @("test","foo","bar")
+-Arg1 test -Arg1 foo -Arg1 bar --> @("test","foo","bar")
+-Arg1 @("test","foo","bar")    --> @("test","foo","bar")
+-Arg1 "test,foo,bar"           --> "test,foo,bar"
+-Arg1 "test foo bar"           --> "test foo bar"
+```
+
+  If I do not expect the values to contain spaces or commas, I could fix the last two cases manually.
 
   - `Start-HealthTestVeeamRecentBackupsExist` expects to read clear-text data from a file. Maybe use Credential Manager. Note that Credential Manager stores passwords per user, which complicates things: it may work from your account but not from SYSTEM.
 
