@@ -397,7 +397,9 @@ function Get-HealthCommentPreviewText {
     return ''
   }
 
-  $normalized = $text.Trim() -replace "(`r`n|`n|`r)", ' ◆ '
+  $diamond = [string]([char]0x25C6)
+  $separator = ' ' + $diamond + ' '
+  $normalized = $text.Trim() -replace "(`r`n|`n|`r)", $separator
   if ($normalized.Length -gt $MaxLength) {
     return $normalized.Substring(0, $MaxLength)
   }
@@ -443,7 +445,8 @@ function Convert-HealthMessagesToHtmlTable {
 
     $headerHtml = "<div><span class='gch-computer'$headerComputerStyle>" + ([System.Net.WebUtility]::HtmlEncode($computer)) + "</span><span class='gch-level' style='background-color:$levelBackground; color:$levelForeground'>" + ([System.Net.WebUtility]::HtmlEncode($displayLevel)) + "</span><span class='gch-message'$headerMessageStyle>$messageHtml</span>"
     if (($level -ine 'postponed') -and (-not [string]::IsNullOrWhiteSpace($suppressionCommand)) -and (-not [string]::IsNullOrWhiteSpace($commentPreviewText))) {
-      $headerHtml += "<span class='gch-comment'>" + ([System.Net.WebUtility]::HtmlEncode('◆ ' + $commentPreviewText)) + "</span>"
+      $diamond = [string]([char]0x25C6)
+      $headerHtml += "<span class='gch-comment'>" + ([System.Net.WebUtility]::HtmlEncode($diamond + ' ' + $commentPreviewText)) + "</span>"
     }
     if (($level -ieq 'postponed') -and (-not [string]::IsNullOrWhiteSpace($realLevel))) {
       $postponedUntilText = 'unknown date'
@@ -500,7 +503,9 @@ function Get-RelaxHtmlBody {
   [CmdletBinding()]
   param()
 
-  return @'
+  $leafEmoji = [char]::ConvertFromUtf32(0x1F343)
+
+  return @"
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -525,7 +530,7 @@ function Get-RelaxHtmlBody {
         <tr>
             <td align="center" valign="middle" height="150" style="padding: 20px;">
                 <div class="swing-effect" style="text-align: center;">
-                    <div style="font-size: 24px; margin-bottom: 10px; font-family: 'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', sans-serif;">🍃</div>
+                    <div style="font-size: 24px; margin-bottom: 10px; font-family: 'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', sans-serif;">$leafEmoji</div>
                     <div style="font-weight: 300; letter-spacing: 10px; color: #718096; font-size: 28px; margin-left: 10px;">
                         Relax
                     </div>
@@ -535,7 +540,7 @@ function Get-RelaxHtmlBody {
     </table>
 </body>
 </html>
-'@
+"@
 }
 function Save-HealthHtmlReport {
   [CmdletBinding()]

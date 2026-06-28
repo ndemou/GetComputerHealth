@@ -11,6 +11,7 @@ Avoid backtick line continuations.
 Avoid calling external shells/tools.
 Avoid using COM objects unless they are obviously read-only.
 Avoid clever pipelines if a loop is easier to audit.
+Avoid non-ASCII literals in PowerShell source files. Build required Unicode characters with `[char]` or `[char]::ConvertFromUtf32()` so Windows PowerShell 5.1 and GitHub Actions read the source consistently.
 
 Code outside the installer/updater must not change computer state. Saving useful and temporary files that are not larger than 100MB is OK.
 

@@ -124,7 +124,8 @@
     $html | Should -Match 'background-color:#ffb300; color:#111'
     $html | Should -Match '>Warning</span><span class=''gch-message''>Disk free space is low</span><span class=''gch-comment''>'
     $html | Should -Match "<div class='gch-root'><div class='gch-row'>"
-    $html | Should -Match ([regex]::Escape('◆ Drive C: has only 4% free ◆ Investigate temp usage'))
+    $diamond = [string]([char]0x25C6)
+    $html | Should -Match ([regex]::Escape("$diamond Drive C: has only 4% free $diamond Investigate temp usage"))
     $html | Should -Not -Match 'border:1px solid'
     $html | Should -Match ([regex]::Escape('&amp; &quot;c:\it\Get-ComputerHealth\bin\Get-ComputerHealth.ps1&quot; -AddWhitelisting -until 2999-12-31 -sig &#39;deadbeef&#39; -ComputerName SRV1 -comment &quot;warning - Disk free space is low&quot;'))
     $html | Should -Not -Match ([regex]::Escape('Invoke-Command SRV1 {'))
