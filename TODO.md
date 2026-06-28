@@ -12,7 +12,7 @@ Latest release already downloaded and -Reinstall was not specified; skipping upd
 Preparing notable report
 ```
 
-Also: the remail report decision is extremely verbose. Look I get two lines of reporting:
+Also: the email report decision is extremely verbose. Look I get two lines of reporting:
 ```
 Email report decision: Email sending disabled by default because the script is running in an interactive context.
 Will not send email report. Reason: Email sending disabled by default because the script is running in an interactive context.
@@ -24,23 +24,24 @@ Email sending disabled by default because the script is running in an interactiv
 
 ## Policy for health test function organization
 
-1. *All* code needed to run Health Tests and nothing but that code should be under folder health-tests
+1. *All* code needed to run Health Tests and nothing but that code should be under folder `health-tests`. This means that  functions shared with Get-ComputerHealth.ps1, if any, should be split into a separate ps1 file which should reside inside this folder.
 2. Every health test function should reside in it's own ps1 file with the same name as the function.
-3. If the user wants to run one specific HealthTest function they must be able to do it after dot-sourcing just that one file.
+3. If the user wants to run one specific HealthTest function they must be able to do it by executing just that one ps1 file. This, along with the previous rule, forces as to dot source all dependencies from that ps1 file.
 
 Update CONTRIBUTING.md with these rules (at leaset sections Placement and Repository Layout).
 
-Move helpers-for-healthtests.ps1 under the `health-tests` folder.
+### Implementation
 
-First two definitions: Let's call a function, a "specific HealthTest helper function" if it is needed only for one health test. Let's call a function, a "domain helper function" if it is needed for a class of domain specific health tests (e.g. the function that returns the description of a scheduled task which is useful for the domain of health tests that check for issues in Scheduled tasks). Let's call a function, a "generic helper function" if it is needed for a range of unrelated health tests (e.g. the Get-PropValue function that returns the property X of object Y, with a default of $null if the property doesn't exist).
+First two definitions: Let's call a function, a "specific HealthTest helper function" if it is needed only for one health test. Let's call a function, a "domain helper function" if it is needed for a class of domain specific health tests (e.g. the function that returns the description of a scheduled task which is useful for the domain of health tests that check for issues in Scheduled tasks). Let's call a function, a "generic helper function" if it is needed for a range of unrelated health tests (e.g. the Get-PropValue function that returns the property X of object Y, with default of $null if the property doesn't exist).
 
-Move all generic helper functions (all is maybe just Get-PropValue) in helpers-for-healthtests.ps1 and dot-source it from each separate ps1 file that uses generic helpers.
+Move helpers-for-helthtests.ps1 under the `health-tests` folder.
+
+Move all generic helper functions (all is maybe just Get-PropValue) in helpers-for-healthtests.ps1.
 
 Move all domain helpers of a specific domain on their own ps1 file.
 
-Move each HealthTest functions and its specific HealthTest helpers on its own ps1 file. Conditionally dot source every needed ps1 file with generic or domain helpers. Use this style: "if definition for foo is missing dot source bar.ps1" for every single needed helper function. This also works as an explicit definition of dependencies. 
+Move each HealthTest functions and its specific HealthTest helpers on its own ps1 file. Conditionally dot source every needed ps1 file with generic or domain helpers. Use this style: "if definition for foo is missing dot source bar.ps1" for every single needed helper function. These commands will also work as an explicit definition of dependencies. At the end of the ps1 add a command that checks of the file was executed rather than dot-sourced, and in that case it executes the function. Before making this change for all health tests, try it with those related to scheduled tasks and verify in production.
 
-Before making this globally experiment with the scheduled tasks domain of health tests
 
 ## HealthTest-UnexpectedListeningPorts -> HealthTest-ListListeningPorts
 
@@ -49,6 +50,7 @@ Follow the spirit of the change that gave us HealthTest-ListServices, ListShares
 Also: are there other HealthTests that fit this style (a function that emits a list of findings where some items are accepted and some are not based on policy)
 
 ## Option IpsOfAllDcs in gch.psd1
+
 The trick with `cache.IpsOfAllDcs.clixml` is a hack. I should incorporate it into gch.psd1. An on-disk format migration can populate the new setting if the file is found, and then remove the old file.
 
 Example `gch.psd1`:
@@ -62,6 +64,7 @@ Example `gch.psd1`:
 ```
 
 ## Send-Message.ps1 should support both JSON and PSD1 configuration files
+
 By default, prefer reading and generating the PSD1 configuration file (.\config\Send-Message.psd1).
 
 This change should also include an On-Disk Format migration; see the relevant developer documentation. The migration must convert any existing JSON configuration (.\config\Send-Message.conf) to PSD1 (.\config\Send-Message.psd1), and then delete .\config\Send-Message.conf.
