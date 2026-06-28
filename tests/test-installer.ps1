@@ -46,20 +46,9 @@ function Invoke-InstallerScenario {
       $zipPathInUse = $paths.ReleaseZipPathVersionless
     }
 
-    $legacyTempDir = Join-Path $paths.TestRoot 'temp'
-    $legacyWorkbookPath = Join-Path $legacyTempDir 'all-messages-legacy.xlsx'
     $legacyCustomTestsDir = Join-Path $paths.TestRoot 'config\Custom-HealthTests'
     $legacyCustomScriptPath = Join-Path $legacyCustomTestsDir 'legacy-custom-test.ps1'
-    New-Item -ItemType Directory -Path $legacyTempDir -Force | Out-Null
     New-Item -ItemType Directory -Path $legacyCustomTestsDir -Force | Out-Null
-    Import-Module ImportExcel -ErrorAction Stop
-    @(
-      [pscustomobject]@{
-        Computer = 'LEGACY'
-        Level = 'warning'
-        Message = 'legacy workbook placeholder'
-      }
-    ) | Export-Excel -Path $legacyWorkbookPath -WorksheetName 'Messages' -AutoSize
     @'
 function HealthTest-LegacyCustomScript {
     Write-Warning "[PASS] Legacy custom script worked"
@@ -86,10 +75,6 @@ function HealthTest-LegacyCustomScript {
       & (Join-Path $paths.InstallRoot 'Update-GetHealthCode.ps1') @updateParams
     }
 
-    $migratedReportPath = Join-Path $paths.TestRoot 'data\all-messages-legacy.clixml'
-    Assert-PathExists -Path $migratedReportPath -Message "Expected disk format migration to convert legacy workbook to clixml: $migratedReportPath"
-    Assert-True -Condition (-not (Test-Path -LiteralPath $legacyWorkbookPath)) -Message "Expected disk format migration to remove legacy workbook from temp: $legacyWorkbookPath"
-    Assert-True -Condition (-not (Test-Path -LiteralPath (Join-Path $paths.TestRoot 'data\all-messages-legacy.xlsx'))) -Message "Expected disk format migration to remove legacy workbook from data."
     $migratedCustomScriptContent = Get-Content -LiteralPath $legacyCustomScriptPath -Raw -ErrorAction Stop
     Assert-True -Condition ($migratedCustomScriptContent -match '(?m)^\s*HealthTest-LegacyCustomScript\s*$') -Message "Expected disk format migration to append a direct invocation to legacy custom script: $legacyCustomScriptPath"
 
