@@ -1,6 +1,4 @@
-﻿# TODO
-
-## DONE, Verification is pending
+# DONE, Verification is pending
 
 ## More consisse messages by Invoke-GetComputerHealth.ps1
 
@@ -24,6 +22,8 @@ This would be enough:
 Email sending disabled by default because the script is running in an interactive context.
 ```
 
+
+# TODO
 
 ## Post-processing of long diagnostic output that may have repetitions
 
