@@ -50,8 +50,8 @@ if ($result.FailedCount -gt 0) {
       if ($_.ErrorRecord -and $_.ErrorRecord.Exception) {
         $err = $_.ErrorRecord.Exception.Message
       }
-      elseif ($_.FailureMessage) {
-        $err = $_.FailureMessage
+      elseif ($_.PSObject.Properties['FailureMessage']) {
+        $err = [string]$_.PSObject.Properties['FailureMessage'].Value
       }
 
       if ([string]::IsNullOrWhiteSpace($err)) {

@@ -1090,7 +1090,7 @@ function Invoke-GetComputerHealthReporting {
     if ([string]::IsNullOrWhiteSpace($interactiveLocationSuffix)) {
       $interactiveLocationSuffix = ($Targets -join ', ')
     }
-    $interactiveReportTitle = "Test findings for {0} — {1}" -f (($Targets -join ', '), $interactiveLocationSuffix)
+    $interactiveReportTitle = "Test findings for {0} - {1}" -f ($Targets -join ', '), $interactiveLocationSuffix
     $interactiveReportHtml = Get-HealthInteractiveHtmlReport -Rows $interactiveRows -Title $interactiveReportTitle -FooterHtml $emailSignature.HtmlBottom
     Save-HealthHtmlReport -Path $reportArtifacts.InteractiveReportTempPath -Html $interactiveReportHtml
 

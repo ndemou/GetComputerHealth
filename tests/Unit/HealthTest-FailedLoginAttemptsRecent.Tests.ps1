@@ -126,13 +126,16 @@ Describe 'HealthTest-FailedLoginAttemptsRecent' {
     Mock Write-Warning {}
 
     $result = @(HealthTest-FailedLoginAttemptsRecent)
+    $expectedFirstTime = ([datetime]'2026-06-21T08:15:00Z').ToLocalTime().ToString('yyyy-MM-dd HH:mm:ss')
+    $expectedSecondTime = ([datetime]'2026-06-21T08:16:00Z').ToLocalTime().ToString('yyyy-MM-dd HH:mm:ss')
+    $expectedThirdTime = ([datetime]'2026-06-21T08:17:00Z').ToLocalTime().ToString('yyyy-MM-dd HH:mm:ss')
 
     $result | Should -HaveCount 25
-    $result[0] | Should -Match "^2026-06-21 11:15:00 principal='CONTOSO\\carol' logonType=Service "
+    $result[0] | Should -Match ("^{0} principal='CONTOSO\\carol' logonType=Service " -f [regex]::Escape($expectedFirstTime))
     $result[0] | Should -Match "hint='Likely a service using stale credentials\.'$"
-    $result[1] | Should -Match "^2026-06-21 11:16:00 principal='CONTOSO\\carol' logonType=Network "
+    $result[1] | Should -Match ("^{0} principal='CONTOSO\\carol' logonType=Network " -f [regex]::Escape($expectedSecondTime))
     $result[1] | Should -Match "hint='Possibly a mapped drive or Explorer-triggered network access using stale credentials\.'$"
-    $result[2] | Should -Match "^2026-06-21 11:17:00 principal='CONTOSO\\carol' logonType=RemoteInteractive "
+    $result[2] | Should -Match ("^{0} principal='CONTOSO\\carol' logonType=RemoteInteractive " -f [regex]::Escape($expectedThirdTime))
     $result[2] | Should -Match "hint='Likely an RDP sign-in attempt from another machine\.'$"
   }
 }
