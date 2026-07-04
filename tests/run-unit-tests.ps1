@@ -17,20 +17,19 @@ if ($pesterModule.Version.Major -lt 5) {
 
 Import-Module $pesterModule.Path -Force
 
-$invokeParams = @{
-  Script = (Join-Path $PSScriptRoot 'Unit')
-  PassThru = $true
-}
+$pesterConfig = [PesterConfiguration]::Default
+$pesterConfig.Run.Path = @((Join-Path $PSScriptRoot 'Unit'))
+$pesterConfig.Run.PassThru = $true
 
 if ($Quiet) {
-  $invokeParams['Quiet'] = $true
+  $pesterConfig.Output.Verbosity = 'None'
 }
 
 if ($Detailed) {
-  $invokeParams['Output'] = 'Detailed'
+  $pesterConfig.Output.Verbosity = 'Detailed'
 }
 
-$result = Invoke-Pester @invokeParams
+$result = Invoke-Pester -Configuration $pesterConfig
 if ($null -eq $result) {
   throw "Invoke-Pester did not return a result object."
 }
