@@ -165,6 +165,131 @@ Describe 'Resolve-ExecutablePath' {
   }
 }
 
+Describe 'Resolve-ServiceExecutable' {
+  BeforeAll {
+    . (Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) 'health-tests\srvc-exe-resolve.ps1')
+    $script:ResolveServiceExecutableRepoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+  }
+
+  BeforeEach {
+    $script:ResolveServiceExecutableRoot = Join-Path $script:ResolveServiceExecutableRepoRoot ('temp\ResolveServiceExecutableTests_' + [guid]::NewGuid().ToString())
+    $script:ServiceDir = Join-Path $script:ResolveServiceExecutableRoot 'Program Files\Vendor App'
+    $script:PayloadDir = Join-Path $script:ResolveServiceExecutableRoot 'Program Files\Vendor App\Payload'
+
+    New-Item -ItemType Directory -Path $script:ServiceDir -Force | Out-Null
+    New-Item -ItemType Directory -Path $script:PayloadDir -Force | Out-Null
+
+    $script:ServiceExePath = Join-Path $script:ServiceDir 'Service.exe'
+    $script:PayloadDllPath = Join-Path $script:PayloadDir 'Payload.dll'
+    $script:DriverSysPath = Join-Path $script:ServiceDir 'Driver.sys'
+
+    New-Item -ItemType File -Path $script:ServiceExePath -Force | Out-Null
+    New-Item -ItemType File -Path $script:PayloadDllPath -Force | Out-Null
+    New-Item -ItemType File -Path $script:DriverSysPath -Force | Out-Null
+  }
+
+  AfterEach {
+    if (Get-Variable -Name ResolveServiceExecutableRoot -Scope Script -ErrorAction SilentlyContinue) {
+      Remove-Item -LiteralPath $script:ResolveServiceExecutableRoot -Recurse -Force -ErrorAction SilentlyContinue
+      Remove-Variable -Name ResolveServiceExecutableRoot -Scope Script -ErrorAction SilentlyContinue
+    }
+  }
+
+  It 'resolves a quoted executable path with service arguments' {
+    $quote = [char]34
+    $commandLine = $quote + $script:ServiceExePath + $quote + ' --service'
+
+    $result = Resolve-ServiceExecutable -LaunchCommand $commandLine -ServiceName 'QuotedVendorSvc'
+
+    (Get-Item -LiteralPath $result.LauncherExe).FullName.ToLowerInvariant() | Should -Be (Get-Item -LiteralPath $script:ServiceExePath).FullName.ToLowerInvariant()
+    $result.LauncherArgs | Should -Be '--service'
+    $result.PayloadType | Should -Be 'Exe'
+    (Get-Item -LiteralPath $result.PayloadPath).FullName.ToLowerInvariant() | Should -Be (Get-Item -LiteralPath $script:ServiceExePath).FullName.ToLowerInvariant()
+    $result.Warnings.Count | Should -Be 0
+  }
+
+  It 'resolves an unquoted executable path with spaces without warning' {
+    $commandLine = $script:ServiceExePath + ' --service'
+
+    $result = Resolve-ServiceExecutable -LaunchCommand $commandLine -ServiceName 'UnquotedVendorSvc'
+
+    (Get-Item -LiteralPath $result.LauncherExe).FullName.ToLowerInvariant() | Should -Be (Get-Item -LiteralPath $script:ServiceExePath).FullName.ToLowerInvariant()
+    $result.LauncherArgs | Should -Be '--service'
+    $result.PayloadType | Should -Be 'Exe'
+    $result.Warnings.Count | Should -Be 0
+  }
+
+  It 'returns Unknown payload and a warning when the launcher cannot be resolved' {
+    $missingPath = Join-Path $script:ServiceDir 'Missing.exe'
+    $commandLine = $missingPath + ' --service'
+
+    $result = Resolve-ServiceExecutable -LaunchCommand $commandLine -ServiceName 'MissingVendorSvc'
+
+    $result.LauncherExe | Should -Be $null
+    $result.PayloadType | Should -Be 'Unknown'
+    $result.PayloadPath | Should -Be $null
+    $result.Warnings | Should -Contain 'Launcher executable could not be resolved from LaunchCommand.'
+  }
+
+  It 'resolves a rundll32 payload DLL and entry point' {
+    $quote = [char]34
+    $rundll32 = Join-Path $env:WINDIR 'System32\rundll32.exe'
+    $commandLine = $quote + $rundll32 + $quote + ' ' + $quote + $script:PayloadDllPath + ',ServiceMain' + $quote
+
+    $result = Resolve-ServiceExecutable -LaunchCommand $commandLine -ServiceName 'RundllVendorSvc'
+
+    $result.PayloadType | Should -Be 'DllViaRundll32'
+    (Get-Item -LiteralPath $result.PayloadPath).FullName.ToLowerInvariant() | Should -Be (Get-Item -LiteralPath $script:PayloadDllPath).FullName.ToLowerInvariant()
+    $result.PayloadDetails.DllToken.ToLowerInvariant() | Should -Be $script:PayloadDllPath.ToLowerInvariant()
+    $result.PayloadDetails.EntryPoint | Should -Be 'ServiceMain'
+  }
+
+  It 'resolves an svchost payload DLL from Parameters\ServiceDll' {
+    Mock Get-ItemProperty {
+      [pscustomobject]@{
+        Type = 16
+      }
+    } -ParameterFilter {
+      $Path -eq 'Registry::HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\SvchostVendorSvc' -and
+      $Name -eq 'Type'
+    }
+
+    Mock Get-ItemProperty {
+      [pscustomobject]@{
+        ServiceDll = $script:PayloadDllPath
+      }
+    } -ParameterFilter {
+      $Path -eq 'Registry::HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\SvchostVendorSvc\Parameters' -and
+      $Name -eq 'ServiceDll'
+    }
+
+    $svchost = Join-Path $env:WINDIR 'System32\svchost.exe'
+    $commandLine = $svchost + ' -k LocalService -p'
+
+    $result = Resolve-ServiceExecutable -LaunchCommand $commandLine -ServiceName 'SvchostVendorSvc'
+
+    $result.PayloadType | Should -Be 'DllViaSvchost'
+    (Get-Item -LiteralPath $result.PayloadPath).FullName.ToLowerInvariant() | Should -Be (Get-Item -LiteralPath $script:PayloadDllPath).FullName.ToLowerInvariant()
+    $result.PayloadDetails.ServiceDll.ToLowerInvariant() | Should -Be $script:PayloadDllPath.ToLowerInvariant()
+  }
+
+  It 'classifies driver-style services as DriverSys' {
+    Mock Get-ItemProperty {
+      [pscustomobject]@{
+        Type = 1
+      }
+    } -ParameterFilter {
+      $Path -eq 'Registry::HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\DriverVendorSvc' -and
+      $Name -eq 'Type'
+    }
+
+    $result = Resolve-ServiceExecutable -LaunchCommand $script:DriverSysPath -ServiceName 'DriverVendorSvc'
+
+    $result.PayloadType | Should -Be 'DriverSys'
+    (Get-Item -LiteralPath $result.PayloadPath).FullName.ToLowerInvariant() | Should -Be (Get-Item -LiteralPath $script:DriverSysPath).FullName.ToLowerInvariant()
+  }
+}
+
 Describe 'HealthTest-AutoStartServicesRunning' {
   BeforeAll {
     . (Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) 'health-tests\srvc-exe-resolve.ps1')

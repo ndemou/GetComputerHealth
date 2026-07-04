@@ -312,7 +312,7 @@ function Split-FirstToken {
 }
 
 # --- Resolve-ServiceExecutable Helper:
-# Progressive probing for unquoted path-with-spaces ambiguity (audit + best-effort resolution) ---
+# Progressive probing for unquoted path-with-spaces resolution.
 function Probe-UnquotedServicePath {
   [CmdletBinding()]
   param(
@@ -460,17 +460,6 @@ function Resolve-ServiceExecutable {
     $launcherArgs  = $pair[1]
     Write-Verbose "[Resolve-ServiceExecutable] ParsedFirstToken: token=<$launcherToken> args=<$launcherArgs>"
   }
-
-  # Warn only for the classic case: the EXE PATH itself contains spaces and wasn't quoted
-  # (i.e., ambiguous "C:\Program Files\..." style)
-  if ($san -match '\s' -and -not $san.TrimStart().StartsWith('"') -and -not $san.TrimStart().StartsWith("'")) {
-    $first = $launcherToken
-    if ($first -and (Test-LooksLikePath $first) -and ($first -match '\s')) {
-      $warnings.Add("Unquoted executable path contains spaces; command line is ambiguous (classic 'unquoted service path' pattern). Attempting progressive probing.")
-      Write-Verbose "[Resolve-ServiceExecutable] Warning: unquoted executable path with spaces detected"
-    }
-  }
-
 
   Write-Verbose "[Resolve-ServiceExecutable] LauncherToken=<$launcherToken>"
   if (-not $launcherPath) {
