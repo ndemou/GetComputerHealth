@@ -248,7 +248,7 @@ Uses: None.
 
 function HealthTest-DefenderStatus {
 <#
-Description: Checks Microsoft Defender signature freshness and protection status.
+Description: Checks Microsoft Defender protection posture and signature freshness.
 AppliesTo: All
 Scope: Computer
 Category: Security & Stability Risks
@@ -256,26 +256,77 @@ Impact: Medium(Time)
 Tags: Essential
 Uses: Get-MpComputerStatus.
 
-Checks Microsoft Defender signature freshness. It collects AntivirusSignatureAge,
-AntispywareSignatureAge, and AntivirusSignatureVersion from Get-MpComputerStatus,
-then compares the signature ages with warning and failure thresholds. It detects
-Defender definitions that are becoming stale or are too old, which can indicate
-update failures or weakened malware detection coverage.
+Checks the Microsoft Defender malware protection subsystem. It collects
+Get-MpComputerStatus state, verifies that the anti-malware service and main
+protection layers are enabled, and compares antivirus and antispyware signature
+ages with warning and failure thresholds. Scan recency is checked separately by
+HealthTest-RecentWindowsScan.
 #>
     param([int]$WarnSigAgeDays=2,[int]$FailSigAgeDays=7)
-    $s = Get-MpComputerStatus
-    $ok = $true
-    if ($s.AntispywareSignatureAge -ge $FailSigAgeDays -or $s.AntivirusSignatureAge -ge $FailSigAgeDays) {
-      Write-Warning "[FAILURE] Defender signatures are too old`n$([math]::Max($s.AntivirusSignatureAge,$s.AntispywareSignatureAge)) days old"
-      $ok = $false
+
+    try {
+      $s = Get-MpComputerStatus -ErrorAction Stop
+    } catch {
+      Write-Warning "[FAILURE] Microsoft Defender status could not be queried`n$($_.Exception.Message)"
+      return
     }
-    elseif ($s.AntispywareSignatureAge -ge $WarnSigAgeDays -or $s.AntivirusSignatureAge -ge $WarnSigAgeDays) {
-      Write-Warning "[WARNING] Defender signatures are rather old`nAV=$($s.AntivirusSignatureAge)d, AS=$($s.AntispywareSignatureAge)d"
-      $ok = $false
+
+    $featureChecks = @(
+      @{ Name = 'DefenderSignaturesOutOfDate'; Expected = $false; Current = $s.DefenderSignaturesOutOfDate; Fix = "You may run`n  Update-MpSignature`n  to update." },
+      @{ Name = 'AMServiceEnabled'; Expected = $true; Current = $s.AMServiceEnabled; Fix = '' },
+      @{ Name = 'AMRunningMode'; Expected = 'Normal'; Current = $s.AMRunningMode; Fix = '' },
+      @{ Name = 'RealTimeProtectionEnabled'; Expected = $true; Current = $s.RealTimeProtectionEnabled; Fix = '' },
+      @{ Name = 'OnAccessProtectionEnabled'; Expected = $true; Current = $s.OnAccessProtectionEnabled; Fix = '' },
+      @{ Name = 'NISEnabled'; Expected = $true; Current = $s.NISEnabled; Fix = '' },
+      @{ Name = 'IoavProtectionEnabled'; Expected = $true; Current = $s.IoavProtectionEnabled; Fix = '' },
+      @{ Name = 'BehaviorMonitorEnabled'; Expected = $true; Current = $s.BehaviorMonitorEnabled; Fix = '' },
+      @{ Name = 'AntivirusEnabled'; Expected = $true; Current = $s.AntivirusEnabled; Fix = '' },
+      @{ Name = 'AntispywareEnabled'; Expected = $true; Current = $s.AntispywareEnabled; Fix = '' }
+    )
+
+    $featureProblems = @()
+    foreach ($check in $featureChecks) {
+      if ($check.Current -ne $check.Expected) {
+        $featureProblems += $check
+      }
     }
-    if ($ok) {
-      Write-Warning "[PASS] Defender signatures fresh (AV=$($s.AntivirusSignatureVersion))"} else {
+
+    if ($featureProblems.Count -gt 0) {
+      foreach ($check in $featureProblems) {
+        $comment = "Current=$($check.Current); Expected=$($check.Expected)"
+        if (-not [string]::IsNullOrWhiteSpace($check.Fix)) {
+          $comment = "$comment`n$($check.Fix)"
+        }
+        Write-Warning "[FAILURE] Microsoft Defender posture check failed: $($check.Name)`n$comment"
+      }
+    } else {
+      Write-Warning "[PASS] Microsoft Defender protection features are enabled and running normally."
     }
+
+    $antivirusAge = if ($null -ne $s.AntivirusSignatureAge) { [int]$s.AntivirusSignatureAge } else { $null }
+    $antispywareAge = if ($null -ne $s.AntispywareSignatureAge) { [int]$s.AntispywareSignatureAge } else { $null }
+    $maxSignatureAge = $null
+    foreach ($age in @($antivirusAge, $antispywareAge)) {
+      if ($null -eq $age) { continue }
+      if ($null -eq $maxSignatureAge -or $age -gt $maxSignatureAge) { $maxSignatureAge = $age }
+    }
+
+    if ($null -eq $maxSignatureAge) {
+      Write-Warning "[WARNING] Defender signature ages could not be determined`nAV=$antivirusAge; AS=$antispywareAge; Version=$($s.AntivirusSignatureVersion)"
+      return
+    }
+
+    if ($maxSignatureAge -ge $FailSigAgeDays) {
+      Write-Warning "[FAILURE] Defender signatures are too old`nAV=$($s.AntivirusSignatureAge)d, AS=$($s.AntispywareSignatureAge)d, Version=$($s.AntivirusSignatureVersion)"
+      return
+    }
+
+    if ($maxSignatureAge -ge $WarnSigAgeDays) {
+      Write-Warning "[WARNING] Defender signatures are rather old`nAV=$($s.AntivirusSignatureAge)d, AS=$($s.AntispywareSignatureAge)d, Version=$($s.AntivirusSignatureVersion)"
+      return
+    }
+
+    Write-Warning "[PASS] Defender signatures fresh (AV=$($s.AntivirusSignatureVersion))"
 }
 
 function HealthTest-FirewallEnabled {
@@ -783,40 +834,14 @@ namespace Toula.HealthTestUnsignedDrivers
 }
 
 
-function HealthTest-CrashDumpSignals {
-<#
-Description: Checks for recent minidumps that indicate recent system crashes.
-AppliesTo: All
-Scope: Computer
-Category: Configuration Hygiene & Best Practices
-Impact: Medium(Disk), Medium(Time)
-Tags: Essential
-Uses: None.
-#>
-    param([int]$Hours = 48)
-
-    $pass = $true
-    if ($Hours -lt 1) { $Hours = 1 }
-    $cutoff = (Get-Date).AddHours(-$Hours)
-
-    Get-ChildItem "$env:SystemRoot\Minidump" -Filter *.dmp -ErrorAction SilentlyContinue | ?{ $_.LastWriteTime -gt $cutoff } | %{
-        Write-Warning "[FAILURE] Found $env:SystemRoot\Minidump\ file(s) within the last N hours`nN=$Hours hours. File: $env:SystemRoot\Minidump\$($_.name))"
-        $pass = $false
-    }
-
-    if ($pass) {
-        Write-Warning "[PASS] No recent minidumps"
-    }
-}
-
 function HealthTest-SeriousRecentEventLogs {
 <#
-Description: Checks recent event logs for serious shutdown, bugcheck, disk, or application crash events.
+Description: Checks recent event logs and minidumps for serious crash, disk, or application events.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: High(Time)
-Uses: Get-WinEvent.
+Uses: Get-WinEvent, Get-ChildItem.
 #>
     [CmdletBinding()]
     param([int]$Hours = 24)
@@ -923,7 +948,34 @@ Uses: Get-WinEvent.
         return ""
     }
 
+    function Get-RecentMinidumpFiles([datetime]$AfterTime) {
+        $files = @()
+
+        if ([string]::IsNullOrWhiteSpace($env:SystemRoot)) { return $files }
+
+        $minidumpPath = Join-Path $env:SystemRoot 'Minidump'
+        $dumpItems = @(Get-ChildItem -LiteralPath $minidumpPath -Filter '*.dmp' -ErrorAction SilentlyContinue)
+        foreach ($dumpItem in $dumpItems) {
+            if ($dumpItem.LastWriteTime -gt $AfterTime) {
+                $files += $dumpItem
+            }
+        }
+
+        return $files
+    }
+
+    function Get-MinidumpDetailText([object[]]$MinidumpFiles) {
+        $lines = @()
+        foreach ($file in @($MinidumpFiles | Sort-Object -Property LastWriteTime, FullName)) {
+            $lines += ("- {0} | LastWriteTime={1}" -f $file.FullName, ([datetime]$file.LastWriteTime).ToString('yyyy-MM-dd HH:mm:ss'))
+        }
+
+        return ($lines -join "`n")
+    }
+
     $seenEvents = New-Object 'System.Collections.Generic.HashSet[string]'
+    $recentMinidumps = @(Get-RecentMinidumpFiles -AfterTime $cutoff)
+    $systemCrashEventFindings = 0
 
     # [FAILURE] Blue screen / bugcheck / unexpected shutdown
     $failureFilters = @(
@@ -935,6 +987,7 @@ Uses: Get-WinEvent.
         Get-WinEvent -FilterHashtable $filter -ErrorAction SilentlyContinue | ForEach-Object {
             if (-not (Test-MarkEventSeen -EventRecord $_ -SeenEvents $seenEvents)) {
                 $totalFindings++
+                $systemCrashEventFindings++
                 $synopsis = if ($_.Id -eq 1001) { 'Detected blue screen / bugcheck event in System log' } else { 'Detected unexpected system shutdown event in System log' }
                 Write-EventFinding -Severity 'failure' -Synopsis $synopsis -EventRecord $_
             }
@@ -980,8 +1033,18 @@ Uses: Get-WinEvent.
         Write-ApplicationCrashFinding -Severity 'notice' -Synopsis $synopsis -EventRecords $events
     }
 
+    if ($recentMinidumps.Count -gt 0) {
+        $minidumpDetails = Get-MinidumpDetailText -MinidumpFiles $recentMinidumps
+        if ($systemCrashEventFindings -gt 0) {
+            Write-Warning "[info] Recent minidump file(s) found in the same SeriousRecentEventLogs window`nThe crash event-log finding is the canonical failure for this incident window.`n$minidumpDetails"
+        } else {
+            $totalFindings++
+            Write-Warning "[failure] Recent minidump file(s) found without a matching shutdown or bugcheck event in the queried window`n$minidumpDetails"
+        }
+    }
+
     if ($totalFindings -eq 0) {
-        Write-Warning "[PASS] No serious shutdown, bugcheck, disk error, or application crash events found in the last $Hours hour(s)"
+        Write-Warning "[PASS] No serious shutdown, bugcheck, disk error, application crash, or minidump signals found in the last $Hours hour(s)"
     }
 }
 

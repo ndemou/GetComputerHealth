@@ -2,42 +2,6 @@
 System Configuration & Feature Discovery
 #>
 
-function HealthTest-MalwareProtectionFeatures {
-<#
-Description: Checks Microsoft Defender malware protection status and signature freshness.
-AppliesTo: All
-Scope: Computer
-Category: Security & Stability Risks
-Impact: Medium(Time)
-Tags: Essential
-Uses: Get-MpComputerStatus.
-
-Checks the Microsoft Defender malware protection subsystem. It collects the
-Get-MpComputerStatus state and verifies that signatures are current, the anti-malware
-service is enabled and running in Normal mode, and the main protection layers are
-enabled: real-time protection, on-access scanning, Network Inspection System, IOAV,
-behavior monitoring, antivirus, and antispyware. It detects stale signatures and
-disabled or degraded Defender features that reduce malware protection coverage.
-#>
-    # $MPs holds the Malware Protection status
-    $MPs=(Get-MpComputerStatus)
-    Write-BasedOnTestResult "Is (Get-MpComputerStatus).DefenderSignaturesOutOfDate not true?" -Test (!$MPs.DefenderSignaturesOutOfDate) -Comment "You may run`n  Update-MpSignature`n  to update."
-    Write-BasedOnTestResult "Is (Get-MpComputerStatus).AMServiceEnabled true?"                -Test $MPs.AMServiceEnabled
-    Write-BasedOnTestResult "Is (Get-MpComputerStatus).AMRunningMode Normal?"                 -Test ($MPs.AMRunningMode -eq 'Normal')
-    Write-BasedOnTestResult "Is (Get-MpComputerStatus).RealTimeProtectionEnabled true?"       -Test $MPs.RealTimeProtectionEnabled
-    Write-BasedOnTestResult "Is (Get-MpComputerStatus).OnAccessProtectionEnabled true?"       -Test $MPs.OnAccessProtectionEnabled
-    Write-BasedOnTestResult "Is (Get-MpComputerStatus).NISEnabled true?"                      -Test $MPs.NISEnabled
-    Write-BasedOnTestResult "Is (Get-MpComputerStatus).IoavProtectionEnabled true?"           -Test $MPs.IoavProtectionEnabled
-    Write-BasedOnTestResult "Is (Get-MpComputerStatus).BehaviorMonitorEnabled true?"          -Test $MPs.BehaviorMonitorEnabled
-    Write-BasedOnTestResult "Is (Get-MpComputerStatus).AntivirusEnabled true?"                -Test $MPs.AntivirusEnabled
-    Write-BasedOnTestResult "Is (Get-MpComputerStatus).AntispywareEnabled true?"              -Test $MPs.AntispywareEnabled
-}
-
-# TODO this test is repeated in HealthTest-ShareReasonableness
-
-
-
-
 function Get-PolicyListShortHash {
   [CmdletBinding()]
   param([Parameter(Mandatory)][string]$Text)

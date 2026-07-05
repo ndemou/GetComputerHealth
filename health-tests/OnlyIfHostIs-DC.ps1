@@ -217,24 +217,6 @@ Uses: dcdiag.exe.
 }
 
 
-function HealthTest-RidManager{
-<#
-Description: Runs the RID Manager dcdiag test and reports any detected issues.
-AppliesTo: DC
-Scope: Computer
-Category: Configuration Hygiene & Best Practices
-Impact: Medium(Time)
-Uses: dcdiag.exe.
-#>
-  $out=& dcdiag /test:ridmanager /v 2>&1
-  $fail=($out | Select-String -Pattern 'failed test RidManager','is low' -SimpleMatch)
-  if($fail){
-    $interesting_lines = Get-CompressedDcDiagInterestingLines -Lines @($fail.Line) -IncludePattern 'low|fail'
-    Write-Warning "[FAILURE] RID Manager test reported issues`nReview dcdiag /test:ridmanager output`nBelow are lines from that output that contain words like low/fail:`n$interesting_lines"
-  } else { Write-Warning "[PASS] RID Manager health OK (dcdiag)" }
-}
-
-
 function HealthTest-DfsReplicationState {
 <#
 Description: Checks whether DFS Replication folders are in the Normal state.
@@ -839,77 +821,6 @@ Uses: Get-ADOptionalFeature.
   if($enabled){ Write-Warning "[PASS] AD Recycle Bin enabled" } else { Write-Warning "[NOTICE] AD Recycle Bin is not enabled -- consider enabling it." }
 }
 
-function HealthTest-ReplicationLatency {
-<#
-Description: Assesses AD replication latency and correlates it with replication trouble signals.
-AppliesTo: DC
-Scope: Domain
-Category: Configuration Hygiene & Best Practices
-Impact: Medium(Time)
-Uses: Get-ADRootDSE, Get-ADDomainController, Get-ADReplicationPartnerMetadata.
-#>
-  [CmdletBinding()]
-  param(
-    [int]$NoticeMinutes = 30,
-    [int]$WarnMinutes   = 120,
-    [int]$FailMinutes   = 240
-  )
-
-  $rootDse = Get-ADRootDSE -ErrorAction Stop
-  $parts = @(
-    $rootDse.schemaNamingContext,
-    $rootDse.configurationNamingContext
-  )
-
-  $hadFailure = $false
-  $hadWarning = $false
-  $hadNotice  = $false
-
-  foreach ($dc in (Get-ADDomainController -Filter *)) {
-    foreach ($p in $parts) {
-      $rows = @(Get-ADReplicationPartnerMetadata -Target $dc.HostName -Partition $p -ErrorAction SilentlyContinue)
-
-      foreach ($row in $rows) {
-        if (-not $row.LastReplicationSuccess) { continue }
-
-        $mins = [int](((Get-Date) - $row.LastReplicationSuccess).TotalMinutes)
-        $hasTrouble = (($row.LastReplicationResult -ne 0) -or ($row.ConsecutiveReplicationFailures -gt 0))
-
-        $details =
-          "`nDC: $($dc.HostName)" +
-          "`nPartition: $p" +
-          "`nPartner: $($row.Partner)" +
-          "`nLatency: $mins min" +
-          "`nLastReplicationSuccess: $($row.LastReplicationSuccess)" +
-          "`nLastReplicationResult: $($row.LastReplicationResult)" +
-          "`nConsecutiveReplicationFailures: $($row.ConsecutiveReplicationFailures)"
-
-        if ($mins -ge $FailMinutes -and $hasTrouble) {
-          $hadFailure = $true
-          Write-Warning "[FAILURE] Replication latency is very high and replication trouble signals are present.$details"
-          continue
-        }
-
-        if ($mins -ge $NoticeMinutes -and $hasTrouble) {
-          $hadWarning = $true
-          Write-Warning "[WARNING] Replication latency is elevated and replication trouble signals are present.$details"
-          continue
-        }
-
-        if ($mins -ge $WarnMinutes) {
-          $hadNotice = $true
-          Write-Warning "[NOTICE] Replication latency is elevated, but current partner metadata shows no failures.$details"
-        }
-      }
-    }
-  }
-
-  if (-not ($hadFailure -or $hadWarning -or $hadNotice)) {
-    Write-Warning "[PASS] AD replication latency looks acceptable. No elevated schema/config latency with corroborating trouble signals was found."
-  }
-}
-
-
 function HealthTest-NtdsLogVolumeFree{
 <#
 Description: Checks whether the NTDS log volume has enough free space.
@@ -1110,7 +1021,7 @@ Uses: Get-ADObject.
 
 function HealthTest-ADReplicationHealth {
 <#
-Description: Uses repadmin and local RSAT cross-checks to detect AD replication failures and stale replication.
+Description: Uses repadmin and local RSAT cross-checks to detect AD replication failures and stale replication latency.
 AppliesTo: DC
 Scope: Domain
 Category: Configuration Hygiene & Best Practices

@@ -293,19 +293,17 @@ If you only want to add a few custom tests, you do not need to modify the core c
 | --- | --- |
 | ADInboundReplicationTopology     | Verifies that each domain controller has inbound AD replication partners and connection objects |
 | AdminSDHolderCoverage            | Reports whether AdminSDHolder protection is currently applied to any users |
-| ADReplicationHealth              | Uses repadmin and local RSAT cross-checks to detect AD replication failures and stale replication |
+| ADReplicationHealth              | Uses repadmin and local RSAT cross-checks to detect AD replication failures and stale replication latency |
 | ADViewConsistency                | Verifies that domain controllers agree on the DC list and FSMO role holders |
 | Services                         | Reviews service operational health, including auto-start services that are not running, abnormal service exit codes, and broken service payload paths |
 | BitLockerStatus                  | Checks whether detected volumes are protected by BitLocker |
 | CertExpiry                       | Checks for certificates that are expired or nearing expiration |
 | ConnectivityToDCs                | Checks DNS resolution and TCP connectivity to discovered domain controllers |
-| CrashDumpSignals                 | Checks for recent minidumps that indicate recent system crashes |
 | Dcdiag                           | Runs DCDIAG and reports failing basic and extended Active Directory diagnostics |
 | DcDnsARecords                    | Checks whether domain controller hostnames resolve to expected A records |
 | DcDnsRegistration                | Checks whether this domain controller has registered its expected DNS records |
-| DcDnsServerForwarder             | Checks whether a domain controller DNS server has appropriate forwarders configured |
 | DefaultLocale                    | Checks whether the system locale matches the expected legacy language baseline |
-| DefenderStatus                   | Checks Microsoft Defender signature freshness and protection status |
+| DefenderStatus                   | Checks Microsoft Defender protection posture and signature freshness |
 | DfsDiagTestDCs                   | Runs DFSDIAG /TestDCs and reports unexpected DFS diagnostics output |
 | DfsNamespaceEnumerate            | Checks whether DFS namespace roots and folders can be enumerated successfully |
 | DfsrBacklog                      | Checks DFS Replication backlog and warns when queued updates are high |
@@ -316,11 +314,10 @@ If you only want to add a few custom tests, you do not need to modify the core c
 | DisabledGpoLinksAtDomainRoot     | Checks for disabled or non-enforced GPO links at the domain root |
 | DisksHaveFreeSpace               | Checks whether local disks have sufficient free space |
 | DnsClientService                 | Checks whether the DNS Client service is running |
-| DnsForwarders                    | Checks whether DNS forwarders are configured and reachable |
+| DnsForwarders                    | Checks whether DNS forwarders are configured, private, and reachable |
 | DnsRecursionConfig               | Checks whether DNS recursion settings follow the expected baseline |
 | DnsScavenging                    | Checks whether DNS scavenging and zone aging are enabled and configured sensibly |
 | DnsSuffixBaseline                | Checks whether DNS suffix search settings match the expected domain baseline |
-| DnsSuffixMatchesDomain           | Checks whether the primary DNS suffix matches the joined AD domain |
 | DnsZoneReplicationScope          | Checks whether AD-integrated DNS zones use the expected replication scope |
 | DnsZoneTransfers                 | Checks whether DNS zone transfers are disabled or restricted as expected |
 | DomainARecordPointsToDcIp        | Checks whether the domain A record points to a DC IP |
@@ -349,7 +346,6 @@ If you only want to add a few custom tests, you do not need to modify the core c
 | ListListeningPorts               | Lists externally reachable TCP listening ports with process and publisher context |
 | LocalAcntRequirePass             | Checks whether local accounts require passwords |
 | ListLocalAdmins                 | Lists members of the local Administrators group |
-| MalwareProtectionFeatures        | Checks Microsoft Defender malware protection status and updates signatures when needed |
 | NetworkConnectionProfiles        | Checks network connection profiles and basic connectivity expectations for each active network |
 | Nic                              | Checks network adapters for unhealthy status or suspicious error counters |
 | NltestSiteDiscovery              | Checks whether site discovery returns a valid AD site for the computer |
@@ -368,17 +364,15 @@ If you only want to add a few custom tests, you do not need to modify the core c
 | RdpHardening                     | Checks whether RDP is hardened with NLA enabled and a TLS certificate bound |
 | RecentWindowsScan                | Checks whether Microsoft Defender has performed a recent quick scan |
 | RecycleBinEnabled                | Checks whether Active Directory Recycle Bin is enabled |
-| ReplicationLatency               | Assesses AD replication latency and correlates it with replication trouble signals |
 | RequiredSrvRecords               | Checks whether required AD DNS SRV records resolve successfully |
 | RestrictAnonymous                | Checks whether anonymous access hardening settings meet the baseline |
 | ReverseZonesPresent              | Checks whether required reverse lookup zones exist |
-| RidManager                       | Runs the RID Manager dcdiag test and reports any detected issues |
 | RodcPrp                          | Checks whether each read-only domain controller has a Password Replication Policy configured |
 | RunningProcesses                 | Emits a suppressed inventory notice for each running process |
 | SchanelBaseline                  | Checks whether Schannel disables legacy protocols and keeps TLS 1.2 enabled |
 | ScheduledTasks                   | Reviews scheduled tasks for failed results, disabled required tasks, missed runs, stale runs, and unreadable metadata |
 | SchemaVersionConsistency         | Checks whether all domain controllers report the same AD schema version |
-| SeriousRecentEventLogs           | Checks recent event logs for serious shutdown, bugcheck, disk, or application crash events |
+| SeriousRecentEventLogs           | Checks recent event logs and minidumps for serious crash, disk, or application events |
 | ServiceAccountsPwdNeverExpires   | Checks for service accounts whose passwords are set to never expire |
 | ShadowStorage                    | Checks whether Volume Shadow Copy storage is configured and sized within the recommended range |
 | ShareReasonableness              | Checks SMB shares for risky or unreasonable share exposure |
@@ -387,7 +381,7 @@ If you only want to add a few custom tests, you do not need to modify the core c
 | Smb1Disabled                     | Checks whether SMBv1 is disabled |
 | SmbSigningRequired               | Checks whether the SMB server requires signing when the server service is running |
 | SoftwareLicensing                | Checks Windows software licensing state and activation status |
-| StaleRdpSessions                 | Checks for idle or disconnected RDP sessions older than the allowed threshold |
+| DesktopSessions                  | Checks for idle or disconnected RDP sessions older than the allowed threshold |
 | Storage                          | Checks physical disks for predictive failure, unhealthy status, temperature, and reliability warnings |
 | SysvolAclHygiene                 | Checks whether SYSVOL grants write access to overly broad principals |
 | SysvolContentConsistency         | Checks whether SYSVOL policy content is present and consistent across domain controllers |

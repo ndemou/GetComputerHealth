@@ -47,14 +47,32 @@ Describe 'DCDIAG output compression' {
     }
   }
 
-  It 'uses compressed DCDIAG output in RidManager warnings' {
-    function dcdiag {
-      'RID pool is low. RID pool is low. DC01 failed test RidManager'
-    }
+  It 'uses compressed DCDIAG output for RID Manager findings in Dcdiag warnings' {
+    $blockText = @'
+      Starting test: RidManager
+         RID pool is low. RID pool is low. DC01 failed test RidManager
+      ......................... DC01 failed test RidManager
+'@
+
+    Mock Get-DcDiagFailures {
+      [pscustomobject]@{
+        Test = 'RidManager'
+        FailureLine = '......................... DC01 failed test RidManager'
+        BlockText = $blockText
+      }
+    } -ParameterFilter { $Comprehensive }
+
+    Mock Get-DcDiagFailures {
+      [pscustomobject]@{
+        Test = 'RidManager'
+        FailureLine = '......................... DC01 failed test RidManager'
+        BlockText = $blockText
+      }
+    } -ParameterFilter { -not $Comprehensive }
 
     Mock Write-Warning {}
 
-    HealthTest-RidManager
+    HealthTest-Dcdiag
 
     Should -Invoke Write-Warning -Times 1 -Exactly -ParameterFilter {
       $Message -match 'RID pool is low\.' -and

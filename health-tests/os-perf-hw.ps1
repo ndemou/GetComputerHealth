@@ -859,7 +859,7 @@ AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: High(Time)
-Uses: Get-SmbShare, Get-SmbShareAccess, Get-SmbServerConfiguration.
+Uses: Get-SmbShare, Get-SmbShareAccess, Get-Acl.
 #>
   [CmdletBinding()]param(
     [string[]]$BroadPrincipals = @(
@@ -981,20 +981,6 @@ Uses: Get-SmbShare, Get-SmbShareAccess, Get-SmbServerConfiguration.
     # if($s.FolderEnumerationMode -ne 'AccessBased'){ Write-Warning ("[WARNING] Enable Access-Based Enumeration on '{0}' if multi-tenant" -f $s.Name) }
     # if(-not $s.EncryptData){ Write-Warning ("[WARNING] Consider SMB encryption on '{0}' for sensitive data" -f $s.Name) }
     # if($s.CachingMode -ne 'None'){ Write-Warning ("[WARNING] Offline caching is {0} on '{1}' - assess if appropriate" -f $s.CachingMode, $s.Name) }
-  }
-
-  # Global checks
-  #--------------------------
-  $srv = Get-SmbServerConfiguration
-  if($srv.EnableSMB1Protocol){
-    Write-Warning "[WARNING] SMB1 is enabled; disable unless really needed`nYou can disable it by running: Set-SmbServerConfiguration -EnableSMB1Protocol `$false"
-  }
-  if($srv.RequireSecuritySignature -eq $false){
-    if ($isHostDC) {
-      Write-Warning "[WARNING] SMB signing not required and this is a DC. It is recomended to enable`nYou can enable it by running: Set-SmbServerConfiguration -RequireSecuritySignature `$true"
-    } else {
-      Write-Warning "[info] SMB signing not required; You may want to consider enabling it. It helps avoid sophisticated internal data integrity attacks."
-    }
   }
 
   # Null session shares

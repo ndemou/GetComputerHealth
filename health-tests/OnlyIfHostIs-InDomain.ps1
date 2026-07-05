@@ -95,28 +95,6 @@ from the AD DNS name.
     }
 }
 
-function HealthTest-DnsSuffixMatchesDomain {
-<#
-Description: Checks whether the primary DNS suffix matches the joined AD domain.
-AppliesTo: DomainJoined
-Scope: Computer
-Category: Configuration Hygiene & Best Practices
-Impact: Medium(Network)
-Tags: Essential
-Uses: ipconfig.exe.
-#>
-  [CmdletBinding()] param()
-  $cs = Get-CimInstance Win32_ComputerSystem
-  $domain = $cs.Domain
-  $out = ipconfig /all 2>&1
-  $pattern = "DNS Suffix.* $domain`$"
-  if ($out | Select-String -Pattern $pattern) {
-    Write-Warning "[PASS] Domain name appears in DNS suffix`nDomain: $domain"
-  } else {
-    Write-Warning "[FAILURE] Domain name does not appear in DNS suffix`nExpected suffix: $domain"
-  }
-}
-
 function HealthTest-DomainARecordPointsToDcIp {
 <#
 Description: Checks whether the domain A record points to a DC IP.
@@ -222,18 +200,7 @@ Uses: Get-DomainControllers, Resolve-DnsName, Test-NetConnectionFast.
       }
     }
 
-    # 3) SRV records check for LDAP
-    $domainName=(Get-CimInstance Win32_ComputerSystem).Domain
-    try {
-      $srv = Resolve-DnsName -Type SRV "_ldap._tcp.dc._msdcs.$domainName" -ErrorAction Stop
-      if ($srv.Name -contains $fqdn) {
-        Write-Warning "[PASS] SRV record present for $fqdn"
-      } else {
-        Write-Warning "[FAILURE] Missing SRV record for $fqdn`nDC not registered in _ldap._tcp.dc._msdcs. Run ipconfig /registerdns on $fqdn."
-      }
-    } catch {
-      Write-Warning "[FAILURE] Could not query SRV records.`nCheck DNS service and replication for zone _msdcs.$((Get-ADForest).RootDomain)."
-    }
+    # Required AD SRV labels are checked by HealthTest-RequiredSrvRecords.
   }
 }
 
