@@ -135,13 +135,29 @@
         }
 
         $tagsMatch = [regex]::Match($helpBlock.BlockText, '(?im)^Tags:\s*(.+)$')
+        $isPolicyTest = $false
         if ($tagsMatch.Success) {
           $tagValues = @($tagsMatch.Groups[1].Value.Split(',') | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+          $isPolicyTest = $tagValues -contains 'Policy'
           foreach ($tagValue in $tagValues) {
             if ($tagValue -notin $allowedTags) {
               "$($helpBlock.FunctionName) in $($helpBlock.FilePath) has unsupported Tag value '$tagValue'."
             }
           }
+        }
+
+        $policyBaselineVersionMatches = @([regex]::Matches($helpBlock.BlockText, '(?im)^Policy baseline version:\s*(.+)$'))
+        if ($policyBaselineVersionMatches.Count -gt 1) {
+          "$($helpBlock.FunctionName) in $($helpBlock.FilePath) has more than one Policy baseline version line."
+        }
+        elseif ($policyBaselineVersionMatches.Count -eq 1) {
+          $policyBaselineVersion = $policyBaselineVersionMatches[0].Groups[1].Value.Trim()
+          if ($policyBaselineVersion -notmatch '^\d+$') {
+            "$($helpBlock.FunctionName) in $($helpBlock.FilePath) has invalid Policy baseline version '$policyBaselineVersion'. Use a non-negative integer."
+          }
+        }
+        elseif ($isPolicyTest) {
+          "$($helpBlock.FunctionName) in $($helpBlock.FilePath) is tagged Policy and must include 'Policy baseline version: N'."
         }
 
         $usesMatch = [regex]::Match($helpBlock.BlockText, '(?im)^Uses:\s*(.+)$')

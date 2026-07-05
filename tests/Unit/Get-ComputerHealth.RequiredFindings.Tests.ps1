@@ -50,7 +50,7 @@ Describe 'Get-ComputerHealth required findings' {
       New-Item -ItemType Directory -Path $tempRoot -Force | Out-Null
       @'
 @{
-    'HealthTest-UnexpectedListeningPorts' = @{
+    'HealthTest-ListListeningPorts' = @{
         'BFC162FA' = @{Description = 'Port 443(IIS) should be listening but is not'; Ts = [datetime]'2025-11-01 12:42'; User = 'ndemou-admin'};
     };
 }
@@ -58,11 +58,11 @@ Describe 'Get-ComputerHealth required findings' {
 
       $config = Read-RequiredFindingsConfig -Path $path
 
-      $config.Keys | Should -Contain 'UnexpectedListeningPorts'
-      $config['UnexpectedListeningPorts'].Keys | Should -Contain 'bfc162fa'
-      $config['UnexpectedListeningPorts']['bfc162fa'].Description | Should -Be 'Port 443(IIS) should be listening but is not'
-      $config['UnexpectedListeningPorts']['bfc162fa'].Ts | Should -Be ([datetime]'2025-11-01 12:42')
-      $config['UnexpectedListeningPorts']['bfc162fa'].User | Should -Be 'ndemou-admin'
+      $config.Keys | Should -Contain 'ListListeningPorts'
+      $config['ListListeningPorts'].Keys | Should -Contain 'bfc162fa'
+      $config['ListListeningPorts']['bfc162fa'].Description | Should -Be 'Port 443(IIS) should be listening but is not'
+      $config['ListListeningPorts']['bfc162fa'].Ts | Should -Be ([datetime]'2025-11-01 12:42')
+      $config['ListListeningPorts']['bfc162fa'].User | Should -Be 'ndemou-admin'
     }
     finally {
       Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
@@ -74,16 +74,16 @@ Describe 'Get-ComputerHealth required findings' {
     $path = Join-Path $tempRoot 'required_findings.psd1'
 
     try {
-      Set-RequiredFindingEntry -Path $path -TestName 'HealthTest-UnexpectedListeningPorts' -Signature 'BFC162FA' -Description 'Port 443(IIS) should be listening but is not' -Timestamp ([datetime]'2025-11-01 12:42') -User 'ndemou-admin'
-      Set-RequiredFindingEntry -Path $path -TestName 'UnexpectedListeningPorts' -Signature '98c134de' -Description 'Port 80(IIS) should be listening but is not' -Timestamp ([datetime]'2025-11-01 12:43') -User 'ndemou-admin'
+      Set-RequiredFindingEntry -Path $path -TestName 'HealthTest-ListListeningPorts' -Signature 'BFC162FA' -Description 'Port 443(IIS) should be listening but is not' -Timestamp ([datetime]'2025-11-01 12:42') -User 'ndemou-admin'
+      Set-RequiredFindingEntry -Path $path -TestName 'ListListeningPorts' -Signature '98c134de' -Description 'Port 80(IIS) should be listening but is not' -Timestamp ([datetime]'2025-11-01 12:43') -User 'ndemou-admin'
 
       $config = Read-RequiredFindingsConfig -Path $path
 
       (Test-Path -LiteralPath $path -PathType Leaf) | Should -BeTrue
-      $config.Keys | Should -Be @('UnexpectedListeningPorts')
-      $config['UnexpectedListeningPorts'].Keys | Should -Be @('98c134de', 'bfc162fa')
-      $config['UnexpectedListeningPorts']['98c134de'].Description | Should -Be 'Port 80(IIS) should be listening but is not'
-      $config['UnexpectedListeningPorts']['bfc162fa'].Description | Should -Be 'Port 443(IIS) should be listening but is not'
+      $config.Keys | Should -Be @('ListListeningPorts')
+      $config['ListListeningPorts'].Keys | Should -Be @('98c134de', 'bfc162fa')
+      $config['ListListeningPorts']['98c134de'].Description | Should -Be 'Port 80(IIS) should be listening but is not'
+      $config['ListListeningPorts']['bfc162fa'].Description | Should -Be 'Port 443(IIS) should be listening but is not'
     }
     finally {
       Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
@@ -95,11 +95,11 @@ Describe 'Get-ComputerHealth required findings' {
     $path = Join-Path $tempRoot 'required_findings.psd1'
 
     try {
-      Set-RequiredFindingEntry -Path $path -TestName 'UnexpectedListeningPorts' -Signature '7bc98807' -Description 'This TCP port should be listening but is not: 10050 (zabbix_agent2, Zabbix SIA)' -Timestamp ([datetime]'2025-11-01 12:42') -User 'ndemou-admin'
+      Set-RequiredFindingEntry -Path $path -TestName 'ListListeningPorts' -Signature '7bc98807' -Description 'This TCP port should be listening but is not: 10050 (zabbix_agent2, Zabbix SIA)' -Timestamp ([datetime]'2025-11-01 12:42') -User 'ndemou-admin'
       $firstContent = Get-Content -LiteralPath $path -Raw
 
       Start-Sleep -Milliseconds 20
-      Set-RequiredFindingEntry -Path $path -TestName 'UnexpectedListeningPorts' -Signature '7bc98807' -Description 'This TCP port should be listening but is not: 10050 (zabbix_agent2, Zabbix SIA)' -Timestamp ([datetime]'2025-11-01 12:43') -User 'another-user'
+      Set-RequiredFindingEntry -Path $path -TestName 'ListListeningPorts' -Signature '7bc98807' -Description 'This TCP port should be listening but is not: 10050 (zabbix_agent2, Zabbix SIA)' -Timestamp ([datetime]'2025-11-01 12:43') -User 'another-user'
       $secondContent = Get-Content -LiteralPath $path -Raw
 
       $secondContent | Should -Be $firstContent
@@ -114,13 +114,13 @@ Describe 'Get-ComputerHealth required findings' {
     $path = Join-Path $tempRoot 'required_findings.psd1'
 
     try {
-      Set-RequiredFindingEntry -Path $path -TestName 'UnexpectedListeningPorts' -Signature '7bc98807' -Description 'This TCP port should be listening but is not: 10050 (zabbix_agent2, Zabbix SIA)' -Timestamp ([datetime]'2025-11-01 12:42') -User 'ndemou-admin'
-      Set-RequiredFindingEntry -Path $path -TestName 'UnexpectedListeningPorts' -Signature '7bc98807' -Description 'This TCP port should be listening but is not: 10050 (zabbix agent)' -Timestamp ([datetime]'2025-11-01 12:43') -User 'ndemou-admin'
+      Set-RequiredFindingEntry -Path $path -TestName 'ListListeningPorts' -Signature '7bc98807' -Description 'This TCP port should be listening but is not: 10050 (zabbix_agent2, Zabbix SIA)' -Timestamp ([datetime]'2025-11-01 12:42') -User 'ndemou-admin'
+      Set-RequiredFindingEntry -Path $path -TestName 'ListListeningPorts' -Signature '7bc98807' -Description 'This TCP port should be listening but is not: 10050 (zabbix agent)' -Timestamp ([datetime]'2025-11-01 12:43') -User 'ndemou-admin'
 
       $config = Read-RequiredFindingsConfig -Path $path
 
-      $config['UnexpectedListeningPorts']['7bc98807'].Description | Should -Be 'This TCP port should be listening but is not: 10050 (zabbix agent)'
-      $config['UnexpectedListeningPorts']['7bc98807'].Ts | Should -Be ([datetime]'2025-11-01 12:43')
+      $config['ListListeningPorts']['7bc98807'].Description | Should -Be 'This TCP port should be listening but is not: 10050 (zabbix agent)'
+      $config['ListListeningPorts']['7bc98807'].Ts | Should -Be ([datetime]'2025-11-01 12:43')
     }
     finally {
       Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
@@ -129,13 +129,13 @@ Describe 'Get-ComputerHealth required findings' {
 
   It 'resolves required findings by short or full health test name' {
     $requiredFindings = [ordered]@{
-      UnexpectedListeningPorts = [ordered]@{
+      ListListeningPorts = [ordered]@{
         bfc162fa = [ordered]@{ Description = 'Port 443(IIS) should be listening but is not'; Ts = [datetime]'2025-11-01 12:42'; User = 'ndemou-admin' }
       }
     }
 
-    $byFullName = Get-RequiredFindingsForTest -RequiredFindings $requiredFindings -FunctionName 'HealthTest-UnexpectedListeningPorts'
-    $byShortName = Get-RequiredFindingsForTest -RequiredFindings $requiredFindings -FunctionName 'UnexpectedListeningPorts'
+    $byFullName = Get-RequiredFindingsForTest -RequiredFindings $requiredFindings -FunctionName 'HealthTest-ListListeningPorts'
+    $byShortName = Get-RequiredFindingsForTest -RequiredFindings $requiredFindings -FunctionName 'ListListeningPorts'
 
     $byFullName.Keys | Should -Contain 'bfc162fa'
     $byShortName.Keys | Should -Contain 'bfc162fa'
@@ -168,14 +168,14 @@ Describe 'Get-ComputerHealth required findings' {
     }
 
     try {
-      $results = @(Invoke-RequiredFindingsValidation -FunctionName 'HealthTest-UnexpectedListeningPorts' -Records @(
+      $results = @(Invoke-RequiredFindingsValidation -FunctionName 'HealthTest-ListListeningPorts' -Records @(
           [pscustomobject]@{
             Level = 'warning'
             Message = 'Port 80(IIS) should be listening but is not'
             Hash = '98c134de'
           }
         ) -RequiredFindings ([ordered]@{
-            UnexpectedListeningPorts = [ordered]@{
+            ListListeningPorts = [ordered]@{
               'bfc162fa' = [ordered]@{ Description = 'Port 443(IIS) should be listening but is not'; Ts = [datetime]'2025-11-01 12:42'; User = 'ndemou-admin' }
               '98c134de' = [ordered]@{ Description = 'Port 80(IIS) should be listening but is not'; Ts = [datetime]'2025-11-01 12:42'; User = 'ndemou-admin' }
             }
@@ -184,8 +184,8 @@ Describe 'Get-ComputerHealth required findings' {
       $results.Count | Should -Be 2
       $results[1].Level | Should -Be 'failure'
       $results[1].Message | Should -Be 'Port 443(IIS) should be listening but is not'
-      $results[1].Comment | Should -Be 'Required finding with signature bfc162fa was not emitted by UnexpectedListeningPorts'
-      $results[1].Emitter | Should -Be 'HealthTest-UnexpectedListeningPorts'
+      $results[1].Comment | Should -Be 'Required finding with signature bfc162fa was not emitted by ListListeningPorts'
+      $results[1].Emitter | Should -Be 'HealthTest-ListListeningPorts'
     }
     finally {
       Remove-Item Function:\Log-Failure -ErrorAction SilentlyContinue

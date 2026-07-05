@@ -304,7 +304,7 @@ Use it when:
 - you changed version-signature behavior
 - you changed email helper functions in `Invoke-GetComputerHealth.ps1`
 
-### [`tests/Unit/HealthTest-InstalledSW.Classification.Tests.ps1`](../tests/Unit/HealthTest-InstalledSW.Classification.Tests.ps1)
+### [`tests/Unit/HealthTest-ListInstalledPrograms.Classification.Tests.ps1`](../tests/Unit/HealthTest-ListInstalledPrograms.Classification.Tests.ps1)
 
 This test file checks how installed software entries are classified.
 

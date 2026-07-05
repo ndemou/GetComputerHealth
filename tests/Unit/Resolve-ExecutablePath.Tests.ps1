@@ -290,7 +290,7 @@ Describe 'Resolve-ServiceExecutable' {
   }
 }
 
-Describe 'HealthTest-AutoStartServicesRunning' {
+Describe 'HealthTest-Services' {
   BeforeAll {
     . (Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) 'health-tests\srvc-exe-resolve.ps1')
   }
@@ -310,8 +310,9 @@ Describe 'HealthTest-AutoStartServicesRunning' {
     } -ParameterFilter { $ClassName -eq 'Win32_Service' -and $Filter -eq "StartMode='Auto' and State!='Running'" }
 
     Mock Write-Warning {}
+    Mock Get-ServiceVendors { @() }
 
-    HealthTest-AutoStartServicesRunning
+    HealthTest-Services
 
     Should -Invoke Write-Warning -Times 1 -Exactly -ParameterFilter {
       $Message -eq "[NOTICE] Service 'FOO' which is set to automatically start, is not running, but its last execution terminated with ExitCode=0(The operation completed successfully.).`nDisplay name: Foo Service, StartMode=Auto, DelayedAutoStart=False, last ExitCode=0(The operation completed successfully.)."
@@ -333,12 +334,82 @@ Describe 'HealthTest-AutoStartServicesRunning' {
     } -ParameterFilter { $ClassName -eq 'Win32_Service' -and $Filter -eq "StartMode='Auto' and State!='Running'" }
 
     Mock Write-Warning {}
+    Mock Get-ServiceVendors { @() }
 
-    HealthTest-AutoStartServicesRunning
+    HealthTest-Services
 
     Should -Invoke Write-Warning -Times 1 -Exactly -ParameterFilter {
       $Message -eq "[FAILURE] Service 'BAR' which is set to automatically start is not running; alarmingly its last execution terminated abnormally: ExitCode=5(Access is denied.).`nDisplay name: Bar Service, StartMode=Auto, DelayedAutoStart=True, last ExitCode=5(Access is denied.)."
     }
+  }
+
+  It 'reports broken service executable or payload resolution' {
+    Mock Get-CimInstance {
+      @()
+    } -ParameterFilter { $ClassName -eq 'Win32_Service' -and $Filter -eq "StartMode='Auto' and State!='Running'" }
+
+    Mock Get-ServiceVendors {
+      @(
+        [pscustomobject]@{
+          ServiceName = 'BrokenSvc'
+          ExceptionsThrown = "Service BrokenSvc points to missing executable. Exe='' PathName='C:\Broken\BrokenSvc.exe'."
+        }
+      )
+    }
+
+    Mock Write-Warning {}
+
+    HealthTest-Services
+
+    Should -Invoke Write-Warning -Times 1 -Exactly -ParameterFilter {
+      $Message -eq "[FAILURE] Service 'BrokenSvc' has a broken or unresolved executable/payload path.`nError(s): Service BrokenSvc points to missing executable. Exe='' PathName='C:\Broken\BrokenSvc.exe'."
+    }
+  }
+}
+
+Describe 'Service policy identity' {
+  BeforeAll {
+    . (Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) 'health-tests\srvc-exe-resolve.ps1')
+  }
+
+  It 'uses vendor identity for signed payloads' {
+    $service = [pscustomobject]@{
+      Vendor = 'Microsoft Corporation'
+      ExeSHA256 = '1111'
+      CodeIdentityType = 'Vendor'
+      CodeIdentityValue = 'Microsoft Corporation'
+    }
+
+    Get-ServiceCodeIdentityText -Service $service | Should -Be 'vendor:microsoft corporation'
+  }
+
+  It 'uses payload hash identity for unsigned payloads' {
+    $service = [pscustomobject]@{
+      Vendor = '(Unsigned)'
+      ExeSHA256 = 'ABCDEF012345'
+      CodeIdentityType = 'Hash'
+      CodeIdentityValue = 'ABCDEF012345'
+    }
+
+    Get-ServiceCodeIdentityText -Service $service | Should -Be 'hash:abcdef012345'
+  }
+
+  It 'changes the policy fingerprint when the payload path changes' {
+    $first = Get-ServicePolicyFingerprint -NormalizedServiceName 'ExampleSvc' -PayloadPath 'C:\Program Files\Example\svc.exe' -CodeIdentityText 'vendor:example inc.'
+    $second = Get-ServicePolicyFingerprint -NormalizedServiceName 'ExampleSvc' -PayloadPath 'C:\Program Files\Example\svc2.exe' -CodeIdentityText 'vendor:example inc.'
+
+    $first | Should -Not -Be $second
+  }
+
+  It 'changes the policy fingerprint when vendor or hash identity changes' {
+    $first = Get-ServicePolicyFingerprint -NormalizedServiceName 'ExampleSvc' -PayloadPath 'C:\Program Files\Example\svc.exe' -CodeIdentityText 'vendor:example inc.'
+    $second = Get-ServicePolicyFingerprint -NormalizedServiceName 'ExampleSvc' -PayloadPath 'C:\Program Files\Example\svc.exe' -CodeIdentityText 'hash:abcdef012345'
+
+    $first | Should -Not -Be $second
+  }
+
+  It 'normalizes per-user service instance names for policy reporting' {
+    Normalize-ServicePolicyName -ServiceName 'ChromeUserSvc_147c46f' -IsPerUserServiceInstance $true | Should -Be 'ChromeUserSvc_*'
   }
 }
 
@@ -372,11 +443,13 @@ Describe 'HealthTest-ListServices' {
     HealthTest-ListServices
 
     Should -Invoke Write-Warning -Times 1 -Exactly -ParameterFilter {
-      $Message -eq "[NOTICE] Found Microsoft service: Vendor='Microsoft Corporation' Name='WinDefend'`nAdmin must verify if service is legit and needed. Service Description: 'Microsoft Defender Antivirus Service'`nExecutable: 'C:\Windows\System32\MsMpEng.exe'."
+      $Message -match "^\[NOTICE\] Found service: Vendor='Microsoft Corporation' Name='WinDefend' fingerprint=[0-9a-f]{16}" -and
+      $Message -match "Executable: 'C:\\Windows\\System32\\MsMpEng[.]exe'[.]" -and
+      $Message -match "Policy identity: vendor:microsoft corporation[.]"
     }
   }
 
-  It 'uses FAILURE only for serious service-vendor resolution problems' {
+  It 'does not emit hygiene failure for service-vendor resolution problems' {
     Mock Get-CimInstance {
       [pscustomobject]@{
         DomainRole = 1
@@ -401,7 +474,9 @@ Describe 'HealthTest-ListServices' {
     HealthTest-ListServices
 
     Should -Invoke Write-Warning -Times 1 -Exactly -ParameterFilter {
-      $Message -eq "[FAILURE] Either something's wrong with service 'BrokenSvc' or there's a bug in Get-ServiceVendors.`nError(s): Service BrokenSvc points to missing executable."
+      $Message -match "^\[WARNING\] Found service: Vendor='' Name='BrokenSvc' fingerprint=[0-9a-f]{16}" -and
+      $Message -match "Executable: 'C:\\Broken\\BrokenSvc[.]exe'[.]" -and
+      $Message -match "Policy identity: unknown:[.]"
     }
   }
 
@@ -453,7 +528,10 @@ Describe 'HealthTest-ListServices' {
     HealthTest-ListServices
 
     Should -Invoke Write-Warning -Times 1 -Exactly -ParameterFilter {
-      $Message -eq "[NOTICE] Found Microsoft service: Vendor='Microsoft Windows' Name='WpnUserService_*' (Per-user service of base service 'WpnUserService')`nAdmin must verify if service is legit and needed. Service Description: 'Windows Push Notifications User Service'`nExecutable: 'C:\WINDOWS\System32\WpnUserService.dll'.`nFull service name: 'WpnUserService_147c46f'."
+      $Message -match "^\[NOTICE\] Found service: Vendor='Microsoft Windows' Name='WpnUserService_[*]' [(]Per-user service of base service 'WpnUserService'[)] fingerprint=[0-9a-f]{16}" -and
+      $Message -match "Executable: 'C:\\WINDOWS\\System32\\WpnUserService[.]dll'[.]" -and
+      $Message -match "Policy identity: vendor:microsoft windows[.]" -and
+      $Message -match "Full service name: 'WpnUserService_147c46f'[.]"
     }
   }
 
@@ -497,7 +575,9 @@ Describe 'HealthTest-ListServices' {
 
     Should -Invoke Write-Warning -Times 2 -Exactly
     Should -Invoke Write-Warning -Times 1 -Exactly -ParameterFilter {
-      $Message -eq "[NOTICE] Found Microsoft service: Vendor='Microsoft Windows' Name='ExampleSvc_147c46f'`nAdmin must verify if service is legit and needed. Service Description: 'Example Instance Service'`nExecutable: 'C:\Windows\System32\example-instance.dll'."
+      $Message -match "^\[NOTICE\] Found service: Vendor='Microsoft Windows' Name='ExampleSvc_147c46f' fingerprint=[0-9a-f]{16}" -and
+      $Message -match "Executable: 'C:\\Windows\\System32\\example-instance[.]dll'[.]" -and
+      $Message -match "Policy identity: vendor:microsoft windows[.]"
     }
   }
 
@@ -542,7 +622,7 @@ Describe 'HealthTest-ListServices' {
 
     Should -Invoke Write-Warning -Times 2 -Exactly
     Should -Invoke Write-Warning -Times 1 -Exactly -ParameterFilter {
-      $Message -eq "[NOTICE] Found Microsoft service: Vendor='Microsoft Windows' Name='TokenBrokerSvc_*' (Per-user service of base service 'TokenBrokerSvc')`nAdmin must verify if service is legit and needed. Service Description: 'Web Account Manager_147c46f'`nExecutable: 'C:\Windows\System32\different-user-host.dll'.`nFull service name: 'TokenBrokerSvc_147c46f'."
+      $Message -eq "[NOTICE] Found service: Vendor='Microsoft Windows' Name='TokenBrokerSvc_*' (Per-user service of base service 'TokenBrokerSvc')`nAdmin must verify if service is legit and needed. Service Description: 'Web Account Manager_147c46f'`nExecutable: 'C:\Windows\System32\different-user-host.dll'.`nFull service name: 'TokenBrokerSvc_147c46f'."
     }
   }
   #>
@@ -587,7 +667,10 @@ Describe 'HealthTest-ListServices' {
 
     Should -Invoke Write-Warning -Times 2 -Exactly
     Should -Invoke Write-Warning -Times 1 -Exactly -ParameterFilter {
-      $Message -eq "[NOTICE] Found service from a common workstation vendor: Vendor='Google LLC' Name='ChromeUserSvc_*' (Per-user service of base service 'ChromeUserSvc')`nAdmin must verify if service is legit and needed. Service Description: 'Chrome User Service_147c46f'`nExecutable: 'C:\Program Files\Google\Chrome\chrome-user-service.exe'.`nFull service name: 'ChromeUserSvc_147c46f'."
+      $Message -match "^\[NOTICE\] Found service: Vendor='Google LLC' Name='ChromeUserSvc_[*]' [(]Per-user service of base service 'ChromeUserSvc'[)] fingerprint=[0-9a-f]{16}" -and
+      $Message -match "Executable: 'C:\\Program Files\\Google\\Chrome\\chrome-user-service[.]exe'[.]" -and
+      $Message -match "Policy identity: vendor:google llc[.]" -and
+      $Message -match "Full service name: 'ChromeUserSvc_147c46f'[.]"
     }
   }
 
@@ -638,7 +721,10 @@ Describe 'HealthTest-ListServices' {
     HealthTest-ListServices
 
     Should -Invoke Write-Warning -Times 1 -Exactly -ParameterFilter {
-      $Message -eq "[NOTICE] Found Microsoft service: Vendor='Microsoft Windows' Name='WpnUserService_*' (Per-user service of base service 'WpnUserService')`nAdmin must verify if service is legit and needed. Service Description: 'Windows Push Notifications User Service_147c46f'`nExecutable: 'C:\WINDOWS\System32\WpnUserService.dll'.`nFull service name: 'WpnUserService_147c46f'."
+      $Message -match "^\[NOTICE\] Found service: Vendor='Microsoft Windows' Name='WpnUserService_[*]' [(]Per-user service of base service 'WpnUserService'[)] fingerprint=[0-9a-f]{16}" -and
+      $Message -match "Executable: 'C:\\WINDOWS\\System32\\WpnUserService[.]dll'[.]" -and
+      $Message -match "Policy identity: vendor:microsoft windows[.]" -and
+      $Message -match "Full service name: 'WpnUserService_147c46f'[.]"
     }
   }
 }

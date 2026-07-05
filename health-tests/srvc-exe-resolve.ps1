@@ -39,20 +39,51 @@ function Expand-EnvVarsWin32 {
   if ($rc -gt 0 -and $rc -le $sb.Capacity) { $sb.ToString() } else { [Environment]::ExpandEnvironmentVariables($Text) }
 }
 
+function Get-FileSha256Safe {
+  [CmdletBinding()]
+  param([Parameter(Mandatory)][string]$Path)
+
+  try {
+    $hash = (Get-FileHash -Path $Path -Algorithm SHA256 -ErrorAction SilentlyContinue).Hash
+    if ($hash) { return $hash }
+  } catch {
+    Write-Verbose "[Get-FileSha256Safe] Hash calc failed for [$Path]: $($_.Exception.Message)"
+  }
+
+  return $null
+}
+
 
 function Get-ExeVendor {
   [CmdletBinding()] [OutputType([pscustomobject])]
   param([Parameter(Mandatory)][string]$Exe)
 
-  if (-not (Test-Path -LiteralPath $Exe)) { return [pscustomobject]@{ Vendor=$null; ExeSHA256=$null } }
+  if (-not (Test-Path -LiteralPath $Exe)) {
+    return [pscustomobject]@{
+      Vendor = $null
+      ExeSHA256 = $null
+      SignatureStatus = $null
+      CodeIdentityType = 'Unknown'
+      CodeIdentityValue = $null
+    }
+  }
 
   if (-not (Get-Variable -Name GetExeVendor_VendorCache -Scope Script -ErrorAction SilentlyContinue)) { $script:GetExeVendor_VendorCache = @{} }
   if (-not (Get-Variable -Name GetExeVendor_HashCache   -Scope Script -ErrorAction SilentlyContinue)) { $script:GetExeVendor_HashCache   = @{} }
+  if (-not (Get-Variable -Name GetExeVendor_StatusCache -Scope Script -ErrorAction SilentlyContinue)) { $script:GetExeVendor_StatusCache = @{} }
+  if (-not (Get-Variable -Name GetExeVendor_IdentityTypeCache -Scope Script -ErrorAction SilentlyContinue)) { $script:GetExeVendor_IdentityTypeCache = @{} }
+  if (-not (Get-Variable -Name GetExeVendor_IdentityValueCache -Scope Script -ErrorAction SilentlyContinue)) { $script:GetExeVendor_IdentityValueCache = @{} }
 
   $vc = $script:GetExeVendor_VendorCache
   $hc = $script:GetExeVendor_HashCache
+  $sc = $script:GetExeVendor_StatusCache
+  $itc = $script:GetExeVendor_IdentityTypeCache
+  $ivc = $script:GetExeVendor_IdentityValueCache
   $vendor = $null
   $exeSHA256 = $null
+  $signatureStatus = $null
+  $codeIdentityType = 'Unknown'
+  $codeIdentityValue = $null
 
   if (-not $vc.ContainsKey($Exe)) {
     try {
@@ -62,43 +93,80 @@ function Get-ExeVendor {
       $sigCert          = $sig.SignerCertificate
     } catch {
       Write-Verbose "[Get-ExeVendor] Signature check failed for [$Exe]: $($_.Exception.Message)"
-      $vc[$Exe] = '(Unknown)'
-      return [pscustomobject]@{ Vendor='(Unknown)'; ExeSHA256=$null }
+      $vendor = '(Unknown)'
+      $signatureStatus = 'Unknown'
+      $exeSHA256 = Get-FileSha256Safe -Path $Exe
+      $codeIdentityType = if ($exeSHA256) { 'Hash' } else { 'Unknown' }
+      $codeIdentityValue = $exeSHA256
+      $vc[$Exe] = $vendor
+      if ($exeSHA256) { $hc[$Exe] = $exeSHA256 }
+      $sc[$Exe] = $signatureStatus
+      $itc[$Exe] = $codeIdentityType
+      $ivc[$Exe] = $codeIdentityValue
+      return [pscustomobject]@{
+        Vendor = $vendor
+        ExeSHA256 = $exeSHA256
+        SignatureStatus = $signatureStatus
+        CodeIdentityType = $codeIdentityType
+        CodeIdentityValue = $codeIdentityValue
+      }
     }
 
+    $signatureStatus = [string]$sigStatus
     $isGoodEnough = ($sigStatus -eq 'Valid') -or ($sigStatusMessage -eq 'A certificate chain processed, but terminated in a root certificate which is not trusted by the trust provider')
 
     if ($isGoodEnough) {
       if ($sigCert) {
         $vendor = $sigCert.GetNameInfo('SimpleName', $false)
         if (-not $vendor) { $vendor = $sigCert.Subject }
+        $codeIdentityType = 'Vendor'
+        $codeIdentityValue = $vendor
       } else {
         $vendor = '(Unsigned)'
-        try {
-          $h = (Get-FileHash -Path $Exe -Algorithm SHA256 -ErrorAction SilentlyContinue).Hash
-          if ($h) { $hc[$Exe] = $h; $exeSHA256 = $h }
-        } catch { Write-Verbose "[Get-ExeVendor] Hash calc failed for [$Exe]: $($_.Exception.Message)" }
+        $exeSHA256 = Get-FileSha256Safe -Path $Exe
+        if ($exeSHA256) { $hc[$Exe] = $exeSHA256 }
+        $codeIdentityType = if ($exeSHA256) { 'Hash' } else { 'Unknown' }
+        $codeIdentityValue = $exeSHA256
       }
     } elseif ($sigStatus -eq 'NotSigned') {
       $vendor = '(Unsigned)'
       if (-not $hc.ContainsKey($Exe)) {
-        try {
-          $h = (Get-FileHash -Path $Exe -Algorithm SHA256 -ErrorAction SilentlyContinue).Hash
-          if ($h) { $hc[$Exe] = $h }
-        } catch { Write-Verbose "[Get-ExeVendor] Hash calc failed for [$Exe]: $($_.Exception.Message)" }
+        $h = Get-FileSha256Safe -Path $Exe
+        if ($h) { $hc[$Exe] = $h }
       }
       if ($hc.ContainsKey($Exe)) { $exeSHA256 = $hc[$Exe] }
+      $codeIdentityType = if ($exeSHA256) { 'Hash' } else { 'Unknown' }
+      $codeIdentityValue = $exeSHA256
     } else {
       $vendor = "(Invalid: $sigStatus, $sigStatusMessage)"
+      if (-not $hc.ContainsKey($Exe)) {
+        $h = Get-FileSha256Safe -Path $Exe
+        if ($h) { $hc[$Exe] = $h }
+      }
+      if ($hc.ContainsKey($Exe)) { $exeSHA256 = $hc[$Exe] }
+      $codeIdentityType = if ($exeSHA256) { 'Hash' } else { 'Unknown' }
+      $codeIdentityValue = $exeSHA256
     }
 
     $vc[$Exe] = $vendor
+    $sc[$Exe] = $signatureStatus
+    $itc[$Exe] = $codeIdentityType
+    $ivc[$Exe] = $codeIdentityValue
   } else {
     $vendor = $vc[$Exe]
     if ($hc.ContainsKey($Exe)) { $exeSHA256 = $hc[$Exe] }
+    if ($sc.ContainsKey($Exe)) { $signatureStatus = $sc[$Exe] }
+    if ($itc.ContainsKey($Exe)) { $codeIdentityType = $itc[$Exe] }
+    if ($ivc.ContainsKey($Exe)) { $codeIdentityValue = $ivc[$Exe] }
   }
 
-  [pscustomobject]@{ Vendor=$vendor; ExeSHA256=$exeSHA256 }
+  [pscustomobject]@{
+    Vendor = $vendor
+    ExeSHA256 = $exeSHA256
+    SignatureStatus = $signatureStatus
+    CodeIdentityType = $codeIdentityType
+    CodeIdentityValue = $codeIdentityValue
+  }
 }
 
 function Normalize-CommandText {
@@ -702,6 +770,110 @@ Throws if no domain can be inferred. Requires DNS reachability.
   return $results
 }
 
+function Normalize-ServicePolicyName {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)][string]$ServiceName,
+    [bool]$IsPerUserServiceInstance
+  )
+
+  $normalizedName = $ServiceName
+  if ($IsPerUserServiceInstance) {
+    $m = [regex]::Match($ServiceName,'^(?<base>.+?)_(?<hex>[0-9a-fA-F]{5,16})$')
+    if ($m.Success) {
+      $normalizedName = $m.Groups['base'].Value
+    } else {
+      $normalizedName = Get-BaseServiceName -ServiceName $ServiceName
+    }
+  }
+
+  $normalizedName = $normalizedName -replace '[0-9]+[.][0-9][0-9.]*$','[VERSION]'
+  if ($IsPerUserServiceInstance) {
+    $normalizedName = "$normalizedName" + "_*"
+  }
+
+  return $normalizedName
+}
+
+function Normalize-ServicePolicyPath {
+  [CmdletBinding()]
+  param([AllowNull()][string]$Path)
+
+  if ([string]::IsNullOrWhiteSpace($Path)) { return '' }
+
+  $normalizedPath = Normalize-CommandText -Text $Path
+  if ([string]::IsNullOrWhiteSpace($normalizedPath)) { return '' }
+
+  return $normalizedPath.ToLowerInvariant()
+}
+
+function Get-ServiceCodeIdentityText {
+  [CmdletBinding()]
+  param([Parameter(Mandatory)]$Service)
+
+  $codeIdentityType = $null
+  $codeIdentityValue = $null
+
+  if ($Service.PSObject.Properties['CodeIdentityType']) {
+    $codeIdentityType = [string]$Service.CodeIdentityType
+  }
+  if ($Service.PSObject.Properties['CodeIdentityValue']) {
+    $codeIdentityValue = [string]$Service.CodeIdentityValue
+  }
+
+  if ([string]::IsNullOrWhiteSpace($codeIdentityType)) {
+    if ($Service.PSObject.Properties['ExeSHA256'] -and -not [string]::IsNullOrWhiteSpace([string]$Service.ExeSHA256)) {
+      $codeIdentityType = 'Hash'
+      $codeIdentityValue = [string]$Service.ExeSHA256
+    }
+    elseif ($Service.PSObject.Properties['Vendor'] -and -not [string]::IsNullOrWhiteSpace([string]$Service.Vendor)) {
+      $codeIdentityType = 'Vendor'
+      $codeIdentityValue = [string]$Service.Vendor
+    }
+    else {
+      $codeIdentityType = 'Unknown'
+      $codeIdentityValue = ''
+    }
+  }
+
+  if ([string]::IsNullOrWhiteSpace($codeIdentityValue)) {
+    $codeIdentityValue = ''
+  }
+
+  return (($codeIdentityType.ToLowerInvariant()) + ':' + ($codeIdentityValue.Trim().ToLowerInvariant()))
+}
+
+function Get-ServicePolicyFingerprintText {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)][string]$NormalizedServiceName,
+    [AllowNull()][string]$PayloadPath,
+    [Parameter(Mandatory)][string]$CodeIdentityText
+  )
+
+  $normalizedPath = Normalize-ServicePolicyPath -Path $PayloadPath
+  return ('name={0}|payload={1}|identity={2}' -f $NormalizedServiceName.ToLowerInvariant(), $normalizedPath, $CodeIdentityText)
+}
+
+function Get-ServicePolicyFingerprint {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)][string]$NormalizedServiceName,
+    [AllowNull()][string]$PayloadPath,
+    [Parameter(Mandatory)][string]$CodeIdentityText
+  )
+
+  $text = Get-ServicePolicyFingerprintText -NormalizedServiceName $NormalizedServiceName -PayloadPath $PayloadPath -CodeIdentityText $CodeIdentityText
+  $bytes = [Text.Encoding]::UTF8.GetBytes($text)
+  $algorithm = [Security.Cryptography.HashAlgorithm]::Create('SHA256')
+  try {
+    $hash = -join ($algorithm.ComputeHash($bytes) | ForEach-Object { $_.ToString('x2') })
+    return $hash.Substring(0, 16)
+  } finally {
+    if ($algorithm) { $algorithm.Dispose() }
+  }
+}
+
 function Get-ServiceVendors {
 <#
 .SYNOPSIS
@@ -718,24 +890,41 @@ Returns a list of objects with ServiceName, Vendor, and ExePath properties.
   [OutputType([pscustomobject])]
   param()
 
-  $services = Get-CimInstance Win32_Service | Select-Object Name,PathName,DisplayName,ServiceType
+  $services = Get-CimInstance Win32_Service | Select-Object Name,PathName,DisplayName,ServiceType,State,StartMode,DelayedAutoStart,ExitCode
 
   foreach($s in $services){
     $ExceptionsThrown = ""
     $exe = $null
+    $payloadType = $null
+    $launcherExe = $null
+    $launcherArgs = $null
+    $resolutionWarnings = @()
     try {
-		$rse = Resolve-ServiceExecutable $s.PathName $s.Name
-		if (-not ($null -eq $rse)) {$exe = $rse.PayloadPath}
+        $rse = Resolve-ServiceExecutable $s.PathName $s.Name
+        if (-not ($null -eq $rse)) {
+          $exe = $rse.PayloadPath
+          $payloadType = $rse.PayloadType
+          $launcherExe = $rse.LauncherExe
+          $launcherArgs = $rse.LauncherArgs
+          $resolutionWarnings = @($rse.Warnings)
+        }
     } catch {
         $ExceptionsThrown += "[Get-ServiceVendors] Resolve failed for service [$($s.Name)]: $($_.Exception.Message)."
     }
     if([string]::IsNullOrWhiteSpace($exe)){ $exe = $null }
 
-    $vendor = $null; $exeSHA256 = $null
+    $vendor = $null
+    $exeSHA256 = $null
+    $signatureStatus = $null
+    $codeIdentityType = 'Unknown'
+    $codeIdentityValue = $null
     if($exe -and (Test-Path -LiteralPath $exe)){
       $r = Get-ExeVendor -Exe $exe
       $vendor = $r.Vendor
       $exeSHA256 = $r.ExeSHA256
+      $signatureStatus = $r.SignatureStatus
+      $codeIdentityType = $r.CodeIdentityType
+      $codeIdentityValue = $r.CodeIdentityValue
     } else {
       $ExceptionsThrown += "Service $($s.Name) points to missing executable. Exe='$exe' PathName='$($s.PathName)'."
     }
@@ -745,8 +934,20 @@ Returns a list of objects with ServiceName, Vendor, and ExePath properties.
       Vendor      = $vendor
       ExePath     = $exe
       ExeSHA256   = $exeSHA256
+      SignatureStatus = $signatureStatus
+      CodeIdentityType = $codeIdentityType
+      CodeIdentityValue = $codeIdentityValue
       DisplayName = $s.DisplayName
       ServiceType = $s.ServiceType
+      State = $s.State
+      StartMode = $s.StartMode
+      DelayedAutoStart = $s.DelayedAutoStart
+      ExitCode = $s.ExitCode
+      PathName = $s.PathName
+      PayloadType = $payloadType
+      LauncherExe = $launcherExe
+      LauncherArgs = $launcherArgs
+      ResolutionWarnings = @($resolutionWarnings)
       ExceptionsThrown  = $ExceptionsThrown
     }
   }
@@ -778,16 +979,18 @@ function Test-LooksLikePath {
 }
 
 
-function HealthTest-AutoStartServicesRunning {
+function HealthTest-Services {
 <#
-Description: Reports auto-start services that are not running, with extra context from their last exit code.
+Description: Reviews service operational health, including auto-start services that are not running, abnormal service exit codes, and broken service payload paths.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: low
 Tags: Essential
-Uses: cmd.exe.
+Uses: Win32_Service, Get-ServiceVendors.
 #>
+  $hadIssue = $false
+
   function Get-ServiceExitCodeMessage {
       param([int]$ExitCode)
 
@@ -813,12 +1016,9 @@ Uses: cmd.exe.
       if ($known) { return $known }
 
       try {
-          $raw = (& cmd.exe /c "net helpmsg $ExitCode" 2>$null)
-          if ($raw) {
-              $msg = ($raw -join ' ') -replace '\s+$',''
-              if ($msg -and $msg -notmatch 'is not a valid Windows|more help is available') {
-                  return $msg
-              }
+          $msg = (New-Object ComponentModel.Win32Exception ([int]$ExitCode)).Message
+          if (-not [string]::IsNullOrWhiteSpace($msg)) {
+              return $msg
           }
       } catch {}
 
@@ -857,29 +1057,51 @@ Uses: cmd.exe.
                 ($_.name -match $SERVICES_THAT_ARE_OFTEN_STOPPED_REGEX)
             )
             if ($serviceInListOfOftenStoped -and ($_.ExitCode -in (0,1077))) {
+                    $hadIssue = $true
                     Write-Warning "[info] This service is stoped but its last execution terminated NORMALY and it's one of the services that are often stopped: Service '$($_.Name)', StartMode=$($_.StartMode), DelayedAutoStart=$($_.DelayedAutoStart), last ExitCode=$($_.ExitCode)($exitCodeMeaning)."} else {
                 if ($_.ExitCode  -in (0,1077)) {
                     # Use NOTICE here, even though it is noisier than INFO, because a service
                     # that stays stopped after restart should remain visible instead of being suppressed.
+                    $hadIssue = $true
                     Write-Warning "[NOTICE] Service '$($_.Name)' which is set to automatically start, is not running, but its last execution terminated with ExitCode=$($_.ExitCode)($exitCodeMeaning).`nDisplay name: $($_.DisplayName), StartMode=$($_.StartMode), DelayedAutoStart=$($_.DelayedAutoStart), last ExitCode=$($_.ExitCode)($exitCodeMeaning)."
                 } else {
+                    $hadIssue = $true
                     Write-Warning "[FAILURE] Service '$($_.Name)' which is set to automatically start is not running; alarmingly its last execution terminated abnormally: ExitCode=$($_.ExitCode)($exitCodeMeaning).`nDisplay name: $($_.DisplayName), StartMode=$($_.StartMode), DelayedAutoStart=$($_.DelayedAutoStart), last ExitCode=$($_.ExitCode)($exitCodeMeaning)."
                 }
             }
         }
-    } else {
-        Write-Warning "[PASS] All services that are set to automatically start are running"}
+    }
+
+    try {
+        $services = @(Get-ServiceVendors)
+        foreach ($service in $services) {
+            if ([string]::IsNullOrWhiteSpace([string]$service.ExceptionsThrown)) { continue }
+
+            $hadIssue = $true
+            Write-Warning "[FAILURE] Service '$($service.ServiceName)' has a broken or unresolved executable/payload path.`nError(s): $($service.ExceptionsThrown)"
+        }
+    } catch {
+        $hadIssue = $true
+        Write-Warning "[FAILURE] Could not inspect service executable/payload paths: $($_.Exception.Message)"
+    }
+
+    if (-not $hadIssue) {
+        Write-Warning "[PASS] Services healthy: all auto-start services are running and service payload paths resolved."
+    }
 }
 
 function HealthTest-ListServices {
 <#
-Description: Lists services and highlights unusual or suspicious service vendors.
+Description: Lists service definitions with payload publisher/hash context for policy review.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: High(Time)
 Tags: Policy
 Uses: Get-ServiceVendors.
+
+Policy identity: normalized service name, normalized resolved payload path, and code identity. Signed payloads use vendor identity; unsigned or invalid-signature payloads use payload hash when available. Runtime state, exit code, and service start result are not included.
+Policy baseline version: 1
 #>
 
     $ok = $true
@@ -969,48 +1191,50 @@ Uses: Get-ServiceVendors.
             $trimmedServiceName = $_.ServiceName
         }
         $trimmedServiceName = $trimmedServiceName -replace '[0-9]+[.][0-9][0-9.]*$','[VERSION]'
+        $policyServiceName = Normalize-ServicePolicyName -ServiceName $_.ServiceName -IsPerUserServiceInstance $isPerUserServiceInstance
+        $codeIdentityText = Get-ServiceCodeIdentityText -Service $_
+        $serviceFingerprint = Get-ServicePolicyFingerprint -NormalizedServiceName $policyServiceName -PayloadPath $_.ExePath -CodeIdentityText $codeIdentityText
         $ok = $false
-        if ($_.ExceptionsThrown) {
-            Write-Warning "[FAILURE] Either something's wrong with service '$($_.ServiceName)' or there's a bug in Get-ServiceVendors.`nError(s): $($_.ExceptionsThrown)"
-        } else {
-            $comment = "Admin must verify if service is legit and needed. Service Description: '$($_.DisplayName)'`nExecutable: '$($_.ExePath)'."
-            if ($isPerUserServiceInstance) {
-                $comment = $comment + "`nFull service name: '$($_.ServiceName)'."
-            }
-            $displayServiceName = $trimmedServiceName
-            $perUserNote = ""
-            if ($_.Vendor -in $CORE_MICROSOFT_VENDORS) {
-                $dedupeKey = "ms|$($_.Vendor)|$trimmedServiceName|$($_.ExePath)"
-                if (-not $reportedServiceKeys.ContainsKey($dedupeKey)) {
-                    $reportedServiceKeys[$dedupeKey] = $true
-                    if ($perUserMicrosoftGroupFlags[$dedupeKey]) {
-                        $displayServiceName = "$trimmedServiceName" + "_*"
-                        $perUserNote = " (Per-user service of base service '$trimmedServiceName')"
-                        if (-not $isPerUserServiceInstance) {
-                            $fullPerUserServiceName = $perUserMicrosoftGroupExampleNames[$dedupeKey]
-                            if ($fullPerUserServiceName) {
-                                $comment = $comment + "`nFull service name: '$fullPerUserServiceName'."
-                            }
+        $comment = "Admin must verify if service is legit and needed. Service Description: '$($_.DisplayName)'`nExecutable: '$($_.ExePath)'.`nPolicy identity: $codeIdentityText."
+        if ($_.PSObject.Properties['PayloadType'] -and (-not [string]::IsNullOrWhiteSpace($_.PayloadType))) {
+            $comment = $comment + "`nPayload type: $($_.PayloadType)."
+        }
+        if ($isPerUserServiceInstance) {
+            $comment = $comment + "`nFull service name: '$($_.ServiceName)'."
+        }
+        $displayServiceName = $trimmedServiceName
+        $perUserNote = ""
+        if ($_.Vendor -in $CORE_MICROSOFT_VENDORS) {
+            $dedupeKey = "ms|$($_.Vendor)|$trimmedServiceName|$($_.ExePath)"
+            if (-not $reportedServiceKeys.ContainsKey($dedupeKey)) {
+                $reportedServiceKeys[$dedupeKey] = $true
+                if ($perUserMicrosoftGroupFlags[$dedupeKey]) {
+                    $displayServiceName = "$trimmedServiceName" + "_*"
+                    $perUserNote = " (Per-user service of base service '$trimmedServiceName')"
+                    if (-not $isPerUserServiceInstance) {
+                        $fullPerUserServiceName = $perUserMicrosoftGroupExampleNames[$dedupeKey]
+                        if ($fullPerUserServiceName) {
+                            $comment = $comment + "`nFull service name: '$fullPerUserServiceName'."
                         }
-                    } else {
-                        $displayServiceName = $trimmedServiceName
-                        $perUserNote = ""
                     }
-                    Write-Warning "[NOTICE] Found Microsoft service: Vendor='$($_.Vendor)' Name='$displayServiceName'$perUserNote$extra_msg`n$comment"
+                } else {
+                    $displayServiceName = $trimmedServiceName
+                    $perUserNote = ""
                 }
-            } elseif ((-not $isHostServer) -and ($_.Vendor -in $COMMON_VENDORS_FOR_WORKSTATIONS)) {
-                if ($isPerUserServiceInstance) {
-                    $displayServiceName = "$trimmedServiceName" + "_*"
-                    $perUserNote = " (Per-user service of base service '$trimmedServiceName')"
-                }
-                Write-Warning "[NOTICE] Found service from a common workstation vendor: Vendor='$($_.Vendor)' Name='$displayServiceName'$perUserNote$extra_msg`n$comment"
-            } else {
-                if ($isPerUserServiceInstance) {
-                    $displayServiceName = "$trimmedServiceName" + "_*"
-                    $perUserNote = " (Per-user service of base service '$trimmedServiceName')"
-                }
-                Write-Warning "[WARNING] Found service from an unusual or higher-risk vendor: Vendor='$($_.Vendor)' Name='$displayServiceName'$perUserNote$extra_msg`n$comment"
+                Write-Warning "[NOTICE] Found service: Vendor='$($_.Vendor)' Name='$displayServiceName'$perUserNote fingerprint=$serviceFingerprint$extra_msg`n$comment"
             }
+        } elseif ((-not $isHostServer) -and ($_.Vendor -in $COMMON_VENDORS_FOR_WORKSTATIONS)) {
+            if ($isPerUserServiceInstance) {
+                $displayServiceName = "$trimmedServiceName" + "_*"
+                $perUserNote = " (Per-user service of base service '$trimmedServiceName')"
+            }
+            Write-Warning "[NOTICE] Found service: Vendor='$($_.Vendor)' Name='$displayServiceName'$perUserNote fingerprint=$serviceFingerprint$extra_msg`n$comment"
+        } else {
+            if ($isPerUserServiceInstance) {
+                $displayServiceName = "$trimmedServiceName" + "_*"
+                $perUserNote = " (Per-user service of base service '$trimmedServiceName')"
+            }
+            Write-Warning "[WARNING] Found service: Vendor='$($_.Vendor)' Name='$displayServiceName'$perUserNote fingerprint=$serviceFingerprint$extra_msg`n$comment"
         }
     }
     if ($ok) {Write-Warning "[PASS] Found no services"}

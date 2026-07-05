@@ -70,10 +70,10 @@ Default: empty (show all). Typical value: `DIP`
 (Parameter set: Run) Alias for `-SkipSlowTests` (kept for backward compatibility).
 
 .PARAMETER SkipPolicyTests
-(Parameter set: Run) Skips health tests tagged as policy inventory tests (`Tags: Policy` in their help block), such as `HealthTest-InstalledSW`.
+(Parameter set: Run) Skips health tests tagged as policy inventory tests (`Tags: Policy` in their help block), such as `HealthTest-ListInstalledPrograms`.
 
 .PARAMETER DontAutosetPolicy
-(Parameter set: Run) Disables first-run auto-baselining for policy tests (`Tags: Policy`, e.g. `HealthTest-InstalledSW`). By default, first run auto-suppresses emitted `[NOTICE]`/`[WARNING]` findings for each policy test and records a marker in the suppression file.
+(Parameter set: Run) Disables first-run auto-baselining for policy tests (`Tags: Policy`, e.g. `HealthTest-ListInstalledPrograms`). By default, first run auto-suppresses emitted `[NOTICE]`/`[WARNING]` findings for each policy test and records a marker in the suppression file. The marker includes the policy baseline version from the test help block (`Policy baseline version: N`, default 0) so a rewritten list test can establish a fresh baseline when the version is intentionally increased. Legacy markers without a baseline value are treated as baseline version 1.
 
 .PARAMETER IpsOfAllDcs
 (Parameter set: Run) Optional list of Domain Controller IP addresses passed in by the orchestrator. Stored in `$Global:GchData.IpsOfAllDcs` for health tests that need it.
@@ -94,7 +94,7 @@ Default: empty (show all). Typical value: `DIP`
 (Parameter sets: AddWhitelist, SetRequired; Mandatory) 8-hex signature to suppress or require (case-insensitive). Alias: `-Sig`.
 
 .PARAMETER Test
-(Parameter set: SetRequired; Mandatory) Health test name that must emit the required signature. You can use the short test name (for example `UnexpectedListeningPorts`) or the full function name (`HealthTest-UnexpectedListeningPorts`).
+(Parameter set: SetRequired; Mandatory) Health test name that must emit the required signature. You can use the short test name (for example `ListListeningPorts`) or the full function name (`HealthTest-ListListeningPorts`).
 
 .PARAMETER Comment
 (Parameter sets: AddWhitelist, SetRequired) Optional free text. For `-AddWhitelisting`, it is appended to the suppression line (non-ASCII characters are replaced with `?`). For `-SetAsRequired`, it becomes the stored description and the emitted failure message when the required signature is missing.
@@ -128,7 +128,7 @@ $out | Out-GridView
 
 .EXAMPLE
 # Mark a finding as required for a health test on this computer:
-.\Get-ComputerHealth.ps1 -SetAsRequired -ComputerName CONTOSO-SRV01 -Test UnexpectedListeningPorts -Signature bfc162fa -Comment "Port 443(IIS) should be listening but is not"
+.\Get-ComputerHealth.ps1 -SetAsRequired -ComputerName CONTOSO-SRV01 -Test ListListeningPorts -Signature bfc162fa -Comment "Port 443(IIS) should be listening but is not"
 
 .NOTES
 - Elevation is enforced for normal runs, whitelisting operations, and required-finding updates.
@@ -1213,15 +1213,58 @@ function Test-PolicyAutosetAlreadyPerformed {
   [CmdletBinding()]
   param(
     [Parameter(Mandatory)][string]$PolicyTestName,
+    [Parameter(Mandatory)][int]$PolicyBaselineVersion,
     [Parameter(Mandatory)][string]$SuppressionFilePath
   )
 
   if (-not (Test-Path -LiteralPath $SuppressionFilePath)) { return $false }
-  $marker = "POLICY_TEST_WAS_RUN: $PolicyTestName"
+  $marker = Get-PolicyAutosetMarker -PolicyTestName $PolicyTestName -PolicyBaselineVersion $PolicyBaselineVersion
+  $legacyMarker = "POLICY_TEST_WAS_RUN: $PolicyTestName"
   foreach ($line in (Get-Content -LiteralPath $SuppressionFilePath -ErrorAction SilentlyContinue)) {
-    if ($line -and ($line.Trim() -eq $marker)) { return $true }
+    if (-not $line) { continue }
+
+    $trimmedLine = $line.Trim()
+    if ($trimmedLine -eq $marker) { return $true }
+
+    if (($PolicyBaselineVersion -eq 1) -and ($trimmedLine -eq $legacyMarker)) {
+      return $true
+    }
   }
   return $false
+}
+
+function Get-PolicyBaselineVersion {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)][string]$FunctionName
+  )
+
+  $cmd = Get-Command -Name $FunctionName -CommandType Function -ErrorAction SilentlyContinue
+  $definition = if ($cmd) { [string]$cmd.Definition } else { '' }
+  if (-not $definition) { return 0 }
+
+  $matches = @([regex]::Matches($definition, '(?im)^\s*Policy baseline version:\s*(.+?)\s*$'))
+  if ($matches.Count -eq 0) { return 0 }
+  if ($matches.Count -gt 1) {
+    throw "Multiple Policy baseline version lines found in $FunctionName."
+  }
+
+  $versionText = ([string]$matches[0].Groups[1].Value).Trim()
+  if ($versionText -notmatch '^\d+$') {
+    throw "Invalid Policy baseline version '$versionText' in $FunctionName. Use a non-negative integer."
+  }
+
+  return [int]$versionText
+}
+
+function Get-PolicyAutosetMarker {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)][string]$PolicyTestName,
+    [Parameter(Mandatory)][int]$PolicyBaselineVersion
+  )
+
+  return "POLICY_TEST_WAS_RUN: $PolicyTestName baseline=$PolicyBaselineVersion"
 }
 
 function Invoke-HealthTestWithPolicyAutoset {
@@ -1245,8 +1288,9 @@ function Invoke-HealthTestWithPolicyAutoset {
   }
   $isPolicyTest = $meta.IsPolicyTest
   $policyTestName = $meta.TestName
+  $policyBaselineVersion = Get-PolicyBaselineVersion -FunctionName $FunctionName
   $shouldAutoset = $isPolicyTest -and (-not $DontAutosetPolicy) -and `
-  (-not (Test-PolicyAutosetAlreadyPerformed -PolicyTestName $policyTestName -SuppressionFilePath $script:Config.SuppressSignaturesPath))
+  (-not (Test-PolicyAutosetAlreadyPerformed -PolicyTestName $policyTestName -PolicyBaselineVersion $policyBaselineVersion -SuppressionFilePath $script:Config.SuppressSignaturesPath))
 
   $records = @(Invoke-HealthTest $FunctionName)
 
@@ -1277,7 +1321,7 @@ function Invoke-HealthTestWithPolicyAutoset {
       Log-Info "No policy findings to auto-suppress during first run of $($meta.FunctionName)."
     }
 
-    Add-AsciiLine -Line "POLICY_TEST_WAS_RUN: $policyTestName" -Path $script:Config.SuppressSignaturesPath
+    Add-AsciiLine -Line (Get-PolicyAutosetMarker -PolicyTestName $policyTestName -PolicyBaselineVersion $policyBaselineVersion) -Path $script:Config.SuppressSignaturesPath
   }
 
   $records = @(Invoke-RequiredFindingsValidation -FunctionName $FunctionName -Records $records -RequiredFindings $script:RequiredFindings)
@@ -1385,7 +1429,8 @@ if ($ListAllBuiltInTests) {
   Sort-Object Name |
   ForEach-Object { . $_.FullName }
 
-  $allHealthTests = Get-Command -CommandType Function -Name 'HealthTest-*' -ErrorAction SilentlyContinue
+  $allHealthTests = Get-Command -CommandType Function -Name 'HealthTest-*' -ErrorAction SilentlyContinue |
+    Sort-Object -Property Name
   Get-HealthTest $allHealthTests
   return
 }

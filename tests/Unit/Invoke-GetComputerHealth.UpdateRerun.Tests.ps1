@@ -25,8 +25,17 @@ Describe 'Invoke-GetComputerHealth update rerun handling' {
   It 'uses a dedicated child-parameter helper instead of forwarding arbitrary wrapper arguments' {
     $script:ScriptText | Should -Match 'function Get-ChildHealthInvocationParameters'
     $script:ScriptText | Should -Match 'IpsOfAllDcs\s*=\s*@\(\$IpsOfAllDcs\)'
+    $script:ScriptText | Should -Match 'OnlyTheseTests\s*=\s*@\(\$OnlyTheseTests\)'
+    $script:ScriptText | Should -Match 'ExcludeTests\s*=\s*@\(\$ExcludeTests\)'
+    $script:ScriptText | Should -Match 'SuppressSigs\s*=\s*@\(\$WhitelistSigs\)'
     $script:ScriptText | Should -Match 'RunWithoutElevation\s*=\s*\[bool\]\$RunWithoutElevation'
     $script:ScriptText | Should -Not -Match '@getHealthParams @PassThruArgs'
+  }
+
+  It 'declares list-like wrapper arguments as string arrays' {
+    $script:ScriptText | Should -Match '\[string\[\]\]\$WhitelistSigs\s*=\s*@\(\)'
+    $script:ScriptText | Should -Match '\[string\[\]\]\$OnlyTheseTests\s*=\s*@\(\)'
+    $script:ScriptText | Should -Match '\[string\[\]\]\$ExcludeTests\s*=\s*@\(\)'
   }
 
   It 'invokes the local health-check block with a single payload object' {

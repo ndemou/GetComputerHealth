@@ -70,6 +70,9 @@ Category: Configuration Hygiene & Best Practices
 Impact: low
 Tags: Policy
 Uses: Get-WindowsFeature.
+
+Policy identity: Windows feature name. Display name, install date, and current runtime state are not included.
+Policy baseline version: 1
 #>
   [CmdletBinding()]
   $roles = $null

@@ -163,7 +163,7 @@ You can acomplish this in two steps:
 1. Identify the signature of the finding you want to require.
 2. Mark it as required and provide a description for future-you:
 
-> `C:\IT\Get-ComputerHealth\bin\Get-ComputerHealth.ps1 -SetAsRequired -ComputerName $env:computername -Test UnexpectedListeningPorts -Signature bfc162fa -Comment "Port 443(IIS) should be listening but is not"`
+> `C:\IT\Get-ComputerHealth\bin\Get-ComputerHealth.ps1 -SetAsRequired -ComputerName $env:computername -Test ListListeningPorts -Signature bfc162fa -Comment "Port 443(IIS) should be listening but is not"`
 
 > **IMPLEMENTATION DETAILS**: Required findings are stored in `C:\IT\Get-ComputerHealth\config\required_findings.psd1`. When a configured test runs, Get-ComputerHealth records the signatures it emitted. If one of that test's required signatures is missing, Get-ComputerHealth emits a new failure explaining that the required finding was not produced.
 
@@ -295,7 +295,7 @@ If you only want to add a few custom tests, you do not need to modify the core c
 | AdminSDHolderCoverage            | Reports whether AdminSDHolder protection is currently applied to any users |
 | ADReplicationHealth              | Uses repadmin and local RSAT cross-checks to detect AD replication failures and stale replication |
 | ADViewConsistency                | Verifies that domain controllers agree on the DC list and FSMO role holders |
-| AutoStartServicesRunning         | Reports auto-start services that are not running, with extra context from their last exit code |
+| Services                         | Reviews service operational health, including auto-start services that are not running, abnormal service exit codes, and broken service payload paths |
 | BitLockerStatus                  | Checks whether detected volumes are protected by BitLocker |
 | CertExpiry                       | Checks for certificates that are expired or nearing expiration |
 | ConnectivityToDCs                | Checks DNS resolution and TCP connectivity to discovered domain controllers |
@@ -338,7 +338,6 @@ If you only want to add a few custom tests, you do not need to modify the core c
 | HyperVRunningVMs                 | Lists running Hyper-V virtual machines on the host |
 | IisBindings                      | Checks IIS bindings for wildcard or otherwise risky binding configurations |
 | ListRolesFeatures                | Lists installed Windows roles and features |
-| InstalledSW                      | Reports installed software not present in the baseline inventory |
 | InterfaceDnsServersUseDcs        | Checks whether member-server network interfaces use domain controllers as DNS servers |
 | IPv6Binding                      | Checks whether IPv6 is bound on network adapters as expected |
 | IsTPMActivated                   | Checks whether the TPM is present and activated |
@@ -346,14 +345,18 @@ If you only want to add a few custom tests, you do not need to modify the core c
 | KrbtgtAge                        | Checks whether the KRBTGT password has been rotated within the allowed age threshold |
 | LargeDirectories                 | Finds directories with more than 10000 child items |
 | LdapSigningChannelBinding        | Checks whether LDAP signing and channel binding enforcement are enabled |
+| ListInstalledPrograms            | Reports installed software not present in the baseline inventory |
+| ListListeningPorts               | Lists externally reachable TCP listening ports with process and publisher context |
 | LocalAcntRequirePass             | Checks whether local accounts require passwords |
 | ListLocalAdmins                 | Lists members of the local Administrators group |
 | MalwareProtectionFeatures        | Checks Microsoft Defender malware protection status and updates signatures when needed |
 | NetworkConnectionProfiles        | Checks network connection profiles and basic connectivity expectations for each active network |
 | Nic                              | Checks network adapters for unhealthy status or suspicious error counters |
 | NltestSiteDiscovery              | Checks whether site discovery returns a valid AD site for the computer |
-| ListShares                       | Lists SMB shares and notes when file and print sharing is unnecessarily enabled |
-| ListServices                     | Lists services and highlights unusual or suspicious service vendors |
+| ListScheduledTasks               | Lists scheduled task definitions with fingerprints for actions, triggers, identity, privilege, and enabled state |
+| ListShares                       | Lists SMB shares |
+| ListServices                     | Lists service definitions with payload publisher/hash context for policy review |
+| ListStartupItems                 | Lists startup items found in standard registry and startup-folder locations |
 | NtdsLogVolumeFree                | Checks whether the NTDS log volume has enough free space |
 | NtdsPathsLocation                | Checks whether the NTDS database and log paths are on expected volumes |
 | NtfsDirtyBit                     | Checks whether any NTFS volumes have the dirty bit set |
@@ -373,21 +376,19 @@ If you only want to add a few custom tests, you do not need to modify the core c
 | RodcPrp                          | Checks whether each read-only domain controller has a Password Replication Policy configured |
 | RunningProcesses                 | Emits a suppressed inventory notice for each running process |
 | SchanelBaseline                  | Checks whether Schannel disables legacy protocols and keeps TLS 1.2 enabled |
-| ScheduledTasks                   | Reviews non-Microsoft scheduled tasks for failures and excessive missed runs |
-| ScheduledTasksLastResult         | Parses scheduled task last-result data and reports task failures or warnings |
+| ScheduledTasks                   | Reviews scheduled tasks for failed results, disabled required tasks, missed runs, stale runs, and unreadable metadata |
 | SchemaVersionConsistency         | Checks whether all domain controllers report the same AD schema version |
 | SeriousRecentEventLogs           | Checks recent event logs for serious shutdown, bugcheck, disk, or application crash events |
 | ServiceAccountsPwdNeverExpires   | Checks for service accounts whose passwords are set to never expire |
 | ShadowStorage                    | Checks whether Volume Shadow Copy storage is configured and sized within the recommended range |
 | ShareReasonableness              | Checks SMB shares for risky or unreasonable share exposure |
+| Shares                           | Checks SMB sharing service hygiene when no shares are present |
 | SingleDefaultGateway             | Checks for multiple default gateways and validates that the active gateway configuration is sensible |
 | Smb1Disabled                     | Checks whether SMBv1 is disabled |
 | SmbSigningRequired               | Checks whether the SMB server requires signing when the server service is running |
 | SoftwareLicensing                | Checks Windows software licensing state and activation status |
 | StaleRdpSessions                 | Checks for idle or disconnected RDP sessions older than the allowed threshold |
-| StartupItems                     | Lists startup items found in standard registry and startup-folder locations |
 | Storage                          | Checks physical disks for predictive failure, unhealthy status, temperature, and reliability warnings |
-| SystemScheduledTasks             | Checks relevant SYSTEM scheduled tasks for disabled, stale, or failing states |
 | SysvolAclHygiene                 | Checks whether SYSVOL grants write access to overly broad principals |
 | SysvolContentConsistency         | Checks whether SYSVOL policy content is present and consistent across domain controllers |
 | SysvolNetlogonAccessible         | Checks whether each domain controller exposes reachable SYSVOL and NETLOGON shares |
@@ -396,7 +397,6 @@ If you only want to add a few custom tests, you do not need to modify the core c
 | TombstoneLifetime                | Checks whether the AD tombstoneLifetime meets the minimum baseline |
 | TrustsVerify                     | Verifies Active Directory trusts and reports any trust validation failures |
 | UnconstrainedDelegationAccounts  | Checks for accounts that are configured for unconstrained delegation |
-| UnexpectedListeningPorts         | Compares listening TCP ports to the baseline and identifies unexpected listeners with process context |
 | UnsignedDrivers                  | Checks for installed PnP driver packages that appear unsigned |
 | UnusedEnabledAdapters            | Checks for enabled network adapters that are disconnected and likely unused |
 | UpdateAge                        | Checks how long it has been since the latest installed Windows update |

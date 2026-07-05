@@ -736,10 +736,6 @@ Uses: None.
     Write-Warning "[PASS] No certificates expiring within $WarnDays days"
 }
 
-# TODO: consolidate this and HealthTest-ScheduledTasksLastResult
-# I think the later seems does more robust detection of issues based on Last Result
-
-
 function HealthTest-IisBindings {
 <#
 Description: Checks IIS bindings for wildcard or otherwise risky binding configurations.

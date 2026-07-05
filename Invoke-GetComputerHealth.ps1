@@ -97,9 +97,9 @@ Forces email sending regardless of whether the script is running in an interacti
 
 param(
   [string]$Hide = "DIP",
-  [string]$WhitelistSigs,
-  [string]$OnlyTheseTests,
-  [string]$ExcludeTests,
+  [string[]]$WhitelistSigs = @(),
+  [string[]]$OnlyTheseTests = @(),
+  [string[]]$ExcludeTests = @(),
   [string[]]$ExcludeServers = @(),
   [Alias('DebugSkipSlowTests')]
   [switch]$SkipSlowTests,
@@ -602,9 +602,9 @@ function Get-ChildHealthInvocationParameters {
   [CmdletBinding()]
   param(
     [string]$Hide,
-    [string]$OnlyTheseTests,
-    [string]$ExcludeTests,
-    [string]$WhitelistSigs,
+    [string[]]$OnlyTheseTests = @(),
+    [string[]]$ExcludeTests = @(),
+    [string[]]$WhitelistSigs = @(),
     [switch]$SkipSlowTests,
     [switch]$SkipPolicyTests,
     [switch]$SkipNonEssentialTests,
@@ -617,9 +617,9 @@ function Get-ChildHealthInvocationParameters {
     OutputObjects         = $true
     OutputConsoleMessages = $true
     Hide                  = $Hide
-    OnlyTheseTests        = $OnlyTheseTests
-    ExcludeTests          = $ExcludeTests
-    SuppressSigs          = $WhitelistSigs
+    OnlyTheseTests        = @($OnlyTheseTests)
+    ExcludeTests          = @($ExcludeTests)
+    SuppressSigs          = @($WhitelistSigs)
     SkipSlowTests         = [bool]$SkipSlowTests
     SkipPolicyTests       = [bool]$SkipPolicyTests
     SkipNonEssentialTests = [bool]$SkipNonEssentialTests

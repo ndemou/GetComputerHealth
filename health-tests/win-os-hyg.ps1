@@ -2223,36 +2223,89 @@ Uses: Get-LiveSessionInfo.
     }
 }
 
+function Get-PolicyListShortHash {
+  [CmdletBinding()]
+  param([Parameter(Mandatory)][string]$Text)
+
+  $bytes = [Text.Encoding]::UTF8.GetBytes($Text)
+  $algorithm = [Security.Cryptography.HashAlgorithm]::Create('SHA256')
+  try {
+    $hash = -join ($algorithm.ComputeHash($bytes) | ForEach-Object { $_.ToString('x2') })
+    return $hash.Substring(0, 16)
+  } finally {
+    if ($algorithm) { $algorithm.Dispose() }
+  }
+}
+
+function Normalize-PolicyListText {
+  [CmdletBinding()]
+  param([AllowNull()][object]$Value)
+
+  if ($null -eq $Value) { return '' }
+  return (([string]$Value).Trim() -replace '\s+', ' ').ToLowerInvariant()
+}
+
 function HealthTest-ListShares {
 <#
-Description: Lists SMB shares and notes when file and print sharing is unnecessarily enabled.
+Description: Lists SMB shares.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: low
-Tags: Essential, Policy
+Tags: Policy
 Uses: None.
+
+Policy identity: normalized share name and normalized shared path. Share runtime use, connection count, and service state are not included.
+Policy baseline version: 1
+#>
+    $shares = @(Get-CimInstance -ClassName Win32_Share | Select-Object Name, Path, Type, Description)
+    if ($shares.Count -gt 0) {
+        foreach ($share in $shares) {
+            $identityText = 'name=' + (Normalize-PolicyListText $share.Name) + '|path=' + (Normalize-PolicyListText $share.Path)
+            $policyId = Get-PolicyListShortHash -Text $identityText
+            Write-Warning "[WARNING] Found SMB share: $($share.Name) fingerprint=$policyId`nPath: $($share.Path)`nType: $($share.Type)`nDescription: $($share.Description)`nIdentity: $identityText"
+        }
+    } else {
+        Write-Warning "[PASS] No SMB shares discovered."
+    }
+}
+
+function HealthTest-Shares {
+<#
+Description: Checks SMB sharing service hygiene when no shares are present.
+AppliesTo: All
+Scope: Computer
+Category: Configuration Hygiene & Best Practices
+Impact: low
+Tags: Essential
+Uses: Get-Service, Win32_ComputerSystem, Win32_Share.
 #>
   # 0(Workstation standalone),  1(Workstation domain joined), 2(Server standalone), 3(Server joined), 4(DC non-FSMO), 5(DC with FSMO role)
   $domainRole = (Get-CimInstance Win32_ComputerSystem).DomainRole
   $isHostDC = ($domainRole -in 4,5)
+  $shares = @(Get-CimInstance -ClassName Win32_Share | Select-Object Name, Path)
+  $lanManServerService = Get-Service -Name "LanmanServer"
 
-    $lanManServer_service = (get-service -Name "LanmanServer")
-    $shares = Get-CimInstance -ClassName Win32_Share | Select-Object Name, Path
-    if ($shares) {
-        $shares | ForEach-Object { Write-Warning "[WARNING] Found a share named '$($_.name)' that shares '$($_.Path)'" }
+  if ($shares.Count -gt 0) {
+    Write-Warning "[PASS] SMB shares exist; file and print sharing service state is expected."
+    return
+  }
+
+  if ($lanManServerService.Status -eq 'Stopped') {
+    Write-Warning "[PASS] Found no shares and LanmanServer service is stopped."
+    return
+  }
+
+  if (-not $isHostDC -and ($lanManServerService.Status -ne 'Stopped' -or $lanManServerService.StartType -ne 'Disabled')) {
+    if ($domainRole -ge 2) {
+      Write-Warning "[WARNING] File and print sharing is enabled but no SMB shares were discovered.`nRun this if you want to disable it:`n   Set-Service -Name 'LanmanServer' -StartupType Disabled; Stop-Service -Name 'LanmanServer'"
     } else {
-        if ((Get-Service  -Name "LanmanServer").status -eq 'Stopped') {
-            Write-Warning "[PASS] Found no shares and LanMan service is stopped."} else {
-            Write-Warning "[PASS] Found no shares."; if (!$isHostDC -and ($lanManServer_service.status -ne 'stopped' -or $lanManServer_service.StartType -ne 'Disabled')) {
-                if ((Get-CimInstance Win32_ComputerSystem).DomainRole -ge 2) { # server
-                    Write-Warning "[WARNING] File & print sharing is enabled. It's recomended to disable it unless you really need it`nRun this if you want to disable:`n   Set-Service -Name 'LanmanServer' -StartupType Disabled; Stop-Service -Name 'LanmanServer'"
-                } else { # workstation
-                    Write-Output ("File & print sharing is enabled on a workstation." + "`n" + "You may consider disabling it to reduce the attack surface")
-                }
-            }
-        }
+      Write-Warning "[NOTICE] File and print sharing is enabled on a workstation but no SMB shares were discovered.`nConsider disabling LanmanServer to reduce attack surface if sharing is not needed."
     }
+    return
+  }
+
+  Write-Warning "[PASS] No SMB share hygiene issues found."
 }
 
 
@@ -2584,6 +2637,9 @@ Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time)
 Tags: Policy
 Uses: None.
+
+Policy identity: normalized account authority and account name as reported for the local Administrators group. Lookup timestamps and transient ADSI object paths are not included.
+Policy baseline version: 1
 #>
     $pass = $true
 
@@ -2611,103 +2667,125 @@ Uses: None.
     }
 }
 
-function HealthTest-UnexpectedListeningPorts {
+function Get-ListeningPortAddressScope {
+  [CmdletBinding()]
+  param([AllowNull()][string]$LocalAddress)
+
+  if ([string]::IsNullOrWhiteSpace($LocalAddress)) { return 'unknown' }
+  if ($LocalAddress -in @('0.0.0.0', '::', '*')) { return 'any' }
+  if ($LocalAddress -in @('127.0.0.1', '::1')) { return 'loopback' }
+  return 'specific'
+}
+
+function Get-ListeningPortVendorText {
+  [CmdletBinding()]
+  param([AllowNull()][object]$VendorResult)
+
+  if ($null -eq $VendorResult) { return '' }
+  if ($VendorResult.PSObject.Properties.Name -contains 'Vendor') {
+    return [string]$VendorResult.Vendor
+  }
+
+  return [string]$VendorResult
+}
+
+function HealthTest-ListListeningPorts {
 <#
-Description: Compares listening TCP ports to the baseline and identifies unexpected listeners with process context.
+Description: Lists externally reachable TCP listening ports with process and publisher context.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: High(Time), Medium(Network)
+Tags: Policy
 Uses: Get-NetTCPConnection, Resolve-ExecutablePath, Get-ExeVendor.
+
+Policy identity: protocol, local port, address scope, process name, normalized executable path, and signed publisher/vendor when available. PID, concrete local IP address, and runtime connection state are not included.
+Policy baseline version: 1
 #>
     [CmdletBinding()] param(
-        [int[]]$AllowedPorts = @(53, 88, 123, 135, 139, 389, 445, 464, 636, 3268, 3269, 5722, 5985, 5986, 9389),
-        [int[]]$OptionalNoticePorts = @(3389, 47001, 593),
         [int]$DynamicStart = 49152,
-        [int]$DynamicEnd = 65535
+        [int]$DynamicEnd = 65535,
+        [switch]$IncludeDynamic,
+        [switch]$IncludeLoopback
     )
 
-# From a brand new Lenovo:
-#    FAILURE:[01d04124] Unexpected listening port: 7680 (Process: svchost)
-#    FAILURE:[3d641d0f] Unexpected listening port: 5040 (Process: svchost)
-#
-#   From Intel ATM:
-#       FAILURE:[5fbea54a] Unexpected listening port: 623 (Process: LMS)
-#       FAILURE:[58582cc2] Unexpected listening port: 16992 (Process: LMS)
+    $allListening = @(Get-NetTCPConnection -State Listen)
+    $factsByIdentity = @{}
 
-    $domainRole = (Get-CimInstance Win32_ComputerSystem).DomainRole
-    $isHostServer = ($domainRole  -in 3,4,5)
+    foreach ($connection in $allListening) {
+        $port = [int]$connection.LocalPort
+        if ((-not $IncludeDynamic) -and $port -ge $DynamicStart -and $port -le $DynamicEnd) { continue }
 
-    # 1. Get all listening connections
-    $AllListening = Get-NetTCPConnection -State Listen
+        $addressScope = Get-ListeningPortAddressScope -LocalAddress ([string]$connection.LocalAddress)
+        if ((-not $IncludeLoopback) -and $addressScope -eq 'loopback') { continue }
 
-    # 2. Filter out connections where the LocalAddress is *only* the localhost loopback (127.0.0.1 or ::1)
-    $ExternalListening = $AllListening | Where-Object {
-        $_.LocalAddress -ne '127.0.0.1' -and $_.LocalAddress -ne '::1'
-    }
+        $procId = [int]$connection.OwningProcess
+        $processName = ''
+        $processPath = ''
+        $vendorText = ''
 
-    # 3. Group the connections by port number. This ensures each port is checked only once.
-    # This replaces the old method of selecting only the port number, so we retain the process ID.
-    $listeningPortGroups = $ExternalListening | Group-Object -Property LocalPort
+        if ($procId -eq 4) {
+            $processName = 'System'
+            $vendorText = 'Microsoft Windows'
+            $processPath = 'pid4-system'
+        }
+        else {
+            $proc = Get-Process -Id $procId -ErrorAction SilentlyContinue
+            if ($proc) {
+                $processName = [string]$proc.ProcessName
+                if ($proc.Path) {
+                    $processPath = [string]$proc.Path
+                } else {
+                    $resolveCommand = Get-Command -Name Resolve-ExecutablePath -ErrorAction SilentlyContinue
+                    if ($resolveCommand) {
+                        $resolved = Resolve-ExecutablePath $proc.ProcessName
+                        if ($resolved) { $processPath = [string]$resolved }
+                    }
+                }
 
-    $bad = $false
-    # 4. Loop through each group of connections (one group per unique port).
-    foreach ($portGroup in $listeningPortGroups) {
-        $comment = ""
-        $p = [int]$portGroup.Name # The port number is the 'Name' of the group
-
-        if ($p -ge $DynamicStart -and $p -le $DynamicEnd) { continue } # ignore ephemeral
-        if ($AllowedPorts -contains $p) { continue }
-
-        # For optional and unexpected ports, we'll find the process name.
-        # Get the Process ID from the first connection object in the group.
-        $procID = $portGroup.Group[0].OwningProcess
-        # Use the ID to get the process name. ErrorAction handles cases where the process might have just ended.
-        $vendor="(failed to find)"
-        if ($procID -eq 4) {
-            $procDescr="Process=SYSTEM(PID=4)"
-            $vendor="Microsoft Windows" # PID 4 is Microsoft Windows system process
-        } else {
-            $proc = (Get-Process -Id $procID -ErrorAction SilentlyContinue)
-            if (-not $proc) {
-                $procDescr = "PID $procID not found"
-                $comment = "The process that was listening terminated before we had the chance to query it. That's unusual."
-            } else {
-                if ($proc.path) {$procPath=Resolve-ExecutablePath $proc.path} else {$procPath=Resolve-ExecutablePath $proc.ProcessName}
-                try {$vendor=Get-ExeVendor $procPath} catch {}
-                $procDescr="$($proc.ProcessName)"
-                $comment = "Vendor: '$vendor'; Process Path: '$procPath'"
+                if (-not [string]::IsNullOrWhiteSpace($processPath)) {
+                    try {
+                        $vendorText = Get-ListeningPortVendorText -VendorResult (Get-ExeVendor -Exe $processPath)
+                    } catch {}
+                }
+            }
+            else {
+                $processName = 'pid-not-found'
             }
         }
 
-        if ($OptionalNoticePorts -contains $p) {
-            # Added process name to the notice message for extra context.
-            Write-Warning "[NOTICE] Optional baseline port is listening: $p ($procDescr)"
-            continue
-        }
-
-        $bad = $true
-
-        if ($vendor.PSObject.Properties.Name -contains 'Vendor') {
-            $vendorDescr=$vendor.Vendor
-        } else {
-            $vendorDescr=$vendor
-        }
-
-        # Display the unexpected port along with the listening process name.
-        # If vendor is like "Microsoft Windows*" then level becomes "WARNING" for servers and "NOTICE" for workstations
-        if ($vendorDescr -like "Microsoft Windows*") {
-            if($isHostServer){
-                Write-Warning "[WARNING] Unexpected listening port: $p (Process: $procDescr, Vendor: $vendor)`n$comment"
-            } else {
-                Write-Warning "[NOTICE] Unexpected listening port: $p (Process: $procDescr, Vendor: $vendor)`n$comment"
+        $identityText = 'protocol=tcp|port=' + $port + '|scope=' + (Normalize-PolicyListText $addressScope) + '|process=' + (Normalize-PolicyListText $processName) + '|path=' + (Normalize-PolicyListText $processPath) + '|vendor=' + (Normalize-PolicyListText $vendorText)
+        if (-not $factsByIdentity.ContainsKey($identityText)) {
+            $factsByIdentity[$identityText] = [pscustomobject]@{
+                Port = $port
+                AddressScope = $addressScope
+                ProcessId = $procId
+                ProcessName = $processName
+                ProcessPath = $processPath
+                Vendor = $vendorText
+                LocalAddresses = New-Object System.Collections.Generic.List[string]
+                IdentityText = $identityText
             }
-        } else {
-            Write-Warning "[FAILURE] Unexpected listening port: $p (Process: $procDescr, Vendor: $vendor)`n$comment"
+        }
+
+        $localAddress = [string]$connection.LocalAddress
+        if (-not $factsByIdentity[$identityText].LocalAddresses.Contains($localAddress)) {
+            [void]$factsByIdentity[$identityText].LocalAddresses.Add($localAddress)
         }
     }
 
-    if (-not $bad) { Write-Warning "[PASS] Listening ports are within baseline"}
+    if ($factsByIdentity.Count -eq 0) {
+        Write-Warning "[PASS] No externally reachable TCP listening ports discovered outside the ignored dynamic range."
+        return
+    }
+
+    foreach ($fact in ($factsByIdentity.Values | Sort-Object Port, ProcessName, ProcessPath)) {
+        $policyId = Get-PolicyListShortHash -Text $fact.IdentityText
+        $level = 'WARNING'
+        if ($fact.Vendor -match '(?i)\bmicrosoft\b') { $level = 'NOTICE' }
+
+        Write-Warning "[$level] Found TCP listening port: $($fact.Port) fingerprint=$policyId`nProcess: $($fact.ProcessName) PID=$($fact.ProcessId)`nExecutable: $($fact.ProcessPath)`nVendor: $($fact.Vendor)`nAddress scope: $($fact.AddressScope)`nLocal addresses: $((@($fact.LocalAddresses) | Sort-Object) -join ', ')`nIdentity: $($fact.IdentityText)"
+    }
 }
 
 function Get-InstalledSW {
@@ -2869,7 +2947,7 @@ function Get-InstalledSoftwareFindingLevel {
     return 'warning'
 }
 
-function HealthTest-InstalledSW {
+function HealthTest-ListInstalledPrograms {
 <#
 Description: Reports installed software not present in the baseline inventory.
 AppliesTo: All
@@ -2878,6 +2956,9 @@ Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time)
 Tags: Policy
 Uses: Get-InstalledSW, Get-NormalizedSoftwareName, Get-InstalledSoftwareFindingLevel.
+
+Policy identity: normalized installed software name. Install date and discovery source are reported as detail but are not part of the finding headline.
+Policy baseline version: 1
 #>
     $seen = 0
     foreach ($sw in (Get-InstalledSW)) {

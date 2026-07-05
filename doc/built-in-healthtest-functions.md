@@ -51,6 +51,11 @@ The `Field: Value` lines follow this exact order (note that some are optional):
    7. `Uses:` optional, up to three essential non-built-in commands or helper functions used by the test.
    8. `FalsePositives:` optional short note, only if false positives are expected.
 
+  If `Tags:` includes `Policy`, the detailed part of the help block must also include:
+
+  - `Policy identity:` explaining what stable object identity or fingerprint appears in the first finding line.
+  - `Policy baseline version: N` where `N` is a non-negative integer. Use `1` for new built-in policy tests.
+
   Use `Uses:` to list the main non-built-in commands or helper functions the HealthTest depends on, for example:
 
   - module cmdlets such as `Get-ADUser`, `Get-DnsServerZone`, `Get-WindowsFeature`
@@ -96,6 +101,50 @@ Policy Health tests have special handling:
 - The first run automatically suppresses `[WARNING]` and `[NOTICE]` findings from that policy test (except if `-DontAutosetPolicy` is used)
 - `[FAILURE]` findings are not auto-suppressed
 - A flag is appended to `Get-ComputerHealth.sigs-to-suppress.txt` so future runs are treated normally
+- The auto-baseline flag includes the test's `Policy baseline version`
+
+### Evidence Identity and Policy/Hygiene Boundaries
+
+Policy tests work best when each emitted finding has a stable, intentional identity. The identity is whatever must appear in the first warning line so the generic message-signature and `Policy` suppression machinery can distinguish a known finding from a new one.
+
+Do not overbuild this. Use the simplest identity that matches the review need:
+
+- If the object identity is enough, put that identity in the first line. Examples: local administrator account, installed role name, share name plus path, or installed software name.
+- If the same object can change in security- or operations-relevant ways while keeping the same object name, add a compact definition fingerprint. The fingerprint should include fields whose change should force human review.
+- Keep volatile runtime status out of policy identity. Last run time, next run time, current state, process ID, missed run count, last result, queue depth, and similar facts usually belong in health findings or comments, not in a policy ID.
+
+Every built-in policy test must document its identity and baseline version in the help block:
+
+```powershell
+Tags: Policy
+Uses: Get-Something.
+
+Policy identity: normalized object name plus review-worthy definition fingerprint.
+Policy baseline version: 1
+```
+
+Increase `Policy baseline version` when a code change changes the meaning of first-run auto-baselining enough that existing automatic baselines should be rebuilt. Typical reasons include changing the policy identity, adding important fields to a fingerprint, removing fields that made the old fingerprint misleading, or splitting/merging policy findings. Do not increase it for wording-only changes, comment/detail changes, severity changes, or collector refactoring that leaves the policy identity semantics intact.
+
+The runtime treats a missing help-block baseline version as `0` for compatibility with older or custom tests. Old suppression files may already contain autoset markers that were written before baseline versions existed. Those legacy recorded markers are treated as baseline version `1`, so systems that already ran the older policy auto-baselining code do not unexpectedly auto-baseline again when a built-in policy test first declares `Policy baseline version: 1`. Built-in health tests are stricter: the unit tests fail any `Tags: Policy` help block that omits `Policy baseline version: N`.
+
+Only split a topic into separate policy and hygiene tests when both questions matter:
+
+- A policy listing answers: "What definitions exist, and are these definitions expected here?"
+- A hygiene test answers: "Is the current state/result of those definitions healthy?"
+
+Some topics need only one side. Installed software is usually just a policy listing. A DNS client service check may be only hygiene. Services and scheduled tasks naturally have both a definition/inventory side and a runtime health side.
+
+Use a shared normalized fact collector only when it pays for itself: when enumeration is expensive, interpretation is complicated, or multiple tests would otherwise duplicate fragile logic. A simple policy test that reads one object type once does not need a separate collector.
+
+Scheduled tasks are the full version of this pattern:
+
+- `HealthTest-ListScheduledTasks` is a `Policy` test that emits one finding per task definition.
+- The stable object key is task path plus task name.
+- The policy fingerprint includes review-worthy definition fields: actions, triggers, run account, run level, logon type, hidden state, and enabled state.
+- Runtime fields such as last run time, missed runs, and last result are deliberately excluded from that fingerprint.
+- `HealthTest-ScheduledTasks` is the separate hygiene test that reports disabled required tasks, failed last results, missed runs, stale runs, and unreadable task metadata.
+
+This lets the generic `Policy` handling baseline known scheduled-task definitions on first run. Later, a new task or a changed definition emits a new message signature without requiring a separate state file, while current operational failures remain visible through the hygiene test.
 
 ### Helpers
 

@@ -1,533 +1,1130 @@
-﻿<#
+<#
 Scheduled Task Master Cluster
 #>
 
-function HealthTest-ScheduledTasks {
-<#
-Description: Reviews non-Microsoft scheduled tasks for failures and excessive missed runs.
-AppliesTo: All
-Scope: Computer
-Category: Configuration Hygiene & Best Practices
-Impact: Medium(Time)
-Uses: Get-ScheduledTask, Get-ScheduledTaskInfo, Get-ScheduledTaskDeepInfo.
-#>
-    $task_name_paterns_to_ignore = @(
-      'OneDrive Per-Machine Standalone Update Task*',
-      'OneDrive Reporting Task*',
-      'OneDrive Standalone Update*',
-      'Office Feature Updates*',
-      'Firefox Background Update*',
-      'Firefox Default Browser Agent*',
-      'Office Actions Server*',
-      'Clipboard User Service*',
-      'Optimize Start Menu Cache Files-*',
-      'User_Feed_Synchronization-*',
-      'SoftLanding*'
-    )
-    $OK_TASK_RESULTS = @(0,267009,267010,267011,267012,267013,267014)
+$script:ScheduledTaskFactsCache = $null
 
-    $problem_found = $false
-    $tasks = Get-ScheduledTask -ErrorAction SilentlyContinue | ?{$_.TaskPath -notlike "\Microsoft\Windows\*"}
+function Reset-ScheduledTaskFactsCache {
+  [CmdletBinding()]
+  param()
 
-    foreach ($t in $tasks) {
-        $skip = $false
-        foreach ($p in $task_name_paterns_to_ignore) {
-          if ($t.TaskName -like $p) { $skip = $true; break }
-        }
-        if ($skip) { continue }
-
-        $i = Get-ScheduledTaskInfo -TaskName $t.TaskName -TaskPath $t.TaskPath -ErrorAction SilentlyContinue
-        $isDisabled = ($t.State -eq 'Disabled')
-        if ($i -and ($isDisabled -or $i.LastTaskResult -notin $OK_TASK_RESULTS -or $i.NumberOfMissedRuns -gt 0)) {
-            $problem_found = $true
-            $details=(Get-ScheduledTaskDeepInfo -TaskName $t.TaskName -TaskPath $t.TaskPath |
-              Select-Object state,actions,Description,RunAcntUserId,RunLogonType,LastRunTime,NextRunTime | %{
-                $_.PSObject.Properties |
-                  Where-Object { $_.Value -ne $null -and "$($_.Value)" -ne '' } |
-                    ForEach-Object {
-                      if ($_.Name -eq 'actions') {
-                        $acts = @($_.Value)
-                        foreach($a in $acts){
-                          if($null -eq $a){ continue }
-                          if($a.PSObject.Properties.Name -contains 'Execute'){
-                            "Command: $($a.Execute) $($a.Arguments)"
-                          } else {
-                            $t = $a.GetType().FullName
-                            "Action: $t"
-                          }
-                        }
-                      } else {
-                        "{0}: {1}" -f $_.Name, $_.Value
-                      }
-                    }
-              } | out-string)
-            $details = "Details about this task:`n" + $details
-            if ($isDisabled) {
-                Write-Warning "[NOTICE] Scheduled Task is disabled: '$($t.TaskPath)$($t.TaskName)'`n$details"
-                continue
-            }
-            if ($i.LastTaskResult -notin $OK_TASK_RESULTS) {
-                $meaning = Convert-TaskResultCode $i.LastTaskResult
-                Write-Warning "[WARNING] Scheduled Task with failures: '$($t.TaskPath)$($t.TaskName)'; Last exit code: $($i.LastTaskResult) ($meaning)`n$details"
-            }
-            if ($i.NumberOfMissedRuns -gt 0) {
-                if ($i.NumberOfMissedRuns -lt 5){
-                    if ($t.TaskName -like '*update*' `
-                        -or $t.TaskName -like '*Maintenance*' `
-                        -or $t.TaskName -in @('Office Serviceability Manager','Resolut Refresh') `
-                    ) {
-                        $details = "$($i.NumberOfMissedRuns) runs where missed. $details"
-                        Write-Warning "[info] Scheduled Task with just a few missed runs(<5): '$($t.TaskPath)$($t.TaskName)'`n$details"
-                    } else {
-                        $details = "$($i.NumberOfMissedRuns) runs where missed. $details"
-                        Write-Warning "[NOTICE] Scheduled Task with just a few missed runs(<5): '$($t.TaskPath)$($t.TaskName)'`n$details"
-                    }
-                } else {
-                    $details = "$($i.NumberOfMissedRuns) runs where missed. $details"
-                    Write-Warning "[WARNING] Scheduled Task with missed runs: '$($t.TaskPath)$($t.TaskName)'`n$details"
-                }
-            }
-        }
-    }
-    if ($problem_found) { return }
-
-    Write-Warning "[PASS] Scheduled tasks healthy (non-Microsoft)"
+  $script:ScheduledTaskFactsCache = $null
 }
 
-function HealthTest-SystemScheduledTasks{
-<#
-Description: Checks relevant SYSTEM scheduled tasks for disabled, stale, or failing states.
-AppliesTo: All
-Scope: Computer
-Category: Configuration Hygiene & Best Practices
-Impact: Medium(Time)
-Uses: Get-ScheduledTask, Get-ScheduledTaskInfo, Get-ScheduledTaskDeepInfo.
-#>
-  [CmdletBinding()] param(
-    [string[]]$MustBeEnabled = @(),  # exact paths or regex
-    [string[]]$Ignore = @(
-      '^\\Microsoft\\Windows\\(AppxDeploymentClient|Bluetooth|Clip|PushToInstall|SharedPC)\\',
-      '^\\Microsoft\\Windows\\(InstallService|WaaSMedic|UpdateOrchestrator)\\',
-      '^\\Microsoft\\Windows\\(PLA\\Server Manager Performance Monitor|File Classification Infrastructure\\Property Definition Sync)$',
-      '^\\Microsoft\\Windows\\\.NET Framework\\\.NET Framework NGEN v4\.0\.30319.*$',
-      '^\\Microsoft\\Windows\\Server Initial Configuration Task$'
-    ),
-    [switch]$IncludeHidden,
-    [switch]$IncludeBuiltIn,   # include Microsoft-authored tasks in checks
-    [int]$StaleDays = 30,
-    [switch]$WarnOnNonZeroLastResult
+function Get-ScheduledTaskDefaultNameIgnorePatterns {
+  @(
+    'OneDrive Per-Machine Standalone Update Task*',
+    'OneDrive Reporting Task*',
+    'OneDrive Standalone Update*',
+    'Office Feature Updates*',
+    'Firefox Background Update*',
+    'Firefox Default Browser Agent*',
+    'Office Actions Server*',
+    'Clipboard User Service*',
+    'Optimize Start Menu Cache Files-*',
+    'User_Feed_Synchronization-*',
+    'SoftLanding*'
+  )
+}
+
+function Get-ScheduledTaskDefaultPathIgnoreRegex {
+  @(
+    '^\\Microsoft\\Windows\\(AppxDeploymentClient|Bluetooth|Clip|PushToInstall|SharedPC)\\',
+    '^\\Microsoft\\Windows\\(InstallService|WaaSMedic|UpdateOrchestrator)\\',
+    '^\\Microsoft\\Windows\\(PLA\\Server Manager Performance Monitor|File Classification Infrastructure\\Property Definition Sync)$',
+    '^\\Microsoft\\Windows\\\.NET Framework\\\.NET Framework NGEN v4\.0\.30319.*$',
+    '^\\Microsoft\\Windows\\Server Initial Configuration Task$'
+  )
+}
+
+function Convert-ISODuration {
+  param([string]$Iso)
+
+  if (-not $Iso) { return $null }
+
+  $match = [regex]::Match($Iso, '^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$')
+  if (-not $match.Success) { return $Iso }
+
+  $parts = New-Object System.Collections.Generic.List[string]
+  if ($match.Groups[1].Value) {
+    $number = [int]$match.Groups[1].Value
+    $suffix = ''
+    if ($number -ne 1) { $suffix = 's' }
+    [void]$parts.Add("$number day$suffix")
+  }
+  if ($match.Groups[2].Value) {
+    $number = [int]$match.Groups[2].Value
+    $suffix = ''
+    if ($number -ne 1) { $suffix = 's' }
+    [void]$parts.Add("$number hour$suffix")
+  }
+  if ($match.Groups[3].Value) {
+    $number = [int]$match.Groups[3].Value
+    $suffix = ''
+    if ($number -ne 1) { $suffix = 's' }
+    [void]$parts.Add("$number minute$suffix")
+  }
+  if ($match.Groups[4].Value) {
+    $number = [int]$match.Groups[4].Value
+    $suffix = ''
+    if ($number -ne 1) { $suffix = 's' }
+    [void]$parts.Add("$number second$suffix")
+  }
+
+  if ($parts.Count -eq 0) { return $Iso }
+  return ($parts -join ' ')
+}
+
+function Convert-TaskResultCode {
+  param([int64]$Code)
+
+  $unsignedCode = ConvertTo-ScheduledTaskUInt32 -Code $Code
+  $hex = '0x{0:X8}' -f $unsignedCode
+  switch ($Code) {
+    0 { 'Success (0)' }
+    2147750687 { "Operator/admin refused ($hex)" }
+    2147942402 { "File not found ($hex)" }
+    2147942403 { "Path not found ($hex)" }
+    2147942405 { "Access denied ($hex)" }
+    2147954402 { "Service not started ($hex)" }
+    267008 { "Ready ($hex)" }
+    267009 { "Running ($hex)" }
+    267010 { "Disabled ($hex)" }
+    267011 { "Not yet run ($hex)" }
+    267012 { "No more runs ($hex)" }
+    267013 { "Terminated ($hex)" }
+    267014 { "No active triggers ($hex)" }
+    2147946720 { "Either wrong password or win32 error 0x800710E0('The operator or administrator has refused the request')" }
+    default {
+      $win32 = $Code
+      $numberStyle = [System.Globalization.NumberStyles]::HexNumber
+      $win32FacilityMask = [uint32]::Parse('FFFF0000', $numberStyle)
+      $win32Facility = [uint32]::Parse('80070000', $numberStyle)
+      if ($null -ne $unsignedCode -and (($unsignedCode -band $win32FacilityMask) -eq $win32Facility)) {
+        $win32 = $unsignedCode -band [uint32]::Parse('0000FFFF', $numberStyle)
+      }
+
+      $win32Message = ''
+      try {
+        $win32Message = (New-Object ComponentModel.Win32Exception ([int]$win32)).Message
+      } catch {
+        $win32Message = ''
+      }
+
+      if ($win32Message) {
+        "Possible win32 error $hex('$win32Message')"
+      } else {
+        "Non standard code hex=$hex"
+      }
+    }
+  }
+}
+
+function Get-ScheduledTaskPropertyValue {
+  param(
+    [AllowNull()][object]$InputObject,
+    [Parameter(Mandatory=$true)][string]$Name
   )
 
-  $hadIssue = $false
-  $isSystem       = { param($t) $t.Principal.UserId -match '^(NT AUTHORITY\\)?SYSTEM$' }
-  $isMicrosoft    = { param($t) ($t.Author -match 'Microsoft') -or ($t.TaskPath -like '\Microsoft\*') }
-  $shouldIgnore  = { param($path) foreach($rx in $Ignore){ if($path -match $rx){ return $true } } return $false }
-  $isRequired    = { param($path) foreach($rx in $MustBeEnabled){ if($path -match $rx){ return $true } } return $false }
-  $isTriggerEnabled = {
-    param($trigger)
-    if ($null -eq $trigger) { return $false }
+  if ($null -eq $InputObject) { return $null }
 
-    $enabledProp = $trigger.PSObject.Properties['Enabled']
-    if ($enabledProp) { return [bool]$enabledProp.Value }
+  $property = $InputObject.PSObject.Properties[$Name]
+  if ($property) { return $property.Value }
 
-    # Some scheduled-task trigger objects do not expose Enabled; treat them as enabled.
-    return $true
+  return $null
+}
+
+function ConvertTo-ScheduledTaskSimpleText {
+  param([AllowNull()][object]$Value)
+
+  if ($null -eq $Value) { return '' }
+
+  $text = [string]$Value
+  $text = $text.Trim()
+  $text = $text -replace '\s+', ' '
+  return $text
+}
+
+function ConvertTo-ScheduledTaskFingerprintText {
+  param([AllowNull()][object]$Value)
+
+  $text = ConvertTo-ScheduledTaskSimpleText -Value $Value
+  return $text.ToLowerInvariant()
+}
+
+function ConvertTo-ScheduledTaskListText {
+  param([AllowNull()][object]$Value)
+
+  if ($null -eq $Value) { return '' }
+  if ($Value -is [string]) { return (ConvertTo-ScheduledTaskSimpleText -Value $Value) }
+
+  $items = New-Object System.Collections.Generic.List[string]
+  foreach ($item in @($Value)) {
+    $text = ConvertTo-ScheduledTaskSimpleText -Value $item
+    if (-not [string]::IsNullOrWhiteSpace($text)) {
+      [void]$items.Add($text)
+    }
   }
-  $tasks = Get-ScheduledTask | Where-Object { & $isSystem $_ }
 
-  if(-not $IncludeHidden){ $tasks = $tasks | Where-Object { -not $_.Settings.Hidden } }
-  if(-not $IncludeBuiltIn){ $tasks = $tasks | Where-Object { -not (& $isMicrosoft $_) } }
+  return ($items -join ',')
+}
 
-  foreach($t in $tasks){
-    # Keep the leading "\" so paths look like \Microsoft\Windows\...
-    $path = Join-Path -Path $t.TaskPath -ChildPath $t.TaskName
-    if(& $shouldIgnore $path){ continue }
+function Normalize-ScheduledTaskPath {
+  param([AllowNull()][string]$TaskPath)
+
+  $path = ConvertTo-ScheduledTaskSimpleText -Value $TaskPath
+  if ([string]::IsNullOrWhiteSpace($path)) { $path = '\' }
+  $path = $path.Replace('/', '\')
+  if (-not $path.StartsWith('\')) { $path = '\' + $path }
+  if (-not $path.EndsWith('\')) { $path = $path + '\' }
+  return $path
+}
+
+function Get-ScheduledTaskStableKey {
+  param(
+    [AllowNull()][string]$TaskPath,
+    [AllowNull()][string]$TaskName
+  )
+
+  $path = Normalize-ScheduledTaskPath -TaskPath $TaskPath
+  $name = ConvertTo-ScheduledTaskSimpleText -Value $TaskName
+  return ($path + $name)
+}
+
+function Test-ScheduledTaskPrincipalPrivileged {
+  [CmdletBinding()]
+  param(
+    [AllowNull()][string]$PrincipalUserId,
+    [AllowNull()][string]$RunLevel
+  )
+
+  $runLevelText = ConvertTo-ScheduledTaskSimpleText -Value $RunLevel
+  if ($runLevelText -match '(?i)^highest') { return $true }
+
+  $principal = ConvertTo-ScheduledTaskSimpleText -Value $PrincipalUserId
+  if ([string]::IsNullOrWhiteSpace($principal)) { return $true }
+
+  $normalized = $principal.ToUpperInvariant()
+  $normalized = $normalized -replace '/', '\'
+
+  if ($normalized -in @('SYSTEM', 'NT AUTHORITY\SYSTEM')) { return $true }
+  if ($normalized -in @('LOCAL SERVICE', 'NT AUTHORITY\LOCAL SERVICE')) { return $true }
+  if ($normalized -in @('NETWORK SERVICE', 'NT AUTHORITY\NETWORK SERVICE')) { return $true }
+  if ($normalized -eq 'S-1-5-18') { return $true }
+  if ($normalized -eq 'S-1-5-19') { return $true }
+  if ($normalized -eq 'S-1-5-20') { return $true }
+  if ($normalized -eq 'S-1-5-32-544') { return $true }
+  if ($normalized -match '(^|\\)ADMINISTRATORS$') { return $true }
+  if ($normalized -match '(^|\\)DOMAIN ADMINS$') { return $true }
+  if ($normalized -match '(^|\\)ENTERPRISE ADMINS$') { return $true }
+
+  return $false
+}
+
+function Test-ScheduledTaskSystemPrincipal {
+  param([AllowNull()][string]$PrincipalUserId)
+
+  $principal = ConvertTo-ScheduledTaskSimpleText -Value $PrincipalUserId
+  if ([string]::IsNullOrWhiteSpace($principal)) { return $false }
+
+  return ($principal -match '^(?i)(NT AUTHORITY\\)?SYSTEM$')
+}
+
+function Test-ScheduledTaskBuiltInMicrosoft {
+  [CmdletBinding()]
+  param(
+    [AllowNull()][string]$TaskPath,
+    [AllowNull()][string]$Author
+  )
+
+  $path = Normalize-ScheduledTaskPath -TaskPath $TaskPath
+  if ($path -like '\Microsoft\*') { return $true }
+
+  $authorText = ConvertTo-ScheduledTaskSimpleText -Value $Author
+  if ($authorText -match '(?i)\bMicrosoft\b') { return $true }
+
+  return $false
+}
+
+function Test-ScheduledTaskTriggerEnabled {
+  param([AllowNull()][object]$Trigger)
+
+  if ($null -eq $Trigger) { return $false }
+
+  $enabled = Get-ScheduledTaskPropertyValue -InputObject $Trigger -Name 'Enabled'
+  if ($null -ne $enabled) { return [bool]$enabled }
+
+  return $true
+}
+
+function Get-ScheduledTaskActionType {
+  param([AllowNull()][object]$Action)
+
+  $actionType = Get-ScheduledTaskPropertyValue -InputObject $Action -Name 'ActionType'
+  if ($actionType) { return (ConvertTo-ScheduledTaskSimpleText -Value $actionType) }
+
+  $cimClass = Get-ScheduledTaskPropertyValue -InputObject $Action -Name 'CimClass'
+  if ($cimClass) {
+    $className = Get-ScheduledTaskPropertyValue -InputObject $cimClass -Name 'CimClassName'
+    if ($className) { return ((ConvertTo-ScheduledTaskSimpleText -Value $className) -replace '^MSFT_Task','') }
+  }
+
+  if ($null -ne $Action) {
+    return (ConvertTo-ScheduledTaskSimpleText -Value ($Action.PSObject.TypeNames | Select-Object -First 1))
+  }
+
+  return ''
+}
+
+function Get-ScheduledTaskTriggerType {
+  param([AllowNull()][object]$Trigger)
+
+  $triggerType = Get-ScheduledTaskPropertyValue -InputObject $Trigger -Name 'TriggerType'
+  if ($triggerType) { return (ConvertTo-ScheduledTaskSimpleText -Value $triggerType) }
+
+  $cimClass = Get-ScheduledTaskPropertyValue -InputObject $Trigger -Name 'CimClass'
+  if ($cimClass) {
+    $className = Get-ScheduledTaskPropertyValue -InputObject $cimClass -Name 'CimClassName'
+    if ($className) { return ((ConvertTo-ScheduledTaskSimpleText -Value $className) -replace '^MSFT_Task','') }
+  }
+
+  if ($null -ne $Trigger) {
+    return (ConvertTo-ScheduledTaskSimpleText -Value ($Trigger.PSObject.TypeNames | Select-Object -First 1))
+  }
+
+  return ''
+}
+
+function ConvertTo-ScheduledTaskActionFact {
+  param([AllowNull()][object]$Action)
+
+  $type = Get-ScheduledTaskActionType -Action $Action
+  $execute = ConvertTo-ScheduledTaskSimpleText -Value (Get-ScheduledTaskPropertyValue -InputObject $Action -Name 'Execute')
+  $arguments = ConvertTo-ScheduledTaskSimpleText -Value (Get-ScheduledTaskPropertyValue -InputObject $Action -Name 'Arguments')
+  $workingDirectory = ConvertTo-ScheduledTaskSimpleText -Value (Get-ScheduledTaskPropertyValue -InputObject $Action -Name 'WorkingDirectory')
+
+  $fingerprintParts = New-Object System.Collections.Generic.List[string]
+  [void]$fingerprintParts.Add('type=' + (ConvertTo-ScheduledTaskFingerprintText -Value $type))
+  [void]$fingerprintParts.Add('execute=' + (ConvertTo-ScheduledTaskFingerprintText -Value $execute))
+  [void]$fingerprintParts.Add('arguments=' + (ConvertTo-ScheduledTaskFingerprintText -Value $arguments))
+  [void]$fingerprintParts.Add('workingdirectory=' + (ConvertTo-ScheduledTaskFingerprintText -Value $workingDirectory))
+
+  [pscustomobject]@{
+    Type = $type
+    Execute = $execute
+    Arguments = $arguments
+    WorkingDirectory = $workingDirectory
+    FingerprintText = ($fingerprintParts -join ';')
+  }
+}
+
+function ConvertTo-ScheduledTaskTriggerFact {
+  param([AllowNull()][object]$Trigger)
+
+  $repetition = Get-ScheduledTaskPropertyValue -InputObject $Trigger -Name 'Repetition'
+  $interval = ''
+  $duration = ''
+  $stopAtDurationEnd = ''
+  if ($null -ne $repetition) {
+    $interval = ConvertTo-ScheduledTaskSimpleText -Value (Get-ScheduledTaskPropertyValue -InputObject $repetition -Name 'Interval')
+    $duration = ConvertTo-ScheduledTaskSimpleText -Value (Get-ScheduledTaskPropertyValue -InputObject $repetition -Name 'Duration')
+    $stopAtDurationEnd = ConvertTo-ScheduledTaskSimpleText -Value (Get-ScheduledTaskPropertyValue -InputObject $repetition -Name 'StopAtDurationEnd')
+  }
+
+  $enabled = Test-ScheduledTaskTriggerEnabled -Trigger $Trigger
+  $type = Get-ScheduledTaskTriggerType -Trigger $Trigger
+  $startBoundary = ConvertTo-ScheduledTaskSimpleText -Value (Get-ScheduledTaskPropertyValue -InputObject $Trigger -Name 'StartBoundary')
+  $endBoundary = ConvertTo-ScheduledTaskSimpleText -Value (Get-ScheduledTaskPropertyValue -InputObject $Trigger -Name 'EndBoundary')
+  $randomDelay = ConvertTo-ScheduledTaskSimpleText -Value (Get-ScheduledTaskPropertyValue -InputObject $Trigger -Name 'RandomDelay')
+  $executionTimeLimit = ConvertTo-ScheduledTaskSimpleText -Value (Get-ScheduledTaskPropertyValue -InputObject $Trigger -Name 'ExecutionTimeLimit')
+  $daysOfWeek = ConvertTo-ScheduledTaskListText -Value (Get-ScheduledTaskPropertyValue -InputObject $Trigger -Name 'DaysOfWeek')
+  $daysOfMonth = ConvertTo-ScheduledTaskListText -Value (Get-ScheduledTaskPropertyValue -InputObject $Trigger -Name 'DaysOfMonth')
+  $monthsOfYear = ConvertTo-ScheduledTaskListText -Value (Get-ScheduledTaskPropertyValue -InputObject $Trigger -Name 'MonthsOfYear')
+
+  $fingerprintParts = New-Object System.Collections.Generic.List[string]
+  [void]$fingerprintParts.Add('type=' + (ConvertTo-ScheduledTaskFingerprintText -Value $type))
+  [void]$fingerprintParts.Add('enabled=' + (ConvertTo-ScheduledTaskFingerprintText -Value $enabled))
+  [void]$fingerprintParts.Add('start=' + (ConvertTo-ScheduledTaskFingerprintText -Value $startBoundary))
+  [void]$fingerprintParts.Add('end=' + (ConvertTo-ScheduledTaskFingerprintText -Value $endBoundary))
+  [void]$fingerprintParts.Add('interval=' + (ConvertTo-ScheduledTaskFingerprintText -Value $interval))
+  [void]$fingerprintParts.Add('duration=' + (ConvertTo-ScheduledTaskFingerprintText -Value $duration))
+  [void]$fingerprintParts.Add('stopatdurationend=' + (ConvertTo-ScheduledTaskFingerprintText -Value $stopAtDurationEnd))
+  [void]$fingerprintParts.Add('randomdelay=' + (ConvertTo-ScheduledTaskFingerprintText -Value $randomDelay))
+  [void]$fingerprintParts.Add('executiontimelimit=' + (ConvertTo-ScheduledTaskFingerprintText -Value $executionTimeLimit))
+  [void]$fingerprintParts.Add('daysofweek=' + (ConvertTo-ScheduledTaskFingerprintText -Value $daysOfWeek))
+  [void]$fingerprintParts.Add('daysofmonth=' + (ConvertTo-ScheduledTaskFingerprintText -Value $daysOfMonth))
+  [void]$fingerprintParts.Add('monthsofyear=' + (ConvertTo-ScheduledTaskFingerprintText -Value $monthsOfYear))
+
+  [pscustomobject]@{
+    Type = $type
+    Enabled = $enabled
+    StartBoundary = $startBoundary
+    EndBoundary = $endBoundary
+    Interval = $interval
+    Duration = $duration
+    StopAtDurationEnd = $stopAtDurationEnd
+    RandomDelay = $randomDelay
+    ExecutionTimeLimit = $executionTimeLimit
+    DaysOfWeek = $daysOfWeek
+    DaysOfMonth = $daysOfMonth
+    MonthsOfYear = $monthsOfYear
+    FingerprintText = ($fingerprintParts -join ';')
+  }
+}
+
+function ConvertTo-ScheduledTaskLastResultCode {
+  param([AllowNull()][object]$Value)
+
+  if ($null -eq $Value) { return $null }
+
+  $text = ConvertTo-ScheduledTaskSimpleText -Value $Value
+  if ([string]::IsNullOrWhiteSpace($text)) { return $null }
+  if ($text -eq 'N/A') { return $null }
+
+  if ($text -match '(?i)^0x([0-9a-f]{1,8})$') {
+    return [int64]([uint32]::Parse($matches[1], [System.Globalization.NumberStyles]::HexNumber))
+  }
+
+  if ($text -match '^-?\d+$') {
+    return [int64]$text
+  }
+
+  return $null
+}
+
+function ConvertTo-ScheduledTaskUInt32 {
+  param([AllowNull()][object]$Code)
+
+  if ($null -eq $Code) { return $null }
+
+  try {
+    $code64 = [int64]$Code
+    $unsigned64 = [uint64]($code64 -band 0xFFFFFFFFFFFFFFFF)
+    return [uint32]($unsigned64 -band 0x00000000FFFFFFFF)
+  } catch {
+    return $null
+  }
+}
+
+function Get-ScheduledTaskLastResultDescription {
+  param(
+    [AllowNull()][object]$Code,
+    [AllowNull()][object]$UInt32Code,
+    [bool]$IsBareWin32
+  )
+
+  $mapHresult = @{
+    '0x40010004' = 'Process terminated externally'
+    '0x80070001' = 'Incorrect function'
+    '0x80070002' = 'File or path not found'
+    '0x80070003' = 'Path not found'
+    '0x80070005' = 'Access denied'
+    '0x8007000A' = 'Invalid environment'
+    '0x8007000B' = 'Bad EXE format or architecture mismatch'
+    '0x80070070' = 'Disk full'
+    '0x8007052E' = 'Logon failure (bad username/password)'
+    '0x80070533' = 'Account disabled'
+    '0x800705B4' = 'Operation timed out'
+    '0x800706BA' = 'RPC server unavailable'
+    '0x80040121' = 'Storage access denied'
+    '0x80040154' = 'COM class not registered'
+    '0x800401F5' = 'COM application not found'
+    '0x8004130F' = 'Task engine execution error/timeout'
+    '0x80004005' = 'Unspecified failure'
+    '0x80090020' = 'Cryptographic/DPAPI failure'
+    '0xC000006D' = 'Logon failure'
+    '0xC000006A' = 'Wrong password'
+    '0xC0000064' = 'Unknown user'
+    '0xC0000072' = 'Account disabled'
+    '0xC0000234' = 'Account locked out'
+  }
+
+  $mapWin32Bare = @{
+    '1056' = 'Service already running'
+    '1326' = 'Logon failure (bad username/password)'
+    '1331' = 'Account disabled'
+    '1909' = 'Account locked out'
+  }
+
+  if ($null -ne $UInt32Code) {
+    $uint32Text = [string]$UInt32Code
+    $hexText = '0x{0:X8}' -f $UInt32Code
+
+    if ($IsBareWin32 -and $mapWin32Bare.ContainsKey($uint32Text)) {
+      return $mapWin32Bare[$uint32Text]
+    }
+
+    if ($mapHresult.ContainsKey($hexText)) {
+      return $mapHresult[$hexText]
+    }
+  }
+
+  if ($null -ne $Code) {
+    return (Convert-TaskResultCode ([int64]$Code))
+  }
+
+  return 'Unknown failure'
+}
+
+function Get-ScheduledTaskLastResultAnalysis {
+  param([AllowNull()][object]$RawValue)
+
+  $code = ConvertTo-ScheduledTaskLastResultCode -Value $RawValue
+  $u32 = ConvertTo-ScheduledTaskUInt32 -Code $code
+  $hex = ''
+  if ($null -ne $u32) {
+    $hex = '0x{0:X8}' -f $u32
+  }
+
+  $isBare = $false
+  if ($null -ne $u32) {
+    $isBare = ($u32 -in @(1056, 1326, 1331, 1909))
+  }
+
+  $severity = 'Error'
+  if ($isBare) {
+    $severity = 'Error'
+  }
+  elseif ($null -ne $u32) {
+    $numberStyle = [System.Globalization.NumberStyles]::HexNumber
+    $severityMask = [uint32]::Parse('C0000000', $numberStyle)
+    $errorSeverity = [uint32]::Parse('80000000', $numberStyle)
+    $warningSeverity = [uint32]::Parse('40000000', $numberStyle)
+    $severityBits = ($u32 -band $severityMask)
+    if ($severityBits -eq $errorSeverity) {
+      $severity = 'Error'
+    }
+    elseif ($severityBits -eq $warningSeverity) {
+      $severity = 'Warning'
+    }
+    else {
+      $severity = 'Success'
+    }
+  }
+
+  $isInformational = $false
+  if ($null -ne $u32) {
+    $numberStyle = [System.Globalization.NumberStyles]::HexNumber
+    $successCode = [uint32]::Parse('00000000', $numberStyle)
+    $successFlag = [uint32]::Parse('10000000', $numberStyle)
+    $terminatedExternally = [uint32]::Parse('40010004', $numberStyle)
+    $serviceAlreadyRunning = [uint32]1056
+    $schedSuccessStart = [uint32]::Parse('00041300', $numberStyle)
+    $schedSuccessEnd = [uint32]::Parse('000413FF', $numberStyle)
+    if ($u32 -in ([uint32[]]($successCode, $successFlag, $terminatedExternally, $serviceAlreadyRunning))) {
+      $isInformational = $true
+    }
+    elseif ($severity -eq 'Success') {
+      $isInformational = $true
+    }
+    elseif ($u32 -ge $schedSuccessStart -and $u32 -le $schedSuccessEnd) {
+      $isInformational = $true
+    }
+  }
+
+  $description = Get-ScheduledTaskLastResultDescription -Code $code -UInt32Code $u32 -IsBareWin32:$isBare
+
+  [pscustomobject]@{
+    RawValue = $RawValue
+    Code = $code
+    UInt32Code = $u32
+    Hex = $hex
+    Severity = $severity
+    Description = $description
+    IsInformational = $isInformational
+  }
+}
+
+function ConvertTo-ScheduledTaskExceptionInfo {
+  param([AllowNull()][object]$ErrorRecord)
+
+  $caughtException = $null
+  $exceptionTypeName = 'unknown exception type'
+  $exceptionMessage = 'No exception details were available.'
+  $hexCode = 'unknown'
+
+  if ($null -ne $ErrorRecord) {
+    try { $caughtException = $ErrorRecord.Exception } catch {}
+  }
+
+  if ($null -ne $caughtException) {
     try {
-        $info = Get-ScheduledTaskInfo -TaskName $t.TaskName -TaskPath $t.TaskPath -ErrorAction Stop
-    } catch [Microsoft.Management.Infrastructure.CimException] {
-        $caughtException = $null
-        $exceptionMessage = 'No exception details were available.'
-        $hexCode = 'unknown'
+      $typeName = $caughtException.GetType().Name
+      if (-not [string]::IsNullOrWhiteSpace($typeName)) {
+        $exceptionTypeName = $typeName
+      }
+    } catch {}
 
-        if ($null -ne $_) {
-            try { $caughtException = $_.Exception } catch {}
-        }
-        if ($null -ne $caughtException) {
-            try {
-                if (-not [string]::IsNullOrWhiteSpace($caughtException.Message)) {
-                    $exceptionMessage = $caughtException.Message
-                }
-            } catch {}
-            try { $hexCode = '0x{0:X8}' -f ([uint32]$caughtException.HResult) } catch {}
-        }
+    try {
+      if (-not [string]::IsNullOrWhiteSpace($caughtException.Message)) {
+        $exceptionMessage = $caughtException.Message
+      }
+    } catch {}
 
-        switch ($hexCode) {
-            '0x80070002' {
-                Write-Warning "[NOTICE] Task '$path' was deleted while we were examining it."
-            }
-            '0x8004130F' {
-                Write-Warning "[WARNING] Task XML for '$path' is corrupted."
-            }
-            default {
-                Write-Warning "[FAILURE] Task '$path' failed with CIM Error $hexCode ($exceptionMessage)"
-            }
-        }
-        continue
-    } catch {
-        $caughtException = $null
-        $exceptionTypeName = 'unknown exception type'
-        $exceptionMessage = 'No exception details were available.'
+    try {
+      $hexCode = '0x{0:X8}' -f ([uint32]$caughtException.HResult)
+    } catch {}
+  }
 
-        if ($null -ne $_) {
-            try { $caughtException = $_.Exception } catch {}
-        }
-        if ($null -ne $caughtException) {
-            try {
-                $typeName = $caughtException.GetType().Name
-                if (-not [string]::IsNullOrWhiteSpace($typeName)) {
-                    $exceptionTypeName = $typeName
-                }
-            } catch {}
-            try {
-                if (-not [string]::IsNullOrWhiteSpace($caughtException.Message)) {
-                    $exceptionMessage = $caughtException.Message
-                }
-            } catch {}
-        }
+  $kind = 'QueryFailure'
+  switch ($hexCode) {
+    '0x80070002' { $kind = 'DeletedDuringScan' }
+    '0x8004130F' { $kind = 'CorruptXml' }
+  }
 
-        Write-Warning "[FAILURE] Task '$path' encountered an unexpected $exceptionTypeName error: $exceptionMessage"
-        continue
+  [pscustomobject]@{
+    Kind = $kind
+    HexCode = $hexCode
+    Message = $exceptionMessage
+    TypeName = $exceptionTypeName
+  }
+}
+
+function Get-ScheduledTaskDefinitionFingerprintText {
+  [CmdletBinding()]
+  param([Parameter(Mandatory=$true)]$Fact)
+
+  $parts = New-Object System.Collections.Generic.List[string]
+  [void]$parts.Add('key=' + (ConvertTo-ScheduledTaskFingerprintText -Value $Fact.StableKey))
+  [void]$parts.Add('principal=' + (ConvertTo-ScheduledTaskFingerprintText -Value $Fact.PrincipalUserId))
+  [void]$parts.Add('runlevel=' + (ConvertTo-ScheduledTaskFingerprintText -Value $Fact.RunLevel))
+  [void]$parts.Add('logontype=' + (ConvertTo-ScheduledTaskFingerprintText -Value $Fact.LogonType))
+  [void]$parts.Add('hidden=' + (ConvertTo-ScheduledTaskFingerprintText -Value $Fact.Hidden))
+  [void]$parts.Add('enabled=' + (ConvertTo-ScheduledTaskFingerprintText -Value $Fact.Enabled))
+
+  foreach ($action in @($Fact.Actions)) {
+    [void]$parts.Add('action=' + (ConvertTo-ScheduledTaskFingerprintText -Value $action.FingerprintText))
+  }
+
+  foreach ($trigger in @($Fact.Triggers)) {
+    [void]$parts.Add('trigger=' + (ConvertTo-ScheduledTaskFingerprintText -Value $trigger.FingerprintText))
+  }
+
+  return ($parts -join '|')
+}
+
+function Get-ScheduledTaskShortHash {
+  param([Parameter(Mandatory=$true)][string]$Text)
+
+  $bytes = [Text.Encoding]::UTF8.GetBytes($Text)
+  $algorithm = [Security.Cryptography.HashAlgorithm]::Create('SHA256')
+  try {
+    $hash = -join ($algorithm.ComputeHash($bytes) | ForEach-Object { $_.ToString('x2') })
+    return $hash.Substring(0, 16)
+  } finally {
+    if ($algorithm) { $algorithm.Dispose() }
+  }
+}
+
+function Get-ScheduledTaskDefinitionFingerprint {
+  [CmdletBinding()]
+  param([Parameter(Mandatory=$true)]$Fact)
+
+  $text = Get-ScheduledTaskDefinitionFingerprintText -Fact $Fact
+  return (Get-ScheduledTaskShortHash -Text $text)
+}
+
+function Get-ScheduledTaskFacts {
+  [CmdletBinding()]
+  param([switch]$Refresh)
+
+  if ((-not $Refresh) -and ($null -ne $script:ScheduledTaskFactsCache)) {
+    return @($script:ScheduledTaskFactsCache)
+  }
+
+  try {
+    $tasks = @(Get-ScheduledTask -ErrorAction Stop)
+  } catch {
+    throw "Failed to enumerate scheduled tasks: $($_.Exception.Message)"
+  }
+
+  $facts = New-Object System.Collections.Generic.List[object]
+  foreach ($task in $tasks) {
+    $taskPath = Normalize-ScheduledTaskPath -TaskPath (Get-ScheduledTaskPropertyValue -InputObject $task -Name 'TaskPath')
+    $taskName = ConvertTo-ScheduledTaskSimpleText -Value (Get-ScheduledTaskPropertyValue -InputObject $task -Name 'TaskName')
+    $stableKey = Get-ScheduledTaskStableKey -TaskPath $taskPath -TaskName $taskName
+    $settings = Get-ScheduledTaskPropertyValue -InputObject $task -Name 'Settings'
+    $principal = Get-ScheduledTaskPropertyValue -InputObject $task -Name 'Principal'
+    $state = ConvertTo-ScheduledTaskSimpleText -Value (Get-ScheduledTaskPropertyValue -InputObject $task -Name 'State')
+
+    $settingsEnabled = Get-ScheduledTaskPropertyValue -InputObject $settings -Name 'Enabled'
+    if ($null -ne $settingsEnabled) {
+      $enabled = [bool]$settingsEnabled
+    } else {
+      $enabled = ($state -ne 'Disabled')
     }
-    $enabled = [bool]$t.Settings.Enabled
-    $state = $t.State
-    $hasEnabledTrigger = ($t.Triggers | Where-Object { & $isTriggerEnabled $_ } | Select-Object -First 1) -ne $null
-    $lastRun = $info.LastRunTime
-    if (-not $lastRun) {$lastRun = [datetime]::MinValue}
-    $lastRes = ('0x{0:X8}' -f ([uint32]$info.LastTaskResult))
 
-    # 1) Disabled tasks
-    if(-not $enabled -or $state -eq 'Disabled'){
-      $hadIssue = $true
-      if(& $isRequired $path){ Write-Warning "[FAILURE] Required SYSTEM task is disabled: $path" }
-      else { Write-Warning "[WARNING] SYSTEM task is disabled: $path" }
-      continue
-    }
+    $hidden = $false
+    $hiddenValue = Get-ScheduledTaskPropertyValue -InputObject $settings -Name 'Hidden'
+    if ($null -ne $hiddenValue) { $hidden = [bool]$hiddenValue }
 
-    # 2) Stale runs (only if triggers exist)
-    if($hasEnabledTrigger -and $StaleDays -gt 0){
-      if(($lastRun -eq [datetime]::MinValue) -or ((Get-Date) - $lastRun).TotalDays -gt $StaleDays){
-        $hadIssue = $true
-        $lastRunText = if ($lastRun -eq [datetime]::MinValue) { 'never' } else { ([datetime]$lastRun).ToString('yyyy-MM-dd') }
-        Write-Warning "[WARNING] SYSTEM task appears stale: $path ; LastRun=$lastRunText (> $StaleDays days or never)"
+    $actions = New-Object System.Collections.Generic.List[object]
+    foreach ($action in @((Get-ScheduledTaskPropertyValue -InputObject $task -Name 'Actions'))) {
+      if ($null -ne $action) {
+        [void]$actions.Add((ConvertTo-ScheduledTaskActionFact -Action $action))
       }
     }
 
-    # 3) Non-zero last result (optional)
-    if($WarnOnNonZeroLastResult -and $info.LastTaskResult -ne 0){
-      $hadIssue = $true
-      if(& $isRequired $path){ Write-Warning "[FAILURE] Required SYSTEM task has non-zero LastTaskResult: $path ; Code=$lastRes" }
-      else { Write-Warning "[WARNING] SYSTEM task has non-zero LastTaskResult: $path ; Code=$lastRes" }
+    $triggers = New-Object System.Collections.Generic.List[object]
+    $hasEnabledTrigger = $false
+    foreach ($trigger in @((Get-ScheduledTaskPropertyValue -InputObject $task -Name 'Triggers'))) {
+      if ($null -eq $trigger) { continue }
+      $triggerFact = ConvertTo-ScheduledTaskTriggerFact -Trigger $trigger
+      [void]$triggers.Add($triggerFact)
+      if ($triggerFact.Enabled) { $hasEnabledTrigger = $true }
     }
+
+    $info = $null
+    $infoError = $null
+    try {
+      $info = Get-ScheduledTaskInfo -TaskName $taskName -TaskPath $taskPath -ErrorAction Stop
+    } catch {
+      $infoError = ConvertTo-ScheduledTaskExceptionInfo -ErrorRecord $_
+    }
+
+    $description = ''
+    $xmlError = $null
+    try {
+      $xmlText = Export-ScheduledTask -TaskName $taskName -TaskPath $taskPath -ErrorAction Stop
+      if (-not [string]::IsNullOrWhiteSpace($xmlText)) {
+        $xml = [xml]$xmlText
+        $description = ConvertTo-ScheduledTaskSimpleText -Value $xml.Task.RegistrationInfo.Description
+      }
+    } catch {
+      $xmlError = ConvertTo-ScheduledTaskExceptionInfo -ErrorRecord $_
+    }
+
+    $lastTaskResult = $null
+    if ($null -ne $info) {
+      $lastTaskResult = Get-ScheduledTaskPropertyValue -InputObject $info -Name 'LastTaskResult'
+    }
+
+    $lastResultAnalysis = Get-ScheduledTaskLastResultAnalysis -RawValue $lastTaskResult
+    $lastRunTime = $null
+    $nextRunTime = $null
+    $numberOfMissedRuns = 0
+    if ($null -ne $info) {
+      $lastRunTime = Get-ScheduledTaskPropertyValue -InputObject $info -Name 'LastRunTime'
+      $nextRunTime = Get-ScheduledTaskPropertyValue -InputObject $info -Name 'NextRunTime'
+      $missedRunsValue = Get-ScheduledTaskPropertyValue -InputObject $info -Name 'NumberOfMissedRuns'
+      if ($null -ne $missedRunsValue) {
+        try { $numberOfMissedRuns = [int]$missedRunsValue } catch { $numberOfMissedRuns = 0 }
+      }
+    }
+
+    $author = ConvertTo-ScheduledTaskSimpleText -Value (Get-ScheduledTaskPropertyValue -InputObject $task -Name 'Author')
+    $principalUserId = ConvertTo-ScheduledTaskSimpleText -Value (Get-ScheduledTaskPropertyValue -InputObject $principal -Name 'UserId')
+    $principalDisplayName = ConvertTo-ScheduledTaskSimpleText -Value (Get-ScheduledTaskPropertyValue -InputObject $principal -Name 'DisplayName')
+    $runLevel = ConvertTo-ScheduledTaskSimpleText -Value (Get-ScheduledTaskPropertyValue -InputObject $principal -Name 'RunLevel')
+    $logonType = ConvertTo-ScheduledTaskSimpleText -Value (Get-ScheduledTaskPropertyValue -InputObject $principal -Name 'LogonType')
+    $actionFacts = @($actions.ToArray())
+    $triggerFacts = @($triggers.ToArray())
+
+    $fact = [pscustomobject]@{
+      TaskPath = $taskPath
+      TaskName = $taskName
+      StableKey = $stableKey
+      State = $state
+      Enabled = $enabled
+      Hidden = $hidden
+      Author = $author
+      Description = $description
+      PrincipalUserId = $principalUserId
+      PrincipalDisplayName = $principalDisplayName
+      RunLevel = $runLevel
+      LogonType = $logonType
+      Actions = $actionFacts
+      Triggers = $triggerFacts
+      HasEnabledTrigger = $hasEnabledTrigger
+      LastRunTime = $lastRunTime
+      NextRunTime = $nextRunTime
+      NumberOfMissedRuns = $numberOfMissedRuns
+      LastTaskResult = $lastTaskResult
+      LastResultCode = $lastResultAnalysis.Code
+      LastResultHex = $lastResultAnalysis.Hex
+      LastResultSeverity = $lastResultAnalysis.Severity
+      LastResultDescription = $lastResultAnalysis.Description
+      LastResultIsInformational = $lastResultAnalysis.IsInformational
+      InfoQueryFailed = ($null -ne $infoError)
+      InfoErrorKind = if ($infoError) { $infoError.Kind } else { '' }
+      InfoErrorHexCode = if ($infoError) { $infoError.HexCode } else { '' }
+      InfoErrorMessage = if ($infoError) { $infoError.Message } else { '' }
+      XmlQueryFailed = ($null -ne $xmlError)
+      XmlErrorKind = if ($xmlError) { $xmlError.Kind } else { '' }
+      XmlErrorHexCode = if ($xmlError) { $xmlError.HexCode } else { '' }
+      XmlErrorMessage = if ($xmlError) { $xmlError.Message } else { '' }
+      IsPrivileged = (Test-ScheduledTaskPrincipalPrivileged -PrincipalUserId $principalUserId -RunLevel $runLevel)
+      IsSystemPrincipal = (Test-ScheduledTaskSystemPrincipal -PrincipalUserId $principalUserId)
+      IsMicrosoftBuiltIn = (Test-ScheduledTaskBuiltInMicrosoft -TaskPath $taskPath -Author $author)
+      PolicyFingerprint = ''
+    }
+
+    $fact.PolicyFingerprint = Get-ScheduledTaskDefinitionFingerprint -Fact $fact
+    [void]$facts.Add($fact)
   }
 
-  if(-not $hadIssue){ Write-Warning "[PASS] All relevant SYSTEM scheduled tasks are enabled and healthy" }
+  $script:ScheduledTaskFactsCache = @($facts.ToArray())
+  return @($script:ScheduledTaskFactsCache)
 }
 
-
-function Convert-ISODuration{
-  param([string]$Iso)
-  if(-not $Iso){return $null}
-  $m=[regex]::Match($Iso,'^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$')
-  if(-not $m.Success){return $Iso}
-  $parts=@()
-  if($m.Groups[1].Value){$n=[int]$m.Groups[1].Value;$parts+=("$n day"+($(if($n-ne 1){'s'}else{''})))}
-  if($m.Groups[2].Value){$n=[int]$m.Groups[2].Value;$parts+=("$n hour"+($(if($n-ne 1){'s'}else{''})))}
-  if($m.Groups[3].Value){$n=[int]$m.Groups[3].Value;$parts+=("$n minute"+($(if($n-ne 1){'s'}else{''})))}
-  if($m.Groups[4].Value){$n=[int]$m.Groups[4].Value;$parts+=("$n second"+($(if($n-ne 1){'s'}else{''})))}
-  if($parts.Count -eq 0){return $Iso}
-  $parts -join ' '
-}
-
-
-function Convert-TaskResultCode{
-  param([int64]$Code)
-  $hex = ('0x{0:X8}' -f $Code)
-  switch($Code){
-    0{"Success (0)"}
-    2147750687{"Operator/admin refused ($hex)"}
-    2147942402{"File not found ($hex)"}
-    2147942403{"Path not found ($hex)"}
-    2147942405{"Access denied ($hex)"}
-    2147954402{"Service not started ($hex)"}
-    267008{"Ready ($hex)"}
-    267009{"Running ($hex)"}
-    267010{"Disabled ($hex)"}
-    267011{"Not yet run ($hex)"}
-    267012{"No more runs ($hex)"}
-    267013{"Terminated ($hex)"}
-    267014{"No active triggers ($hex)"}
-    2147946720{"Either wrong password or win32 error 0x800710E0('The operator or administrator has refused the request')"}
-    default{
-          $win32 = if ($Code -band 0x80070000) { $Code -band 0xFFFF } else { $Code }
-          try {
-            $win32msg = (New-Object ComponentModel.Win32Exception ([int]$win32)).Message
-          } catch {
-            $win32msg = ""
-          }
-          if ($win32msg) {"Possible win32 error $hex('$win32msg')"} else {"Non standard code hex=$hex"}
-    }
-  }
-}
-
-
-function Get-ScheduledTaskDeepInfo{
-  [CmdletBinding()]param(
+function Get-ScheduledTaskDeepInfo {
+  [CmdletBinding()]
+  param(
     [Parameter(Mandatory=$true)][string]$TaskName,
     [string]$TaskPath
   )
 
-  function _TaskDesc($n,$p){
-    try{([xml](Export-ScheduledTask -TaskName $n -TaskPath $p -ErrorAction Stop)).Task.RegistrationInfo.Description}
-    catch{$null}
-  }
-  function _TrigType($tr){
-    if($tr.PSObject.Properties.Match('TriggerType').Count -and $tr.TriggerType){return $tr.TriggerType}
-    if($tr.PSObject.Properties.Match('CimClass').Count -and $tr.CimClass){return ($tr.CimClass.CimClassName -replace '^MSFT_Task','')}
-    ($tr.PSObject.TypeNames|Select-Object -First 1)
-  }
-  function _ActionType($a){
-    if($a.PSObject.Properties.Match('ActionType').Count -and $a.ActionType){return $a.ActionType}
-    if($a.PSObject.Properties.Match('CimClass').Count -and $a.CimClass){return ($a.CimClass.CimClassName -replace '^MSFT_Task','')}
-    ($a.PSObject.TypeNames|Select-Object -First 1)
-  }
-  function _ActionProp($a,$name){
-    $prop = $a.PSObject.Properties[$name]
-    if($prop){ return $prop.Value }
-    $null
-  }
-
-  $tasks = if($TaskPath){
-    Get-ScheduledTask -TaskName $TaskName -TaskPath $TaskPath -ErrorAction SilentlyContinue
-  }else{
-    Get-ScheduledTask -ErrorAction SilentlyContinue | Where-Object { $_.TaskName -eq $TaskName }
-  }
-  if(-not $tasks){ throw "Task '$TaskName' not found." }
-
-  $out=@()
-  foreach($t in $tasks){
-    $info=Get-ScheduledTaskInfo -TaskName $t.TaskName -TaskPath $t.TaskPath -ErrorAction SilentlyContinue
-    $full="$($t.TaskPath)$($t.TaskName)"
-    $desc=_TaskDesc $t.TaskName $t.TaskPath
-
-    $acts=@()
-    foreach($a in $t.Actions){
-      $acts+=[pscustomobject]@{
-        Type=_ActionType $a
-        Execute=_ActionProp $a 'Execute'
-        Arguments=_ActionProp $a 'Arguments'
-        WorkingDirectory=_ActionProp $a 'WorkingDirectory'
-      }
-    }
-
-    $trigs=@()
-    foreach($tr in $t.Triggers){
-      $rep=$null
-      if($tr.PSObject.Properties.Match('Repetition').Count -and $tr.Repetition){
-        $rep=[pscustomobject]@{
-          Interval=$tr.Repetition.Interval
-          Duration=$tr.Repetition.Duration
-          StopAtDurationEnd=$tr.Repetition.StopAtDurationEnd
-        }
-      }
-      $sumParts=@()
-      if($rep -and $rep.Interval){$sumParts+="Every $(Convert-ISODuration $rep.Interval)"}
-      if($tr.StartBoundary){$sumParts+="from $([datetime]$tr.StartBoundary)"}
-      if($tr.EndBoundary){$sumParts+="until $([datetime]$tr.EndBoundary)"}
-      if($tr.Enabled -ne $null){$sumParts+="enabled: $($tr.Enabled)"}
-
-      $trigs+=[pscustomobject]@{
-        Type=_TrigType $tr
-        Start=$tr.StartBoundary
-        End=$tr.EndBoundary
-        Enabled=$tr.Enabled
-        Every = $( if($rep -and $rep.Interval){ Convert-ISODuration $rep.Interval } else { $null } )
-        Duration = $( if($rep -and $rep.Duration){ Convert-ISODuration $rep.Duration } else { $null } )
-        StopAtDurationEnd = $( if($rep){ $rep.StopAtDurationEnd } else { $null } )
-        RandomDelay = $( Convert-ISODuration $tr.RandomDelay )
-        ExecutionTimeLimit = $( Convert-ISODuration $tr.ExecutionTimeLimit )
-        DaysOfWeek=$tr.DaysOfWeek
-        DaysOfMonth=$tr.DaysOfMonth
-        MonthsOfYear=$tr.MonthsOfYear
-        Summary=($sumParts -join ' ')
-      }
-    }
-
-    [pscustomobject]@{
-      PathPlusName=$full
-      State=$t.State
-      Enabled=($t.State -ne 'Disabled')
-      Actions=$acts
-      LastTaskResult="$($info.LastTaskResult); $(Convert-TaskResultCode $info.LastTaskResult)"
-      Description=$desc
-      Author=$t.Author
-      RunAcntUserId="$($t.Principal.UserId) $($t.Principal.DisplayName)"
-      RunLevel=$t.Principal.RunLevel
-      RunLogonType=$t.Principal.LogonType
-      LastRunTime=$info.LastRunTime
-      NextRunTime=$info.NextRunTime
-      NumberOfMissedRuns=$info.NumberOfMissedRuns
-      Triggers=$trigs
-      Settings=[pscustomobject]@{
-        AllowDemandStart=$t.Settings.AllowDemandStart
-        StartWhenAvailable=$t.Settings.StartWhenAvailable
-        MultipleInstances=$t.Settings.MultipleInstances
-        WakeToRun=$t.Settings.WakeToRun
-        DisallowStartIfOnBatteries=$t.Settings.DisallowStartIfOnBatteries
-        StopIfGoingOnBatteries=$t.Settings.StopIfGoingOnBatteries
-        ExecutionTimeLimit=$( Convert-ISODuration $t.Settings.ExecutionTimeLimit )
-        Priority=$t.Settings.Priority
+  $targetKey = Get-ScheduledTaskStableKey -TaskPath $TaskPath -TaskName $TaskName
+  $facts = @(Get-ScheduledTaskFacts)
+  foreach ($fact in $facts) {
+    if ($fact.StableKey -eq $targetKey -or ((-not $TaskPath) -and $fact.TaskName -eq $TaskName)) {
+      [pscustomobject]@{
+        PathPlusName = $fact.StableKey
+        State = $fact.State
+        Enabled = $fact.Enabled
+        Actions = @($fact.Actions)
+        LastTaskResult = "$($fact.LastTaskResult); $($fact.LastResultDescription)"
+        Description = $fact.Description
+        Author = $fact.Author
+        RunAcntUserId = "$($fact.PrincipalUserId) $($fact.PrincipalDisplayName)".Trim()
+        RunLevel = $fact.RunLevel
+        RunLogonType = $fact.LogonType
+        LastRunTime = $fact.LastRunTime
+        NextRunTime = $fact.NextRunTime
+        NumberOfMissedRuns = $fact.NumberOfMissedRuns
+        Triggers = @($fact.Triggers)
       }
     }
   }
 }
 
-function HealthTest-ScheduledTasksLastResult {
+function Test-ScheduledTaskPathMatchesAnyRegex {
+  param(
+    [Parameter(Mandatory=$true)][string]$Path,
+    [AllowNull()][string[]]$Patterns
+  )
+
+  foreach ($pattern in @($Patterns)) {
+    if ([string]::IsNullOrWhiteSpace($pattern)) { continue }
+    if ($Path -match $pattern) { return $true }
+  }
+
+  return $false
+}
+
+function Test-ScheduledTaskNameMatchesAnyPattern {
+  param(
+    [Parameter(Mandatory=$true)][string]$Name,
+    [AllowNull()][string[]]$Patterns
+  )
+
+  foreach ($pattern in @($Patterns)) {
+    if ([string]::IsNullOrWhiteSpace($pattern)) { continue }
+    if ($Name -like $pattern) { return $true }
+  }
+
+  return $false
+}
+
+function Test-ScheduledTaskRequired {
+  param(
+    [Parameter(Mandatory=$true)]$Fact,
+    [AllowNull()][string[]]$MustBeEnabled
+  )
+
+  foreach ($pattern in @($MustBeEnabled)) {
+    if ([string]::IsNullOrWhiteSpace($pattern)) { continue }
+    if ($Fact.StableKey -eq $pattern) { return $true }
+    if ($Fact.StableKey -match $pattern) { return $true }
+  }
+
+  return $false
+}
+
+function Test-ScheduledTaskIgnoredForOperationalChecks {
+  param(
+    [Parameter(Mandatory=$true)]$Fact,
+    [AllowNull()][string[]]$NamePatterns,
+    [AllowNull()][string[]]$PathRegex
+  )
+
+  if (Test-ScheduledTaskNameMatchesAnyPattern -Name $Fact.TaskName -Patterns $NamePatterns) {
+    return $true
+  }
+
+  if (Test-ScheduledTaskPathMatchesAnyRegex -Path $Fact.StableKey -Patterns $PathRegex) {
+    return $true
+  }
+
+  return $false
+}
+
+function Get-ScheduledTaskOperationalSeverity {
+  param(
+    [Parameter(Mandatory=$true)]$Fact,
+    [Parameter(Mandatory=$true)][string]$IssueType,
+    [bool]$Required
+  )
+
+  if ($Required) { return 'FAILURE' }
+
+  if ($IssueType -eq 'LastResult') {
+    if ($Fact.IsPrivileged -and $Fact.LastResultSeverity -eq 'Error') { return 'FAILURE' }
+    if ($Fact.IsPrivileged) { return 'WARNING' }
+    if ($Fact.LastResultSeverity -eq 'Error') { return 'WARNING' }
+    return 'NOTICE'
+  }
+
+  if ($IssueType -eq 'ManyMissedRuns') { return 'WARNING' }
+  if ($IssueType -eq 'FewMissedRuns') { return 'NOTICE' }
+  if ($IssueType -eq 'QueryFailure') { return 'FAILURE' }
+  if ($IssueType -eq 'CorruptXml') { return 'WARNING' }
+  if ($Fact.IsPrivileged) { return 'WARNING' }
+
+  return 'NOTICE'
+}
+
+function Test-ScheduledTaskLastResultReportable {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory=$true)]$Fact,
+    [bool]$Required,
+    [bool]$IncludeBuiltIn
+  )
+
+  if ($Required) { return $true }
+  if ($IncludeBuiltIn) { return $true }
+  if (-not $Fact.IsMicrosoftBuiltIn) { return $true }
+
+  return ($Fact.NumberOfMissedRuns -ge 5)
+}
+
+function Format-ScheduledTaskFactDetails {
+  param([Parameter(Mandatory=$true)]$Fact)
+
+  $lines = New-Object System.Collections.Generic.List[string]
+  [void]$lines.Add('Task: ' + $Fact.StableKey)
+  [void]$lines.Add('State: ' + $Fact.State)
+  [void]$lines.Add('Enabled: ' + $Fact.Enabled)
+  [void]$lines.Add('Hidden: ' + $Fact.Hidden)
+  if ($Fact.Author) { [void]$lines.Add('Author: ' + $Fact.Author) }
+  if ($Fact.PrincipalUserId) { [void]$lines.Add('Run as: ' + $Fact.PrincipalUserId) }
+  if ($Fact.RunLevel) { [void]$lines.Add('Run level: ' + $Fact.RunLevel) }
+  if ($Fact.LogonType) { [void]$lines.Add('Logon type: ' + $Fact.LogonType) }
+  if ($Fact.Description) { [void]$lines.Add('Description: ' + $Fact.Description) }
+  if ($null -ne $Fact.LastRunTime) { [void]$lines.Add('Last run time: ' + $Fact.LastRunTime) }
+  if ($null -ne $Fact.NextRunTime) { [void]$lines.Add('Next run time: ' + $Fact.NextRunTime) }
+  [void]$lines.Add('Missed runs: ' + $Fact.NumberOfMissedRuns)
+  if ($Fact.LastResultHex) {
+    [void]$lines.Add('Last result: ' + $Fact.LastResultHex + ' (' + $Fact.LastResultDescription + ')')
+  }
+
+  foreach ($action in @($Fact.Actions)) {
+    $actionText = 'Action: ' + $action.Type
+    if ($action.Execute) { $actionText = $actionText + ' Execute=' + $action.Execute }
+    if ($action.Arguments) { $actionText = $actionText + ' Arguments=' + $action.Arguments }
+    if ($action.WorkingDirectory) { $actionText = $actionText + ' WorkingDirectory=' + $action.WorkingDirectory }
+    [void]$lines.Add($actionText)
+  }
+
+  foreach ($trigger in @($Fact.Triggers)) {
+    $triggerText = 'Trigger: ' + $trigger.Type + ' Enabled=' + $trigger.Enabled
+    if ($trigger.StartBoundary) { $triggerText = $triggerText + ' Start=' + $trigger.StartBoundary }
+    if ($trigger.EndBoundary) { $triggerText = $triggerText + ' End=' + $trigger.EndBoundary }
+    if ($trigger.Interval) { $triggerText = $triggerText + ' Interval=' + $trigger.Interval }
+    [void]$lines.Add($triggerText)
+  }
+
+  return ($lines -join "`n")
+}
+
+function Format-ScheduledTaskDefinitionDetails {
+  param([Parameter(Mandatory=$true)]$Fact)
+
+  $lines = New-Object System.Collections.Generic.List[string]
+  [void]$lines.Add('Task: ' + $Fact.StableKey)
+  [void]$lines.Add('Fingerprint: ' + $Fact.PolicyFingerprint)
+  [void]$lines.Add('Enabled: ' + $Fact.Enabled)
+  [void]$lines.Add('Hidden: ' + $Fact.Hidden)
+  if ($Fact.Author) { [void]$lines.Add('Author: ' + $Fact.Author) }
+  if ($Fact.PrincipalUserId) { [void]$lines.Add('Run as: ' + $Fact.PrincipalUserId) }
+  if ($Fact.RunLevel) { [void]$lines.Add('Run level: ' + $Fact.RunLevel) }
+  if ($Fact.LogonType) { [void]$lines.Add('Logon type: ' + $Fact.LogonType) }
+  if ($Fact.Description) { [void]$lines.Add('Description: ' + $Fact.Description) }
+
+  foreach ($action in @($Fact.Actions)) {
+    $actionText = 'Action: ' + $action.Type
+    if ($action.Execute) { $actionText = $actionText + ' Execute=' + $action.Execute }
+    if ($action.Arguments) { $actionText = $actionText + ' Arguments=' + $action.Arguments }
+    if ($action.WorkingDirectory) { $actionText = $actionText + ' WorkingDirectory=' + $action.WorkingDirectory }
+    [void]$lines.Add($actionText)
+  }
+
+  foreach ($trigger in @($Fact.Triggers)) {
+    $triggerText = 'Trigger: ' + $trigger.Type + ' Enabled=' + $trigger.Enabled
+    if ($trigger.StartBoundary) { $triggerText = $triggerText + ' Start=' + $trigger.StartBoundary }
+    if ($trigger.EndBoundary) { $triggerText = $triggerText + ' End=' + $trigger.EndBoundary }
+    if ($trigger.Interval) { $triggerText = $triggerText + ' Interval=' + $trigger.Interval }
+    [void]$lines.Add($triggerText)
+  }
+
+  return ($lines -join "`n")
+}
+
+function HealthTest-ScheduledTasks {
 <#
-Description: Parses scheduled task last-result data and reports task failures or warnings.
+Description: Reviews scheduled tasks for failed results, disabled required tasks, missed runs, stale runs, and unreadable metadata.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
-Impact: High(Time)
-Uses: schtasks.exe.
+Impact: Medium(Time)
+Uses: Get-ScheduledTask, Get-ScheduledTaskInfo, Export-ScheduledTask.
 #>
+  [CmdletBinding()]
+  param(
+    [string[]]$MustBeEnabled = @(),
+    [string[]]$Ignore = $(Get-ScheduledTaskDefaultPathIgnoreRegex),
+    [string[]]$IgnoreTaskName = $(Get-ScheduledTaskDefaultNameIgnorePatterns),
+    [switch]$IncludeHidden,
+    [switch]$IncludeBuiltIn,
+    [int]$StaleDays = 30
+  )
 
-  $mapHresult = @{
-    0x40010004=@{d='Process terminated externally'}
-    0x80070001=@{d='Incorrect function'}
-    0x80070002=@{d='File or path not found'}
-    0x80070003=@{d='Path not found'}
-    0x80070005=@{d='Access denied'}
-    0x8007000A=@{d='Invalid environment'}
-    0x8007000B=@{d='Bad EXE format / arch mismatch'}
-    0x80070070=@{d='Disk full'}
-    0x8007052E=@{d='Logon failure (bad username/password)'}
-    0x80070533=@{d='Account disabled'}
-    0x800705B4=@{d='Operation timed out'}
-    0x800706BA=@{d='RPC server unavailable'}
-    0x80040121=@{d='Storage access denied'}
-    0x80040154=@{d='COM class not registered'}
-    0x800401F5=@{d='COM application not found'}
-    0x8004130F=@{d='Task engine execution error/timeout'}
-    0x80004005=@{d='Unspecified failure'}
-    0x80090020=@{d='Cryptographic/DPAPI failure'}
-    0xC000006D=@{d='Logon failure'}
-    0xC000006A=@{d='Wrong password'}
-    0xC0000064=@{d='Unknown user'}
-    0xC0000072=@{d='Account disabled'}
-    0xC0000234=@{d='Account locked out'}
-  }
-  $mapWin32Bare = @{
-    1056=@{d='Service already running'}
-    1326=@{d='Logon failure (bad username/password)'}
-    1331=@{d='Account disabled'}
-    1909=@{d='Account locked out'}
+  $hadIssue = $false
+
+  try {
+    $facts = @(Get-ScheduledTaskFacts)
+  } catch {
+    Write-Warning "[FAILURE] Failed to collect scheduled task facts: $($_.Exception.Message)"
+    return
   }
 
-  function Normalize-Code($v){
-    if($null -eq $v){return $null}
-    $s="$v".Trim()
-    if($s -eq '' -or $s -eq 'N/A'){return $null}
-    if($s -match '(?i)^0x([0-9a-f]{1,8})$'){return [int64]([uint32]::Parse($matches[1],[System.Globalization.NumberStyles]::HexNumber))}
-    if($s -match '^-?\d+$'){return [int64]$s}
-    $null
-  }
-  function To-UInt32($code){
-    try{
-      $i64=[int64]$code
-      $u64=[uint64]($i64 -band 0xFFFFFFFFFFFFFFFF)
-      [uint32]($u64 -band 0x00000000FFFFFFFF)
-    }catch{$null}
-  }
-  function Get-Severity($u32,$isBare){
-    if($isBare){return 'Error'}
-    if($null -eq $u32){return 'Error'}
-    $sev=($u32 -band 0xC0000000)
-    if($sev -eq 0x80000000){'Error'}
-    elseif($sev -eq 0x40000000){'Warning'}
-    elseif($u32 -eq 0){'Success'}
-    else{'Success'}
-  }
+  foreach ($fact in ($facts | Sort-Object StableKey)) {
+    $isRequired = Test-ScheduledTaskRequired -Fact $fact -MustBeEnabled $MustBeEnabled
+    $ignored = Test-ScheduledTaskIgnoredForOperationalChecks -Fact $fact -NamePatterns $IgnoreTaskName -PathRegex $Ignore
 
-  # Suppress purely informational "Last Result" values entirely
-  $benign = [uint32[]](0x00000000,0x10000000,0x40010004) # S_OK, success-severity flag, DBG_TERMINATE_PROCESS
-  function Is-Informational($u32,$sev){
-    if($null -eq $u32){return $false}
-    if($benign -contains $u32){return $true}
-    if($sev -eq 'Success'){return $true}
-    if($u32 -ge 0x00041300 -and $u32 -le 0x000413FF){return $true} # SCHED_S_* family
-    $false
-  }
+    if ((-not $IncludeHidden) -and $fact.Hidden -and (-not $isRequired)) {
+      continue
+    }
 
-  function Get-RowValue{ param($row,[string[]]$names)
-    foreach($n in $names){
-      if($row.PSObject.Properties.Name -contains $n){
-        $v=$row.$n; if($v){return "$v"}
+    if ($fact.InfoQueryFailed) {
+      $hadIssue = $true
+      if ($fact.InfoErrorKind -eq 'DeletedDuringScan') {
+        Write-Warning "[NOTICE] Task '$($fact.StableKey)' was deleted while scheduled task metadata was being collected."
+      }
+      elseif ($fact.InfoErrorKind -eq 'CorruptXml') {
+        Write-Warning "[WARNING] Task XML for '$($fact.StableKey)' is corrupted.`n$(Format-ScheduledTaskFactDetails -Fact $fact)"
+      }
+      else {
+        Write-Warning "[FAILURE] Task '$($fact.StableKey)' failed Get-ScheduledTaskInfo with $($fact.InfoErrorHexCode) ($($fact.InfoErrorMessage)).`n$(Format-ScheduledTaskFactDetails -Fact $fact)"
+      }
+      continue
+    }
+
+    if ($fact.XmlQueryFailed) {
+      $hadIssue = $true
+      $level = Get-ScheduledTaskOperationalSeverity -Fact $fact -IssueType 'CorruptXml' -Required:$isRequired
+      Write-Warning "[$level] Task XML for '$($fact.StableKey)' could not be read: $($fact.XmlErrorHexCode) ($($fact.XmlErrorMessage)).`n$(Format-ScheduledTaskFactDetails -Fact $fact)"
+      continue
+    }
+
+    if ($ignored -and (-not $isRequired)) {
+      continue
+    }
+
+    $isThirdPartyOrRequired = ((-not $fact.IsMicrosoftBuiltIn) -or $IncludeBuiltIn -or $isRequired)
+
+    if ((-not $fact.Enabled) -or ($fact.State -eq 'Disabled')) {
+      if ($isThirdPartyOrRequired) {
+        $hadIssue = $true
+        $level = Get-ScheduledTaskOperationalSeverity -Fact $fact -IssueType 'Disabled' -Required:$isRequired
+        if ($isRequired -and $fact.IsSystemPrincipal) {
+          Write-Warning "[$level] Required SYSTEM scheduled task is disabled: $($fact.StableKey)`n$(Format-ScheduledTaskFactDetails -Fact $fact)"
+        } else {
+          Write-Warning "[$level] Scheduled task is disabled: $($fact.StableKey)`n$(Format-ScheduledTaskFactDetails -Fact $fact)"
+        }
+      }
+      continue
+    }
+
+    if (($null -ne $fact.LastResultCode) -and (-not $fact.LastResultIsInformational)) {
+      if (Test-ScheduledTaskLastResultReportable -Fact $fact -Required:$isRequired -IncludeBuiltIn:$IncludeBuiltIn) {
+        $hadIssue = $true
+        $level = Get-ScheduledTaskOperationalSeverity -Fact $fact -IssueType 'LastResult' -Required:$isRequired
+        Write-Warning "[$level] Scheduled task '$($fact.StableKey)' terminated with LastTaskResult=$($fact.LastResultHex) ($($fact.LastResultDescription)).`n$(Format-ScheduledTaskFactDetails -Fact $fact)"
       }
     }
-    $null
-  }
 
-  $want = [ordered]@{
-    'Task Name'         = @('TaskName','Task Name')
-    'Run As User'       = @('Run As User','RunAsUser')
-    'Last Run Time'     = @('Last Run Time','LastRunTime')
-    'Next Run Time'     = @('Next Run Time','NextRunTime')
-    'Status'            = @('Status')
-    'Schedule Type'     = @('Schedule Type','ScheduleType')
-    'Triggers'          = @('Schedule','Triggers')
-    'Task To Run'       = @('Task To Run','TaskToRun','Actions')
-    'Start In'          = @('Start In','StartIn')
-    'Logon Mode'        = @('Logon Mode','LogonMode')
-    'Author'            = @('Author')
-    'Last Result (raw)' = @('Last Result','LastResult')
-  }
-
-  $passed = $true
-  # These conditions:
-  #     $_.'Last Result' -notmatch 'Last Result' -and $_.HostName -eq $env:COMPUTERNAME
-  # filter-out plenty of invalid lines that schtasks generates
-  $tasks = schtasks /query /fo csv /v | ConvertFrom-Csv | Where-Object {
-    $_.'Last Result' -ne 0 -and `
-    $_.'Last Result' -notmatch 'Last Result' -and $_.HostName -eq $env:COMPUTERNAME
-  }
-
-  foreach($t in $tasks){
-    $dec = Normalize-Code $t.'Last Result'
-    if($null -eq $dec){ continue }
-    $u32 = To-UInt32 $dec
-    if($null -eq $u32){ continue }
-
-    $isBare = $mapWin32Bare.ContainsKey($u32)
-    $sev = Get-Severity $u32 $isBare
-    if(Is-Informational $u32 $sev){ continue } # suppress informational results
-
-    $info = if($isBare){ $mapWin32Bare[$u32] } else { $mapHresult[$u32] }
-    $desc = if($info){ $info.d } else { 'Unknown failure' }
-    $hex  = ('0x{0:X8}' -f $u32)
-    $msg  = "Scheduled Task '$($t.TaskName)' terminated with Last Result=$hex('$desc')"
-
-    $lines=@()
-    foreach($k in $want.Keys){
-      $val = Get-RowValue -row $t -names $want[$k]
-      if($val){ $lines += ('{0}: {1}' -f $k,$val) }
+    if ($fact.NumberOfMissedRuns -gt 0 -and $isThirdPartyOrRequired) {
+      $hadIssue = $true
+      if ($fact.NumberOfMissedRuns -ge 5) {
+        $level = Get-ScheduledTaskOperationalSeverity -Fact $fact -IssueType 'ManyMissedRuns' -Required:$isRequired
+      } else {
+        $level = Get-ScheduledTaskOperationalSeverity -Fact $fact -IssueType 'FewMissedRuns' -Required:$isRequired
+      }
+      Write-Warning "[$level] Scheduled task missed $($fact.NumberOfMissedRuns) runs: $($fact.StableKey)`n$(Format-ScheduledTaskFactDetails -Fact $fact)"
     }
-    $details = ($lines -join "`r`n")
 
-    if($sev -eq 'Error'){ Write-Warning "[FAILURE] $msg`n$details"; $passed = $false }
-    elseif($sev -eq 'Warning'){ Write-Warning "[WARNING] $msg"; $passed = $false }
+    if ($StaleDays -gt 0 -and $fact.HasEnabledTrigger -and $isThirdPartyOrRequired) {
+      $lastRun = $fact.LastRunTime
+      $isStale = $false
+      $lastRunText = 'never'
+      if ($null -eq $lastRun -or $lastRun -eq [datetime]::MinValue) {
+        $isStale = $true
+      } else {
+        $lastRunDate = [datetime]$lastRun
+        $lastRunText = $lastRunDate.ToString('yyyy-MM-dd')
+        if (((Get-Date) - $lastRunDate).TotalDays -gt $StaleDays) {
+          $isStale = $true
+        }
+      }
+
+      if ($isStale) {
+        $hadIssue = $true
+        $level = Get-ScheduledTaskOperationalSeverity -Fact $fact -IssueType 'Stale' -Required:$isRequired
+        Write-Warning "[$level] Scheduled task appears stale: $($fact.StableKey) LastRun=$lastRunText (> $StaleDays days or never).`n$(Format-ScheduledTaskFactDetails -Fact $fact)"
+      }
+    }
   }
 
-  if ($passed) {
-      Write-Warning "[PASS] HealthTest-ScheduledTasksLastResult found no problem"
+  if (-not $hadIssue) {
+    Write-Warning "[PASS] Scheduled tasks healthy"
+  }
+}
+
+function HealthTest-ListScheduledTasks {
+<#
+Description: Lists scheduled task definitions with fingerprints for actions, triggers, identity, privilege, and enabled state.
+AppliesTo: All
+Scope: Computer
+Category: Configuration Hygiene & Best Practices
+Impact: Medium(Time)
+Tags: Policy
+Uses: Get-ScheduledTask, Get-ScheduledTaskInfo, Export-ScheduledTask.
+
+Policy identity: stable task key plus fingerprint of normalized actions, principal, run level, logon type, triggers, hidden state, and enabled state. Last run time, next run time, missed runs, and last result are not included.
+Policy baseline version: 1
+#>
+  [CmdletBinding()]
+  param()
+
+  try {
+    $facts = @(Get-ScheduledTaskFacts)
+  } catch {
+    Write-Warning "[FAILURE] Failed to collect scheduled task definitions: $($_.Exception.Message)"
+    return
+  }
+
+  $seen = 0
+  foreach ($fact in ($facts | Sort-Object StableKey)) {
+    $seen += 1
+    $level = 'NOTICE'
+    if ($fact.IsPrivileged) { $level = 'WARNING' }
+
+    Write-Warning "[$level] Found scheduled task: $($fact.StableKey) fingerprint=$($fact.PolicyFingerprint)`n$(Format-ScheduledTaskDefinitionDetails -Fact $fact)"
+  }
+
+  if ($seen -eq 0) {
+    Write-Warning "[PASS] No scheduled tasks discovered."
   }
 }

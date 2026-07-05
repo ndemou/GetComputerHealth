@@ -25,12 +25,6 @@ Move all domain helpers of a specific domain on their own ps1 file.
 Move each HealthTest functions and its specific HealthTest helpers on its own ps1 file. Conditionally dot source every needed ps1 file with generic or domain helpers. Use this style: "if definition for foo is missing dot source bar.ps1" for every single needed helper function. These commands will also work as an explicit definition of dependencies. At the end of the ps1 add a command that checks of the file was executed rather than dot-sourced, and in that case it executes the function. Before making this change for all health tests, try it with those related to scheduled tasks and verify in production.
 
 
-## HealthTest-UnexpectedListeningPorts -> HealthTest-ListListeningPorts
-
-Follow the spirit of the change that gave us HealthTest-ListServices, ListShares, ListLocalAdmins, ListLocalAdmins a few commits ago.
-
-Also: are there other HealthTests that fit this style (a function that emits a list of findings where some items are accepted and some are not based on policy)
-
 ## Option IpsOfAllDcs in gch.psd1
 
 The trick with `cache.IpsOfAllDcs.clixml` is a hack. I should incorporate it into gch.psd1. An on-disk format migration can populate the new setting if the file is found, and then remove the old file.
@@ -113,8 +107,8 @@ It would be useful to include the suppression reason in the findings that are re
 This is an example for `.\state\policy_test_was_run.psd1`:
 ```powershelll
 @{
-    InstalledSW = @{ Ts = [datetime]'2025-11-01 12:42'; User = 'ndemou-admin' }
-    UnexpectedListeningPorts = @{Ts = [datetime]'2025-11-01 12:45'; User = 'ndemou-admin' }
+    ListInstalledPrograms = @{ Ts = [datetime]'2025-11-01 12:42'; User = 'ndemou-admin' }
+    ListListeningPorts = @{Ts = [datetime]'2025-11-01 12:45'; User = 'ndemou-admin' }
 }
 ```
 
@@ -124,11 +118,11 @@ The migration will initialize `policy_test_was_run.psd1` with any  existing line
 
 For example a like like this:
 ```
-POLICY_TEST_WAS_RUN: InstalledSW
+POLICY_TEST_WAS_RUN: ListInstalledPrograms
 ```
 Will result in this entry in `policy_test_was_run.psd1`:
 ```powershelll
-InstalledSW = @{Ts = <current time>; User = <current user>}
+ListInstalledPrograms = @{Ts = <current time>; User = <current user>}
 ```
 
 ## Save suppressed findings to `.\config\suppressed_findings.psd1` instead of `Get-ComputerHealth.sigs-to-suppress.txt`
@@ -138,7 +132,7 @@ This is an example for `.\config\suppressed_findings.psd1`:
 ```powershelll
 @{
     'bfc162fa' = [pscustomobject]@{
-        TestName    = 'UnexpectedListeningPorts'
+        TestName    = 'ListListeningPorts'
         Description = 'Computer is listening to port 443'
         Reason      = 'business need'
         Ts          = [datetime]'2025-11-01 12:42'
@@ -147,7 +141,7 @@ This is an example for `.\config\suppressed_findings.psd1`:
     }
 
     'a7d91c03' = [pscustomobject]@{
-        TestName    = 'InstalledSW'
+        TestName    = 'ListInstalledPrograms'
         Description = 'Legacy software 7zip is installed'
         Reason      = 'business need'
         Ts          = [datetime]'2025-11-01 12:44'
@@ -202,9 +196,8 @@ Then check each cluster by asking: “Which tests are merely different views of 
 
 #### Cluster C: Scheduled task health
 - `HealthTest-ScheduledTasks`
-- `HealthTest-SystemScheduledTasks`
-- `HealthTest-ScheduledTasksLastResult`
-- Recommendation: one engine with scoped sections and dedupe by task path/name/reason.
+- `HealthTest-ListScheduledTasks`
+- Recommendation: already split into operational hygiene and policy inventory. Revisit only if future scheduled-task tests reintroduce overlapping hygiene output.
 
 #### Cluster D: AD replication and topology
 - `HealthTest-ADInboundReplicationTopology`
@@ -229,7 +222,7 @@ Then check each cluster by asking: “Which tests are merely different views of 
 
 #### Cluster G: Network exposure surface
 - `HealthTest-FirewallEnabled`
-- `HealthTest-UnexpectedListeningPorts`
+- `HealthTest-ListListeningPorts`
 - `HealthTest-WinRMListening`
 - `HealthTest-ShareReasonableness`
 - Recommendation: do not merge; distinct failure modes, but add cross-links in output.
@@ -249,7 +242,7 @@ Then check each cluster by asking: “Which tests are merely different views of 
 1. `HealthTest-DnsSuffixBaseline` + `HealthTest-DnsSuffixMatchesDomain`
 2. `HealthTest-MalwareProtectionFeatures` + `HealthTest-DefenderStatus`
 3. `HealthTest-DfsReplicationState` + `HealthTest-DfsrBacklog`
-4. `HealthTest-ScheduledTasks` + `HealthTest-ScheduledTasksLastResult` (plus overlap with `HealthTest-SystemScheduledTasks`)
+4. Scheduled task overlap has been addressed by `HealthTest-ScheduledTasks` and `HealthTest-ListScheduledTasks`; look for regressions only.
 5. SRV-record portion of `HealthTest-ConnectivityToDCs` + `HealthTest-RequiredSrvRecords`
 
 
