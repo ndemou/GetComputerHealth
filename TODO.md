@@ -1,9 +1,5 @@
 # DONE, Verification is pending
 
-Nothing Yet
-
-# TODO
-
 ## Policy for health test function organization
 
 1. *All* code needed to run Health Tests and nothing but that code should be under folder `health-tests`. This means that  functions shared with Get-ComputerHealth.ps1, if any, should be split into a separate ps1 file which should reside inside this folder.
@@ -24,6 +20,8 @@ Move all domain helpers of a specific domain on their own ps1 file.
 
 Move each HealthTest functions and its specific HealthTest helpers on its own ps1 file. Conditionally dot source every needed ps1 file with generic or domain helpers. Use this style: "if definition for foo is missing dot source bar.ps1" for every single needed helper function. These commands will also work as an explicit definition of dependencies. At the end of the ps1 add a command that checks of the file was executed rather than dot-sourced, and in that case it executes the function. Before making this change for all health tests, try it with those related to scheduled tasks and verify in production.
 
+
+# TODO
 
 ## Option IpsOfAllDcs in gch.psd1
 
