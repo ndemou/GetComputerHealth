@@ -1,7 +1,7 @@
-﻿Describe 'HealthTest-DesktopSessions message formatting' {
+Describe 'HealthTest-DesktopSessions message formatting' {
   BeforeAll {
     $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-    . (Join-Path $repoRoot 'health-tests\win-os-hyg.ps1')
+    . (Join-Path $repoRoot 'health-tests\HealthTest-DesktopSessions.ps1')
   }
 
   It 'does not include a session number in disconnected session synopsis and omits extra timing fields' {

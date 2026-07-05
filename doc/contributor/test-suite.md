@@ -177,7 +177,7 @@ This is the `Resolve-ServiceExecutable` group inside [`tests/run-all-tests.ps1`]
 
 What it does:
 
-- loads code from [`health-tests/srvc-exe-resolve.ps1`](../../health-tests/srvc-exe-resolve.ps1)
+- loads code from [`health-tests/helper-regarding-service-and-executable-resolution.ps1`](../../health-tests/helper-regarding-service-and-executable-resolution.ps1)
 - enumerates real Windows services with `Get-CimInstance Win32_Service`
 - checks whether service executable paths can be resolved correctly on the current machine
 
@@ -287,7 +287,7 @@ Use it when:
 - you changed executable path resolution logic
 - you changed quoting behavior
 - you changed PATH probing logic
-- you changed related helper code in `srvc-exe-resolve.ps1`
+- you changed related helper code in `helper-regarding-service-and-executable-resolution.ps1`
 
 ### [`tests/Unit/Invoke-GetComputerHealth.EmailSignature.Tests.ps1`](../../tests/Unit/Invoke-GetComputerHealth.EmailSignature.Tests.ps1)
 

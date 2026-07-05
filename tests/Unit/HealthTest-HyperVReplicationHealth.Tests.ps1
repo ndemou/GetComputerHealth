@@ -1,6 +1,6 @@
-﻿Describe 'HealthTest-HyperVReplicationHealth' {
+Describe 'HealthTest-HyperVReplicationHealth' {
   BeforeAll {
-    . (Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) 'health-tests\OnlyIfHostIs-HyperV.ps1')
+    . (Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) 'health-tests\HealthTest-HyperVReplicationHealth.ps1')
 
     function Get-VM {}
     function Get-VMReplication {}

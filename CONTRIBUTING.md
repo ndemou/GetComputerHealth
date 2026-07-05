@@ -115,7 +115,7 @@ Use explicit conditional dependency declarations near the top of the file. Prefe
 
 ```powershell
 if (-not (Get-Command -Name 'Get-ScheduledTaskFacts' -CommandType Function -ErrorAction SilentlyContinue)) {
-  . (Join-Path -Path $PSScriptRoot -ChildPath 'ScheduledTaskHelpers.ps1')
+  . (Join-Path -Path $PSScriptRoot -ChildPath 'helper-regarding-scheduled-tasks.ps1')
 }
 ```
 
@@ -127,14 +127,14 @@ if ($MyInvocation.InvocationName -ne '.') {
 }
 ```
 
-Existing grouped health-test files are being migrated incrementally. Do not add new `HealthTest-*` functions to grouped files.
+Do not add `HealthTest-*` functions to helper files or grouped files.
 
 ### Helper Placement
 
 Use these categories when placing helper functions:
 
 - A specific health-test helper is needed by only one health test. Keep it in that health test's same-name `.ps1` file.
-- A domain helper is needed by a class of domain-specific health tests. Put it in its own domain helper file under `health-tests`, for example `ScheduledTaskHelpers.ps1`.
+- A domain helper is needed by a class of domain-specific health tests. Put it in its own domain helper file under `health-tests` named `helper-regarding-<DOMAIN DESCRIPTION>.ps1`, for example `helper-regarding-scheduled-tasks.ps1`.
 - A generic helper is useful across unrelated health tests. Put it in `health-tests\helpers-for-healthtests.ps1`.
 
 ### Local Validation

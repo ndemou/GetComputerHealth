@@ -18,6 +18,13 @@ Describe 'Invoke-HealthTest output stream comment capture' {
       $funcAst | Should -Not -BeNullOrEmpty
       . ([scriptblock]::Create($funcAst.Extent.Text))
     }
+
+    function Get-LeftString {
+      param([string]$String, [int]$Count)
+      if ($null -eq $String) { return $null }
+      if ($String.Length -le $Count) { return $String }
+      return $String.Substring(0, $Count)
+    }
   }
 
   BeforeEach {

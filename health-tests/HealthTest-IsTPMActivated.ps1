@@ -1,0 +1,26 @@
+<#
+Standalone file for HealthTest-IsTPMActivated.
+Generated during the repo-wide health-test split.
+#>
+# HostRequirement: Mobile
+
+function HealthTest-IsTPMActivated {
+<#
+Description: Checks whether the TPM is present and activated.
+AppliesTo: Mobile
+Scope: Computer
+Category: Security & Stability Risks
+Impact: Medium(Time)
+Uses: Get-Tpm.
+#>
+  if ($RunWithoutElevation) {
+    Write-Warning "[WARNING] this test requires elevation"
+    return
+  }
+
+  Write-BasedOnTestResult "Is TPM Activated?" -Test (Get-Tpm).TpmActivated
+}
+
+if ($MyInvocation.InvocationName -ne '.') {
+  HealthTest-IsTPMActivated
+}

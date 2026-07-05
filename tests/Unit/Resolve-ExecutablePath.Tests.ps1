@@ -1,8 +1,8 @@
-﻿$repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+$repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 
 Describe 'Resolve-ExecutablePath' {
   BeforeAll {
-    . (Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) 'health-tests\srvc-exe-resolve.ps1')
+    . (Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) 'health-tests\helper-regarding-service-and-executable-resolution.ps1')
   }
 
   $hasNotepad = Test-Path -LiteralPath (Join-Path $env:WINDIR 'System32\notepad.exe') -PathType Leaf
@@ -167,7 +167,7 @@ Describe 'Resolve-ExecutablePath' {
 
 Describe 'Resolve-ServiceExecutable' {
   BeforeAll {
-    . (Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) 'health-tests\srvc-exe-resolve.ps1')
+    . (Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) 'health-tests\helper-regarding-service-and-executable-resolution.ps1')
     $script:ResolveServiceExecutableRepoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
   }
 
@@ -292,7 +292,7 @@ Describe 'Resolve-ServiceExecutable' {
 
 Describe 'HealthTest-Services' {
   BeforeAll {
-    . (Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) 'health-tests\srvc-exe-resolve.ps1')
+    . (Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) 'health-tests\HealthTest-Services.ps1')
   }
 
   It 'emits NOTICE when an auto-start service is stopped but last exited normally' {
@@ -369,7 +369,7 @@ Describe 'HealthTest-Services' {
 
 Describe 'Service policy identity' {
   BeforeAll {
-    . (Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) 'health-tests\srvc-exe-resolve.ps1')
+    . (Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) 'health-tests\helper-regarding-service-and-executable-resolution.ps1')
   }
 
   It 'uses vendor identity for signed payloads' {
@@ -415,7 +415,7 @@ Describe 'Service policy identity' {
 
 Describe 'HealthTest-ListServices' {
   BeforeAll {
-    . (Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) 'health-tests\srvc-exe-resolve.ps1')
+    . (Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) 'health-tests\HealthTest-ListServices.ps1')
   }
 
   It 'reports Microsoft services instead of filtering them out' {

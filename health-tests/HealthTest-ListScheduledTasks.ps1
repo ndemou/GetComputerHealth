@@ -3,11 +3,11 @@ Standalone file for HealthTest-ListScheduledTasks.
 #>
 
 if (-not (Get-Command -Name 'Get-ScheduledTaskFacts' -CommandType Function -ErrorAction SilentlyContinue)) {
-  . (Join-Path -Path $PSScriptRoot -ChildPath 'ScheduledTaskHelpers.ps1')
+  . (Join-Path -Path $PSScriptRoot -ChildPath 'helper-regarding-scheduled-tasks.ps1')
 }
 
 if (-not (Get-Command -Name 'Format-ScheduledTaskDefinitionDetails' -CommandType Function -ErrorAction SilentlyContinue)) {
-  . (Join-Path -Path $PSScriptRoot -ChildPath 'ScheduledTaskHelpers.ps1')
+  . (Join-Path -Path $PSScriptRoot -ChildPath 'helper-regarding-scheduled-tasks.ps1')
 }
 
 function HealthTest-ListScheduledTasks {

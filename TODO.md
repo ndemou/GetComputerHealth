@@ -14,12 +14,16 @@ Update CONTRIBUTING.md with these rules (at least sections Placement and Reposit
 
 First two definitions: Let's call a function, a "specific HealthTest helper function" if it is needed only for one health test. Let's call a function, a "domain helper function" if it is needed for a class of domain specific health tests (e.g. the function that returns the description of a scheduled task which is useful for the domain of health tests that check for issues in Scheduled tasks). Let's call a function, a "generic helper function" if it is needed for a range of unrelated health tests (e.g. the Get-PropValue function that returns the property X of object Y, with default of $null if the property doesn't exist).
 
-Status: CONTRIBUTING.md is updated, `helpers-for-healthtests.ps1` has moved under `health-tests`, `Get-PropValue` is in that generic helper file, and the scheduled-task health tests have been migrated as the production-verified pilot.
+Status: CONTRIBUTING.md is updated, `helpers-for-healthtests.ps1` has moved under `health-tests`, `Get-PropValue` is in that generic helper file, and all built-in `HealthTest-*` functions now live in same-name standalone files. The old grouped files that still exist are helper-only files.
 
-Remaining: migrate the other grouped `HealthTest-*` functions. Move all domain helpers of each specific domain into their own `.ps1` files. Move each remaining health test function and its specific helpers into its own same-name `.ps1` file. Conditionally dot-source every needed generic or domain helper with this style: "if definition for foo is missing dot source bar.ps1" for every needed helper function. These commands also work as an explicit definition of dependencies. At the end of each health-test `.ps1`, add a command that checks whether the file was executed rather than dot-sourced, and in that case executes the function.
+Remaining: verify the split in production. Consider whether any helper-only files should be renamed later for clarity.
 
 
 # TODO
+
+## Optimize -OnlyTheseTests after health-test file split
+
+After the repo-wide health-test file split, avoid loading every `HealthTest-*.ps1` file when `-OnlyTheseTests` names a small subset. Load only the requested same-name health-test files and their declared dependencies.
 
 ## Option IpsOfAllDcs in gch.psd1
 

@@ -1,6 +1,6 @@
-﻿Describe 'HealthTest-SeriousRecentEventLogs' {
+Describe 'HealthTest-SeriousRecentEventLogs' {
   BeforeAll {
-    . (Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) 'health-tests\win-os-hyg.ps1')
+    . (Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) 'health-tests\HealthTest-SeriousRecentEventLogs.ps1')
   }
 
   BeforeEach {

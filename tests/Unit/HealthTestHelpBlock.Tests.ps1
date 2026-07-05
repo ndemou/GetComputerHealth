@@ -1,4 +1,50 @@
-﻿Describe 'HealthTest help blocks' {
+Describe 'HealthTest help blocks' {
+  It 'keeps every HealthTest function in its same-name file with a direct-run guard' {
+    $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+    $healthTestsPath = Join-Path $repoRoot 'health-tests'
+    $violations = @()
+
+    Get-ChildItem -Path $healthTestsPath -Filter *.ps1 -File | ForEach-Object {
+      $content = Get-Content -Path $_.FullName -Raw
+      $matches = @([regex]::Matches($content, '(?m)^[ \t]*function[ \t]+(?<Name>HealthTest-[\w-]+)[ \t]*\{'))
+
+      if ($_.BaseName -like 'HealthTest-*') {
+        if ($matches.Count -ne 1) {
+          $violations += "$($_.FullName) must contain exactly one HealthTest function. Found $($matches.Count)."
+          return
+        }
+
+        $functionName = $matches[0].Groups['Name'].Value
+        if ($functionName -ne $_.BaseName) {
+          $violations += "$($_.FullName) contains $functionName but the file name requires $($_.BaseName)."
+        }
+
+        $hasDirectRunCheck = $content -match [regex]::Escape('$MyInvocation.InvocationName')
+        $hasDirectFunctionCall = $false
+        foreach ($line in ($content -split '\r?\n')) {
+          if ($line.Trim() -eq $functionName) {
+            $hasDirectFunctionCall = $true
+            break
+          }
+        }
+
+        if (-not $hasDirectRunCheck -or -not $hasDirectFunctionCall) {
+          $violations += "$($_.FullName) must execute $functionName when run directly."
+        }
+      }
+      elseif ($matches.Count -gt 0) {
+        $violations += "$($_.FullName) is a helper file and must not contain HealthTest functions."
+      }
+
+      if ($_.BaseName -notlike 'HealthTest-*' -and
+          $_.Name -ne 'helpers-for-healthtests.ps1' -and
+          $_.Name -notlike 'helper-regarding-*.ps1') {
+        $violations += "$($_.FullName) must be helpers-for-healthtests.ps1 or follow helper-regarding-<DOMAIN DESCRIPTION>.ps1."
+      }
+    }
+
+    @($violations) | Should -BeNullOrEmpty
+  }
   It 'all HealthTest-* functions have the required help block format' {
     $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
     $healthTestsPath = Join-Path $repoRoot 'health-tests'

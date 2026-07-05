@@ -1,7 +1,7 @@
 Describe 'Scheduled task fact helpers' {
   BeforeAll {
     $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-    . (Join-Path $repoRoot 'health-tests\ScheduledTaskHelpers.ps1')
+    . (Join-Path $repoRoot 'health-tests\helper-regarding-scheduled-tasks.ps1')
 
     function New-TestScheduledTaskFact {
       param(

@@ -145,3 +145,24 @@ function Compress-HealthDiagnosticOutputLines {
   return $resultLines
 }
 
+function Get-PolicyListShortHash {
+  [CmdletBinding()]
+  param([Parameter(Mandatory)][string]$Text)
+
+  $bytes = [Text.Encoding]::UTF8.GetBytes($Text)
+  $algorithm = [Security.Cryptography.HashAlgorithm]::Create('SHA256')
+  try {
+    $hash = -join ($algorithm.ComputeHash($bytes) | ForEach-Object { $_.ToString('x2') })
+    return $hash.Substring(0, 16)
+  } finally {
+    if ($algorithm) { $algorithm.Dispose() }
+  }
+}
+
+function Normalize-PolicyListText {
+  [CmdletBinding()]
+  param([AllowNull()][object]$Value)
+
+  if ($null -eq $Value) { return '' }
+  return (([string]$Value).Trim() -replace '\s+', ' ').ToLowerInvariant()
+}

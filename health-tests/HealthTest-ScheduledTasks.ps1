@@ -3,35 +3,35 @@ Standalone file for HealthTest-ScheduledTasks.
 #>
 
 if (-not (Get-Command -Name 'Get-ScheduledTaskDefaultPathIgnoreRegex' -CommandType Function -ErrorAction SilentlyContinue)) {
-  . (Join-Path -Path $PSScriptRoot -ChildPath 'ScheduledTaskHelpers.ps1')
+  . (Join-Path -Path $PSScriptRoot -ChildPath 'helper-regarding-scheduled-tasks.ps1')
 }
 
 if (-not (Get-Command -Name 'Get-ScheduledTaskDefaultNameIgnorePatterns' -CommandType Function -ErrorAction SilentlyContinue)) {
-  . (Join-Path -Path $PSScriptRoot -ChildPath 'ScheduledTaskHelpers.ps1')
+  . (Join-Path -Path $PSScriptRoot -ChildPath 'helper-regarding-scheduled-tasks.ps1')
 }
 
 if (-not (Get-Command -Name 'Get-ScheduledTaskFacts' -CommandType Function -ErrorAction SilentlyContinue)) {
-  . (Join-Path -Path $PSScriptRoot -ChildPath 'ScheduledTaskHelpers.ps1')
+  . (Join-Path -Path $PSScriptRoot -ChildPath 'helper-regarding-scheduled-tasks.ps1')
 }
 
 if (-not (Get-Command -Name 'Test-ScheduledTaskRequired' -CommandType Function -ErrorAction SilentlyContinue)) {
-  . (Join-Path -Path $PSScriptRoot -ChildPath 'ScheduledTaskHelpers.ps1')
+  . (Join-Path -Path $PSScriptRoot -ChildPath 'helper-regarding-scheduled-tasks.ps1')
 }
 
 if (-not (Get-Command -Name 'Test-ScheduledTaskIgnoredForOperationalChecks' -CommandType Function -ErrorAction SilentlyContinue)) {
-  . (Join-Path -Path $PSScriptRoot -ChildPath 'ScheduledTaskHelpers.ps1')
+  . (Join-Path -Path $PSScriptRoot -ChildPath 'helper-regarding-scheduled-tasks.ps1')
 }
 
 if (-not (Get-Command -Name 'Format-ScheduledTaskFactDetails' -CommandType Function -ErrorAction SilentlyContinue)) {
-  . (Join-Path -Path $PSScriptRoot -ChildPath 'ScheduledTaskHelpers.ps1')
+  . (Join-Path -Path $PSScriptRoot -ChildPath 'helper-regarding-scheduled-tasks.ps1')
 }
 
 if (-not (Get-Command -Name 'Get-ScheduledTaskOperationalSeverity' -CommandType Function -ErrorAction SilentlyContinue)) {
-  . (Join-Path -Path $PSScriptRoot -ChildPath 'ScheduledTaskHelpers.ps1')
+  . (Join-Path -Path $PSScriptRoot -ChildPath 'helper-regarding-scheduled-tasks.ps1')
 }
 
 if (-not (Get-Command -Name 'Test-ScheduledTaskLastResultReportable' -CommandType Function -ErrorAction SilentlyContinue)) {
-  . (Join-Path -Path $PSScriptRoot -ChildPath 'ScheduledTaskHelpers.ps1')
+  . (Join-Path -Path $PSScriptRoot -ChildPath 'helper-regarding-scheduled-tasks.ps1')
 }
 
 function HealthTest-ScheduledTasks {

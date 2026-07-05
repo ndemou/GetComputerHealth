@@ -1,8 +1,8 @@
-﻿Describe 'Suppressed health tests' {
+Describe 'Suppressed health tests' {
   BeforeAll {
     $script:RepoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
     $script:GetComputerHealthScript = Join-Path $script:RepoRoot 'Get-ComputerHealth.ps1'
-    . (Join-Path $script:RepoRoot 'health-tests\win-os-hyg.ps1')
+    . (Join-Path $script:RepoRoot 'health-tests\HealthTest-RunningProcesses.ps1')
   }
 
   It 'includes the process owner in running-process inventory messages' {

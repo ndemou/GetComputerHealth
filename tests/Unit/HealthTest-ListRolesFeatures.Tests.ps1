@@ -1,6 +1,6 @@
 Describe 'HealthTest-ListRolesFeatures source' {
   BeforeAll {
-    $scriptPath = Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) 'health-tests\OnlyIfHostIs-Server.ps1'
+    $scriptPath = Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) 'health-tests\HealthTest-ListRolesFeatures.ps1'
     $scriptText = Get-Content -LiteralPath $scriptPath -Raw
   }
 

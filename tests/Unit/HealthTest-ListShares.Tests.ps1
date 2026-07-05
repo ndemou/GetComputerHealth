@@ -1,6 +1,6 @@
 Describe 'HealthTest-ListShares' {
   BeforeAll {
-    . (Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) 'health-tests\win-os-hyg.ps1')
+    . (Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) 'health-tests\HealthTest-ListShares.ps1')
   }
 
   It 'reports default shares instead of filtering them out' {
@@ -77,7 +77,7 @@ Describe 'HealthTest-ListShares' {
 
 Describe 'HealthTest-Shares' {
   BeforeAll {
-    . (Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) 'health-tests\win-os-hyg.ps1')
+    . (Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) 'health-tests\HealthTest-Shares.ps1')
   }
 
   It 'reports hygiene warning when file and print sharing is enabled on a server with no shares' {

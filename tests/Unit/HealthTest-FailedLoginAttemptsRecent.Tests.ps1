@@ -1,6 +1,6 @@
 Describe 'HealthTest-FailedLoginAttemptsRecent' {
   BeforeAll {
-    . (Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) 'health-tests\win-os-hyg.ps1')
+    . (Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) 'health-tests\HealthTest-FailedLoginAttemptsRecent.ps1')
     $script:NewFailedLogonEvent = {
       param(
         [string]$User,

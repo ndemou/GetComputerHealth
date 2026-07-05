@@ -1078,6 +1078,101 @@ Lists all loaded HealthTest-* functions with their description text.
   }
 }
 
+function Get-BuiltInHealthTestHostRequirement {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)][string]$ScriptPath
+  )
+
+  $lines = @(Get-Content -LiteralPath $ScriptPath -TotalCount 12 -ErrorAction Stop)
+  foreach ($line in $lines) {
+    if ($line -match '^\s*#\s*HostRequirement:\s*(?<Value>[A-Za-z]+)\s*$') {
+      return $matches['Value']
+    }
+  }
+
+  return 'All'
+}
+
+function Test-BuiltInHealthTestHostRequirement {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)][string]$HostRequirement,
+    [bool]$HostIsVirtualMachine,
+    [bool]$HostIsMobile,
+    [bool]$HostIsInDomain,
+    [bool]$HostIsServer,
+    [bool]$HostIsDomainController,
+    [bool]$HostIsPrimaryDomainController,
+    [bool]$HostIsDnsServer,
+    [bool]$HostIsDhcpServer,
+    [bool]$HostIsHyperV
+  )
+
+  switch ($HostRequirement.ToLowerInvariant()) {
+    'all' { return $true }
+    'vm' { return $HostIsVirtualMachine }
+    'mobile' { return $HostIsMobile }
+    'domainjoined' { return $HostIsInDomain }
+    'domainjoinednotdc' { return ($HostIsInDomain -and (-not $HostIsDomainController)) }
+    'server' { return $HostIsServer }
+    'workstation' { return (-not $HostIsServer) }
+    'dc' { return $HostIsDomainController }
+    'pdc' { return $HostIsPrimaryDomainController }
+    'dnsserver' { return $HostIsDnsServer }
+    'dhcpserver' { return $HostIsDhcpServer }
+    'hyperv' { return $HostIsHyperV }
+    default { throw "Unsupported HostRequirement '$HostRequirement'." }
+  }
+}
+
+function Get-BuiltInHealthTestScriptsToImport {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)][string]$HealthTestsPath,
+    [switch]$IncludeAll,
+    [bool]$HostIsVirtualMachine,
+    [bool]$HostIsMobile,
+    [bool]$HostIsInDomain,
+    [bool]$HostIsServer,
+    [bool]$HostIsDomainController,
+    [bool]$HostIsPrimaryDomainController,
+    [bool]$HostIsDnsServer,
+    [bool]$HostIsDhcpServer,
+    [bool]$HostIsHyperV
+  )
+
+  $selectedFiles = @(
+    Get-ChildItem -Path $HealthTestsPath -Filter 'HealthTest-*.ps1' -File |
+    Sort-Object Name |
+    ForEach-Object {
+      $shouldLoad = $true
+      if (-not $IncludeAll) {
+        $requirement = Get-BuiltInHealthTestHostRequirement -ScriptPath $_.FullName
+        $requirementParams = @{
+          HostRequirement                = $requirement
+          HostIsVirtualMachine           = $HostIsVirtualMachine
+          HostIsMobile                   = $HostIsMobile
+          HostIsInDomain                 = $HostIsInDomain
+          HostIsServer                   = $HostIsServer
+          HostIsDomainController         = $HostIsDomainController
+          HostIsPrimaryDomainController  = $HostIsPrimaryDomainController
+          HostIsDnsServer                = $HostIsDnsServer
+          HostIsDhcpServer               = $HostIsDhcpServer
+          HostIsHyperV                   = $HostIsHyperV
+        }
+        $shouldLoad = Test-BuiltInHealthTestHostRequirement @requirementParams
+      }
+
+      if ($shouldLoad) {
+        $_
+      }
+    }
+  )
+
+  return $selectedFiles
+}
+
 function Invoke-HealthTestsFromFolder {
   [CmdletBinding()]
   param(
@@ -1425,9 +1520,12 @@ if ($PrettifyWriteWarning) {
 }
 
 if ($ListAllBuiltInTests) {
-  Get-ChildItem -Path (Join-Path -Path $PSScriptRoot -ChildPath 'health-tests') -Filter *.ps1 -File |
-  Sort-Object Name |
-  ForEach-Object { . $_.FullName }
+  $importAllBuiltInHealthTestsParams = @{
+    HealthTestsPath = Join-Path -Path $PSScriptRoot -ChildPath 'health-tests'
+    IncludeAll      = $true
+  }
+  Get-BuiltInHealthTestScriptsToImport @importAllBuiltInHealthTestsParams |
+    ForEach-Object { . $_.FullName }
 
   $allHealthTests = Get-Command -CommandType Function -Name 'HealthTest-*' -ErrorAction SilentlyContinue |
     Sort-Object -Property Name
@@ -1471,6 +1569,14 @@ if ((-not $AddWhitelisting) -and (-not $SetAsRequired)) {
     #------------------------------------------
     # What type of system are we running on
     #------------------------------------------
+    if (-not (Get-Command -Name 'Test-IsVirtualMachine' -CommandType Function -ErrorAction SilentlyContinue)) {
+      . (Join-Path -Path $PSScriptRoot -ChildPath 'health-tests\helpers-for-healthtests.ps1')
+    }
+
+    if (-not (Get-Command -Name 'Test-IsLaptopOrMobile' -CommandType Function -ErrorAction SilentlyContinue)) {
+      . (Join-Path -Path $PSScriptRoot -ChildPath 'health-tests\helpers-for-healthtests.ps1')
+    }
+
     $isHostVM = Test-IsVirtualMachine
     $isHostMobile = Test-IsLaptopOrMobile
     $IsHostInDomain = ($domainRole -in 1, 3, 4, 5)
@@ -1561,23 +1667,20 @@ if ((-not $AddWhitelisting) -and (-not $SetAsRequired)) {
     #| Dot source health tests
     #|
 
-    . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\syscfg-featdisc.ps1")
-    . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\srvc-exe-resolve.ps1")
-    . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\file-dir-anlz.ps1")
-    . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\HealthTest-ScheduledTasks.ps1")
-    . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\HealthTest-ListScheduledTasks.ps1")
-    . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\net-conn.ps1")
-    . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\os-perf-hw.ps1")
-    . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\win-os-hyg.ps1")
-
-    if ($isHostDC) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\OnlyIfHostIs-DC.ps1") }
-    if ($isHostDnsServer) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\OnlyIfHostIs-DnsServer.ps1") }
-    if ($isHostDhcpServer) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\OnlyIfHostIs-DhcpServer.ps1") }
-    if ($IsHostInDomain) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\OnlyIfHostIs-InDomain.ps1") }
-    if ($IsHostInDomain -and -not $isHostDC) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\OnlyIfHostIs-InDomainButNotDC.ps1") }
-    if ($isHostMobile) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\OnlyIfHostIs-Mobile.ps1") }
-    if ($isHostHyperV) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\OnlyIfHostIs-HyperV.ps1") }
-    if ($isHostServer) { . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\OnlyIfHostIs-Server.ps1") }
+    $importBuiltInHealthTestsParams = @{
+      HealthTestsPath                = Join-Path -Path $PSScriptRoot -ChildPath 'health-tests'
+      HostIsVirtualMachine           = $isHostVM
+      HostIsMobile                   = $isHostMobile
+      HostIsInDomain                 = $IsHostInDomain
+      HostIsServer                   = $isHostServer
+      HostIsDomainController         = $isHostDC
+      HostIsPrimaryDomainController  = $isHostPDC
+      HostIsDnsServer                = $isHostDnsServer
+      HostIsDhcpServer               = $isHostDhcpServer
+      HostIsHyperV                   = $isHostHyperV
+    }
+    Get-BuiltInHealthTestScriptsToImport @importBuiltInHealthTestsParams |
+      ForEach-Object { . $_.FullName }
     #|
     #| Dot source health tests
     #+-----------------------------------------------------------
@@ -1661,7 +1764,12 @@ Initialize-LogSystem `
 #|
 #+-----------------------------------------------------------
 Log-Debug "`$global:GchData" -Comment "$(($global:GchData|Format-List|Out-String).trim())"
-Log-Debug '$allHealthTests' -comment "$(($allHealthTests).name -join ', ')"
+$allHealthTestNames = @(
+  $allHealthTests |
+    Where-Object { $null -ne $_ -and $_.PSObject.Properties['Name'] } |
+    ForEach-Object { $_.Name }
+)
+Log-Debug '$allHealthTests' -comment "$($allHealthTestNames -join ', ')"
 
 Log-info "$((Split-Path $PSCommandPath -Leaf) -replace '.ps1'), ver.$VERSION, Nick Demou, enLogic"
 $biosSerialNumber = 'Unknown'

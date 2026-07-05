@@ -1,4 +1,4 @@
-﻿[CmdletBinding()]
+[CmdletBinding()]
 param(
   [ValidateSet('All', 'Unit', 'Integration')]
   [string]$Category = 'All',
@@ -11,7 +11,7 @@ if (-not $PSScriptRoot) {
 }
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
-. (Join-Path $repoRoot 'health-tests\srvc-exe-resolve.ps1')
+. (Join-Path $repoRoot 'health-tests\helper-regarding-service-and-executable-resolution.ps1')
 
 $script:ArtifactsRoot = Join-Path $PSScriptRoot 'artifacts\last-run'
 

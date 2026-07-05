@@ -1,7 +1,7 @@
-﻿Describe 'Microsoft installed software update classification' {
+Describe 'Microsoft installed software update classification' {
   BeforeAll {
     $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-    $scriptPath = Join-Path $repoRoot 'health-tests\win-os-hyg.ps1'
+    $scriptPath = Join-Path $repoRoot 'health-tests\HealthTest-ListInstalledPrograms.ps1'
 
     $parseErrors = $null
     $tokens = $null

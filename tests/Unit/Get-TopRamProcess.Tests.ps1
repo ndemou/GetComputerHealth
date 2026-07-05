@@ -1,6 +1,6 @@
 Describe 'Get-TopRamProcess' {
   BeforeAll {
-    . (Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) 'health-tests\os-perf-hw.ps1')
+    . (Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) 'health-tests\HealthTest-RamPressure.ps1')
   }
 
   BeforeEach {
