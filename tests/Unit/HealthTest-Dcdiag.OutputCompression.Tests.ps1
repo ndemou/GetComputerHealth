@@ -1,7 +1,7 @@
 Describe 'DCDIAG output compression' {
   BeforeAll {
     $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-    . (Join-Path $repoRoot 'helpers-for-healthtests.ps1')
+    . (Join-Path $repoRoot 'health-tests\helpers-for-healthtests.ps1')
     . (Join-Path $repoRoot 'health-tests\OnlyIfHostIs-DC.ps1')
   }
 

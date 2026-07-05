@@ -17,7 +17,7 @@ The codebase is Windows-specific in important places. Do not assume Linux compat
 - [`Get-ComputerHealth.ps1`](./Get-ComputerHealth.ps1): local runner on the target host
 - [`Invoke-GetComputerHealth.ps1`](./Invoke-GetComputerHealth.ps1): orchestration entry point
 - [`Update-GetHealthCode.ps1`](./Update-GetHealthCode.ps1): updater/installer
-- [`health-tests`](./health-tests): built-in `HealthTest-*` functions
+- [`health-tests`](./health-tests): built-in `HealthTest-*` functions and the helper code needed to run them
 - [`tests`](./tests): script-based test harness and standalone tests
 - [`.github/workflows/tests.yml`](./.github/workflows/tests.yml): CI workflow
 
@@ -104,7 +104,37 @@ If you want to contribute a built-in check that ships in `health-tests\*.ps1` an
 
 ### Placement
 
-Append the function to the most suitable script under [`health-tests`](./health-tests). Those files are grouped by topic.
+All code needed to run built-in health tests, and only that code, belongs under [`health-tests`](./health-tests). If a helper is shared by `Get-ComputerHealth.ps1` and health tests, keep it under `health-tests` and dot-source it from the caller that needs it.
+
+Every `HealthTest-*` function must live in its own `.ps1` file under `health-tests`, and the file name must match the function name, for example `health-tests\HealthTest-ScheduledTasks.ps1`.
+
+Each same-name health-test file must be directly executable. A user who wants to run one specific built-in health test must be able to run only that `.ps1` file. To make this work, dot-source every dependency from the health-test file itself.
+
+Use explicit conditional dependency declarations near the top of the file. Prefer this style for every needed helper function:
+
+```powershell
+if (-not (Get-Command -Name 'Get-ScheduledTaskFacts' -CommandType Function -ErrorAction SilentlyContinue)) {
+  . (Join-Path -Path $PSScriptRoot -ChildPath 'ScheduledTaskHelpers.ps1')
+}
+```
+
+At the end of the health-test file, execute the function only when the file was run directly rather than dot-sourced:
+
+```powershell
+if ($MyInvocation.InvocationName -ne '.') {
+  HealthTest-YourTestName
+}
+```
+
+Existing grouped health-test files are being migrated incrementally. Do not add new `HealthTest-*` functions to grouped files.
+
+### Helper Placement
+
+Use these categories when placing helper functions:
+
+- A specific health-test helper is needed by only one health test. Keep it in that health test's same-name `.ps1` file.
+- A domain helper is needed by a class of domain-specific health tests. Put it in its own domain helper file under `health-tests`, for example `ScheduledTaskHelpers.ps1`.
+- A generic helper is useful across unrelated health tests. Put it in `health-tests\helpers-for-healthtests.ps1`.
 
 ### Local Validation
 

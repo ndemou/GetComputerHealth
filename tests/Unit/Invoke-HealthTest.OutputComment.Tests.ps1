@@ -2,7 +2,7 @@ Describe 'Invoke-HealthTest output stream comment capture' {
   BeforeAll {
     $script:RepoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
     $script:GetComputerHealthScript = Join-Path $script:RepoRoot 'Get-ComputerHealth.ps1'
-    . (Join-Path $script:RepoRoot 'helpers-for-healthtests.ps1')
+    . (Join-Path $script:RepoRoot 'health-tests\helpers-for-healthtests.ps1')
 
     $parseErrors = $null
     $tokens = $null

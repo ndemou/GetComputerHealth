@@ -120,7 +120,7 @@ session. This is only a light form of isolation:
       - `IpsOfAllDcs`
     - built-in functions that happened to be loaded by the built-in health-test 
       scripts for the current host. Especially functions from 
-      [`helpers-for-healthtests.ps1`](../helpers-for-healthtests.ps1)
+      [`helpers-for-healthtests.ps1`](../health-tests/helpers-for-healthtests.ps1)
 
 Important cautions for developers:
 

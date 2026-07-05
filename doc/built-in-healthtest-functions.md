@@ -145,4 +145,4 @@ This lets the generic `Policy` handling baseline known scheduled-task definition
 
 ### Helpers
 
-Feel free to use functions from `helpers-for-healthtests.ps1`.
+Feel free to use functions from `health-tests\helpers-for-healthtests.ps1`.

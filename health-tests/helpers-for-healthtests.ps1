@@ -1,4 +1,15 @@
-﻿function Test-IsVirtualMachine {
+function Get-PropValue {
+# returns a default value if object does not have a property with that name.
+# The default value for the default value returned is $null but you can Set
+# $default to anything else.
+    param($obj, [string]$name, $default=$null)
+    if ($obj -and $obj.PSObject -and $obj.PSObject.Properties[$name]) {
+        return $obj.PSObject.Properties[$name].Value
+    }
+    return $default
+}
+
+function Test-IsVirtualMachine {
   # returns $true if it guesses the computer is VM
   [CmdletBinding()]
   [OutputType([bool])]
@@ -133,3 +144,4 @@ function Compress-HealthDiagnosticOutputLines {
 
   return $resultLines
 }
+

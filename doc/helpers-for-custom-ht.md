@@ -67,4 +67,4 @@ function HealthTest-RecentBakExist {
 
 ## Other helper functions
 
-You may wish to use functions from `helpers-for-healthtests.ps1`.
+You may wish to use functions from `health-tests\helpers-for-healthtests.ps1`.

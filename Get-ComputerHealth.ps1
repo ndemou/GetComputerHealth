@@ -27,7 +27,7 @@ Idempotency:
 
 Dependencies & execution context:
 - Requires elevation.
-- Relies on companion scripts: `lib-write-log-objects.ps1`, `helpers-for-healthtests.ps1`, and the modules under `health-tests\*.ps1` dot-sourced below.
+- Relies on companion scripts: `lib-write-log-objects.ps1` and the modules/helpers under `health-tests\*.ps1` dot-sourced below.
 - Uses a suppression config file at `.\config\Get-ComputerHealth.sigs-to-suppress.txt`.
 - Uses a required-findings config file at `.\config\required_findings.psd1`.
 
@@ -264,7 +264,7 @@ $script:Config = [pscustomobject]@{
 # Dot source libraries of functions
 #
 . (Join-Path -Path $PSScriptRoot -ChildPath "lib-write-log-objects.ps1")
-. (Join-Path -Path $PSScriptRoot -ChildPath "helpers-for-healthtests.ps1")
+. (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\helpers-for-healthtests.ps1")
 
 #------------------------------------------
 # Helper functions specific to this script except tests
@@ -1564,7 +1564,8 @@ if ((-not $AddWhitelisting) -and (-not $SetAsRequired)) {
     . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\syscfg-featdisc.ps1")
     . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\srvc-exe-resolve.ps1")
     . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\file-dir-anlz.ps1")
-    . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\schtasks-master.ps1")
+    . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\HealthTest-ScheduledTasks.ps1")
+    . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\HealthTest-ListScheduledTasks.ps1")
     . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\net-conn.ps1")
     . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\os-perf-hw.ps1")
     . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\win-os-hyg.ps1")
