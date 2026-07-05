@@ -1101,7 +1101,7 @@ Tags: Policy
 Uses: Get-ServiceVendors.
 
 Policy identity: normalized service name, normalized resolved payload path, and code identity. Signed payloads use vendor identity; unsigned or invalid-signature payloads use payload hash when available. Runtime state, exit code, and service start result are not included.
-Policy baseline version: 1
+Policy baseline version: 2
 #>
 
     $ok = $true

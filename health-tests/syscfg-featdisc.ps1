@@ -71,7 +71,7 @@ Tags: Policy
 Uses: None.
 
 Policy identity: source type and location, item name, and normalized command/path text. Volatile file timestamps and runtime state are not included.
-Policy baseline version: 1
+Policy baseline version: 2
 #>
   $registryPaths=@(
     @{ Scope = 'Machine'; Path = 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Run' },

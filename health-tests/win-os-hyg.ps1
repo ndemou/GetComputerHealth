@@ -2256,7 +2256,7 @@ Tags: Policy
 Uses: None.
 
 Policy identity: normalized share name and normalized shared path. Share runtime use, connection count, and service state are not included.
-Policy baseline version: 1
+Policy baseline version: 2
 #>
     $shares = @(Get-CimInstance -ClassName Win32_Share | Select-Object Name, Path, Type, Description)
     if ($shares.Count -gt 0) {
@@ -2700,7 +2700,7 @@ Tags: Policy
 Uses: Get-NetTCPConnection, Resolve-ExecutablePath, Get-ExeVendor.
 
 Policy identity: protocol, local port, address scope, process name, normalized executable path, and signed publisher/vendor when available. PID, concrete local IP address, and runtime connection state are not included.
-Policy baseline version: 1
+Policy baseline version: 2
 #>
     [CmdletBinding()] param(
         [int]$DynamicStart = 49152,

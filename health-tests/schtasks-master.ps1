@@ -1103,7 +1103,7 @@ Tags: Policy
 Uses: Get-ScheduledTask, Get-ScheduledTaskInfo, Export-ScheduledTask.
 
 Policy identity: stable task key plus fingerprint of normalized actions, principal, run level, logon type, triggers, hidden state, and enabled state. Last run time, next run time, missed runs, and last result are not included.
-Policy baseline version: 1
+Policy baseline version: 2
 #>
   [CmdletBinding()]
   param()
