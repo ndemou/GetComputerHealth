@@ -51,10 +51,7 @@ The `Field: Value` lines follow this exact order (note that some are optional):
    7. `Uses:` optional, up to three essential non-built-in commands or helper functions used by the test.
    8. `FalsePositives:` optional short note, only if false positives are expected.
 
-  If `Tags:` includes `Policy`, the detailed part of the help block must also include:
-
-  - `Policy identity:` explaining what stable object identity or fingerprint appears in the first finding line.
-  - `Policy baseline version: N` where `N` is a non-negative integer. Use `1` for new built-in policy tests.
+  If `Tags:` includes `Policy`, the detailed part of the help block must also include `Policy identity:` and `Policy baseline version: N`. See below.
 
   Use `Uses:` to list the main non-built-in commands or helper functions the HealthTest depends on, for example:
 
@@ -103,13 +100,15 @@ Policy Health tests have special handling:
 - A flag is appended to `Get-ComputerHealth.sigs-to-suppress.txt` so future runs are treated normally
 - The auto-baseline flag includes the test's `Policy baseline version`
 
-### Evidence Identity and Policy/Hygiene Boundaries
+The detailed part of the help block of a Policy health test must also include:
+  - `Policy identity:` explaining what stable object identity or fingerprint appears in the first finding line.
+  - `Policy baseline version: N` where `N` is a non-negative integer. Use `1` for new built-in policy tests.
 
 Policy tests work best when each emitted finding has a stable, intentional identity. The identity is whatever must appear in the first warning line so the generic message-signature and `Policy` suppression machinery can distinguish a known finding from a new one.
 
 Do not overbuild this. Use the simplest identity that matches the review need:
 
-- If the object identity is enough, put that identity in the first line. Examples: local administrator account, installed role name, share name plus path, or installed software name.
+- If the object identity is enough, put that identity in the first line prefixed with "Found ". Examples: local administrator account, installed role name, share name plus path, or installed software name. 
 - If the same object can change in security- or operations-relevant ways while keeping the same object name, add a compact definition fingerprint. The fingerprint should include fields whose change should force human review.
 - Keep volatile runtime status out of policy identity. Last run time, next run time, current state, process ID, missed run count, last result, queue depth, and similar facts usually belong in health findings or comments, not in a policy ID.
 
@@ -123,9 +122,7 @@ Policy identity: normalized object name plus review-worthy definition fingerprin
 Policy baseline version: 1
 ```
 
-Increase `Policy baseline version` when a code change changes the meaning of first-run auto-baselining enough that existing automatic baselines should be rebuilt. Typical reasons include changing the policy identity, adding important fields to a fingerprint, removing fields that made the old fingerprint misleading, or splitting/merging policy findings. Do not increase it for wording-only changes, comment/detail changes, severity changes, or collector refactoring that leaves the policy identity semantics intact.
-
-The runtime treats a missing help-block baseline version as `0` for compatibility with older or custom tests. Old suppression files may already contain autoset markers that were written before baseline versions existed. Those legacy recorded markers are treated as baseline version `1`, so systems that already ran the older policy auto-baselining code do not unexpectedly auto-baseline again when a built-in policy test first declares `Policy baseline version: 1`. Built-in health tests are stricter: the unit tests fail any `Tags: Policy` help block that omits `Policy baseline version: N`.
+Increase `Policy baseline version` when a code change results in a change of the first warning line, and as a result requires a re-run of auto-baselining. Typical reasons include changing the policy identity, adding important fields to a fingerprint, removing fields that made the old fingerprint misleading, or splitting/merging policy findings. 
 
 Only split a topic into separate policy and hygiene tests when both questions matter:
 
