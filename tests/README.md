@@ -1,19 +1,15 @@
-﻿# Tests
+# Tests
 
-The contributor-facing testing documentation now lives in [`CONTRIBUTING.md`](../CONTRIBUTING.md).
+Canonical testing docs:
 
-Use that file for:
+- [`../doc/contributor/test-suite.md`](../doc/contributor/test-suite.md) explains what each runner does and when to use it.
+- [`../CONTRIBUTING.md`](../CONTRIBUTING.md) contains the contributor workflow, conventions, and CI policy.
 
-- test commands
-- test categories
-- conventions for new tests
-- CI behavior
+Quick command reference:
 
-Quick reference:
-
-- run unit tests:
+- Run unit tests:
   `.\tests\run-unit-tests.ps1`
-- run all tests:
-  `.\tests\run-all-tests.ps1`
-- smoke run:
+- Run smoke tests:
   `.\tests\run-all-tests.ps1 -Smoke`
+- Run all tests:
+  `.\tests\run-all-tests.ps1`

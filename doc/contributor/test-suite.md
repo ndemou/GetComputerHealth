@@ -1,8 +1,10 @@
-﻿# Test Suite Guide
+# Test Suite Guide
 
 *(Information for developers only)*
 
 This guide explains the test and validation scripts in this repository in simple language.
+
+For the full documentation routing table, see [`README.md`](../README.md).
 
 It is written for:
 
@@ -38,7 +40,7 @@ What it does:
 
 - checks that Pester 5 or newer is installed
 - loads Pester
-- runs all tests under [`tests/Unit`](../tests/Unit)
+- runs all tests under [`tests/Unit`](../../tests/Unit)
 
 Use it when:
 
@@ -84,7 +86,7 @@ What it does:
 - runs the repo-wide PowerShell syntax pass
 - runs the ScriptAnalyzer wrapper
 - runs machine-coupled validation
-- runs standalone `test-*.ps1` scripts in [`tests`](../tests)
+- runs standalone `test-*.ps1` scripts in [`tests`](../../tests)
 - runs the real-service executable resolution check
 
 Use it when:
@@ -138,7 +140,7 @@ The main runner groups its work into a few buckets.
 
 This is the `Repo PowerShell syntax` test group inside the runner.
 
-In practice, it calls [`scripts/syntax/Test-RepoPowerShellSyntax.ps1`](../scripts/syntax/Test-RepoPowerShellSyntax.ps1), which parses repository PowerShell files and reports syntax errors.
+In practice, it calls [`scripts/syntax/Test-RepoPowerShellSyntax.ps1`](../../scripts/syntax/Test-RepoPowerShellSyntax.ps1), which parses repository PowerShell files and reports syntax errors.
 
 Use this group when:
 
@@ -150,7 +152,7 @@ Use this group when:
 
 This is the `ScriptAnalyzer` test group inside the runner.
 
-In practice, it calls [`tests/script-analysis.ps1`](../tests/script-analysis.ps1), which runs `Invoke-ScriptAnalyzer` against the repo and reports errors.
+In practice, it calls [`tests/script-analysis.ps1`](../../tests/script-analysis.ps1), which runs `Invoke-ScriptAnalyzer` against the repo and reports errors.
 
 Use this group when:
 
@@ -161,7 +163,7 @@ Use this group when:
 
 This is the `Pester unit suite` test group inside the runner.
 
-In practice, it calls [`tests/run-unit-tests.ps1`](../tests/run-unit-tests.ps1), which runs the Pester unit tests under [`tests/Unit`](../tests/Unit).
+In practice, it calls [`tests/run-unit-tests.ps1`](../../tests/run-unit-tests.ps1), which runs the Pester unit tests under [`tests/Unit`](../../tests/Unit).
 
 Use this group when:
 
@@ -171,11 +173,11 @@ Use this group when:
 
 ### 4. Real service executable resolution check
 
-This is the `Resolve-ServiceExecutable` group inside [`tests/run-all-tests.ps1`](../tests/run-all-tests.ps1).
+This is the `Resolve-ServiceExecutable` group inside [`tests/run-all-tests.ps1`](../../tests/run-all-tests.ps1).
 
 What it does:
 
-- loads code from [`health-tests/srvc-exe-resolve.ps1`](../health-tests/srvc-exe-resolve.ps1)
+- loads code from [`health-tests/srvc-exe-resolve.ps1`](../../health-tests/srvc-exe-resolve.ps1)
 - enumerates real Windows services with `Get-CimInstance Win32_Service`
 - checks whether service executable paths can be resolved correctly on the current machine
 
@@ -193,13 +195,13 @@ Important note:
 
 ### 5. Standalone script tests
 
-The runner also executes standalone files named `test-*.ps1` under [`tests`](../tests), excluding helper files.
+The runner also executes standalone files named `test-*.ps1` under [`tests`](../../tests), excluding helper files.
 
 These are script-based integration-style tests.
 
 ## Standalone Test Scripts
 
-### [`tests/test-installer.ps1`](../tests/test-installer.ps1)
+### [`tests/test-installer.ps1`](../../tests/test-installer.ps1)
 
 This is the most important installer/update validation script.
 
@@ -228,7 +230,7 @@ Important note:
 
 - this script is included in smoke mode
 
-### [`tests/test-Get-ComputerHealth.ps1`](../tests/test-Get-ComputerHealth.ps1)
+### [`tests/test-Get-ComputerHealth.ps1`](../../tests/test-Get-ComputerHealth.ps1)
 
 This is a broader “does the main script still run sanely?” check.
 
@@ -263,9 +265,9 @@ Important note:
 
 ## Pester Unit Tests
 
-These live under [`tests/Unit`](../tests/Unit).
+These live under [`tests/Unit`](../../tests/Unit).
 
-### [`tests/Unit/Resolve-ExecutablePath.Tests.ps1`](../tests/Unit/Resolve-ExecutablePath.Tests.ps1)
+### [`tests/Unit/Resolve-ExecutablePath.Tests.ps1`](../../tests/Unit/Resolve-ExecutablePath.Tests.ps1)
 
 This test file checks executable path resolution behavior.
 
@@ -287,7 +289,7 @@ Use it when:
 - you changed PATH probing logic
 - you changed related helper code in `srvc-exe-resolve.ps1`
 
-### [`tests/Unit/Invoke-GetComputerHealth.EmailSignature.Tests.ps1`](../tests/Unit/Invoke-GetComputerHealth.EmailSignature.Tests.ps1)
+### [`tests/Unit/Invoke-GetComputerHealth.EmailSignature.Tests.ps1`](../../tests/Unit/Invoke-GetComputerHealth.EmailSignature.Tests.ps1)
 
 This test file checks the email-signature helper functions in `Invoke-GetComputerHealth.ps1`.
 
@@ -304,7 +306,7 @@ Use it when:
 - you changed version-signature behavior
 - you changed email helper functions in `Invoke-GetComputerHealth.ps1`
 
-### [`tests/Unit/HealthTest-ListInstalledPrograms.Classification.Tests.ps1`](../tests/Unit/HealthTest-ListInstalledPrograms.Classification.Tests.ps1)
+### [`tests/Unit/HealthTest-ListInstalledPrograms.Classification.Tests.ps1`](../../tests/Unit/HealthTest-ListInstalledPrograms.Classification.Tests.ps1)
 
 This test file checks how installed software entries are classified.
 
@@ -320,7 +322,7 @@ Use it when:
 - you changed keyword rules for updates
 - you changed severity mapping for these findings
 
-### [`tests/Unit/HealthTestHelpBlock.Tests.ps1`](../tests/Unit/HealthTestHelpBlock.Tests.ps1)
+### [`tests/Unit/HealthTestHelpBlock.Tests.ps1`](../../tests/Unit/HealthTestHelpBlock.Tests.ps1)
 
 This test file checks contributor-facing structure rules for built-in `HealthTest-*` functions.
 
@@ -342,9 +344,9 @@ This is a structure/quality check, not a runtime behavior check.
 
 ## Extra Validation Scripts
 
-These scripts are useful. Both scripts below are now included by [`tests/run-all-tests.ps1`](../tests/run-all-tests.ps1) in the full suite. The syntax pass is also included in smoke mode.
+These scripts are useful. Both scripts below are now included by [`tests/run-all-tests.ps1`](../../tests/run-all-tests.ps1) in the full suite. The syntax pass is also included in smoke mode.
 
-### [`scripts/syntax/Test-RepoPowerShellSyntax.ps1`](../scripts/syntax/Test-RepoPowerShellSyntax.ps1)
+### [`scripts/syntax/Test-RepoPowerShellSyntax.ps1`](../../scripts/syntax/Test-RepoPowerShellSyntax.ps1)
 
 Command:
 
@@ -369,7 +371,7 @@ Use it when:
 
 This is a very useful safety net because syntax errors can appear in files that do not yet have dedicated runtime tests.
 
-### [`tests/script-analysis.ps1`](../tests/script-analysis.ps1)
+### [`tests/script-analysis.ps1`](../../tests/script-analysis.ps1)
 
 What it does:
 
@@ -389,7 +391,7 @@ Important note:
 
 ## Support Files Used by Tests
 
-### [`tests/test-helpers.ps1`](../tests/test-helpers.ps1)
+### [`tests/test-helpers.ps1`](../../tests/test-helpers.ps1)
 
 This is a shared helper module for standalone script tests.
 
@@ -406,7 +408,7 @@ Use it when:
 - you need repeatable temporary test setup
 - you want to follow existing standalone test style
 
-### [`tests/helpers-files.ps1`](../tests/helpers-files.ps1)
+### [`tests/helpers-files.ps1`](../../tests/helpers-files.ps1)
 
 This file contains file and zip helpers used by tests.
 
@@ -458,7 +460,7 @@ If you are preparing a release:
 - run `.\tests\run-unit-tests.ps1`
 - run `.\tests\run-all-tests.ps1 -Smoke`
 - run broader integration coverage if the release touches machine-coupled behavior
-- use [`scripts/release/New-GetComputerHealthRelease.ps1`](../scripts/release/New-GetComputerHealthRelease.ps1) for the release workflow itself
+- use [`scripts/release/New-GetComputerHealthRelease.ps1`](../../scripts/release/New-GetComputerHealthRelease.ps1) for the release workflow itself
 
 ## Simple Mental Model For New Contributors
 

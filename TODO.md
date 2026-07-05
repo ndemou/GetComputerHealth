@@ -1,5 +1,7 @@
 # DONE, Verification is pending
 
+This file is working notes and backlog. It is not canonical user or contributor documentation. Move durable decisions into `README.md`, `CONTRIBUTING.md`, or a focused file under `doc`.
+
 ## Policy for health test function organization
 
 1. *All* code needed to run Health Tests and nothing but that code should be under folder `health-tests`. This means that  functions shared with Get-ComputerHealth.ps1, if any, should be split into a separate ps1 file which should reside inside this folder.
@@ -77,7 +79,7 @@ https://docs.sigstore.dev/quickstart/quickstart-cosign/
 
 ## Review our test suite for this repo
 
-Review /doc/test-suite-guide.md and improve our test suite if needed.
+Review /doc/contributor/test-suite.md and improve our test suite if needed.
 
 ## Enhance -AddWhitelisting with reason
 

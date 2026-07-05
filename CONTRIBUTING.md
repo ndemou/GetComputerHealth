@@ -1,8 +1,8 @@
-﻿# Contributing
+# Contributing
 
 This project is intentionally small and script-first. Contributions should preserve that style: direct PowerShell, minimal abstraction, and behavior that is easy to debug on a real Windows machine.
 
-This guide is for contributors. If you want to add your own out-of-tree checks as a user, see [`doc/how-to-add-custom-tests.md`](./doc/how-to-add-custom-tests.md) instead.
+This guide is for contributors. If you want to add your own out-of-tree checks as a user, see [`doc/user/custom-tests.md`](./doc/user/custom-tests.md) instead.
 
 ## Environment
 
@@ -17,6 +17,7 @@ The codebase is Windows-specific in important places. Do not assume Linux compat
 - [`Get-ComputerHealth.ps1`](./Get-ComputerHealth.ps1): local runner on the target host
 - [`Invoke-GetComputerHealth.ps1`](./Invoke-GetComputerHealth.ps1): orchestration entry point
 - [`Update-GetHealthCode.ps1`](./Update-GetHealthCode.ps1): updater/installer
+- [`doc`](./doc): focused user, contributor, and design guides; start with [`doc/README.md`](./doc/README.md)
 - [`health-tests`](./health-tests): built-in `HealthTest-*` functions and the helper code needed to run them
 - [`tests`](./tests): script-based test harness and standalone tests
 - [`.github/workflows/tests.yml`](./.github/workflows/tests.yml): CI workflow
@@ -99,8 +100,8 @@ If you change test entry points or required environment assumptions, update the 
 
 If you want to contribute a built-in check that ships in `health-tests\*.ps1` and appears in `-ListAllBuiltInTests`, follow these guidelines:
 
- - [`how-to-add-custom-tests.md`](how-to-add-custom-tests.md).
- - [`built-in-healthtest-functions.md`](built-in-healthtest-functions.md).
+- [`doc/user/custom-tests.md`](./doc/user/custom-tests.md) explains the user-facing custom-test model.
+- [`doc/contributor/built-in-health-tests.md`](./doc/contributor/built-in-health-tests.md) contains the detailed built-in health-test conventions.
 
 ### Placement
 
@@ -162,7 +163,10 @@ Then run broader validation when needed:
 When contributor-facing behavior changes, update the relevant docs:
 - this file for contributor workflow, CI, and testing
 - [`README.md`](./README.md) for user-facing usage
-- keep [`doc/how-to-add-custom-tests.md`](./doc/how-to-add-custom-tests.md) focused on users writing custom tests
+- keep [`doc/user/custom-tests.md`](./doc/user/custom-tests.md) focused on users writing custom tests
+- keep [`doc/README.md`](./doc/README.md) current when adding, moving, or changing ownership of Markdown docs
+
+Use the documentation map as the source of truth for where durable documentation belongs. Avoid duplicating long guidance across files; link to the canonical document instead.
 
 ## Non-Goals
 

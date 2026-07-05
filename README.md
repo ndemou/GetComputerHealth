@@ -1,4 +1,4 @@
-﻿# Introduction
+# Introduction
 
 **Get-ComputerHealth** is a **production-ready, lightweight, secure, and extensible** PowerShell toolkit that **installs in a flash**. It scans your server, workstation, or fleet of domain servers for **more than a hundred health indicators**.
 
@@ -7,6 +7,16 @@ These include issues such as low RAM, missing updates, disk errors, and failed l
 It produces **useful, concise reports and email alerts**. You can also add your own **custom health tests with plain PowerShell scripts**.
 
 <img width="729" height="426" alt="Example of the report you receive via email"  src="https://github.com/user-attachments/assets/56ed5109-0f71-4f10-a7ba-2b0cf0e36669" />
+
+# Quick Documentation Map
+
+| Need | Read |
+| --- | --- |
+| Install or run the toolkit | Keep reading this `README.md` |
+| Add local custom checks | [`doc/user/custom-tests.md`](./doc/user/custom-tests.md) |
+| Contribute code or built-in tests | [`CONTRIBUTING.md`](./CONTRIBUTING.md) |
+| Understand the test suite | [`doc/contributor/test-suite.md`](./doc/contributor/test-suite.md) |
+| Find the complete documentation map | [`doc/README.md`](./doc/README.md) |
 
 # Status / Is this toolkit for you?
 
@@ -169,7 +179,7 @@ You can acomplish this in two steps:
 
 ## How to Add Custom Tests
 
-[Follow these instructions](./doc/how-to-add-custom-tests.md)
+[Follow these instructions](./doc/user/custom-tests.md)
 
 ## Interactive execution of tests
 
@@ -274,7 +284,7 @@ These are the scripts you actually execute.
 | `C:\IT\Get-ComputerHealth\bin\`    | All script files (`.ps1`). |
 | `C:\IT\Get-ComputerHealth\config\` | Configuration files. |
 | `C:\IT\Get-ComputerHealth\config\required_findings.psd1` | Optional required findings that must be emitted by selected built-in tests. |
-| `C:\IT\Get-ComputerHealth\config\Custom-HealthTests` | [Optional custom health tests.](./doc/how-to-add-custom-tests.md)  |
+| `C:\IT\Get-ComputerHealth\config\Custom-HealthTests` | [Optional custom health tests.](./doc/user/custom-tests.md)  |
 | `C:\IT\Get-ComputerHealth\temp\`   | Temp files like downloads and generated email HTML. |
 | `C:\IT\Get-ComputerHealth\log\`    | Logs of script execution. |
 
@@ -282,7 +292,7 @@ These are the scripts you actually execute.
 
 [See `CONTRIBUTING.md`](./CONTRIBUTING.md).
 
-If you only want to add a few custom tests, you do not need to modify the core code. [See `doc/how-to-add-custom-tests.md`](./doc/how-to-add-custom-tests.md).
+If you only want to add a few custom tests, you do not need to modify the core code. [See `doc/user/custom-tests.md`](./doc/user/custom-tests.md).
 
 
 # 7. List of Available Tests

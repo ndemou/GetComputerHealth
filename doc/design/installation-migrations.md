@@ -1,6 +1,8 @@
 # On-Disk Format Migrations
 *(Information for developers only)*
 
+For the full documentation routing table, see [`README.md`](../README.md).
+
 ## What is an On-Disk Format Migration
 
 Sometimes a new version needs more than the expected code changes in `.\bin`. It may also need to work with:

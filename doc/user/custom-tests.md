@@ -1,6 +1,8 @@
-﻿# How to Add Custom Tests
+# How to Add Custom Tests
 
 *(Information for users)*
+
+For the full documentation routing table, see [`README.md`](../README.md).
 
 ## TL;DR
   
@@ -10,7 +12,7 @@ Write-Warning "[PASS] Description of what's OK"
 Write-Warning "[FAILURE] Description of the issue"
 Write-Warning ("[FAILURE] Description of the issue" + "`n" + $details)
 # Choose between [NOTICE], [WARNING], or [FAILURE] depending on severity
-````
+```
 
 The code you write will run with **high privileges** and, apart from any temporary files or similar artifacts it may need, it **MUST not change** the system state.
 
@@ -70,7 +72,7 @@ Often this style covers your needs:
 ```powershell
 Write-Warning "[PASS] <A single terse line that describes the good status>"
 Write-Warning "[FAILURE] <A single terse line that uniquely describes the issue>""
-````
+```
 
 But if you have details to report, use this style:
 ```powershell
@@ -120,7 +122,7 @@ session. This is only a light form of isolation:
       - `IpsOfAllDcs`
     - built-in functions that happened to be loaded by the built-in health-test 
       scripts for the current host. Especially functions from 
-      [`helpers-for-healthtests.ps1`](../health-tests/helpers-for-healthtests.ps1)
+      [`helpers-for-healthtests.ps1`](../../health-tests/helpers-for-healthtests.ps1)
 
 Important cautions for developers:
 
@@ -131,11 +133,11 @@ Important cautions for developers:
 
 ## Optional Features You Might Find Useful
 
-You may wish to consider the extra guidelines on how to write [`built-in-healthtest-functions.md`](built-in-healthtest-functions.md).
+You may wish to consider the extra guidelines on how to write [`contributor/built-in-health-tests.md`](../contributor/built-in-health-tests.md).
 
-There are also some specialized helper functions you may wish to use. See [`helpers-for-custom-ht.md`](helpers-for-custom-ht.md).
+There are also some specialized helper functions you may wish to use. See [`user/custom-test-helpers.md`](./custom-test-helpers.md).
 
-# Instructions for LLMs Helping a Novice Write a Custom Test
+## Instructions for LLMs Helping a Novice Write a Custom Test
 
 First, ask your human to run these commands on the computer where they are writing the test. The output will help you understand whether the expected folders exist and whether any custom tests already exist.
 

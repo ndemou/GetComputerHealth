@@ -1,8 +1,10 @@
-﻿## Built-in HealthTest functions
+# Built-in HealthTest Functions
 
 *(Information for developers only)*
 
-### Behavior Rules
+For the full documentation routing table, see [`README.md`](../README.md).
+
+## Behavior Rules
 
 - Keep side effects at zero.
   Functions **must never** change machine state, only inspect and report.
@@ -11,12 +13,12 @@
   Write-Warning "[LEVEL] Description of the issue"
   Write-Warning ("[LEVEL] Description of the issue" + "`n" + $details)
   ```
-  Where `LEVEL` is one of `PASS`, `INFO`, `NOTICE`, `WARNING`, or `FAILURE`. See [`how-to-add-custom-tests.md`](how-to-add-custom-tests.md) for more information.
+  Where `LEVEL` is one of `PASS`, `INFO`, `NOTICE`, `WARNING`, or `FAILURE`. See [`user/custom-tests.md`](../user/custom-tests.md) for more information.
 - Be explicit about scope and prerequisites.
   If a test only applies to DCs, domain-joined machines, laptops, and so on, use the special fields in the top-level help block. If they don't cover your situation, short-circuit early.
 - Catch exceptions only when you can recover or downgrade cleanly. Otherwise, do nothing because the framework that invokes the functions catches exceptions, reports them, and aborts the rest of the HealthTest code. A typical example is iterating over a list and testing each item, where you do not want an exception for one item to skip all the others.
 
-### Function Shape
+## Function Shape
 
 Use this structure and PascalCase after the `HealthTest-` prefix:
 ```powershell
@@ -66,7 +68,7 @@ The `Field: Value` lines follow this exact order (note that some are optional):
   - helper functions defined inside the `HealthTest-*` function itself
   - vague prose descriptions instead of concrete command/function names
 
-### About the Tags field
+## About the Tags field
 
 Use it to tag health tests. Examples:
 - `Tags: Essential`
@@ -77,12 +79,12 @@ Supported tags:
 - `Policy`: indicates a policy inventory test (see below)
 - `Suppressed`: indicates an inventory/audit test whose emitted non-debug messages should be treated as suppressed by default (see below)
 
-### Slow tests
+## Slow tests
 
 If your test needs more than 3 seconds to complete, indicate that in the Impact field (`Impact: ... High(Time)`).
 `-SkipSlowTests` uses that marker.
 
-### Suppressed Inventory Tests
+## Suppressed Inventory Tests
 
 Tests with the `Suppressed` tag are for inventory/audit data that should be returned as structured log objects without distracting operators in normal console output. When the runner processes a suppressed-tagged test, each emitted non-debug test message is marked with `Suppressed = $true` as if its message signature were present in `Get-ComputerHealth.sigs-to-suppress.txt`.
 
@@ -90,7 +92,7 @@ Use `Suppressed` only when every message from the test is expected inventory dat
 
 Suppressed Inventory Tests can be extremely useful for "Required findings".
 
-### Policy Inventory Tests
+## Policy Inventory Tests
 
 Tests with the `Policy` tag inventory a system aspect where the initial controlled state is accepted as a baseline. For example, this can cover open ports, installed software, and enabled services after a clean server installation.
 
@@ -143,6 +145,6 @@ Scheduled tasks are the full version of this pattern:
 
 This lets the generic `Policy` handling baseline known scheduled-task definitions on first run. Later, a new task or a changed definition emits a new message signature without requiring a separate state file, while current operational failures remain visible through the hygiene test.
 
-### Helpers
+## Helpers
 
 Feel free to use functions from `health-tests\helpers-for-healthtests.ps1`.

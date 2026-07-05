@@ -15,7 +15,7 @@ example:
 Custom tests do currently run in the same PowerShell session as
 `Get-ComputerHealth.ps1`, in a child script scope, so they can also see some
 already-loaded functions and variables. See
-[`how-to-add-custom-tests.md`](how-to-add-custom-tests.md) for the current
+[`user/custom-tests.md`](./custom-tests.md) for the current
 execution-scope details and cautions.
 
 ## How to check whether recent Veeam backups exist in a folder

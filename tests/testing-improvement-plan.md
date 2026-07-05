@@ -1,6 +1,8 @@
-﻿# Test Improvement Plan
+# Test Improvement Plan
 
 This repo does not need a full testing framework migration right now. The current script-based approach is acceptable. However, a few small changes would materially improve reliability, maintainability, diagnostics, and day-to-day usage.
+
+For current test commands and runner behavior, use [`../doc/contributor/test-suite.md`](../doc/contributor/test-suite.md).
 
 ## Goal
 

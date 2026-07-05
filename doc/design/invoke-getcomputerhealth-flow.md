@@ -1,6 +1,8 @@
-﻿# Invoke-GetComputerHealth execution flow
+# Invoke-GetComputerHealth execution flow
 
 *(Interface-level guide mainly for developers)*
+
+For the full documentation routing table, see [`README.md`](../README.md).
 
 This document explains what happens when you run `Invoke-GetComputerHealth.ps1`.
 It focuses on observable behavior, inputs, outputs, and handoffs between scripts.
