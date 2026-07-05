@@ -4,20 +4,31 @@ This file is working notes and backlog. It is not canonical user or contributor 
 
 ## Policy for health test function organization
 
-1. *All* code needed to run Health Tests and nothing but that code should be under folder `health-tests`. This means that  functions shared with Get-ComputerHealth.ps1, if any, should be split into a separate ps1 file which should reside inside this folder.
+1. *All* code needed to run Health Tests and nothing but that code should be under folder `health-tests`. This means that  functions shared with Get-
+ComputerHealth.ps1, if any, should be split into a separate ps1 file which should reside inside this folder.
 2. Every health test function should reside in it's own ps1 file with the same name as the function.
-3. If the user wants to run one specific HealthTest function they must be able to do it by executing just that one ps1 file. This, along with the previous rule, forces as to dot source all dependencies from that ps1 file.
+3. If the user wants to run one specific HealthTest function they must be able to do it by executing just that one ps1 file. This, along with the previous rule,
+forces as to dot source all dependencies from that ps1 file.
 
-Update CONTRIBUTING.md with these rules (at least sections Placement and Repository Layout).
+Update CONTRIBUTING.md with these rules (at leaset sections Placement and Repository Layout).
 
 ### Implementation
 
-First two definitions: Let's call a function, a "specific HealthTest helper function" if it is needed only for one health test. Let's call a function, a "domain helper function" if it is needed for a class of domain specific health tests (e.g. the function that returns the description of a scheduled task which is useful for the domain of health tests that check for issues in Scheduled tasks). Let's call a function, a "generic helper function" if it is needed for a range of unrelated health tests (e.g. the Get-PropValue function that returns the property X of object Y, with default of $null if the property doesn't exist).
+First two definitions: Let's call a function, a "specific HealthTest helper function" if it is needed only for one health test. Let's call a function, a "domain
+helper function" if it is needed for a class of domain specific health tests (e.g. the function that returns the description of a scheduled task which is useful
+for the domain of health tests that check for issues in Scheduled tasks). Let's call a function, a "generic helper function" if it is needed for a range of
+unrelated health tests (e.g. the Get-PropValue function that returns the property X of object Y, with default of $null if the property doesn't exist).
 
-Status: CONTRIBUTING.md is updated, `helpers-for-healthtests.ps1` has moved under `health-tests`, `Get-PropValue` is in that generic helper file, and the scheduled-task health tests have been migrated as the production-verified pilot.
+Move helpers-for-helthtests.ps1 under the `health-tests` folder.
 
-Remaining: migrate the other grouped `HealthTest-*` functions. Move all domain helpers of each specific domain into their own `.ps1` files. Move each remaining health test function and its specific helpers into its own same-name `.ps1` file. Conditionally dot-source every needed generic or domain helper with this style: "if definition for foo is missing dot source bar.ps1" for every needed helper function. These commands also work as an explicit definition of dependencies. At the end of each health-test `.ps1`, add a command that checks whether the file was executed rather than dot-sourced, and in that case executes the function.
+Move all generic helper functions (all is maybe just Get-PropValue) in helpers-for-healthtests.ps1.
 
+Move all domain helpers of a specific domain on their own ps1 file.
+
+Move each HealthTest functions and its specific HealthTest helpers on its own ps1 file. Conditionally dot source every needed ps1 file with generic or domain
+helpers. Use this style: "if definition for foo is missing dot source bar.ps1" for every single needed helper function. These commands will also work as an
+explicit definition of dependencies. At the end of the ps1 add a command that checks of the file was executed rather than dot-sourced, and in that case it
+executes the function. Before making this change for all health tests, try it with those related to scheduled tasks and verify in production.
 
 # TODO
 
