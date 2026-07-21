@@ -32,6 +32,30 @@ executes the function. Before making this change for all health tests, try it wi
 
 # TODO
 
+## Centralization for domains 
+
+I probably need a directory Get-ComputerHealth under NETLOGON share with at least 2 subdirs: config and temp.
+Temp is good for spring flags; config is for domain wide configuration and domain wide custom scripts.
+
+Some tests that have Scope: Domain should ideally be executed on one DC only or on one server only.
+
+Here are some tests that can be run from any domain controller and need only run once:
+
+- "HealthTest-ADReplicationDomainRepadmin"
+- "HealthTest-SysvolNetlogonAccessible"
+- "HealthTest-SchemaVersionConsistency"
+- "HealthTest-TombstoneLifetime"
+- "HealthTest-RecycleBinEnabled"
+
+Besides the scope I also need the health test to define the host type from which they can be invoked: Some tests can be run from any server, some from any domain controller, some from any workstation.
+
+I also need to store a flag that proves a test was run (in NETLOGON\GCH\temp). Also an identifier for each run (e.g. the timestamp when the domain wide tests started) must be passed to all targets.
+
+Custom tests that test the AD health and the network health should also use this functionality: custom AD tests need to run from a DC, network health ones from *almost* any computer (almost because e.g. I don't want the DMZed web server to be checking the servers VLAN health). So custom tests can have tags to indicate either "run only from these computers" or "run from any computer except these".
+
+(BTW a directory under NETLOGON is probably the ideal place to publish the updates zip)
+
+
 ## Option IpsOfAllDcs in gch.psd1
 
 The trick with `cache.IpsOfAllDcs.clixml` is a hack. I should incorporate it into gch.psd1. An on-disk format migration can populate the new setting if the file is found, and then remove the old file.
@@ -46,7 +70,7 @@ Example `gch.psd1`:
 }
 ```
 
-## Send-Message.ps1 should support both JSON and PSD1 configuration files
+## Send-Message.ps1 should support both JSON and PSD1 configurationfiles
 
 By default, prefer reading and generating the PSD1 configuration file (.\config\Send-Message.psd1).
 
@@ -293,13 +317,6 @@ See also : .\tests\script-analysis.ps1
 
   - `Start-HealthTestVeeamRecentBackupsExist` expects to read clear-text data from a file. Maybe use Credential Manager. Note that Credential Manager stores passwords per user, which complicates things: it may work from your account but not from SYSTEM.
 
-## Some tests that have Scope: Domain should ideally be executed on one DC
-
-- "HealthTest-ADReplicationDomainRepadmin"
-- "HealthTest-SysvolNetlogonAccessible"
-- "HealthTest-SchemaVersionConsistency"
-- "HealthTest-TombstoneLifetime"
-- "HealthTest-RecycleBinEnabled"
 
 ## MAYBE change any files with JSON content to `.psd1`
 
