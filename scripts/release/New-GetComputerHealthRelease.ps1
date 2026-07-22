@@ -12,6 +12,8 @@ Performs the repository release flow end to end:
 - commits and pushes the version bump
 - creates a GitHub release with the zip asset attached
 
+A full release can take several minutes because the smoke and installer checks are intentionally thorough. Allow at least 15 minutes unless the script reports a concrete failure.
+
 .PARAMETER Part
 Semantic version part to increment. Defaults to `Minor`.
 
@@ -51,6 +53,17 @@ function Assert-CommandAvailable {
   }
 }
 
+function Assert-NativeCommandSucceeded {
+  param(
+    [Parameter(Mandatory)][string]$Operation,
+    [Parameter(Mandatory)][int]$ExitCode
+  )
+
+  if ($ExitCode -ne 0) {
+    throw "$Operation failed with exit code $ExitCode."
+  }
+}
+
 function Get-RepoRoot {
   $root = Resolve-Path (Join-Path $PSScriptRoot '..\..')
   return $root.ProviderPath
@@ -68,6 +81,7 @@ function Get-EmbeddedVersion {
 
 function Get-LatestSemanticTagVersion {
   $tags = @(git tag --list)
+  Assert-NativeCommandSucceeded -Operation 'Listing Git tags' -ExitCode $LASTEXITCODE
   $versions = @(
     foreach ($tag in $tags) {
       if ($tag -match '^(?:v)?(?<Version>\d+\.\d+\.\d+)$') {
@@ -128,7 +142,9 @@ function Set-EmbeddedVersion {
 }
 
 function Get-GitHubRepoSlug {
-  $originUrl = (git remote get-url origin).Trim()
+  $originUrl = git remote get-url origin
+  Assert-NativeCommandSucceeded -Operation 'Reading the origin URL' -ExitCode $LASTEXITCODE
+  $originUrl = ([string]$originUrl).Trim()
   if ($originUrl -match 'github\.com[:/](?<Owner>[^/]+)/(?<Repo>[^/.]+?)(?:\.git)?$') {
     return ('{0}/{1}' -f $Matches['Owner'], $Matches['Repo'])
   }
@@ -212,11 +228,13 @@ Assert-CommandAvailable -Name 'gh'
 Assert-CommandAvailable -Name 'powershell'
 
 $status = @(git status --porcelain)
+Assert-NativeCommandSucceeded -Operation 'Reading Git working-tree status' -ExitCode $LASTEXITCODE
 if ($status.Count -gt 0) {
   throw "Working tree is not clean. Commit, stash, or discard changes before creating a release."
 }
 
 $branch = (git rev-parse --abbrev-ref HEAD).Trim()
+Assert-NativeCommandSucceeded -Operation 'Reading the current Git branch' -ExitCode $LASTEXITCODE
 if ($branch -ne 'main') {
   throw "Release script must be run from branch 'main'. Current branch: $branch"
 }
@@ -226,9 +244,11 @@ $repoSlug = Get-GitHubRepoSlug
 
 Write-Step 'Fetching latest origin state and tags'
 git fetch --tags origin | Out-Host
+Assert-NativeCommandSucceeded -Operation 'Fetching origin and tags' -ExitCode $LASTEXITCODE
 
 Write-Step 'Rebasing local main onto origin/main'
 git pull --rebase origin main | Out-Host
+Assert-NativeCommandSucceeded -Operation 'Rebasing local main onto origin/main' -ExitCode $LASTEXITCODE
 
 $embeddedVersion = Get-EmbeddedVersion -Path $versionScriptPath
 $latestTagVersion = Get-LatestSemanticTagVersion
@@ -237,7 +257,9 @@ $newVersion = Get-IncrementedVersion -BaseVersion $baseVersion -VersionPart $Par
 $newVersionText = $newVersion.ToString()
 $releaseTag = 'v{0}' -f $newVersionText
 
-if (git tag --list $releaseTag) {
+$matchingTags = @(git tag --list $releaseTag)
+Assert-NativeCommandSucceeded -Operation "Checking for tag $releaseTag" -ExitCode $LASTEXITCODE
+if ($matchingTags.Count -gt 0) {
   throw "Tag already exists: $releaseTag"
 }
 
@@ -262,17 +284,22 @@ Test-ReleaseZipInstall -RepoRoot $repoRoot -ZipPath $zipPath -ExpectedVersion $n
 
 Write-Step 'Committing version bump'
 git add -- $versionScriptPath | Out-Host
+Assert-NativeCommandSucceeded -Operation 'Staging the version bump' -ExitCode $LASTEXITCODE
 git commit -m ("Bump version to {0}" -f $newVersionText) | Out-Host
+Assert-NativeCommandSucceeded -Operation 'Committing the version bump' -ExitCode $LASTEXITCODE
 
 Write-Step 'Pushing main to origin'
 git push origin main | Out-Host
+Assert-NativeCommandSucceeded -Operation 'Pushing main to origin' -ExitCode $LASTEXITCODE
 
 Write-Step ("Creating GitHub release {0}" -f $releaseTag)
 gh release create $releaseTag $zipPath --target main --title $releaseTag --generate-notes | Out-Host
+Assert-NativeCommandSucceeded -Operation "Creating GitHub release $releaseTag" -ExitCode $LASTEXITCODE
 
 $releaseZipUrl = (
   gh release view $releaseTag --repo $repoSlug --json assets --jq '.assets[0].url'
 ).Trim()
+Assert-NativeCommandSucceeded -Operation "Reading GitHub release $releaseTag" -ExitCode $LASTEXITCODE
 
 Write-Step 'Release completed successfully'
 Write-Host ("Version: {0}" -f $newVersionText)

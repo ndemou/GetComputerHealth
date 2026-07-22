@@ -63,5 +63,6 @@ Run tests from the repository root in Windows PowerShell (v5).
 
 - Use `.\scripts\release\New-GetComputerHealthRelease.ps1` from the repo root to create a release. It defaults to a minor bump; use `-Part Patch` or `-Part Major` to change the semantic-version part being incremented.
 - Use `.\scripts\release\New-GetComputerHealthRelease.ps1 -SkipTests` only when the relevant tests have already passed in the current work session and you want to avoid rerunning the unit and smoke wrappers during release. The release script still validates installation from the release zip.
+- A full release can take several minutes because it runs the unit suite, smoke and installer scenarios, and release-zip installation validation. Do not interrupt it merely because output pauses; allow at least 15 minutes unless the script reports a concrete failure.
 
 For minor & major releases verify the "List of Available Tests" in README.md matches what `Get-ComputerHealth -ListAllBuiltInTests` returns. If not, update README.md
