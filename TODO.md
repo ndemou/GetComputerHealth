@@ -4,26 +4,54 @@ This file is working notes and backlog. It is not canonical user or contributor 
 
 ## Policy for health test function organization
 
-1. *All* code needed to run Health Tests and nothing but that code should be under folder `health-tests`. This means that  functions shared with Get-ComputerHealth.ps1, if any, should be split into a separate ps1 file which should reside inside this folder.
+1. *All* code needed to run Health Tests and nothing but that code should be under folder `health-tests`. This means that  functions shared with Get-
+ComputerHealth.ps1, if any, should be split into a separate ps1 file which should reside inside this folder.
 2. Every health test function should reside in it's own ps1 file with the same name as the function.
-3. If the user wants to run one specific HealthTest function they must be able to do it by executing just that one ps1 file. This, along with the previous rule, forces as to dot source all dependencies from that ps1 file.
+3. If the user wants to run one specific HealthTest function they must be able to do it by executing just that one ps1 file. This, along with the previous rule,
+forces as to dot source all dependencies from that ps1 file.
 
-Update CONTRIBUTING.md with these rules (at least sections Placement and Repository Layout).
+Update CONTRIBUTING.md with these rules (at leaset sections Placement and Repository Layout).
 
 ### Implementation
 
-First two definitions: Let's call a function, a "specific HealthTest helper function" if it is needed only for one health test. Let's call a function, a "domain helper function" if it is needed for a class of domain specific health tests (e.g. the function that returns the description of a scheduled task which is useful for the domain of health tests that check for issues in Scheduled tasks). Let's call a function, a "generic helper function" if it is needed for a range of unrelated health tests (e.g. the Get-PropValue function that returns the property X of object Y, with default of $null if the property doesn't exist).
+First two definitions: Let's call a function, a "specific HealthTest helper function" if it is needed only for one health test. Let's call a function, a "domain
+helper function" if it is needed for a class of domain specific health tests (e.g. the function that returns the description of a scheduled task which is useful
+for the domain of health tests that check for issues in Scheduled tasks). Let's call a function, a "generic helper function" if it is needed for a range of
+unrelated health tests (e.g. the Get-PropValue function that returns the property X of object Y, with default of $null if the property doesn't exist).
 
 Status: CONTRIBUTING.md is updated, `helpers-for-healthtests.ps1` has moved under `health-tests`, `Get-PropValue` is in that generic helper file, and all built-in `HealthTest-*` functions now live in same-name standalone files. The old grouped files that still exist are helper-only files.
 
 Remaining: verify the split in production. Consider whether any helper-only files should be renamed later for clarity.
-
 
 # TODO
 
 ## Optimize -OnlyTheseTests after health-test file split
 
 After the repo-wide health-test file split, avoid loading every `HealthTest-*.ps1` file when `-OnlyTheseTests` names a small subset. Load only the requested same-name health-test files and their declared dependencies.
+
+## Centralization for domains
+
+I probably need a directory Get-ComputerHealth under NETLOGON share with at least 2 subdirs: config and temp.
+Temp is good for spring flags; config is for domain wide configuration and domain wide custom scripts.
+
+Some tests that have Scope: Domain should ideally be executed on one DC only or on one server only.
+
+Here are some tests that can be run from any domain controller and need only run once:
+
+- "HealthTest-ADReplicationDomainRepadmin"
+- "HealthTest-SysvolNetlogonAccessible"
+- "HealthTest-SchemaVersionConsistency"
+- "HealthTest-TombstoneLifetime"
+- "HealthTest-RecycleBinEnabled"
+
+Besides the scope I also need the health test to define the host type from which they can be invoked: Some tests can be run from any server, some from any domain controller, some from any workstation.
+
+I also need to store a flag that proves a test was run (in NETLOGON\GCH\temp). Also an identifier for each run (e.g. the timestamp when the domain wide tests started) must be passed to all targets.
+
+Custom tests that test the AD health and the network health should also use this functionality: custom AD tests need to run from a DC, network health ones from *almost* any computer (almost because e.g. I don't want the DMZed web server to be checking the servers VLAN health). So custom tests can have tags to indicate either "run only from these computers" or "run from any computer except these".
+
+(BTW a directory under NETLOGON is probably the ideal place to publish the updates zip)
+
 
 ## Option IpsOfAllDcs in gch.psd1
 
@@ -39,7 +67,7 @@ Example `gch.psd1`:
 }
 ```
 
-## Send-Message.ps1 should support both JSON and PSD1 configuration files
+## Send-Message.ps1 should support both JSON and PSD1 configurationfiles
 
 By default, prefer reading and generating the PSD1 configuration file (.\config\Send-Message.psd1).
 
@@ -286,13 +314,6 @@ See also : .\tests\script-analysis.ps1
 
   - `Start-HealthTestVeeamRecentBackupsExist` expects to read clear-text data from a file. Maybe use Credential Manager. Note that Credential Manager stores passwords per user, which complicates things: it may work from your account but not from SYSTEM.
 
-## Some tests that have Scope: Domain should ideally be executed on one DC
-
-- "HealthTest-ADReplicationDomainRepadmin"
-- "HealthTest-SysvolNetlogonAccessible"
-- "HealthTest-SchemaVersionConsistency"
-- "HealthTest-TombstoneLifetime"
-- "HealthTest-RecycleBinEnabled"
 
 ## MAYBE change any files with JSON content to `.psd1`
 

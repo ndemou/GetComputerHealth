@@ -1,6 +1,6 @@
 # Reporting
 
-`reporting.ps1` exposes `Invoke-GetComputerHealthReporting` as the callable reporting entry point.
+`reporting.ps1` exposes `Invoke-GetComputerHealthReporting` as the callable reporting entry point. (Reminder: `Get-ComputerHealth.ps1` runs tests; `Invoke-GetComputerHealth.ps1` orchestrates machines and collection (it calls `Get-ComputerHealth.ps1`); reporting.ps1 turns the collected results into saved artifacts, HTML reports, and optional email.)
 
 For interactive developer use:
 
