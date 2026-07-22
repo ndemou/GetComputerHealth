@@ -412,6 +412,33 @@ Describe 'HealthTest-ListScheduledTasks' {
     @($script:warnings | Where-Object { $_ -match '^\[WARNING\] Found scheduled task: \\Vendor\\Task fingerprint=priv' }).Count | Should -Be 1
   }
 
+  It 'suppresses known noisy scheduled task definitions' {
+    $script:TestScheduledTaskFacts = @(
+      New-TestScheduledTaskFact -TaskPath '\' -TaskName 'OneDrive Reporting Task-S-1-5-21-1000'
+      New-TestScheduledTaskFact -TaskPath '\' -TaskName 'OneDrive Startup Task-S-1-5-21-1000'
+      New-TestScheduledTaskFact -TaskPath '\SoftLanding\S-1-5-21-1000\' -TaskName 'SoftLandingDeferralTask'
+      New-TestScheduledTaskFact -TaskPath '\Microsoft\Windows\UpdateOrchestrator\' -TaskName 'Schedule Scan'
+      New-TestScheduledTaskFact -TaskPath '\Microsoft\Office\' -TaskName 'Office Serviceability Manager'
+    )
+
+    HealthTest-ListScheduledTasks
+
+    @($script:warnings | Where-Object { $_ -match 'Found scheduled task' }).Count | Should -Be 0
+    @($script:warnings | Where-Object { $_ -match '^\[PASS\] No reportable scheduled tasks discovered\.$' }).Count | Should -Be 1
+  }
+
+  It 'continues to report tasks outside the suppression list' {
+    $script:TestScheduledTaskFacts = @(
+      New-TestScheduledTaskFact -TaskPath '\Microsoft\Other\' -TaskName 'Task'
+      New-TestScheduledTaskFact -TaskPath '\Vendor\' -TaskName 'Task'
+    )
+
+    HealthTest-ListScheduledTasks
+
+    @($script:warnings | Where-Object { $_ -match 'Found scheduled task: \\Microsoft\\Other\\Task' }).Count | Should -Be 1
+    @($script:warnings | Where-Object { $_ -match 'Found scheduled task: \\Vendor\\Task' }).Count | Should -Be 1
+  }
+
   It 'emits a different policy finding when the same task key has a changed action fingerprint' {
     $script:TestScheduledTaskFacts = @(New-TestScheduledTaskFact -PolicyFingerprint 'oldaction')
     HealthTest-ListScheduledTasks

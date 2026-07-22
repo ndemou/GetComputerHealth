@@ -33,8 +33,28 @@ Policy baseline version: 2
     return
   }
 
+  $suppressedStableKeyPatterns = @(
+    '\OneDrive Reporting Task*'
+    '\OneDrive Startup Task*'
+    '\SoftLanding\*'
+    '\Microsoft\Windows\*'
+    '\Microsoft\Office\*'
+  )
+
   $seen = 0
   foreach ($fact in ($facts | Sort-Object StableKey)) {
+    $isSuppressed = $false
+    foreach ($pattern in $suppressedStableKeyPatterns) {
+      if ($fact.StableKey -like $pattern) {
+        $isSuppressed = $true
+        break
+      }
+    }
+
+    if ($isSuppressed) {
+      continue
+    }
+
     $seen += 1
     $level = 'NOTICE'
     if ($fact.IsPrivileged) { $level = 'WARNING' }
@@ -43,7 +63,7 @@ Policy baseline version: 2
   }
 
   if ($seen -eq 0) {
-    Write-Warning "[PASS] No scheduled tasks discovered."
+    Write-Warning "[PASS] No reportable scheduled tasks discovered."
   }
 }
 
