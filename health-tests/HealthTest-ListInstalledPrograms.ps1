@@ -163,6 +163,20 @@ function Get-InstalledSoftwareFindingLevel {
     return 'warning'
 }
 
+function Format-InstalledSoftwareInstallDate {
+    param([AllowNull()][object]$Value)
+
+    if ($null -eq $Value) {
+        return '(not reported)'
+    }
+
+    if ($Value -is [datetime]) {
+        return ([datetime]$Value).ToString('yyyy-MM-dd', [System.Globalization.CultureInfo]::InvariantCulture)
+    }
+
+    return [string]$Value
+}
+
 function HealthTest-ListInstalledPrograms {
 <#
 Description: Reports installed software not present in the baseline inventory.
@@ -187,7 +201,8 @@ Policy baseline version: 1
 		} else {
 		    $publisher = $sw.Publisher
 		}
-        $details = "Full program name: $($sw.Name); Publisher: $publisher; Install Date: $($sw.InstallDate); Source: $($sw.Source); Scope: $($sw.Scope)"
+        $installDateText = Format-InstalledSoftwareInstallDate -Value $sw.InstallDate
+        $details = "Full program name: $($sw.Name); Publisher: $publisher; Install Date: $installDateText; Source: $($sw.Source); Scope: $($sw.Scope)"
         $level = Get-InstalledSoftwareFindingLevel -Name $sw.Name -Publisher $sw.Publisher
         Write-Warning "[$level] New installed software: $normalizedName`n$details"
     }

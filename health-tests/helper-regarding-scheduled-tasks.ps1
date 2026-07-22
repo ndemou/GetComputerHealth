@@ -899,6 +899,22 @@ function Test-ScheduledTaskLastResultReportable {
   return ($Fact.NumberOfMissedRuns -ge 5)
 }
 
+function Format-ScheduledTaskDateTime {
+  param([AllowNull()][object]$Value)
+
+  if ($null -eq $Value) { return '' }
+
+  if ($Value -is [datetime]) {
+    return ([datetime]$Value).ToString('yyyy-MM-dd HH:mm:ss', [System.Globalization.CultureInfo]::InvariantCulture)
+  }
+
+  if ($Value -is [datetimeoffset]) {
+    return ([datetimeoffset]$Value).ToString('yyyy-MM-dd HH:mm:ss zzz', [System.Globalization.CultureInfo]::InvariantCulture)
+  }
+
+  return [string]$Value
+}
+
 function Format-ScheduledTaskFactDetails {
   param([Parameter(Mandatory=$true)]$Fact)
 
@@ -912,8 +928,8 @@ function Format-ScheduledTaskFactDetails {
   if ($Fact.RunLevel) { [void]$lines.Add('Run level: ' + $Fact.RunLevel) }
   if ($Fact.LogonType) { [void]$lines.Add('Logon type: ' + $Fact.LogonType) }
   if ($Fact.Description) { [void]$lines.Add('Description: ' + $Fact.Description) }
-  if ($null -ne $Fact.LastRunTime) { [void]$lines.Add('Last run time: ' + $Fact.LastRunTime) }
-  if ($null -ne $Fact.NextRunTime) { [void]$lines.Add('Next run time: ' + $Fact.NextRunTime) }
+  if ($null -ne $Fact.LastRunTime) { [void]$lines.Add('Last run time: ' + (Format-ScheduledTaskDateTime -Value $Fact.LastRunTime)) }
+  if ($null -ne $Fact.NextRunTime) { [void]$lines.Add('Next run time: ' + (Format-ScheduledTaskDateTime -Value $Fact.NextRunTime)) }
   [void]$lines.Add('Missed runs: ' + $Fact.NumberOfMissedRuns)
   if ($Fact.LastResultHex) {
     [void]$lines.Add('Last result: ' + $Fact.LastResultHex + ' (' + $Fact.LastResultDescription + ')')

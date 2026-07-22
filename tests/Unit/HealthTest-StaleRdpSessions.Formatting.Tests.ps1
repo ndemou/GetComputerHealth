@@ -53,6 +53,8 @@ Describe 'HealthTest-DesktopSessions message formatting' {
     ($script:captured -join "`n") | Should -Not -Match 'DisconnectTime:'
     ($script:captured -join "`n") | Should -Not -Match 'DisconnectedTime:'
     ($script:captured -join "`n") | Should -Not -Match 'SessionAge:'
+    ($script:captured -join "`n") | Should -Match '(?m)^LogonTime: 2026-05-19 12:44:16$'
+    ($script:captured -join "`n") | Should -Match '(?m)^LastInputTime: 2026-05-19 12:45:47$'
     ($script:captured -join "`n") | Should -Match 'ProcessCount: 5'
     ($script:captured -join "`n") | Should -Match 'CPUPercent: 3.2%'
     ($script:captured -join "`n") | Should -Match 'MemoryMB: 42.5'

@@ -307,7 +307,7 @@ If you only want to add a few custom tests, you do not need to modify the core c
 | ADViewConsistency                | Verifies that domain controllers agree on the DC list and FSMO role holders |
 | Services                         | Reviews service operational health, including auto-start services that are not running, abnormal service exit codes, and broken service payload paths |
 | BitLockerStatus                  | Checks whether detected volumes are protected by BitLocker |
-| CertExpiry                       | Checks for certificates that are expired or nearing expiration |
+| CertExpiry                       | Checks LocalMachine\My certificates for expiration and reports identity, validity, usage context, and remediation guidance |
 | ConnectivityToDCs                | Checks DNS resolution and TCP connectivity to discovered domain controllers |
 | Dcdiag                           | Runs DCDIAG and reports failing basic and extended Active Directory diagnostics |
 | DcDnsARecords                    | Checks whether domain controller hostnames resolve to expected A records |

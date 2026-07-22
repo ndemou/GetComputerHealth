@@ -279,7 +279,7 @@ namespace Toula.WtsEx
     [Runtime.InteropServices.Marshal]::PtrToStringUni($Ptr)
   }
 
-  function Convert-WtsFileTimeToLocal {
+function Convert-WtsFileTimeToLocal {
     param([long]$Value)
     if ($Value -le 0) { return $null }
     try { [DateTime]::FromFileTimeUtc($Value).ToLocalTime() } catch { $null }
@@ -771,6 +771,22 @@ namespace Toula.WtsEx
   }
 }
 
+function Format-DesktopSessionDateTime {
+  param([AllowNull()][object]$Value)
+
+  if ($null -eq $Value) { return '' }
+
+  if ($Value -is [datetime]) {
+    return ([datetime]$Value).ToString('yyyy-MM-dd HH:mm:ss', [System.Globalization.CultureInfo]::InvariantCulture)
+  }
+
+  if ($Value -is [datetimeoffset]) {
+    return ([datetimeoffset]$Value).ToString('yyyy-MM-dd HH:mm:ss zzz', [System.Globalization.CultureInfo]::InvariantCulture)
+  }
+
+  return [string]$Value
+}
+
 function HealthTest-DesktopSessions {
 <#
 Description: Checks for idle or disconnected RDP sessions older than the allowed threshold.
@@ -807,8 +823,8 @@ Uses: Get-LiveSessionInfo.
         $detailLines = @()
         $detailLines += "State: $($session.State)"
         if ($session.SessionName)      { $detailLines += "SessionName: $($session.SessionName)" }
-        if ($session.LogonTime)        { $detailLines += "LogonTime: $($session.LogonTime)" }
-        if ($session.LastInputTime)    { $detailLines += "LastInputTime: $($session.LastInputTime)" }
+        if ($session.LogonTime)        { $detailLines += "LogonTime: $(Format-DesktopSessionDateTime -Value $session.LogonTime)" }
+        if ($session.LastInputTime)    { $detailLines += "LastInputTime: $(Format-DesktopSessionDateTime -Value $session.LastInputTime)" }
         if ($session.IdleTime)         { $detailLines += "IdleTime: $($session.IdleTime)" }
         if ($session.ClientName)       { $detailLines += "ClientName: $($session.ClientName)" }
         if ($session.ClientAddress)    { $detailLines += "ClientAddress: $($session.ClientAddress)" }

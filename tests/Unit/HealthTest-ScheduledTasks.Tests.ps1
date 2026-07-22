@@ -126,6 +126,16 @@ Describe 'Scheduled task fact helpers' {
     $new.PolicyFingerprint | Should -Be $old.PolicyFingerprint
   }
 
+  It 'formats typed last and next run times in ISO year-month-day order' {
+    $fact = New-TestScheduledTaskFact -LastRunTime ([datetime]'2026-01-09T08:54:23')
+    $fact.NextRunTime = [datetime]'2026-02-10T09:55:24'
+
+    $details = Format-ScheduledTaskFactDetails -Fact $fact
+
+    $details | Should -Match '(?m)^Last run time: 2026-01-09 08:54:23$'
+    $details | Should -Match '(?m)^Next run time: 2026-02-10 09:55:24$'
+  }
+
   It 'changes the policy fingerprint when the action changes' {
     $old = New-TestScheduledTaskFact -Actions @(New-TestActionFact -Execute 'C:\Tools\old.exe')
     $new = New-TestScheduledTaskFact -Actions @(New-TestActionFact -Execute 'C:\Tools\new.exe')

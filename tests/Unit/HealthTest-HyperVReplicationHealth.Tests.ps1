@@ -54,7 +54,7 @@ Describe 'HealthTest-HyperVReplicationHealth' {
     $script:warnings | Should -HaveCount $ExpectedMessageCount
     $script:warnings[0] | Should -Match "^\[$ExpectedLevel\] replication health for VM 'SRV1\(Win 2025\)' is at Warning state"
     $script:warnings[0] | Should -Match 'ReplicationState: Replicating'
-    $script:warnings[0] | Should -Match 'Last successful replication time:'
+    $script:warnings[0] | Should -Match 'Last successful replication time: 2026-05-18 \d{2}:\d{2}:\d{2}'
 
     if ($ExpectedLevel -eq 'INFO') {
       $script:warnings[1] | Should -Be "[PASS] All Hyper-V VMs have healthy replication and no replica VM is running."
@@ -68,7 +68,7 @@ Describe 'HealthTest-HyperVReplicationHealth' {
 
     $script:warnings | Should -HaveCount 1
     $script:warnings[0] | Should -Match "^\[NOTICE\] replication health for VM 'SRV1\(Win 2025\)' is at Warning state"
-    $script:warnings[0] | Should -Match 'Last successful replication time: 2026-05-18T10:35:00'
+    $script:warnings[0] | Should -Match 'Last successful replication time: 2026-05-18 10:35:00'
   }
 
   It 'treats culture-ambiguous text replication times as missing' {

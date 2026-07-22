@@ -7,7 +7,7 @@ Describe 'Microsoft installed software update classification' {
     $tokens = $null
     $ast = [System.Management.Automation.Language.Parser]::ParseFile($scriptPath, [ref]$tokens, [ref]$parseErrors)
 
-    foreach ($functionName in @('Get-NormalizedSoftwareName', 'Test-IsMicrosoftInstalledSoftwareUpdate', 'Get-InstalledSoftwareFindingLevel')) {
+    foreach ($functionName in @('Get-NormalizedSoftwareName', 'Test-IsMicrosoftInstalledSoftwareUpdate', 'Get-InstalledSoftwareFindingLevel', 'Format-InstalledSoftwareInstallDate')) {
       $funcAst = $ast.Find({
           param($node)
           $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
@@ -50,6 +50,11 @@ Describe 'Microsoft installed software update classification' {
 
   It 'normalizes Java update build numbers into VER' {
     Get-NormalizedSoftwareName -Name 'Java 8 Update 491' | Should -Be 'Java 8 Update VER'
+  }
+
+  It 'formats typed install dates in ISO year-month-day order' {
+    Format-InstalledSoftwareInstallDate -Value ([datetime]'2026-01-09T08:54:23') | Should -Be '2026-01-09'
+    Format-InstalledSoftwareInstallDate -Value $null | Should -Be '(not reported)'
   }
 
   It 'normalizes v-prefixed versions into VER' {

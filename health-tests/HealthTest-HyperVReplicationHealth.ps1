@@ -109,7 +109,14 @@ Uses: Get-VM, Get-VMReplication.
         }
 
         if ($LastSuccessfulReplicationTime) {
-            $details += "Last successful replication time: $LastSuccessfulReplicationTime"
+            $replicationDate = ConvertTo-ReplicationDateTime -Value $LastSuccessfulReplicationTime
+            if ($null -ne $replicationDate) {
+                $replicationTimeText = $replicationDate.ToString('yyyy-MM-dd HH:mm:ss', [System.Globalization.CultureInfo]::InvariantCulture)
+            }
+            else {
+                $replicationTimeText = [string]$LastSuccessfulReplicationTime
+            }
+            $details += "Last successful replication time: $replicationTimeText"
         }
 
         if ($details.Count -eq 0) {
