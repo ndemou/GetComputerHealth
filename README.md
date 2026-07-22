@@ -351,7 +351,7 @@ If you only want to add a few custom tests, you do not need to modify the core c
 | KerberosEncryptionTypes          | Checks for AD accounts that still permit weak RC4 Kerberos encryption |
 | KrbtgtAge                        | Checks whether the KRBTGT password has been rotated within the allowed age threshold |
 | LargeDirectories                 | Finds directories with more than 10000 child items |
-| LdapSigningChannelBinding        | Checks whether LDAP signing and channel binding enforcement are enabled |
+| LdapSigningChannelBinding        | Checks whether DC LDAP signing and channel binding enforcement are enabled |
 | ListInstalledPrograms            | Reports installed software not present in the baseline inventory |
 | ListListeningPorts               | Lists externally reachable TCP listening ports with process and publisher context |
 | LocalAcntRequirePass             | Checks whether local accounts require passwords |

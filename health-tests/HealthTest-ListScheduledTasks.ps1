@@ -22,6 +22,8 @@ Uses: Get-ScheduledTask, Get-ScheduledTaskInfo, Export-ScheduledTask.
 
 Policy identity: stable task key plus fingerprint of normalized actions, principal, run level, logon type, triggers, hidden state, and enabled state. Last run time, next run time, missed runs, and last result are not included.
 Policy baseline version: 2
+
+Suppression: Known noisy tasks are excluded when their stable task key (normalized task path plus task name) matches a hard-coded wildcard pattern with PowerShell's case-insensitive -like operator. Suppression does not inspect task actions, publisher, signature, principal, or fingerprint.
 #>
   [CmdletBinding()]
   param()
@@ -36,6 +38,8 @@ Policy baseline version: 2
   $suppressedStableKeyPatterns = @(
     '\OneDrive Reporting Task*'
     '\OneDrive Startup Task*'
+    '\MicrosoftEdgeUpdateTaskMachineCore*'
+    '\MicrosoftEdgeUpdateTaskMachineUA*'
     '\SoftLanding\*'
     '\Microsoft\Windows\*'
     '\Microsoft\Office\*'

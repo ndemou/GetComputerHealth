@@ -416,6 +416,8 @@ Describe 'HealthTest-ListScheduledTasks' {
     $script:TestScheduledTaskFacts = @(
       New-TestScheduledTaskFact -TaskPath '\' -TaskName 'OneDrive Reporting Task-S-1-5-21-1000'
       New-TestScheduledTaskFact -TaskPath '\' -TaskName 'OneDrive Startup Task-S-1-5-21-1000'
+      New-TestScheduledTaskFact -TaskPath '\' -TaskName 'MicrosoftEdgeUpdateTaskMachineCore{BE4EBA8B-9338-4B05-8A78-77E79CAA88B2}'
+      New-TestScheduledTaskFact -TaskPath '\' -TaskName 'MicrosoftEdgeUpdateTaskMachineUA{FB1D6D56-FF84-4FA9-A689-8A3A308ED04B}'
       New-TestScheduledTaskFact -TaskPath '\SoftLanding\S-1-5-21-1000\' -TaskName 'SoftLandingDeferralTask'
       New-TestScheduledTaskFact -TaskPath '\Microsoft\Windows\UpdateOrchestrator\' -TaskName 'Schedule Scan'
       New-TestScheduledTaskFact -TaskPath '\Microsoft\Office\' -TaskName 'Office Serviceability Manager'
