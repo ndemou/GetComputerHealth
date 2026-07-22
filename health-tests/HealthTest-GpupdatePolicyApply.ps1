@@ -15,8 +15,6 @@ Uses: Test-ComputerSecureChannel, gpupdate.exe.
 #>
   [CmdletBinding()] param()
 
-  $dcIps = @($Global:GchData.IpsOfAllDcs)
-
   if (!(Test-ComputerSecureChannel)) {
       Write-Warning "[WARNING] Can't connected to any Domain Controller. Can not run gpupdate.`nMake sure you are on the domain LAN or connected via VPN."
     return

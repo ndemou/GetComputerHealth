@@ -102,7 +102,7 @@ Function Get-WindowsOriginalInstallDate {
 }
 
 function Get-DaysSinceLastVirusScan {
-  [CmdletBinding()] param([int]$Days=3)
+  [CmdletBinding()] param()
   try { $mp = Get-MpComputerStatus -ErrorAction Stop } catch {
     return [pscustomobject]@{DaysSinceScan=$null;Details="Get-MpComputerStatus failed with error $_.Exception.Message"}
   }
@@ -117,7 +117,6 @@ function Get-DaysSinceLastVirusScan {
 
   if ($last) {
     $ageDays = ((Get-Date) - $last).TotalDays
-    $ok = ($ageDays -le $Days)
     return [pscustomobject]@{DaysSinceScan=[math]::Round($ageDays,1);Details='Source: Time'}
   }
 
@@ -128,7 +127,6 @@ function Get-DaysSinceLastVirusScan {
   }
   if ($ages.Count -gt 0) {
     $minAge = ($ages | Measure-Object -Minimum).Minimum
-    $ok = ($minAge -le $Days)
     return [pscustomobject]@{DaysSinceScan=$minAge;Details='Source: Age'}
   }
 

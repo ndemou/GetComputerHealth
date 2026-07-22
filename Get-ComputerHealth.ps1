@@ -656,7 +656,6 @@ FunctionName, Time, ElapsedMilliseconds, Output, Success, Error, Category, Reaso
   try {
     $cntProperRecord = 0
     $cntImproperRecord = 0
-    $cntPassRecord = 0
     $legacyLogDetected = $false
     $supplementalOutputLines = New-Object 'System.Collections.Generic.List[string]'
     $pendingOutputRecords = New-Object 'System.Collections.Generic.List[object]'
@@ -664,12 +663,7 @@ FunctionName, Time, ElapsedMilliseconds, Output, Success, Error, Category, Reaso
 
     $result = & {
       $WarningPreference = 'Continue'
-      if ($PSBoundParameters.ContainsKey('Argument')) {
-        & $target $Argument 3>&1
-      }
-      else {
-        & $target 3>&1
-      }
+      & $target 3>&1
     }
 
     foreach ($item in $result) {
@@ -680,12 +674,10 @@ FunctionName, Time, ElapsedMilliseconds, Output, Success, Error, Category, Reaso
             Value = $record
           })
         $cntProperRecord += 1
-        if (($item.Message -as [string]) -match '^\s*\[\s*pass\s*\]') { $cntPassRecord += 1 }
       }
       elseif ($item -and $item.PSObject.Properties['Hash'] -and $null -ne $item.PSObject.Properties['Message'] -and $item.PSObject.Properties['level']) {
         $legacyLogDetected = $true
         $cntProperRecord += 1
-        if ($item.level -eq 'pass') { $cntPassRecord += 1 }
         if ($markTestMessagesSuppressed -and ([string]$item.level).ToLowerInvariant() -ne 'debug') {
           $item | Add-Member -NotePropertyName Suppressed -NotePropertyValue $true -Force
         }
@@ -943,7 +935,6 @@ function Invoke-CustomHealthTestScript {
   try {
     $cntProperRecord = 0
     $cntImproperRecord = 0
-    $cntPassRecord = 0
     $legacyLogDetected = $false
     $ErrorActionPreference = 'Stop'
 
@@ -958,12 +949,10 @@ function Invoke-CustomHealthTestScript {
         $comment = Add-CustomTestScriptReferenceComment -Comment $record.Comment -ScriptPath $ScriptPath
         Log-Msg -Level $record.Level -Msg $record.Msg -Comment $comment -Emitter $ScriptPath
         $cntProperRecord += 1
-        if (($item.Message -as [string]) -match '^\s*\[\s*pass\s*\]') { $cntPassRecord += 1 }
       }
       elseif ($item -and $item.PSObject.Properties['Hash'] -and $null -ne $item.PSObject.Properties['Message'] -and $item.PSObject.Properties['level']) {
         $legacyLogDetected = $true
         $cntProperRecord += 1
-        if ($item.level -eq 'pass') { $cntPassRecord += 1 }
         $existingComment = ''
         if ($item.PSObject.Properties['Comment']) {
           $existingComment = [string]$item.Comment
@@ -1226,16 +1215,6 @@ function Write-UsageHelp {
   Write-Host -ForegroundColor White "    `$out | ogv # or similar"
   Write-Host -ForegroundColor Gray  ""
   return
-}
-
-function Write-DummyHealthTest {
-  # Useful only for code testing.
-  Write-Output "Dummy debug message"
-  Write-Warning "[info] Dummy info message"
-  Write-Warning "[PASS] Dummy pass message"
-  Write-Warning "[NOTICE] Dummy notice message"
-  Write-Warning ("[WARNING] Dummy warning message" + "`n" + "This one has a comment(details) also")
-  Write-Warning ("[FAILURE] Dummy failure message" + "`n" + "This one has a comment(details) also`nWith 2 lines of text!")
 }
 
 function Get-HealthTestTagsMetadata {

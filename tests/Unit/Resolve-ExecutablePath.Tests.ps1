@@ -1,5 +1,3 @@
-$repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-
 Describe 'Resolve-ExecutablePath' {
   BeforeAll {
     . (Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) 'health-tests\helper-regarding-service-and-executable-resolution.ps1')

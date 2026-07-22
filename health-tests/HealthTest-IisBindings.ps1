@@ -37,8 +37,7 @@ Uses: Get-WindowsFeature, Get-Website, Get-WebBinding.
       $b = Get-WebBinding -Name $s.Name
       foreach ($x in $b) {
         if ($x.protocol -eq 'http' -and ($x.bindingInformation -like '*:80:*') -and ($sites.count -gt 1)) {
-            $commnet = ""
-            if ($sites.count -gt 1) {$comment = "`nSince multiple sites are hosted, wildcard bindins may expose unintended content"}
+            $comment = "`nSince multiple sites are hosted, wildcard bindins may expose unintended content"
             Write-Warning "[NOTICE] $($s.Name): site serves plain HTTP with wildcard bindings$comment"
             $problem_found = $true
         }

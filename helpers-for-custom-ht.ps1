@@ -125,7 +125,7 @@ param(
             $cred      = New-Object System.Management.Automation.PSCredential($username, $securePwd)
 
             $driveName = "UNC$(Get-Random -Minimum 1000 -Maximum 9999)"
-            Write-Output "Creating temporary PSDrive $driveName for $RootPath using credentials from $secretsPath"
+            Write-Output "Creating temporary PSDrive $driveName for $RootPath using credentials from $ConfigPath"
             New-PSDrive -Name $driveName -PSProvider FileSystem -Root $RootPath -Credential $cred -Scope Global -ErrorAction Stop | Out-Null
 
             $root = "$driveName`:\"

@@ -837,15 +837,12 @@ Uses: Get-LiveSessionInfo.
         }
 
         $problemType = $null
-        $problemAge = $null
 
         if ($session.State -eq 'WTSDisconnected' -and $session.DisconnectedTime -ge $Threshold) {
             $problemType = 'disconnected'
-            $problemAge = $session.DisconnectedTime
         }
         elseif ($session.IdleTime -ge $Threshold) {
             $problemType = 'idle'
-            $problemAge = $session.IdleTime
         }
 
         if (-not $problemType) { continue }

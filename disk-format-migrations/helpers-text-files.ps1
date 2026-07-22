@@ -381,7 +381,6 @@ Returns:
   $greekRe='[\u0370-\u03FF\u1F00-\u1FFF]'
   $greekRunRe='[\u0370-\u03FF\u1F00-\u1FFF]{2,}'
   $greekLetters=[regex]::Matches($s,$greekRe).Count
-  $letters=[regex]::Matches($s,'\p{L}').Count
   $greekRuns=[regex]::Matches($s,$greekRunRe).Count
 
   # Step 4: focus on Greek Capital Alpha Tonos (the only letter that is encoded
@@ -1015,7 +1014,7 @@ Offer help on how to install uchardet if not found.
                 $encoding = $dgaeEncoding
                 $preferIsoEffective = $true
               } else {
-                if ($UchardetPath) {$comment = "Are you sure it's at $UchardetPath?"} else {$comment = "Are you sure it's in the path?"}
+                if ($UchardetPath) {$comment = "Are you sure it's at ${UchardetPath}?"} else {$comment = "Are you sure it's in the path?"}
                 _Write-FunctionError -Message ("uchardet was not found. Is it installed? $comment") -Category $cat -TargetObject $file.FullName
               }
             } else {

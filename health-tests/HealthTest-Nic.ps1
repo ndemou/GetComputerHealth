@@ -49,7 +49,6 @@ Uses: Get-NetAdapter, Get-NetAdapterStatistics.
             (Get-PropValue $stat 'OutboundMulticastPackets' 0)
 
         if ($n.MediaConnectionState -ne 'Connected') {
-            $warnList += "$($n.Name): mediaState=$($n.MediaConnectionState)"
             Write-Warning "[WARNING] Disconnected network interface ($($n.Name))"
             $pass = $false
             continue
@@ -72,11 +71,9 @@ Uses: Get-NetAdapter, Get-NetAdapterStatistics.
         $pctStr = ("{0:N4}%%" -f $errorPct)
 
         if ($errors -ge 1000 -and $errorPct -ge 0.01) {
-            $warnList += "$($n.Name): errors=$pctStr ($errors/$totalPackets total)"
             Write-Warning "[WARNING] Network interface with plenty of errors ($($n.Name))`nerrors=$pctStr ($errors/$totalPackets total packets)"
             $pass = $false
         } elseif ($errors -ge 100 -and $errorPct -ge 0.002) {
-            $noticeList += "$($n.Name): errors=$pctStr ($errors/$totalPackets total)"
             Write-Warning "[NOTICE] Network interface with some errors ($($n.Name))`nerrors=$pctStr ($errors/$totalPackets total packets)"
             $pass = $false
         } else {

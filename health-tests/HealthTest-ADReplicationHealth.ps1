@@ -112,7 +112,6 @@ Uses: repadmin.exe, Get-ADReplicationPartnerMetadata.
   $repadminCmd = Get-Command repadmin.exe -ErrorAction SilentlyContinue
   $repadmin = if ($repadminCmd -and $repadminCmd.Source) { $repadminCmd.Source } else { "$env:windir\system32\repadmin.exe" }
 
-  $ok = $true
   $repadminAvailable = (Test-Path -LiteralPath $repadmin)
   $rsatCheck = Invoke-LocalRsatCrossCheck -LocalHostName $localHostName
 
@@ -150,7 +149,6 @@ Uses: repadmin.exe, Get-ADReplicationPartnerMetadata.
 
   if (-not $sumOut) {
     Write-Warning "[FAILURE] repadmin /replsummary returned no output."
-    $ok = $false
   } else {
     $rows = @()
     foreach ($ln in ($sumOut -split '\r?\n')) {
@@ -168,7 +166,6 @@ Uses: repadmin.exe, Get-ADReplicationPartnerMetadata.
 
     if ($rows.Count -eq 0) {
       Write-Warning "[FAILURE] repadmin /replsummary output could not be parsed.`nRun repadmin /replsummary manually and inspect the output."
-      $ok = $false
     } else {
       $badFails = @($rows | Where-Object { $_.Fails -gt 0 })
       foreach ($b in $badFails) {
@@ -179,8 +176,6 @@ Uses: repadmin.exe, Get-ADReplicationPartnerMetadata.
           "`nError percentage: $($b.Percent)%"
         )
       }
-      if ($badFails.Count -gt 0) { $ok = $false }
-
       $badDeltaFail = @($rows | Where-Object { $null -ne $_.Delta -and $_.Delta -ge $FailLargestDelta })
       foreach ($b in $badDeltaFail) {
         Write-Warning (
@@ -190,8 +185,6 @@ Uses: repadmin.exe, Get-ADReplicationPartnerMetadata.
           "`nFails: $($b.Fails) / $($b.Total)"
         )
       }
-      if ($badDeltaFail.Count -gt 0) { $ok = $false }
-
       $badDeltaWarn = @(
         $rows |
         Where-Object {
@@ -236,7 +229,6 @@ Uses: repadmin.exe, Get-ADReplicationPartnerMetadata.
 
   if (-not $showOut) {
     Write-Warning "[FAILURE] repadmin /showrepl * returned no output."
-    $ok = $false
   } else {
     $lines = @($showOut -split '\r?\n')
     $currentDc = $null
@@ -276,7 +268,6 @@ Uses: repadmin.exe, Get-ADReplicationPartnerMetadata.
 
     if ($attempts.Count -eq 0) {
       Write-Warning "[WARNING] repadmin /showrepl * produced no last-attempt lines.`nRun repadmin /showrepl * manually and inspect the output."
-      $ok = $false
     } else {
       $notOk = @($attempts | Where-Object { -not $_.Successful })
       foreach ($a in $notOk) {
@@ -289,9 +280,7 @@ Uses: repadmin.exe, Get-ADReplicationPartnerMetadata.
         )
       }
 
-      if ($notOk.Count -gt 0) {
-        $ok = $false
-      } else {
+      if ($notOk.Count -eq 0) {
         $dcCount = (@($attempts | Select-Object -ExpandProperty DC -Unique) | Measure-Object).Count
         Write-Warning (
           "[PASS] repadmin /showrepl * found all last attempts successful" +
@@ -305,7 +294,6 @@ Uses: repadmin.exe, Get-ADReplicationPartnerMetadata.
   if ($rsatCheck.Executed) {
     if ($rsatCheck.FailedCount -gt 0) {
       Write-Warning $rsatCheck.FailureText
-      $ok = $false
     } elseif ($rsatCheck.Passed) {
       Write-Warning $rsatCheck.SummaryText
     }

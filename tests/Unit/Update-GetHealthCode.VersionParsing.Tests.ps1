@@ -2,7 +2,6 @@ Describe 'Update-GetHealthCode version parsing' {
   BeforeAll {
     $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
     $scriptPath = Join-Path $repoRoot 'Update-GetHealthCode.ps1'
-    $scriptText = Get-Content -LiteralPath $scriptPath -Raw
 
     $parseErrors = $null
     $tokens = $null
