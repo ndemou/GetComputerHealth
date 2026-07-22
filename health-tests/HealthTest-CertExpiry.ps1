@@ -17,7 +17,6 @@ Uses: None.
     param([int]$WarnDays=60,[int]$FailDays=30)
     $now = Get-Date
     $certs = Get-ChildItem Cert:\LocalMachine\My -ErrorAction SilentlyContinue
-    $problem_found = $false
     if (-not $certs) { Write-Warning "[info] No certificates in LocalMachine\My"; return }
     $fail = @(); $warn = @()
     foreach ($c in $certs) {
@@ -28,7 +27,15 @@ Uses: None.
       elseif ($days -le $FailDays) { $fail += "$($c.Subject) :: will expire soon, at $($c.NotAfter)" }
       elseif ($days -le $WarnDays) { $warn += "$($c.Subject) :: will expire within $WarnDays, at $($c.NotAfter)" }
     }
-    if ($problem_found) {return}
+
+    foreach ($message in $fail) {
+      Write-Warning "[FAILURE] Certificate expiry issue`n$message"
+    }
+    foreach ($message in $warn) {
+      Write-Warning "[WARNING] Certificate expiry issue`n$message"
+    }
+    if ($fail.Count -gt 0 -or $warn.Count -gt 0) { return }
+
     Write-Warning "[PASS] No certificates expiring within $WarnDays days"
 }
 
