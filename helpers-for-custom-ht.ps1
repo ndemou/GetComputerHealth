@@ -22,20 +22,313 @@ function Read-JsonFile {
 }
 
 
-function Start-HealthTestVeeamRecentConfigBackupsExist{
+function Start-HealthTestVeeamRecentBackupsExist {
 <#
 .SYNOPSIS
-Reports if recent enough Veeam Configuration backups (.BCO) exist and have reasonable sizes
+Reports if recent enough Veeam VM backups exist and have reasonable sizes.
+Expects at least one .VBK file and a fresh .VBM and either a fresh .VIB
+or a fresh .VBK.
+
+.DESCRIPTION
+Supports configuration via either a JSON config file (-ConfigPath) or by
+passing -RootPath directly.
+
+If both are provided, values from -ConfigPath are used for credentials,
+while -RootPath takes precedence for the backup path.
+
+If the UNC path is already accessible through an existing SMB connection,
+that connection is reused. A temporary PSDrive is created only when the
+UNC path is not already accessible.
+
+Config file examples:
+
+    {
+      "RootPath": "\\\\10.1.2.3\\share\\path\\to\\Backups",
+      "Username": "foo",
+      "Password": "bar"
+    }
+
+Or:
+
+    {
+      "RootPath": "C:\\path\\to\\Backups"
+    }
+
+.EXAMPLE
+    Start-HealthTestVeeamRecentBackupsExist `
+        -ConfigPath 'C:\Get-ComputerHealth\config\HealthTest-RecentBackupsExist.config' `
+        -MaxAgeHoursForVibVbm 23 `
+        -MaxAgeHoursForVBK 480
+
+.EXAMPLE
+    Start-HealthTestVeeamRecentBackupsExist `
+        -RootPath 'C:\path\to\Backups' `
+        -MaxAgeHoursForVibVbm 23 `
+        -MaxAgeHoursForVBK 480
 #>
-[CmdletBinding()]
-param(
-    [string]$RootPath,
-    [int]$MaxAgeHours = 24
-)
-    if (Get-RecentFilesConditional -Path $RootPath -Pattern *.BCO -MinBytes 25000 -MaxAgeHours $MaxAgeHours) {
-        write-warning "[PASS] Found recent Configuration Backup in $RootPath"
-    } else {
-        write-warning "[FAILURE] No recent Configuration Backup in $RootPath"
+
+    [CmdletBinding()]
+    param(
+        [string]$ConfigPath,
+        [string]$RootPath,
+        [int]$MaxAgeHoursForVBK = 480,
+        [int]$MaxAgeHoursForVibVbm = 23
+    )
+
+    if (
+        [string]::IsNullOrWhiteSpace($ConfigPath) -and
+        [string]::IsNullOrWhiteSpace($RootPath)
+    ) {
+        Write-Warning (
+            "[FAILURE] Not running HealthTest-RecentBackupsExist because " +
+            "neither -ConfigPath nor -RootPath was provided"
+        )
+        return
+    }
+
+    $username = ''
+    $password = ''
+
+    if (-not [string]::IsNullOrWhiteSpace($ConfigPath)) {
+        if (-not (Test-Path -LiteralPath $ConfigPath -PathType Leaf)) {
+            Write-Warning (
+                "[NOTICE] Not running HealthTest-RecentBackupsExist because " +
+                "settings file does not exist: $ConfigPath"
+            )
+            return
+        }
+
+        try {
+            $settings = Read-JsonFile -Path $ConfigPath -Encoding UTF8
+        }
+        catch {
+            Write-Warning (
+                "[FAILURE] Could not read configuration file $ConfigPath. " +
+                "Error: $($_.Exception.Message)"
+            )
+            return
+        }
+
+        if ($null -eq $settings) {
+            Write-Warning (
+                "[FAILURE] Configuration file is empty or invalid: $ConfigPath"
+            )
+            return
+        }
+
+        if ([string]::IsNullOrWhiteSpace($RootPath)) {
+            $RootPath = $settings.RootPath
+        }
+
+        try {
+            $username = [string]$settings.Username
+            $password = [string]$settings.Password
+        }
+        catch {
+            $username = ''
+            $password = ''
+        }
+    }
+
+    if ([string]::IsNullOrWhiteSpace($RootPath)) {
+        Write-Warning (
+            "[FAILURE] Not running HealthTest-RecentBackupsExist because " +
+            "no RootPath could be determined"
+        )
+        return
+    }
+
+    $driveName = $null
+    $root = $RootPath
+
+    try {
+        # For UNC paths, first check whether the path is already accessible.
+        # This allows an existing SMB connection to be reused and avoids:
+        #
+        # "Multiple connections to a server or shared resource by the same
+        # user, using more than one user name, are not allowed."
+        if ($RootPath -like '\\*') {
+            $existingConnectionUsable = $false
+
+            try {
+                Get-ChildItem `
+                    -LiteralPath $RootPath `
+                    -Force `
+                    -ErrorAction Stop |
+                    Select-Object -First 1 |
+                    Out-Null
+
+                $existingConnectionUsable = $true
+            }
+            catch {
+                $existingConnectionUsable = $false
+            }
+
+            if ($existingConnectionUsable) {
+                Write-Output "Using existing SMB connection for $RootPath"
+                $root = $RootPath
+            }
+            elseif (-not [string]::IsNullOrWhiteSpace($username)) {
+                if ([string]::IsNullOrWhiteSpace($password)) {
+                    Write-Warning (
+                        "[FAILURE] A username was provided in $ConfigPath, " +
+                        "but the password is empty"
+                    )
+                    return
+                }
+
+                $securePwd = ConvertTo-SecureString `
+                    -String $password `
+                    -AsPlainText `
+                    -Force
+
+                $cred = New-Object `
+                    System.Management.Automation.PSCredential(
+                        $username,
+                        $securePwd
+                    )
+
+                $candidateDriveName = "UNC$(Get-Random -Minimum 1000 -Maximum 9999)"
+
+                Write-Output (
+                    "Creating temporary PSDrive $candidateDriveName for " +
+                    "$RootPath using credentials from $ConfigPath"
+                )
+
+                try {
+                    New-PSDrive `
+                        -Name $candidateDriveName `
+                        -PSProvider FileSystem `
+                        -Root $RootPath `
+                        -Credential $cred `
+                        -Scope Global `
+                        -ErrorAction Stop |
+                        Out-Null
+
+                    # Only assign driveName after successful creation.
+                    # This prevents the finally block from attempting to
+                    # remove a drive that was never created.
+                    $driveName = $candidateDriveName
+                    $root = "$driveName`:\"
+                }
+                catch {
+                    $errorMessage = $_.Exception.Message
+
+                    if ($errorMessage -match 'Multiple connections') {
+                        Write-Warning (
+                            "[FAILURE] An SMB connection to the server hosting " +
+                            "$RootPath already exists under different credentials, " +
+                            "but that connection cannot access the requested path. " +
+                            "Disconnect the conflicting SMB connection or use the " +
+                            "same credentials. Error: $errorMessage"
+                        )
+                    }
+                    else {
+                        Write-Warning (
+                            "[FAILURE] Could not create a temporary PSDrive for " +
+                            "$RootPath. Error: $errorMessage"
+                        )
+                    }
+
+                    return
+                }
+            }
+            else {
+                $authHint = if ($ConfigPath) {
+                    " Try adding a username and password to $ConfigPath."
+                }
+                else {
+                    ''
+                }
+
+                Write-Warning (
+                    "[FAILURE] Can't access $RootPath.$authHint"
+                )
+                return
+            }
+        }
+
+        # VBM = metadata/index describing the backup chain.
+        # VIB = incremental backup containing changes since the last backup.
+        # VBK = full backup and baseline for incremental backups.
+        $fresh_vbm = Get-RecentFilesConditional `
+            -Path $root `
+            -Pattern '*.vbm' `
+            -MinBytes (10 * 1024) `
+            -MaxAgeHours $MaxAgeHoursForVibVbm
+
+        $fresh_vib = Get-RecentFilesConditional `
+            -Path $root `
+            -Pattern '*.vib' `
+            -MinBytes (1 * 1024 * 1024 * 1024) `
+            -MaxAgeHours $MaxAgeHoursForVibVbm
+
+        $fresh_vbk = Get-RecentFilesConditional `
+            -Path $root `
+            -Pattern '*.vbk' `
+            -MinBytes (10 * 1024 * 1024 * 1024) `
+            -MaxAgeHours $MaxAgeHoursForVibVbm
+
+        $atleast_one_vbk = Get-RecentFilesConditional `
+            -Path $root `
+            -Pattern '*.vbk' `
+            -MinBytes (10 * 1024 * 1024 * 1024) `
+            -MaxAgeHours $MaxAgeHoursForVBK
+
+        $configHint = if ($ConfigPath) {
+            "If you want to change the configuration edit: $ConfigPath"
+        }
+        else {
+            ''
+        }
+
+        if (
+            $fresh_vbm -and
+            ($fresh_vib -or $fresh_vbk) -and
+            $atleast_one_vbk
+        ) {
+            Write-Warning "[PASS] Found recent Veeam backups at $RootPath"
+        }
+        else {
+            $directoryListing = try {
+                Get-ChildItem `
+                    -LiteralPath $root `
+                    -ErrorAction Stop |
+                    Out-String
+            }
+            catch {
+                "Could not list directory contents: $($_.Exception.Message)"
+            }
+
+            Write-Warning (
+                "[FAILURE] No recent Veeam backups found at: $RootPath" +
+                "`n$configHint" +
+                "`nfresh_vbm=$([bool]$fresh_vbm)" +
+                ", fresh_vib=$([bool]$fresh_vib)" +
+                ", fresh_vbk=$([bool]$fresh_vbk)" +
+                ", atleast_one_vbk=$([bool]$atleast_one_vbk)" +
+                "`nCondition for pass is: " +
+                '($fresh_vbm -and ($fresh_vib -or $fresh_vbk) -and $atleast_one_vbk)' +
+                "`n$directoryListing"
+            )
+        }
+    }
+    catch {
+        Write-Warning (
+            "[FAILURE] Unexpected error while checking Veeam backups at " +
+            "$RootPath. Error: $($_.Exception.Message)"
+        )
+    }
+    finally {
+        if ($driveName) {
+            Write-Output "Removing PSDrive $driveName"
+
+            Remove-PSDrive `
+                -Name $driveName `
+                -Scope Global `
+                -Force `
+                -ErrorAction SilentlyContinue
+        }
     }
 }
 
