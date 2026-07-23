@@ -68,7 +68,7 @@ Customize and run this:
 Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/ndemou/GetComputerHealth/refs/heads/main/Update-GetHealthCode.ps1" -OutFile ".\Update-GetHealthCode.ps1"
 & .\Update-GetHealthCode.ps1 -Config @{
     Options = @{
-        InstallDir = 'C:\IT\GetComputerHealth'
+        InstallDir = 'C:\IT\Get-ComputerHealth'
     }
     ConfigFiles = @{
         'Send-Message.psd1' = @{
