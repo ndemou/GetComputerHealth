@@ -363,6 +363,7 @@ If you only want to add a few custom tests, you do not need to modify the core c
 | ListShares                       | Lists SMB shares |
 | ListServices                     | Lists service definitions with payload publisher/hash context for policy review |
 | ListStartupItems                 | Lists startup items found in standard registry and startup-folder locations |
+| ListTlsRegistryOverrides         | Lists explicit Schannel and Windows cryptography registry settings for policy review |
 | NtdsLogVolumeFree                | Checks whether the NTDS log volume has enough free space |
 | NtdsPathsLocation                | Checks whether the NTDS database and log paths are on expected volumes |
 | NtfsDirtyBit                     | Checks whether any NTFS volumes have the dirty bit set |
@@ -379,7 +380,7 @@ If you only want to add a few custom tests, you do not need to modify the core c
 | ReverseZonesPresent              | Checks whether required reverse lookup zones exist |
 | RodcPrp                          | Checks whether each read-only domain controller has a Password Replication Policy configured |
 | RunningProcesses                 | Emits a suppressed inventory notice for each running process |
-| SchanelBaseline                  | Checks whether Schannel disables legacy protocols and keeps TLS 1.2 enabled |
+| SchanelBaseline                  | Evaluates Client and Server Schannel protocol posture using explicit settings and Windows-version defaults |
 | ScheduledTasks                   | Reviews scheduled tasks for failed results, disabled required tasks, missed runs, stale runs, and unreadable metadata |
 | SchemaVersionConsistency         | Checks whether all domain controllers report the same AD schema version |
 | SeriousRecentEventLogs           | Checks recent event logs and minidumps for serious crash, disk, or application events |

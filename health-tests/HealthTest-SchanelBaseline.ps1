@@ -1,69 +1,191 @@
 # HostRequirement: All
 
-function HealthTest-SchanelBaseline{
+if (-not (Get-Command -Name 'Get-TlsProtocolConfiguration' -CommandType Function -ErrorAction SilentlyContinue)) {
+    . (Join-Path -Path $PSScriptRoot -ChildPath 'helper-regarding-tls-registry.ps1')
+}
+
+function HealthTest-SchanelBaseline {
 <#
-Description: Checks whether Schannel disables legacy protocols and keeps TLS 1.2 enabled.
+Description: Evaluates Client and Server Schannel protocol posture using explicit settings and Windows-version defaults.
 AppliesTo: All
 Scope: Computer
-Category: Configuration Hygiene & Best Practices
-Impact: Medium(Time)
+Category: Security & Stability Risks
+Impact: low
 Tags: Essential
-Uses: None.
+Uses: Get-CimInstance, helper-regarding-tls-registry.ps1.
+
+The finding title identifies only the protocol and role so its hash remains stable
+when registry values change. Baseline deviations that match the Windows default are
+concise NOTICE findings. Explicit non-default deviations and invalid configurations
+are detailed WARNING findings with raw values, registry types, and recommended action.
 #>
-  $base='HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols'
-  function Get-EffState($proto,$role){
-    $key=(Join-Path (Join-Path $base $proto) $role)
-    $enabled=$null; $disabledByDefault=$null; $src='OS default'; $state='Enabled'
-    if(Test-Path $key){
-      try{
-        $p=Get-ItemProperty -Path $key -ErrorAction Stop
-        if($p.PSObject.Properties.Name -contains 'Enabled'){ $enabled=[uint32]$p.Enabled }
-        if($p.PSObject.Properties.Name -contains 'DisabledByDefault'){ $disabledByDefault=[uint32]$p.DisabledByDefault }
-      }catch{}
+    try {
+        $operatingSystem = Get-TlsOperatingSystemInfo
     }
-    if($enabled -ne $null){
-      if($enabled -eq 0){ $state='Disabled'; $src='Enabled=0' } else { $state='Enabled'; $src='Enabled=1/FFFF' }
-    } else {
-      if($disabledByDefault -ne $null -and $disabledByDefault -eq 1){ $state='Disabled'; $src='DisabledByDefault=1' } else { $state='Enabled'; $src='OS default' }
+    catch {
+        Write-Warning (
+            "[FAILURE] Schannel operating system detection failed`n" +
+            "The test cannot interpret absent protocol values without the Windows version and product type.`n" +
+            "Error: $($_.Exception.Message)"
+        )
+        return
     }
-    [pscustomobject]@{ Protocol=$proto; Role=$role; CurrentState=$state; Source=$src; EnabledRaw=$enabled; DisabledByDefaultRaw=$disabledByDefault; Key=$key }
-  }
 
-  $items=@()
-  $items += Get-EffState 'SSL 3.0' 'Server'
-  $items += Get-EffState 'TLS 1.0' 'Server'
-  $items += Get-EffState 'TLS 1.1' 'Server'
-  $items += Get-EffState 'TLS 1.2' 'Server'
+    $protocols = @('SSL 3.0', 'TLS 1.0', 'TLS 1.1', 'TLS 1.2', 'TLS 1.3')
+    $roles = @('Client', 'Server')
+    $findingCount = 0
 
-  $should=@{
-    'SSL 3.0'='Disabled'
-    'TLS 1.0'='Disabled'
-    'TLS 1.1'='Disabled'
-    'TLS 1.2'='Enabled'
-  }
+    foreach ($protocol in $protocols) {
+        foreach ($role in $roles) {
+            try {
+                $configuration = Get-TlsProtocolConfiguration -Protocol $protocol -Role $role -OperatingSystem $operatingSystem
+            }
+            catch {
+                $findingCount++
+                Write-Warning (
+                    "[FAILURE] TLS protocol inspection failed: Protocol='$protocol'; Role='$role'`n" +
+                    "Registry path: 'HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols\$protocol\$role'.`n" +
+                    "Error: $($_.Exception.Message)"
+                )
+                continue
+            }
 
-  $bad=@()
-  foreach($it in $items){
-    $want=$should[$it.Protocol]
-    if($it.CurrentState -ne $want){ $bad += $it }
-  }
+            if ($configuration.IsCompliant) {
+                continue
+            }
 
-  $det=""
-  foreach($it in $items){
-    $e=$it.EnabledRaw; if($null -eq $e){ $e='<absent>' }
-    $d=$it.DisabledByDefaultRaw; if($null -eq $d){ $d='<absent>' }
-    $det += "    {0}\Server: Current={1}; Source={2}; Enabled={3}; DisabledByDefault={4}`n" -f $it.Protocol,$it.CurrentState,$it.Source,$e,$d
-  }
+            $findingCount++
 
-  if($bad.Count -eq 0){
-    Write-Warning "[PASS] Schannel baseline OK (SSL3/TLS1.0/TLS1.1 disabled, TLS1.2 enabled)"
-  } else {
-    $why="Inbound services that rely on Schannel may negotiate legacy TLS/SSL protocols if they remain enabled. E.g. IIS web server, RDP/RDS, AD DS/LDAPS, WinRM/ADWS(Remote PowerShell), encrypted SQL, OWA and other exchange componets, .Net apps & PowerShell scripts, RRAS/SSTP VPN."
-    $comment = ($why + "`nDetected mismatches:`n"+($bad | ForEach-Object { "  - {0}: Current={1}, Recommended={2}" -f $_.Protocol,$_.CurrentState,$should[$_.Protocol] } | Out-String) + "`nRegistry snapshot:`n"+$det)
-    Write-Warning ("[WARNING] Schannel baseline not hardened" + "`n" + $comment)
-  }
+            $isOsDefaultDeviation = (
+                @($configuration.Issues).Count -eq 0 -and
+                $configuration.OsDefaultState -in @('Enabled', 'Disabled') -and
+                $configuration.CurrentState -eq $configuration.OsDefaultState
+            )
+
+            if ($isOsDefaultDeviation) {
+                $operatingSystemName = ([string]$operatingSystem.Caption).Trim()
+                if ($operatingSystemName.StartsWith('Microsoft ')) {
+                    $operatingSystemName = $operatingSystemName.Substring('Microsoft '.Length)
+                }
+
+                if ($configuration.ExpectedState -eq 'Disabled') {
+                    if ($role -eq 'Client') {
+                        $title = "Local CLIENT applications that depend on SCHANNEL may use $protocol."
+                    }
+                    else {
+                        $title = "Local SERVER applications that depend on SCHANNEL may accept $protocol connections."
+                    }
+
+                    $explanation = (
+                        "Although this is the $operatingSystemName default, we recommend hardening it " +
+                        "unless $protocol is genuinely required by a legacy application."
+                    )
+                }
+                else {
+                    if ($role -eq 'Client') {
+                        $title = "Local CLIENT applications that depend on SCHANNEL may not use $protocol."
+                    }
+                    else {
+                        $title = "Local SERVER applications that depend on SCHANNEL may not accept $protocol connections."
+                    }
+
+                    $explanation = (
+                        "Although this is the $operatingSystemName default, we recommend enabling $protocol " +
+                        'to meet the hardened baseline.'
+                    )
+                }
+
+                Write-Warning (
+                    "[NOTICE] $title`n" +
+                    "$explanation`n" +
+                    "Related Registry path: $($configuration.Path)"
+                )
+                continue
+            }
+
+            $enabledValue = '<absent>'
+            $enabledKind = '<absent>'
+            if ($configuration.EnabledInfo.Exists) {
+                $enabledValue = ConvertTo-TlsRegistryDisplayValue -Value $configuration.EnabledInfo.Value
+                $enabledKind = $configuration.EnabledInfo.Kind
+            }
+
+            $disabledValue = '<absent>'
+            $disabledKind = '<absent>'
+            if ($configuration.DisabledByDefaultInfo.Exists) {
+                $disabledValue = ConvertTo-TlsRegistryDisplayValue -Value $configuration.DisabledByDefaultInfo.Value
+                $disabledKind = $configuration.DisabledByDefaultInfo.Kind
+            }
+
+            $issueLines = @()
+            foreach ($issue in @($configuration.Issues)) {
+                $issueLines += "Configuration issue: $issue"
+            }
+
+            if ($protocol -in @('SSL 3.0', 'TLS 1.0', 'TLS 1.1')) {
+                $impact = (
+                    "$protocol remains available to Schannel $role applications. " +
+                    'Applications that explicitly request it may still negotiate the legacy protocol.'
+                )
+                $recommendedAction = (
+                    "Confirm that no application still depends on $protocol, then set Enabled=0 (DWord) " +
+                    "and DisabledByDefault=1 (DWord) under the registry path below."
+                )
+            }
+            elseif ($configuration.ExpectedState -eq 'Unsupported') {
+                $impact = (
+                    "$protocol is not supported by this Windows version. An enabling override is ineffective " +
+                    'or unsafe and can mislead administrators about the available protocol posture.'
+                )
+                $recommendedAction = (
+                    "Remove the unsupported $protocol enabling override. Upgrade Windows if this protocol is required."
+                )
+            }
+            else {
+                $impact = (
+                    "$protocol is not fully available by default to Schannel $role applications. " +
+                    'Connections that require this modern protocol can fail or fall back to an older protocol.'
+                )
+                $recommendedAction = (
+                    "Remove the blocking override or set Enabled=1 (DWord) and " +
+                    'DisabledByDefault=0 (DWord) under the registry path below.'
+                )
+            }
+
+            $commentLines = @(
+                "Current state: $($configuration.CurrentState).",
+                "Expected state: $($configuration.ExpectedState).",
+                "Availability: $($configuration.Availability) ($($configuration.AvailabilitySource)).",
+                "Use by default: $($configuration.DefaultUse) ($($configuration.DefaultUseSource)).",
+                "Enabled: $enabledValue (registry type: $enabledKind).",
+                "DisabledByDefault: $disabledValue (registry type: $disabledKind).",
+                "Windows default: $($configuration.OsDefaultState). $($configuration.OsDefaultReason)",
+                "Operating system: $($operatingSystem.Caption) $($operatingSystem.Version).",
+                "Registry path: '$($configuration.Path)'."
+            )
+            $commentLines += $issueLines
+            $commentLines += "Impact: $impact"
+            $commentLines += "Recommended action: $recommendedAction"
+            $commentLines += (
+                'After changing Schannel settings, restart affected services or reboot, then test both inbound ' +
+                'and outbound application connections.'
+            )
+
+            Write-Warning (
+                "[WARNING] TLS protocol posture issue: Protocol='$protocol'; Role='$role'`n" +
+                ($commentLines -join "`n")
+            )
+        }
+    }
+
+    if ($findingCount -eq 0) {
+        Write-Warning (
+            '[PASS] Schannel protocol posture matches the baseline for Client and Server roles ' +
+            "on $($operatingSystem.Caption) $($operatingSystem.Version)"
+        )
+    }
 }
 
 if ($MyInvocation.InvocationName -ne '.') {
-  HealthTest-SchanelBaseline
+    HealthTest-SchanelBaseline
 }
