@@ -66,3 +66,5 @@ Run tests from the repository root in Windows PowerShell (v5).
 - A full release can take several minutes because it runs the unit suite, smoke and installer scenarios, and release-zip installation validation. Do not interrupt it merely because output pauses; allow at least 15 minutes unless the script reports a concrete failure.
 
 For minor & major releases verify the "List of Available Tests" in README.md matches what `Get-ComputerHealth -ListAllBuiltInTests` returns. If not, update README.md
+
+- Before minor and major releases, review comments for historical scaffolding left by completed refactors or migrations. Remove comments that only describe how code came to exist, while retaining comments that explain current behavior, compatibility, safety constraints, or active migration logic.

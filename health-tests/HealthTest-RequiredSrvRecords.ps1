@@ -1,7 +1,3 @@
-<#
-Standalone file for HealthTest-RequiredSrvRecords.
-Generated during the repo-wide health-test split.
-#>
 # HostRequirement: DomainJoined
 
 function HealthTest-RequiredSrvRecords{

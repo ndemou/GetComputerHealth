@@ -1,7 +1,3 @@
-<#
-Standalone file for HealthTest-ADReplicationHealth.
-Generated during the repo-wide health-test split.
-#>
 # HostRequirement: DC
 
 function HealthTest-ADReplicationHealth {

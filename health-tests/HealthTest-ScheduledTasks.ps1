@@ -1,7 +1,3 @@
-<#
-Standalone file for HealthTest-ScheduledTasks.
-#>
-
 if (-not (Get-Command -Name 'Get-ScheduledTaskDefaultPathIgnoreRegex' -CommandType Function -ErrorAction SilentlyContinue)) {
   . (Join-Path -Path $PSScriptRoot -ChildPath 'helper-regarding-scheduled-tasks.ps1')
 }

@@ -1,7 +1,3 @@
-<#
-Standalone file for HealthTest-NltestSiteDiscovery.
-Generated during the repo-wide health-test split.
-#>
 # HostRequirement: DomainJoined
 
 function HealthTest-NltestSiteDiscovery {

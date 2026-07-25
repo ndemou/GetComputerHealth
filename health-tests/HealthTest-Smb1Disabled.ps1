@@ -1,7 +1,3 @@
-<#
-Standalone file for HealthTest-Smb1Disabled.
-Generated during the repo-wide health-test split.
-#>
 # HostRequirement: All
 
 function HealthTest-Smb1Disabled{

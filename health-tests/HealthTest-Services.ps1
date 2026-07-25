@@ -1,7 +1,3 @@
-<#
-Standalone file for HealthTest-Services.
-Generated during the repo-wide health-test split.
-#>
 # HostRequirement: All
 
 if (-not (Get-Command -Name 'Get-ServiceVendors' -CommandType Function -ErrorAction SilentlyContinue)) {

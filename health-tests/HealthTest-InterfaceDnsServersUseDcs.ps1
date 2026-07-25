@@ -1,7 +1,3 @@
-<#
-Standalone file for HealthTest-InterfaceDnsServersUseDcs.
-Generated during the repo-wide health-test split.
-#>
 # HostRequirement: DomainJoinedNotDC
 
 function HealthTest-InterfaceDnsServersUseDcs {

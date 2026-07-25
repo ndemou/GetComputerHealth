@@ -1,7 +1,3 @@
-<#
-Standalone file for HealthTest-RecentWindowsScan.
-Generated during the repo-wide health-test split.
-#>
 # HostRequirement: All
 
 Function Get-WindowsOriginalInstallDate {

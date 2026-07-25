@@ -1,7 +1,3 @@
-<#
-Standalone file for HealthTest-ConnectivityToDCs.
-Generated during the repo-wide health-test split.
-#>
 # HostRequirement: DomainJoined
 
 if (-not (Get-Command -Name 'Get-DomainControllers' -CommandType Function -ErrorAction SilentlyContinue)) {

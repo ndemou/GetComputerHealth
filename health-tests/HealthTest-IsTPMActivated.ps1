@@ -1,7 +1,3 @@
-<#
-Standalone file for HealthTest-IsTPMActivated.
-Generated during the repo-wide health-test split.
-#>
 # HostRequirement: Mobile
 
 function HealthTest-IsTPMActivated {

@@ -24,11 +24,6 @@ public static class Win32SvcPath {
 }
 "@
 }
-
-
-#--------------------------------------------------------
-# xxx new tests 20205-11-26
-
 function Expand-EnvVarsWin32 {
 
   [CmdletBinding()]

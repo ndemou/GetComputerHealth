@@ -1,7 +1,3 @@
-<#
-Standalone file for HealthTest-WinRMListening.
-Generated during the repo-wide health-test split.
-#>
 # HostRequirement: All
 
 function HealthTest-WinRMListening{

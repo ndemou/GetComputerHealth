@@ -1,7 +1,3 @@
-<#
-Standalone file for HealthTest-RamPressure.
-Generated during the repo-wide health-test split.
-#>
 # HostRequirement: All
 
 function Get-TopRamProcess {

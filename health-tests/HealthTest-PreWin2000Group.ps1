@@ -1,7 +1,3 @@
-<#
-Standalone file for HealthTest-PreWin2000Group.
-Generated during the repo-wide health-test split.
-#>
 # HostRequirement: DC
 
 function HealthTest-PreWin2000Group{

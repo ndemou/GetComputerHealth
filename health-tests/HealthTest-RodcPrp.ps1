@@ -1,7 +1,3 @@
-<#
-Standalone file for HealthTest-RodcPrp.
-Generated during the repo-wide health-test split.
-#>
 # HostRequirement: DC
 
 function HealthTest-RodcPrp{

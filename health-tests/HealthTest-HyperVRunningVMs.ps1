@@ -1,7 +1,3 @@
-<#
-Standalone file for HealthTest-HyperVRunningVMs.
-Generated during the repo-wide health-test split.
-#>
 # HostRequirement: HyperV
 
 function HealthTest-HyperVRunningVMs {

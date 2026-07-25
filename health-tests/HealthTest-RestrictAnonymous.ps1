@@ -1,7 +1,3 @@
-<#
-Standalone file for HealthTest-RestrictAnonymous.
-Generated during the repo-wide health-test split.
-#>
 # HostRequirement: All
 
 function HealthTest-RestrictAnonymous {

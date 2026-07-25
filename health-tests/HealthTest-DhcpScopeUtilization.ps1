@@ -1,7 +1,3 @@
-<#
-Standalone file for HealthTest-DhcpScopeUtilization.
-Generated during the repo-wide health-test split.
-#>
 # HostRequirement: Server
 
 function HealthTest-DhcpScopeUtilization {

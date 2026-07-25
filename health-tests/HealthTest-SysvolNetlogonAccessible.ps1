@@ -1,7 +1,3 @@
-<#
-Standalone file for HealthTest-SysvolNetlogonAccessible.
-Generated during the repo-wide health-test split.
-#>
 # HostRequirement: DC
 
 if (-not (Get-Command -Name 'Get-DomainControllers' -CommandType Function -ErrorAction SilentlyContinue)) {

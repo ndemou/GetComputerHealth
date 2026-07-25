@@ -1,7 +1,3 @@
-<#
-Standalone file for HealthTest-DnsScavenging.
-Generated during the repo-wide health-test split.
-#>
 # HostRequirement: DnsServer
 
 function HealthTest-DnsScavenging{

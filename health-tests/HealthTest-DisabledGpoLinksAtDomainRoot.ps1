@@ -1,7 +1,3 @@
-<#
-Standalone file for HealthTest-DisabledGpoLinksAtDomainRoot.
-Generated during the repo-wide health-test split.
-#>
 # HostRequirement: DC
 
 function HealthTest-DisabledGpoLinksAtDomainRoot{

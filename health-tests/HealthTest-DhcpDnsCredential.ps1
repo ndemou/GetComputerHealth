@@ -1,7 +1,3 @@
-<#
-Standalone file for HealthTest-DhcpDnsCredential.
-Generated during the repo-wide health-test split.
-#>
 # HostRequirement: DhcpServer
 
 function HealthTest-DhcpDnsCredential{

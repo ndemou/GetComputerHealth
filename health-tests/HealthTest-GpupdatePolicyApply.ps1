@@ -1,7 +1,3 @@
-<#
-Standalone file for HealthTest-GpupdatePolicyApply.
-Generated during the repo-wide health-test split.
-#>
 # HostRequirement: DomainJoinedNotDC
 
 function HealthTest-GpupdatePolicyApply {

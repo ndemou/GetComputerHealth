@@ -1,7 +1,3 @@
-<#
-Standalone file for HealthTest-DnsZoneReplicationScope.
-Generated during the repo-wide health-test split.
-#>
 # HostRequirement: DnsServer
 
 function HealthTest-DnsZoneReplicationScope{

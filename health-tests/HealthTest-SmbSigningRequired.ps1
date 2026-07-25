@@ -1,7 +1,3 @@
-<#
-Standalone file for HealthTest-SmbSigningRequired.
-Generated during the repo-wide health-test split.
-#>
 # HostRequirement: All
 
 if (-not (Get-Command -Name 'Get-PropValue' -CommandType Function -ErrorAction SilentlyContinue)) {

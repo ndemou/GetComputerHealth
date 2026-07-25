@@ -1,7 +1,3 @@
-<#
-Standalone file for HealthTest-SysvolAclHygiene.
-Generated during the repo-wide health-test split.
-#>
 # HostRequirement: DC
 
 function HealthTest-SysvolAclHygiene{

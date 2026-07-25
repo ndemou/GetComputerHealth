@@ -1,7 +1,3 @@
-<#
-Standalone file for HealthTest-DhcpInAd.
-Generated during the repo-wide health-test split.
-#>
 # HostRequirement: Server
 
 function HealthTest-DhcpInAd{

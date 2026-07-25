@@ -1,7 +1,3 @@
-<#
-Standalone file for HealthTest-Dcdiag.
-Generated during the repo-wide health-test split.
-#>
 # HostRequirement: DC
 
 if (-not (Get-Command -Name 'Compress-HealthDiagnosticOutputLines' -CommandType Function -ErrorAction SilentlyContinue)) {

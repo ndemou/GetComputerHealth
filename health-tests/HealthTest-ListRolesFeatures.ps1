@@ -1,7 +1,3 @@
-<#
-Standalone file for HealthTest-ListRolesFeatures.
-Generated during the repo-wide health-test split.
-#>
 # HostRequirement: Server
 
 function HealthTest-ListRolesFeatures {

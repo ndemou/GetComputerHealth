@@ -1,7 +1,3 @@
-<#
-Standalone file for HealthTest-BitLockerStatus.
-Generated during the repo-wide health-test split.
-#>
 # HostRequirement: All
 
 if (-not (Get-Command -Name 'Test-IsVirtualMachine' -CommandType Function -ErrorAction SilentlyContinue)) {

@@ -1,7 +1,3 @@
-<#
-Standalone file for HealthTest-IPv6Binding.
-Generated during the repo-wide health-test split.
-#>
 # HostRequirement: All
 
 function HealthTest-IPv6Binding{

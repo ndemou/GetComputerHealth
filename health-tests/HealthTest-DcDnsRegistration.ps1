@@ -1,7 +1,3 @@
-<#
-Standalone file for HealthTest-DcDnsRegistration.
-Generated during the repo-wide health-test split.
-#>
 # HostRequirement: DnsServer
 
 function HealthTest-DcDnsRegistration {

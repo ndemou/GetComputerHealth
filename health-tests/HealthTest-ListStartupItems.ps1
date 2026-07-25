@@ -1,7 +1,3 @@
-<#
-Standalone file for HealthTest-ListStartupItems.
-Generated during the repo-wide health-test split.
-#>
 # HostRequirement: All
 
 if (-not (Get-Command -Name 'Get-PolicyListShortHash' -CommandType Function -ErrorAction SilentlyContinue)) {
