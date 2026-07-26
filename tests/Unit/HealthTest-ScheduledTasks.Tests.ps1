@@ -191,6 +191,7 @@ Describe 'HealthTest-ScheduledTasks' {
         [bool]$Hidden = $false,
         [string]$PrincipalUserId = 'CONTOSO\User',
         [string]$RunLevel = 'LeastPrivilege',
+        [string]$LogonType = 'Password',
         [object[]]$Actions = @(),
         [object[]]$Triggers = @(),
         [bool]$HasEnabledTrigger = $false,
@@ -224,7 +225,7 @@ Describe 'HealthTest-ScheduledTasks' {
         PrincipalUserId = $PrincipalUserId
         PrincipalDisplayName = ''
         RunLevel = $RunLevel
-        LogonType = 'Password'
+        LogonType = $LogonType
         Actions = @($Actions)
         Triggers = @($Triggers)
         HasEnabledTrigger = $HasEnabledTrigger
@@ -257,6 +258,7 @@ Describe 'HealthTest-ScheduledTasks' {
     $script:warnings = @()
     $script:TestScheduledTaskFacts = @()
     Mock Get-ScheduledTaskFacts { return @($script:TestScheduledTaskFacts) }
+    Mock Get-ScheduledTaskLoggedOnInteractiveUsers { return @() }
     Mock Write-Warning { $script:warnings += $Message }
   }
 
@@ -331,6 +333,64 @@ Describe 'HealthTest-ScheduledTasks' {
     HealthTest-ScheduledTasks -StaleDays 0
 
     @($script:warnings | Where-Object { $_ -match '^\[NOTICE\] Scheduled task missed 1 runs: \\Vendor\\Task' }).Count | Should -Be 1
+  }
+
+  It 'does not report missed runs for logged-off Interactive and InteractiveToken users' {
+    Mock Get-ScheduledTaskLoggedOnInteractiveUsers {
+      return @('CONTOSO\OtherUser')
+    }
+
+    foreach ($logonType in @('Interactive', 'InteractiveToken')) {
+      $script:warnings = @()
+      $script:TestScheduledTaskFacts = @(
+        New-TestScheduledTaskFact -LogonType $logonType -PrincipalUserId 'CONTOSO\User' -NumberOfMissedRuns 3
+      )
+
+      HealthTest-ScheduledTasks -StaleDays 0
+
+      @($script:warnings | Where-Object { $_ -match 'Scheduled task missed' }).Count | Should -Be 0
+      @($script:warnings | Where-Object { $_ -match '^\[PASS\] Scheduled tasks healthy$' }).Count | Should -Be 1
+    }
+  }
+
+  It 'reports missed runs for an Interactive task when its user is logged on' {
+    Mock Get-ScheduledTaskLoggedOnInteractiveUsers {
+      return @('CONTOSO\User')
+    }
+    $script:TestScheduledTaskFacts = @(
+      New-TestScheduledTaskFact -LogonType 'Interactive' -PrincipalUserId 'CONTOSO\User' -NumberOfMissedRuns 2
+    )
+
+    HealthTest-ScheduledTasks -StaleDays 0
+
+    @($script:warnings | Where-Object { $_ -match 'Scheduled task missed 2 runs' }).Count | Should -Be 1
+  }
+
+  It 'retains missed-run findings when logged-on-user inspection fails' {
+    Mock Get-ScheduledTaskLoggedOnInteractiveUsers {
+      throw 'CIM unavailable'
+    }
+    $script:TestScheduledTaskFacts = @(
+      New-TestScheduledTaskFact -LogonType 'InteractiveToken' -PrincipalUserId 'CONTOSO\User' -NumberOfMissedRuns 2
+    )
+
+    HealthTest-ScheduledTasks -StaleDays 0
+
+    @($script:warnings | Where-Object { $_ -match 'Scheduled task missed 2 runs' }).Count | Should -Be 1
+  }
+
+  It 'still reports stale Interactive tasks when only the missed-run finding is skipped' {
+    Mock Get-ScheduledTaskLoggedOnInteractiveUsers {
+      return @()
+    }
+    $script:TestScheduledTaskFacts = @(
+      New-TestScheduledTaskFact -LogonType 'Interactive' -PrincipalUserId 'CONTOSO\User' -NumberOfMissedRuns 6 -HasEnabledTrigger $true -LastRunTime ((Get-Date).AddDays(-60))
+    )
+
+    HealthTest-ScheduledTasks -StaleDays 30
+
+    @($script:warnings | Where-Object { $_ -match 'Scheduled task missed' }).Count | Should -Be 0
+    @($script:warnings | Where-Object { $_ -match 'Scheduled task appears stale' }).Count | Should -Be 1
   }
 
   It 'does not emit PASS when task-info collection failed' {

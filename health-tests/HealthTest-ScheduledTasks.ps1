@@ -30,6 +30,18 @@ if (-not (Get-Command -Name 'Test-ScheduledTaskLastResultReportable' -CommandTyp
   . (Join-Path -Path $PSScriptRoot -ChildPath 'helper-regarding-scheduled-tasks.ps1')
 }
 
+if (-not (Get-Command -Name 'Test-ScheduledTaskUsesInteractiveToken' -CommandType Function -ErrorAction SilentlyContinue)) {
+  . (Join-Path -Path $PSScriptRoot -ChildPath 'helper-regarding-scheduled-tasks.ps1')
+}
+
+if (-not (Get-Command -Name 'Get-ScheduledTaskLoggedOnInteractiveUsers' -CommandType Function -ErrorAction SilentlyContinue)) {
+  . (Join-Path -Path $PSScriptRoot -ChildPath 'helper-regarding-scheduled-tasks.ps1')
+}
+
+if (-not (Get-Command -Name 'Test-ScheduledTaskPrincipalLoggedOn' -CommandType Function -ErrorAction SilentlyContinue)) {
+  . (Join-Path -Path $PSScriptRoot -ChildPath 'helper-regarding-scheduled-tasks.ps1')
+}
+
 function HealthTest-ScheduledTasks {
 <#
 Description: Reviews scheduled tasks for failed results, disabled required tasks, missed runs, stale runs, and unreadable metadata.
@@ -38,6 +50,10 @@ Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time)
 Uses: Get-ScheduledTask, Get-ScheduledTaskInfo, Export-ScheduledTask.
+
+Missed runs are not reported for Interactive or InteractiveToken tasks when the
+configured user is confirmed not to be logged on. If logged-on-user inspection
+or principal matching is inconclusive, the missed-run finding is retained.
 #>
   [CmdletBinding()]
   param(
@@ -50,6 +66,9 @@ Uses: Get-ScheduledTask, Get-ScheduledTaskInfo, Export-ScheduledTask.
   )
 
   $hadIssue = $false
+  $loggedOnUsersCollected = $false
+  $loggedOnUsersKnown = $false
+  $loggedOnInteractiveUsers = @()
 
   try {
     $facts = @(Get-ScheduledTaskFacts)
@@ -115,13 +134,36 @@ Uses: Get-ScheduledTask, Get-ScheduledTaskInfo, Export-ScheduledTask.
     }
 
     if ($fact.NumberOfMissedRuns -gt 0 -and $isThirdPartyOrRequired) {
-      $hadIssue = $true
-      if ($fact.NumberOfMissedRuns -ge 5) {
-        $level = Get-ScheduledTaskOperationalSeverity -Fact $fact -IssueType 'ManyMissedRuns' -Required:$isRequired
-      } else {
-        $level = Get-ScheduledTaskOperationalSeverity -Fact $fact -IssueType 'FewMissedRuns' -Required:$isRequired
+      $reportMissedRuns = $true
+
+      if (Test-ScheduledTaskUsesInteractiveToken -Fact $fact) {
+        if (-not $loggedOnUsersCollected) {
+          $loggedOnUsersCollected = $true
+          try {
+            $loggedOnInteractiveUsers = @(Get-ScheduledTaskLoggedOnInteractiveUsers)
+            $loggedOnUsersKnown = $true
+          } catch {
+            $loggedOnUsersKnown = $false
+          }
+        }
+
+        if ($loggedOnUsersKnown) {
+          $principalNames = @(Get-ScheduledTaskPrincipalComparisonNames -PrincipalUserId $fact.PrincipalUserId)
+          if ($principalNames.Count -gt 0) {
+            $reportMissedRuns = Test-ScheduledTaskPrincipalLoggedOn -PrincipalUserId $fact.PrincipalUserId -LoggedOnUsers $loggedOnInteractiveUsers
+          }
+        }
       }
-      Write-Warning "[$level] Scheduled task missed $($fact.NumberOfMissedRuns) runs: $($fact.StableKey)`n$(Format-ScheduledTaskFactDetails -Fact $fact)"
+
+      if ($reportMissedRuns) {
+        $hadIssue = $true
+        if ($fact.NumberOfMissedRuns -ge 5) {
+          $level = Get-ScheduledTaskOperationalSeverity -Fact $fact -IssueType 'ManyMissedRuns' -Required:$isRequired
+        } else {
+          $level = Get-ScheduledTaskOperationalSeverity -Fact $fact -IssueType 'FewMissedRuns' -Required:$isRequired
+        }
+        Write-Warning "[$level] Scheduled task missed $($fact.NumberOfMissedRuns) runs: $($fact.StableKey)`n$(Format-ScheduledTaskFactDetails -Fact $fact)"
+      }
     }
 
     if ($StaleDays -gt 0 -and $fact.HasEnabledTrigger -and $isThirdPartyOrRequired) {

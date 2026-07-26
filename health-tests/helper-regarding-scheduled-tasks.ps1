@@ -899,6 +899,135 @@ function Test-ScheduledTaskLastResultReportable {
   return ($Fact.NumberOfMissedRuns -ge 5)
 }
 
+function Test-ScheduledTaskUsesInteractiveToken {
+  [CmdletBinding()]
+  [OutputType([bool])]
+  param(
+    [Parameter(Mandatory=$true)]$Fact
+  )
+
+  $logonType = ([string]$Fact.LogonType).Trim()
+  return $logonType -in @('Interactive', 'InteractiveToken')
+}
+
+function Get-ScheduledTaskLoggedOnInteractiveUsers {
+  [CmdletBinding()]
+  [OutputType([string[]])]
+  param()
+
+  $interactiveLogonTypes = @(2, 7, 10, 11, 12, 13)
+  $interactiveLogonIds = @()
+
+  $sessions = @(Get-CimInstance -ClassName Win32_LogonSession -ErrorAction Stop)
+  foreach ($session in $sessions) {
+    if ([int]$session.LogonType -notin $interactiveLogonTypes) {
+      continue
+    }
+
+    $logonId = ([string]$session.LogonId).Trim()
+    if ($logonId -and $interactiveLogonIds -notcontains $logonId) {
+      $interactiveLogonIds += $logonId
+    }
+  }
+
+  if ($interactiveLogonIds.Count -eq 0) {
+    return @()
+  }
+
+  $loggedOnUsers = @()
+  $links = @(Get-CimInstance -ClassName Win32_LoggedOnUser -ErrorAction Stop)
+  foreach ($link in $links) {
+    $session = Get-ScheduledTaskPropertyValue -InputObject $link -Name 'Dependent'
+    $account = Get-ScheduledTaskPropertyValue -InputObject $link -Name 'Antecedent'
+    $logonId = [string](Get-ScheduledTaskPropertyValue -InputObject $session -Name 'LogonId')
+
+    if ($interactiveLogonIds -notcontains $logonId) {
+      continue
+    }
+
+    $name = ([string](Get-ScheduledTaskPropertyValue -InputObject $account -Name 'Name')).Trim()
+    $domain = ([string](Get-ScheduledTaskPropertyValue -InputObject $account -Name 'Domain')).Trim()
+    if (-not $name) {
+      continue
+    }
+
+    if ($loggedOnUsers -notcontains $name) {
+      $loggedOnUsers += $name
+    }
+
+    if ($domain) {
+      $qualifiedName = "$domain\$name"
+      if ($loggedOnUsers -notcontains $qualifiedName) {
+        $loggedOnUsers += $qualifiedName
+      }
+    }
+  }
+
+  return @($loggedOnUsers)
+}
+
+function Get-ScheduledTaskPrincipalComparisonNames {
+  [CmdletBinding()]
+  [OutputType([string[]])]
+  param(
+    [AllowNull()][string]$PrincipalUserId
+  )
+
+  $principal = ([string]$PrincipalUserId).Trim()
+  if (-not $principal) {
+    return @()
+  }
+
+  if ($principal -match '^S-\d-\d+(?:-\d+)+$') {
+    try {
+      $sid = New-Object System.Security.Principal.SecurityIdentifier($principal)
+      $account = $sid.Translate([System.Security.Principal.NTAccount])
+      return @($account.Value)
+    } catch {
+      return @()
+    }
+  }
+
+  if ($principal -match '@') {
+    try {
+      $account = New-Object System.Security.Principal.NTAccount($principal)
+      $sid = $account.Translate([System.Security.Principal.SecurityIdentifier])
+      $canonicalAccount = $sid.Translate([System.Security.Principal.NTAccount])
+      return @($canonicalAccount.Value)
+    } catch {
+      return @()
+    }
+  }
+
+  if ($principal -match '^[.][\\](?<Name>.+)$') {
+    return @($Matches['Name'])
+  }
+
+  return @($principal)
+}
+
+function Test-ScheduledTaskPrincipalLoggedOn {
+  [CmdletBinding()]
+  [OutputType([bool])]
+  param(
+    [AllowNull()][string]$PrincipalUserId,
+    [AllowNull()][string[]]$LoggedOnUsers
+  )
+
+  $comparisonNames = @(Get-ScheduledTaskPrincipalComparisonNames -PrincipalUserId $PrincipalUserId)
+  if ($comparisonNames.Count -eq 0) {
+    return $true
+  }
+
+  foreach ($comparisonName in $comparisonNames) {
+    if (@($LoggedOnUsers) -contains $comparisonName) {
+      return $true
+    }
+  }
+
+  return $false
+}
+
 function Format-ScheduledTaskDateTime {
   param([AllowNull()][object]$Value)
 
