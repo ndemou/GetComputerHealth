@@ -96,7 +96,7 @@ are detailed WARNING findings with raw values, registry types, and recommended a
                 }
 
                 Write-Warning (
-                    "[NOTICE] $title`n" +
+                    "[NOTICE] SCHANNEL hardening: $title`n" +
                     "$explanation`n" +
                     "Related Registry path: $($configuration.Path)"
                 )
@@ -172,7 +172,7 @@ are detailed WARNING findings with raw values, registry types, and recommended a
             )
 
             Write-Warning (
-                "[WARNING] TLS protocol posture issue: Protocol='$protocol'; Role='$role'`n" +
+                "[WARNING] SCHANNEL hardening: protocol posture issue: Protocol='$protocol'; Role='$role'`n" +
                 ($commentLines -join "`n")
             )
         }

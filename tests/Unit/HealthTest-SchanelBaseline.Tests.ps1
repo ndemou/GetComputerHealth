@@ -73,7 +73,7 @@ Describe 'HealthTest-SchanelBaseline' {
             Where-Object { $_ -match '^\[NOTICE\].*CLIENT.*TLS 1\.0' }
         )
         $clientFinding | Should -HaveCount 1
-        ($clientFinding[0] -split "`n")[0] | Should -Be '[NOTICE] Local CLIENT applications that depend on SCHANNEL may use TLS 1.0.'
+        ($clientFinding[0] -split "`n")[0] | Should -Be '[NOTICE] SCHANNEL hardening: Local CLIENT applications that depend on SCHANNEL may use TLS 1.0.'
         $clientFinding[0] | Should -Match 'Although this is the Windows Server 2022 Standard default, we recommend hardening it'
         $clientFinding[0] | Should -Match 'unless TLS 1\.0 is genuinely required by a legacy application\.'
         $clientFinding[0] | Should -Match '(?m)^Related Registry path: HKLM:\\.*\\TLS 1\.0\\Client$'
@@ -83,7 +83,7 @@ Describe 'HealthTest-SchanelBaseline' {
             Where-Object { $_ -match '^\[NOTICE\].*SERVER.*TLS 1\.0' }
         )
         $serverFinding | Should -HaveCount 1
-        ($serverFinding[0] -split "`n")[0] | Should -Be '[NOTICE] Local SERVER applications that depend on SCHANNEL may accept TLS 1.0 connections.'
+        ($serverFinding[0] -split "`n")[0] | Should -Be '[NOTICE] SCHANNEL hardening: Local SERVER applications that depend on SCHANNEL may accept TLS 1.0 connections.'
         $serverFinding[0] | Should -Match '(?m)^Related Registry path: HKLM:\\.*\\TLS 1\.0\\Server$'
     }
 
@@ -116,7 +116,7 @@ Describe 'HealthTest-SchanelBaseline' {
 
         $finding = @($script:warnings | Where-Object { $_ -match '^\[NOTICE\].*CLIENT.*TLS 1\.2' })
         $finding | Should -HaveCount 1
-        ($finding[0] -split "`n")[0] | Should -Be '[NOTICE] Local CLIENT applications that depend on SCHANNEL may not use TLS 1.2.'
+        ($finding[0] -split "`n")[0] | Should -Be '[NOTICE] SCHANNEL hardening: Local CLIENT applications that depend on SCHANNEL may not use TLS 1.2.'
         $finding[0] | Should -Match 'Although this is the Windows Server 2008 R2 Standard default, we recommend enabling TLS 1\.2'
         $finding[0] | Should -Match '(?m)^Related Registry path: HKLM:\\.*\\TLS 1\.2\\Client$'
     }
@@ -197,7 +197,7 @@ Describe 'HealthTest-SchanelBaseline' {
 
         $finding = @($script:warnings | Where-Object { $_ -match "Protocol='TLS 1\.2'; Role='Server'" })
         $finding | Should -HaveCount 1
-        ($finding[0] -split "`n")[0] | Should -Be "[WARNING] TLS protocol posture issue: Protocol='TLS 1.2'; Role='Server'"
+        ($finding[0] -split "`n")[0] | Should -Be "[WARNING] SCHANNEL hardening: protocol posture issue: Protocol='TLS 1.2'; Role='Server'"
         $finding[0] | Should -Match 'Enabled: 1 \(registry type: String\)\.'
         $finding[0] | Should -Match "Configuration issue: Enabled has registry type 'String' instead of DWord\."
         ($finding[0] -split "`n")[0] | Should -Not -Match 'Enabled|DWord|Registry'

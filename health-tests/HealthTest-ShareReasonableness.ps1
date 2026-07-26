@@ -70,6 +70,7 @@ Uses: Get-SmbShare, Get-SmbShareAccess, Get-Acl.
   # 0(Workstation standalone),  1(Workstation domain joined), 2(Server standalone), 3(Server joined), 4(DC non-FSMO), 5(DC with FSMO role)
   $domainRole = (Get-CimInstance Win32_ComputerSystem).DomainRole
   $isHostDC = ($domainRole -in 4,5)
+  $isDomainJoined = ($domainRole -in 1,3,4,5)
 
   if ((Get-PropValue -obj (Get-Service -Name LanmanServer) -name Status) -ne 'running') {
       Write-Warning "[PASS] Skipping HealthTest-ShareReasonableness; LanmanServer service not running."
@@ -180,7 +181,21 @@ Uses: Get-SmbShare, Get-SmbShareAccess, Get-Acl.
     }
   } catch {}
   if($nullShares -and $nullShares.Count -gt 0){
-    Write-Warning "[FAILURE] Null session shares configured: $($nullShares -join ', ')`nRemove unless a documented legacy requirement exists."
+    if ($isDomainJoined) {
+      $configurationReference = (
+        'Related domain policy path: Computer Configuration\Policies\Windows Settings\Security Settings\Local Policies\' +
+        'Security Options\Network access: Shares that can be accessed anonymously.'
+      )
+    } else {
+      $configurationReference = (
+        "Related registry path: 'HKLM:\SYSTEM\CurrentControlSet\Services\LanmanServer\Parameters\NullSessionShares'."
+      )
+    }
+
+    Write-Warning (
+      "[FAILURE] Null session shares configured: $($nullShares -join ', ')`n" +
+      "Remove these entries unless a documented legacy requirement exists.`n$configurationReference"
+    )
     $riskFound = $true
   }
 
@@ -208,7 +223,23 @@ Uses: Get-SmbShare, Get-SmbShareAccess, Get-Acl.
   }
 
   if ($nullPipes -and $nullPipes.Count -gt 0) {
-    Write-Warning ("[NOTICE] Null session pipes (Named Pipes that can be accessed anonymously) found: {0}`nAnonymous users are allowed to open those pipes. Modern domains don't need null pipes and they increase attack surface if other policies are loose. If you don't have legacy (pre-Windows 2000-era) trusts/clients, it's recommended to keep Null session pipes empty. Change Local Security Policy > Security Options > 'Network access: Named Pipes that can be accessed anonymously' (set to None), or the equivalent GPO." -f ($nullPipes -join ', '))
+    if ($isDomainJoined) {
+      $configurationReference = (
+        'Related domain policy path: Computer Configuration\Policies\Windows Settings\Security Settings\Local Policies\' +
+        'Security Options\Network access: Named Pipes that can be accessed anonymously.'
+      )
+    } else {
+      $configurationReference = (
+        "Related registry path: 'HKLM:\SYSTEM\CurrentControlSet\Services\LanmanServer\Parameters\NullSessionPipes'."
+      )
+    }
+
+    Write-Warning (
+      "[NOTICE] Null session pipes (Named Pipes that can be accessed anonymously) found: $($nullPipes -join ', ')`n" +
+      'Anonymous users are allowed to open these named pipes. They increase attack surface when other anonymous ' +
+      "access policies are loose. Keep the list empty unless legacy trusts or applications require it.`n" +
+      $configurationReference
+    )
   }
 
   if (!$riskFound) {Write-Warning "[PASS] No risks related to SMB shares were detected"}

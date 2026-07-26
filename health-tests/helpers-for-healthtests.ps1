@@ -9,6 +9,20 @@ function Get-PropValue {
     return $default
 }
 
+function Test-IsDomainJoinedComputer {
+  [CmdletBinding()]
+  [OutputType([bool])]
+  param()
+
+  try {
+    $computerSystem = Get-CimInstance -ClassName Win32_ComputerSystem -ErrorAction Stop
+    $domainRole = [int]$computerSystem.DomainRole
+    return $domainRole -in @(1, 3, 4, 5)
+  } catch {
+    return $false
+  }
+}
+
 function Test-IsVirtualMachine {
   # returns $true if it guesses the computer is VM
   [CmdletBinding()]

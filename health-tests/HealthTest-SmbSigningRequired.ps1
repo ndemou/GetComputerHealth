@@ -1,6 +1,9 @@
 # HostRequirement: All
 
-if (-not (Get-Command -Name 'Get-PropValue' -CommandType Function -ErrorAction SilentlyContinue)) {
+if (
+  -not (Get-Command -Name 'Get-PropValue' -CommandType Function -ErrorAction SilentlyContinue) -or
+  -not (Get-Command -Name 'Test-IsDomainJoinedComputer' -CommandType Function -ErrorAction SilentlyContinue)
+) {
   . (Join-Path -Path $PSScriptRoot -ChildPath 'helpers-for-healthtests.ps1')
 }
 
@@ -23,7 +26,24 @@ Uses: Get-SmbServerConfiguration.
   if($c.RequireSecuritySignature){
     Write-Warning "[PASS] SMB signing required on the server"
   } else {
-    Write-Warning "[WARNING] SMB signing is not required`nRequireSecuritySignature=$($c.RequireSecuritySignature); EnableSecuritySignature=$($c.EnableSecuritySignature)"
+    if (Test-IsDomainJoinedComputer) {
+      $configurationReference = (
+        'Related domain policy path: Computer Configuration\Policies\Windows Settings\Security Settings\Local Policies\' +
+        'Security Options\Microsoft network server: Digitally sign communications (always).'
+      )
+    } else {
+      $configurationReference = (
+        'Recommended local command: Set-SmbServerConfiguration -RequireSecuritySignature $true'
+      )
+    }
+
+    Write-Warning (
+      "[WARNING] SMB hardening: server signing is not required`n" +
+      "RequireSecuritySignature=$($c.RequireSecuritySignature); " +
+      "EnableSecuritySignature=$($c.EnableSecuritySignature).`n" +
+      "Requiring SMB signing protects traffic integrity and helps prevent session tampering.`n" +
+      $configurationReference
+    )
   }
 }
 

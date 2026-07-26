@@ -30,7 +30,28 @@ Uses: None.
     if (($sign -ge 1) -and ($cb -ge 1)) {
         Write-Warning "[PASS] LDAP signing & channel binding enforced"
     } else {
-        Write-Warning "[NOTICE] LDAP signing and/or channel binding not enforced`nLDAPServerIntegrity=$sign; LdapEnforceChannelBinding=$cb"
+        $commentLines = @(
+            "Current state: LDAPServerIntegrity=$sign; LdapEnforceChannelBinding=$cb."
+        )
+
+        if ($sign -lt 1) {
+            $commentLines += (
+                'Related domain policy path: Computer Configuration\Policies\Windows Settings\Security Settings\' +
+                'Local Policies\Security Options\Domain controller: LDAP server signing requirements.'
+            )
+        }
+
+        if ($cb -lt 1) {
+            $commentLines += (
+                'Related domain policy path: Computer Configuration\Policies\Windows Settings\Security Settings\' +
+                'Local Policies\Security Options\Domain controller: LDAP server channel binding token requirements.'
+            )
+        }
+
+        Write-Warning (
+            "[NOTICE] LDAP hardening: signing and/or channel binding is not enforced`n" +
+            ($commentLines -join "`n")
+        )
     }
 }
 

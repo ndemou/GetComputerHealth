@@ -19,18 +19,63 @@ Uses: None.
   $certBound = ($null -ne $cert) -and ($cert.Trim() -ne '')
 
   $isServer = $false
-  try { $isServer = ((Get-CimInstance Win32_ComputerSystem -ErrorAction Stop).DomainRole -ge 2) } catch {}
+  $isDomainJoined = $false
+  try {
+    $domainRole = [int](Get-CimInstance Win32_ComputerSystem -ErrorAction Stop).DomainRole
+    $isServer = $domainRole -ge 2
+    $isDomainJoined = $domainRole -in @(1, 3, 4, 5)
+  } catch {}
 
   if ($nla -eq 1 -and $certBound) {
     Write-Warning "[PASS] RDP hardened: NLA enabled and a certificate is bound"
   } else {
-    $sev = "Severity: Medium. Risk: Users may click through name-mismatch warnings; increases MITM risk on first-connect or via spoofing." + $(if($isServer){ " On a DC this is sensitive." } else { "" })
-    $rdpState = "NLA=$nla; CertBound=$(if($certBound){$true}else{$false})"
-    if ($isServer) {
-      Write-Warning "[WARNING] RDP is not hardened (NLA and/or TLS certificate binding missing)`n$rdpState`n$sev"
-    } else {
-      Write-Warning "[NOTICE] RDP is not hardened (NLA and/or TLS certificate binding missing)`n$rdpState`n$sev"
+    $commentLines = @(
+      "Current state: NLA=$nla; CertBound=$(if($certBound){$true}else{$false})."
+    )
+
+    if ($nla -ne 1) {
+      $commentLines += 'Impact: RDP reaches a later stage of connection setup before authenticating the user.'
+
+      if ($isDomainJoined) {
+        $commentLines += (
+          'Related domain policy path: Computer Configuration\Policies\Administrative Templates\Windows Components\' +
+          'Remote Desktop Services\Remote Desktop Session Host\Security\Require user authentication for remote ' +
+          'connections by using Network Level Authentication.'
+        )
+      } else {
+        $commentLines += "Related registry path: '$k\UserAuthentication'."
+      }
     }
+
+    if (-not $certBound) {
+      $commentLines += (
+        'Impact: Users may receive certificate warnings, increasing the risk that they accept a spoofed RDP endpoint.'
+      )
+
+      if ($isDomainJoined) {
+        $commentLines += (
+          'Related domain policy path: Computer Configuration\Policies\Administrative Templates\Windows Components\' +
+          'Remote Desktop Services\Remote Desktop Session Host\Security\Server authentication certificate template.'
+        )
+      } else {
+        $commentLines += "Related registry path: '$k\SSLCertificateSHA1Hash'."
+      }
+    }
+
+    if ($isServer) {
+      $level = 'WARNING'
+    } else {
+      $level = 'NOTICE'
+    }
+
+    if ($isServer) {
+      $commentLines += 'This exposure is more significant on a server or domain controller.'
+    }
+
+    Write-Warning (
+      "[$level] RDP is not hardened (NLA and/or TLS certificate binding missing)`n" +
+      ($commentLines -join "`n")
+    )
   }
 }
 
