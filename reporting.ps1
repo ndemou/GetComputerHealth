@@ -334,12 +334,12 @@ function Get-HealthSuppressionCommand {
   if (($hash -match '^[0-9a-fA-F]{8}$') -and (-not [string]::IsNullOrWhiteSpace($computer))) {
     $messageText = if ($MessageRecord.PSObject.Properties['Message']) { [string]$MessageRecord.Message } else { '' }
     $levelText = if ($MessageRecord.PSObject.Properties['Level']) { [string]$MessageRecord.Level } else { '' }
-    $safeMessageText = $messageText -replace '"', "''"
-    $commentText = "$levelText - $safeMessageText"
+    $commentText = "$levelText - $messageText"
     if ($commentText.Length -gt 400) {
       $commentText = $commentText.Substring(0, 400)
     }
-    $baseCommand = ("& ""c:\it\Get-ComputerHealth\bin\Get-ComputerHealth.ps1"" -AddWhitelisting -until 2999-12-31 -sig '{0}' -ComputerName {1} -comment ""{2}""" -f $hash.ToLowerInvariant(), $computer.Trim(), $commentText)
+    $safeCommentText = $commentText.Replace("'", "''")
+    $baseCommand = ("& ""c:\it\Get-ComputerHealth\bin\Get-ComputerHealth.ps1"" -AddWhitelisting -until 2999-12-31 -sig '{0}' -ComputerName {1} -comment '{2}'" -f $hash.ToLowerInvariant(), $computer.Trim(), $safeCommentText)
     if ($WrapInInvokeCommand) {
       return ("Invoke-Command {0} {{{1}}}" -f $computer.Trim(), $baseCommand)
     }

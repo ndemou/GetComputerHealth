@@ -127,7 +127,7 @@
     $diamond = [string]([char]0x25C6)
     $html | Should -Match ([regex]::Escape("$diamond Drive C: has only 4% free $diamond Investigate temp usage"))
     $html | Should -Not -Match 'border:1px solid'
-    $html | Should -Match ([regex]::Escape('&amp; &quot;c:\it\Get-ComputerHealth\bin\Get-ComputerHealth.ps1&quot; -AddWhitelisting -until 2999-12-31 -sig &#39;deadbeef&#39; -ComputerName SRV1 -comment &quot;warning - Disk free space is low&quot;'))
+    $html | Should -Match ([regex]::Escape('&amp; &quot;c:\it\Get-ComputerHealth\bin\Get-ComputerHealth.ps1&quot; -AddWhitelisting -until 2999-12-31 -sig &#39;deadbeef&#39; -ComputerName SRV1 -comment &#39;warning - Disk free space is low&#39;'))
     $html | Should -Not -Match ([regex]::Escape('Invoke-Command SRV1 {'))
     $html | Should -Not -Match ([regex]::Escape("Drive C: has only 4% free`nInvestigate temp usage"))
     $css = Get-HealthEmailCss
@@ -138,6 +138,48 @@
     $css | Should -Match '\.gch-command \{[\s\S]*font-size: 6pt;'
     $css | Should -Match '\.gch-signature-top \{[\s\S]*font-size: 9pt;'
     $css | Should -Match '\.gch-signature-bottom \{[\s\S]*font-size: 8pt;'
+  }
+
+  It 'preserves embedded quotes as one comment argument in suppression commands' {
+    $messageText = 'Certificate validity issue: Store=''LocalMachine\My''; Subject=''CN=example.test, S="Brussels Region", C=BE''; Issuer=''CN=Test CA''; SerialNumber=''ABC123'''
+    $messageRecord = [pscustomobject]@{
+      Level = 'warning'
+      Computer = 'WEB1'
+      Message = $messageText
+      Hash = '6876a882'
+    }
+
+    $command = Get-HealthSuppressionCommand -MessageRecord $messageRecord -WrapInInvokeCommand:$false
+
+    $parseErrors = $null
+    $tokens = $null
+    $commandAst = [System.Management.Automation.Language.Parser]::ParseInput(
+      $command,
+      [ref]$tokens,
+      [ref]$parseErrors
+    )
+
+    $parseErrors | Should -BeNullOrEmpty
+    $invocationAst = $commandAst.Find({
+        param($node)
+        $node -is [System.Management.Automation.Language.CommandAst]
+      }, $true)
+
+    $commentParameterIndex = $null
+    for ($index = 0; $index -lt $invocationAst.CommandElements.Count; $index++) {
+      $element = $invocationAst.CommandElements[$index]
+      if ($element -is [System.Management.Automation.Language.CommandParameterAst] -and
+          $element.ParameterName -ieq 'comment') {
+        $commentParameterIndex = $index
+        break
+      }
+    }
+
+    $commentParameterIndex | Should -Not -BeNullOrEmpty
+    $commentArgument = $invocationAst.CommandElements[$commentParameterIndex + 1]
+    $commentArgument | Should -BeOfType ([System.Management.Automation.Language.StringConstantExpressionAst])
+    $commentArgument.StringConstantType | Should -Be 'SingleQuoted'
+    $commentArgument.Value | Should -Be "warning - $messageText"
   }
 
   It 'renders postponed findings with a separated muted postponed style' {
@@ -201,8 +243,8 @@
       }
     )
 
-    $html | Should -Match ([regex]::Escape('&amp; &quot;c:\it\Get-ComputerHealth\bin\Get-ComputerHealth.ps1&quot; -AddWhitelisting -until 2999-12-31 -sig &#39;deadbeef&#39; -ComputerName SRV1 -comment &quot;warning - Disk free space is low&quot;'))
-    $html | Should -Match ([regex]::Escape('&amp; &quot;c:\it\Get-ComputerHealth\bin\Get-ComputerHealth.ps1&quot; -AddWhitelisting -until 2999-12-31 -sig &#39;feedbead&#39; -ComputerName SRV2 -comment &quot;notice - A few failed login attempts&quot;'))
+    $html | Should -Match ([regex]::Escape('&amp; &quot;c:\it\Get-ComputerHealth\bin\Get-ComputerHealth.ps1&quot; -AddWhitelisting -until 2999-12-31 -sig &#39;deadbeef&#39; -ComputerName SRV1 -comment &#39;warning - Disk free space is low&#39;'))
+    $html | Should -Match ([regex]::Escape('&amp; &quot;c:\it\Get-ComputerHealth\bin\Get-ComputerHealth.ps1&quot; -AddWhitelisting -until 2999-12-31 -sig &#39;feedbead&#39; -ComputerName SRV2 -comment &#39;notice - A few failed login attempts&#39;'))
     $html | Should -Not -Match ([regex]::Escape('Invoke-Command SRV1 {'))
     $html | Should -Not -Match ([regex]::Escape('Invoke-Command SRV2 {'))
   }
@@ -498,7 +540,8 @@
     $html | Should -Match 'if \(actionHistory\.length > 100\)'
     $html | Should -Match "if \(!isPostponed\)"
     $html | Should -Match '\{& \\"c:\\\\it\\\\Get-ComputerHealth\\\\bin\\\\Get-ComputerHealth\.ps1\\" -AddWhitelisting -until '
-    $html | Should -Match ' -comment \\"'
+    $html | Should -Match ([regex]::Escape(".replace(/'/g, `"''`")"))
+    $html | Should -Match ([regex]::Escape('+ " -comment ''"'))
     $html | Should -Not -Match '\\\\\\\\"'
     $html | Should -Match 'function commandsShareSingleComputer\(commands\)'
     $html | Should -Match 'function simplifyCommandsForSingleComputer\(commands\)'

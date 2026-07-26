@@ -666,7 +666,7 @@
         else if (whatToDo !== 'suppress') {
           return '';
         }
-        var safeComment = (level + ' - ' + message).replace(/"/g, '"');
+        var safeComment = (level + ' - ' + message).replace(/'/g, "''");
         return "Invoke-Command " + computer
           + " {& \"c:\\it\\Get-ComputerHealth\\bin\\Get-ComputerHealth.ps1\" -AddWhitelisting -until "
           + until
@@ -674,9 +674,9 @@
           + hash
           + "' -ComputerName "
           + computer
-          + " -comment \""
+          + " -comment '"
           + safeComment
-          + "\"}";
+          + "'}";
       }
 
       function commandsShareSingleComputer(commands) {
