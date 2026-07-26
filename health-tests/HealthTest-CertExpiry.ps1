@@ -96,14 +96,15 @@ function Format-CertExpiryEnhancedKeyUsage {
 function Get-CertExpiryFindingTitle {
     param(
         [Parameter(Mandatory=$true)]$Certificate,
-        [Parameter(Mandatory=$true)][string]$Store
+        [Parameter(Mandatory=$true)][string]$Store,
+        [string]$Summary = 'Certificate validity issue'
     )
 
     $subject = ConvertTo-CertExpiryFindingValue -Value (Get-CertExpiryPropertyValue -InputObject $Certificate -Name 'Subject')
     $issuer = ConvertTo-CertExpiryFindingValue -Value (Get-CertExpiryPropertyValue -InputObject $Certificate -Name 'Issuer')
     $serialNumber = ConvertTo-CertExpiryFindingValue -Value (Get-CertExpiryPropertyValue -InputObject $Certificate -Name 'SerialNumber')
 
-    return "Certificate validity issue: Store='$Store'; Subject='$subject'; Issuer='$issuer'; SerialNumber='$serialNumber'"
+    return "$($Summary): Store='$Store'; Subject='$subject'; Issuer='$issuer'; SerialNumber='$serialNumber'"
 }
 
 function Get-CertExpiryReplacementCandidate {
@@ -296,7 +297,17 @@ The certificate store has no universal reverse lookup for service or application
             continue
         }
 
-        $title = Get-CertExpiryFindingTitle -Certificate $certificate -Store $store
+        $titleSummary = 'Certificate validity issue'
+        if ($status -like 'Expires in *') {
+            if ($level -eq 'FAILURE') {
+                $titleSummary = 'Certificate will expire very soon'
+            }
+            elseif ($level -eq 'WARNING') {
+                $titleSummary = 'Certificate will expire soon'
+            }
+        }
+
+        $title = Get-CertExpiryFindingTitle -Certificate $certificate -Store $store -Summary $titleSummary
         $notBefore = Format-CertExpiryDate -Value (Get-CertExpiryPropertyValue -InputObject $certificate -Name 'NotBefore')
         $formattedNotAfter = Format-CertExpiryDate -Value $notAfter
         $friendlyName = ConvertTo-CertExpiryFindingValue -Value (Get-CertExpiryPropertyValue -InputObject $certificate -Name 'FriendlyName')

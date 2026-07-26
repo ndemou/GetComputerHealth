@@ -42,8 +42,8 @@ Describe 'HealthTest-CertExpiry' {
 
         HealthTest-CertExpiry
 
-        @($script:warnings | Where-Object { $_ -match '(?s)^\[FAILURE\].*CN=Expired' }).Count | Should -Be 1
-        @($script:warnings | Where-Object { $_ -match '(?s)^\[WARNING\].*CN=Expiring' }).Count | Should -Be 1
+        @($script:warnings | Where-Object { $_ -match '(?s)^\[FAILURE\] Certificate validity issue:.*CN=Expired' }).Count | Should -Be 1
+        @($script:warnings | Where-Object { $_ -match '(?s)^\[WARNING\] Certificate will expire soon:.*CN=Expiring' }).Count | Should -Be 1
         @($script:warnings | Where-Object { $_ -match '^\[PASS\]' }).Count | Should -Be 0
     }
 
@@ -60,8 +60,8 @@ Describe 'HealthTest-CertExpiry' {
 
         $script:warnings | Should -HaveCount 1
         $lines = @($script:warnings[0] -split "`n")
-        $lines[0] | Should -Be "[FAILURE] Certificate validity issue: Store='LocalMachine\My'; Subject='CN=Server''s Certificate'; Issuer='CN=Issuer A'; SerialNumber='ABC123'"
-        $lines[0] | Should -Not -Match 'Expires|NotAfter|Thumbprint|202[0-9]'
+        $lines[0] | Should -Be "[FAILURE] Certificate will expire very soon: Store='LocalMachine\My'; Subject='CN=Server''s Certificate'; Issuer='CN=Issuer A'; SerialNumber='ABC123'"
+        $lines[0] | Should -Not -Match 'NotAfter|Thumbprint|202[0-9]|\d+ days'
         $script:warnings[0] | Should -Match '(?m)^Status: Expires in \d+ days\.$'
         $script:warnings[0] | Should -Match "(?m)^Validity: '\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}' through '\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}' \(local time\)\.$"
         $script:warnings[0] | Should -Match "(?m)^Friendly name: 'Web TLS'\.$"
