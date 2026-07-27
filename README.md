@@ -49,7 +49,7 @@ You can also disable automatic updates by setting `AutomaticUpdates = $false`.
 
 This toolkit has **no external dependencies**.
 
-Aside from installation, this code *should not change the state of the system in any way*. The code is intentionally simple and clean so it can be audited with a modern AI agent.
+The default built-in health-test suite is read-only. Built-in tests that make limited computer-state changes are kept in a separate folder and are not loaded or run unless the administrator explicitly supplies `-IReallyWantToRunTestsThatChangeState`. This keeps normal execution consistent with the advertised read-only policy while preserving valuable active diagnostics. Custom tests remain administrator-controlled code and can have their own side effects.
 
 GetComputerHealth is not a malware or intrusion-detection product. It can incidentally expose suspicious traces, but it prioritizes actionable, low-noise administrative findings over broad detection with frequent false positives. Use an EDR product and purpose-built security monitoring for threat detection. See the [health findings and noise design decision](./doc/design/health-findings-and-noise.md).
 
@@ -97,6 +97,20 @@ Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/ndemou/Get
 C:\IT\Get-ComputerHealth\bin\Invoke-GetComputerHealth.ps1
 ```
 
+## Optional Active Diagnostics
+
+GetComputerHealth includes a small, separately guarded class of active diagnostics. We consider these tests highly safe on conventional systems and dangerous only in unusual or tightly constrained environments, but they are not observationally read-only. Enable them explicitly:
+
+```powershell
+C:\IT\Get-ComputerHealth\bin\Invoke-GetComputerHealth.ps1 -IReallyWantToRunTestsThatChangeState
+```
+
+The gpupdate test actively refreshes Group Policy. A policy refresh is a routine Windows domain operation that happens automatically and is expected to apply configured settings, scripts, deployments, and Immediate Tasks safely. Running it during the health scan provides valuable end-to-end verification of the secure channel, domain-controller access, Group Policy client, and applicable policy processing. For conventional domain-joined systems, we encourage enabling it because that verification normally outweighs the small cost of one additional refresh.
+
+The DCDIAG test actively runs comprehensive Microsoft domain-controller diagnostics. Some checks can create and remove temporary diagnostic data or refresh registrations while verifying Active Directory. These bounded actions are designed for routine domain administration and provide strong corroboration across important services, so we also encourage running DCDIAG on conventional domain controllers. Leave the switch off for unusually fragile, isolated, forensically preserved, or strictly change-controlled systems.
+
+See the [state-changing health-test design decision](./doc/design/state-changing-health-tests.md) for the repository rules behind this separation.
+
 ## Automatic Daily Monitoring of One Computer
 
 1. Test email delivery:
@@ -118,6 +132,8 @@ C:\IT\Get-ComputerHealth\bin\Update-GetHealthCode.ps1 -ScheduleDailyInvokationAt
 
 2. Copy the code below into your editor and fill in the proper values on the three lines under `CONFIGURATION`:
 
+> **State-change warning:** This conventional domain-scan example deliberately enables `-IReallyWantToRunTestsThatChangeState`, so gpupdate and DCDIAG may perform their documented, normally safe administrative changes on target computers. Remove the switch for a strictly read-only scan or for an unusual environment where the timing of even routine diagnostic changes is unacceptable.
+
 ```powershell
 # Executes Invoke-GetComputerHealth.ps1 on all domain-joined servers and any configured workstations
 param([string]$Hide="DIPS",[string]$OnlyTheseTests,[switch]$SkipSlowTests,[switch]$SkipPolicyTests,[switch]$NoSendMessage,[switch]$NoUpdate)
@@ -132,7 +148,7 @@ if (-not $NoUpdate) {
 	# Update local version of GetComputerHealth (only when a new version is found)
 	& C:\IT\Get-ComputerHealth\bin\Update-GetHealthCode.ps1
 }
-& C:\IT\Get-ComputerHealth\bin\Invoke-GetComputerHealth.ps1 -Computers "ALL_DOMAIN_SERVERS,$WorkstationsToInclude" -ExcludeServers $WindowsServersToExclude -Hide:$Hide -OnlyTheseTests $OnlyTheseTests -SkipSlowTests:$SkipSlowTests -SkipPolicyTests:$SkipPolicyTests -NoSendMessage:$NoSendMessage -NoUpdate:$NoUpdate -PushUpdate -IpsOfAllDcs $IpsOfAllDcs
+& C:\IT\Get-ComputerHealth\bin\Invoke-GetComputerHealth.ps1 -Computers "ALL_DOMAIN_SERVERS,$WorkstationsToInclude" -ExcludeServers $WindowsServersToExclude -Hide:$Hide -OnlyTheseTests $OnlyTheseTests -SkipSlowTests:$SkipSlowTests -SkipPolicyTests:$SkipPolicyTests -NoSendMessage:$NoSendMessage -NoUpdate:$NoUpdate -PushUpdate -IpsOfAllDcs $IpsOfAllDcs -IReallyWantToRunTestsThatChangeState
 ```
 
 3. Save it as `C:\IT\bin\Invoke-GetHealthDomainComputers.ps1`.
@@ -194,7 +210,7 @@ $results | ogv
 > * `-OutputConsoleMessages` generates the colorful output in your console.
 > * `-OutputObjects` is what populates `$results`.
 > * `-Hide DIP` hides **D**ebug, **I**nfo, and **P**ass messages from the console, showing only **N**otices, **W**arnings, **F**ailures, and **S**uppressed messages.
-> * Available options let you skip slow tests (`-SkipSlowTests`), skip non-essential tests (`-SkipNonEssentialTests`), exclude specific tests (`-ExcludeTests`), or run specific tests (`-OnlyTheseTests`). Autocomplete using `-` + `TAB` is your friend. `-ListAllBuiltInTests` will give you a list of all tests.
+> * Available options let you skip slow tests (`-SkipSlowTests`), skip non-essential tests (`-SkipNonEssentialTests`), exclude specific tests (`-ExcludeTests`), run specific tests (`-OnlyTheseTests`), or explicitly enable the guarded active diagnostics (`-IReallyWantToRunTestsThatChangeState`). Autocomplete using `-` + `TAB` is your friend. `-ListAllBuiltInTests` will give you a list of all tests, including guarded tests that are not loaded by default.
 
 ---
 
@@ -207,7 +223,7 @@ Think of the scripts as three layers:
  0. (**Only for multiple domain joined targets**) `Invoke-GetHealthDomainComputers.ps1` is a very light wrapper around `Invoke-GetComputerHealth.ps1`.
  1. `Invoke-GetComputerHealth.ps1` orchestrates update, target selection, remoting, collection, artifacts, and email.
  2. `Get-ComputerHealth.ps1` runs the actual health tests for one target context.
- 3. `Health-test\*` scripts produce individual health messages.
+ 3. `health-tests\*.ps1` scripts produce individual read-only health messages. The separately guarded `health-tests\HealthTests-that-do-change-state\*.ps1` scripts are loaded only with the explicit opt-in switch.
 
 ## Relationship Diagram
 
@@ -230,6 +246,7 @@ flowchart BT
         LocalRunner["Get-ComputerHealth.ps1"]
         Updater["Update-GetHealthCode.ps1"]
         Tests["health-tests/*.ps1"]
+        StateChangingTests["health-tests/HealthTests-that-do-change-state/*.ps1"]
         Config["Suppression File"]
  end
     Entry --> Orchestrator
@@ -240,6 +257,7 @@ flowchart BT
     Report -- "Keep *.clixml data" --> Files
     Updater -- "2. Updates Scripts" --> LocalRunner
     LocalRunner -- "3. Executes" --> Tests
+    LocalRunner -- "Only with explicit state-change switch" --> StateChangingTests
     Config --> LocalRunner
 
      Report:::Rose
@@ -311,7 +329,7 @@ If you only want to add a few custom tests, you do not need to modify the core c
 | BitLockerStatus                  | Checks whether detected volumes are protected by BitLocker |
 | CertExpiry                       | Checks LocalMachine\My certificates for expiration and reports identity, validity, usage context, and remediation guidance |
 | ConnectivityToDCs                | Checks DNS resolution and TCP connectivity to discovered domain controllers |
-| Dcdiag                           | Runs DCDIAG and reports failing basic and extended Active Directory diagnostics |
+| Dcdiag                           | Actively runs comprehensive DCDIAG diagnostics, which may make limited diagnostic changes, and reports failures |
 | DcDnsARecords                    | Checks whether domain controller hostnames resolve to expected A records |
 | DcDnsRegistration                | Checks whether this domain controller has registered its expected DNS records |
 | DefaultLocale                    | Checks whether the system locale matches the expected legacy language baseline |
@@ -340,7 +358,7 @@ If you only want to add a few custom tests, you do not need to modify the core c
 | FirewallEnabled                  | Checks whether Windows Firewall profiles are enabled and the firewall service is available |
 | GcPlacement                      | Checks whether each AD site has a Global Catalog and the domain has at least one GC |
 | GpoVersionConsistency            | Checks whether each GPO has matching AD and SYSVOL version numbers |
-| GpupdatePolicyApply              | Checks whether the machine secure channel is healthy enough for Group Policy processing |
+| GpupdatePolicyApply              | Actively applies Group Policy with gpupdate and reports whether computer and user policy processing succeeds |
 | GpWmiFilterNamespacesOnLocalHost | Checks whether Group Policy WMI filter namespaces are accessible on the local host |
 | HotfixBaseline                   | Checks whether all required hotfixes from the baseline are installed |
 | HyperVReplicationHealth          | Checks Hyper-V VM replication health, missing replication, and running replica VMs |

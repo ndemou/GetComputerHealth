@@ -18,7 +18,8 @@ The codebase is Windows-specific in important places. Do not assume Linux compat
 - [`Invoke-GetComputerHealth.ps1`](./Invoke-GetComputerHealth.ps1): orchestration entry point
 - [`Update-GetHealthCode.ps1`](./Update-GetHealthCode.ps1): updater/installer
 - [`doc`](./doc): focused user, contributor, and design guides; start with [`doc/README.md`](./doc/README.md)
-- [`health-tests`](./health-tests): built-in `HealthTest-*` functions and the helper code needed to run them
+- [`health-tests`](./health-tests): read-only built-in `HealthTest-*` functions and the helper code needed to run them
+- [`health-tests/HealthTests-that-do-change-state`](./health-tests/HealthTests-that-do-change-state): explicitly guarded built-in tests that are considered highly safe but can make limited computer-state changes
 - [`tests`](./tests): script-based test harness and standalone tests
 - [`.github/workflows/tests.yml`](./.github/workflows/tests.yml): CI workflow
 
@@ -105,9 +106,9 @@ If you want to contribute a built-in check that ships in `health-tests\*.ps1` an
 
 ### Placement
 
-All code needed to run built-in health tests, and only that code, belongs under [`health-tests`](./health-tests). If a helper is shared by `Get-ComputerHealth.ps1` and health tests, keep it under `health-tests` and dot-source it from the caller that needs it.
+All code needed to run built-in health tests, and only that code, belongs under [`health-tests`](./health-tests). Ordinary built-in tests must be read-only and live directly under that folder. An approved test that can change computer state must live under [`health-tests/HealthTests-that-do-change-state`](./health-tests/HealthTests-that-do-change-state) and must remain guarded by `-IReallyWantToRunTestsThatChangeState`. If a helper is shared by `Get-ComputerHealth.ps1` and health tests, keep it under `health-tests` and dot-source it from the caller that needs it.
 
-Every `HealthTest-*` function must live in its own `.ps1` file under `health-tests`, and the file name must match the function name, for example `health-tests\HealthTest-ScheduledTasks.ps1`.
+Every `HealthTest-*` function must live in its own `.ps1` file in the appropriate built-in test folder, and the file name must match the function name, for example `health-tests\HealthTest-ScheduledTasks.ps1`.
 
 Each same-name health-test file must be directly executable. A user who wants to run one specific built-in health test must be able to run only that `.ps1` file. To make this work, dot-source every dependency from the health-test file itself.
 

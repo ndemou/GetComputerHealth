@@ -1,7 +1,8 @@
 # HostRequirement: DC
 
 if (-not (Get-Command -Name 'Compress-HealthDiagnosticOutputLines' -CommandType Function -ErrorAction SilentlyContinue)) {
-  . (Join-Path -Path $PSScriptRoot -ChildPath 'helpers-for-healthtests.ps1')
+  $healthTestsPath = Split-Path -Parent $PSScriptRoot
+  . (Join-Path -Path $healthTestsPath -ChildPath 'helpers-for-healthtests.ps1')
 }
 
 
@@ -102,12 +103,14 @@ function Get-DcDiagFailures {
 
 function HealthTest-Dcdiag {
 <#
-Description: Runs DCDIAG and reports failing basic and extended Active Directory diagnostics.
+Description: Actively runs comprehensive DCDIAG diagnostics, which may make limited diagnostic changes, and reports failures.
 AppliesTo: DC
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: High(Time)
 Uses: dcdiag.exe.
+
+This state-changing test runs DCDIAG /c /v. Some DCDIAG checks can create and remove temporary diagnostic data or refresh registrations while verifying Active Directory. It is loaded only when -IReallyWantToRunTestsThatChangeState is used.
 #>
 
     write-progress "Runing DCDIAG /c /v"

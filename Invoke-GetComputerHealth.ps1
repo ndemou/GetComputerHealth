@@ -7,6 +7,7 @@ Wraps `.\bin\Get-ComputerHealth.ps1` to support multiple targets (including an A
 
 Per target:
 - Runs `.\bin\Update-GetHealthCode.ps1` then executes `.\bin\Get-ComputerHealth.ps1` with `-OutputObjects -OutputConsoleMessages`, plus the provided filters and optional custom tests folder (`.\config\Custom-HealthTests\`).
+- Passes `-IReallyWantToRunTestsThatChangeState` through only when the caller explicitly supplies it.
 - For remote targets, checks basic TCP reachability and if reachable, uses `New-PSSession` to run the tests.
 
 After collection:
@@ -51,6 +52,9 @@ Passed through to Get-ComputerHealth as `-OnlyTheseTests` (limits which tests ru
 .PARAMETER ExcludeTests
 Passed through to Get-ComputerHealth as `-ExcludeTests` (skips selected tests).
 
+.PARAMETER IReallyWantToRunTestsThatChangeState
+Explicitly enables the separately guarded built-in tests that may make limited computer-state changes, including the active gpupdate and comprehensive DCDIAG tests. They are not loaded or run by default.
+
 .PARAMETER NoUpdate
 Skips execution of `.\bin\Update-GetHealthCode.ps1` before running `Get-ComputerHealth.ps1` on each target.
 
@@ -83,6 +87,10 @@ Forces email sending regardless of whether the script is running in an interacti
 .\Invoke-GetComputerHealth.ps1 -Computers ALL_DOMAIN_SERVERS -ExcludeServers SRV1 -Hide DIP
 
 .EXAMPLE
+# Run the conventional domain scan and explicitly include the guarded state-changing diagnostics:
+.\Invoke-GetComputerHealth.ps1 -Computers ALL_DOMAIN_SERVERS -IReallyWantToRunTestsThatChangeState
+
+.EXAMPLE
 # Run a small set of tests across domain servers plus a couple of extra targets:
 .\Invoke-GetComputerHealth.ps1 -Computers ALL_DOMAIN_SERVERS,APP01,FS01 -OnlyTheseTests HealthTest-ShareReasonableness,HealthTest-ListShares
 
@@ -101,6 +109,7 @@ param(
   [string[]]$OnlyTheseTests = @(),
   [string[]]$ExcludeTests = @(),
   [string[]]$ExcludeServers = @(),
+  [switch]$IReallyWantToRunTestsThatChangeState,
   [Alias('DebugSkipSlowTests')]
   [switch]$SkipSlowTests,
   [switch]$SkipPolicyTests,
@@ -602,6 +611,7 @@ function Get-ChildHealthInvocationParameters {
     [string[]]$OnlyTheseTests = @(),
     [string[]]$ExcludeTests = @(),
     [string[]]$WhitelistSigs = @(),
+    [switch]$IReallyWantToRunTestsThatChangeState,
     [switch]$SkipSlowTests,
     [switch]$SkipPolicyTests,
     [switch]$SkipNonEssentialTests,
@@ -622,6 +632,10 @@ function Get-ChildHealthInvocationParameters {
     SkipNonEssentialTests = [bool]$SkipNonEssentialTests
     RunWithoutElevation   = [bool]$RunWithoutElevation
     IpsOfAllDcs           = @($IpsOfAllDcs)
+  }
+
+  if ($IReallyWantToRunTestsThatChangeState) {
+    $childParams['IReallyWantToRunTestsThatChangeState'] = $true
   }
 
   if (-not [string]::IsNullOrWhiteSpace($IncludeTestsFromFolder)) {
@@ -975,7 +989,7 @@ foreach ($target in $targets) {
 
   if ($target -eq $env:COMPUTERNAME) {
     $skipTargetUpdate = $NoUpdate -or $localUpdateAlreadyRan
-    $localChildHealthParams = Get-ChildHealthInvocationParameters -Hide $Hide -OnlyTheseTests $OnlyTheseTests -ExcludeTests $ExcludeTests -WhitelistSigs $WhitelistSigs -SkipSlowTests:$SkipSlowTests -SkipPolicyTests:$SkipPolicyTests -SkipNonEssentialTests:$SkipNonEssentialTests -RunWithoutElevation:$RunWithoutElevation -IpsOfAllDcs $IpsOfAllDcs
+    $localChildHealthParams = Get-ChildHealthInvocationParameters -Hide $Hide -OnlyTheseTests $OnlyTheseTests -ExcludeTests $ExcludeTests -WhitelistSigs $WhitelistSigs -IReallyWantToRunTestsThatChangeState:$IReallyWantToRunTestsThatChangeState -SkipSlowTests:$SkipSlowTests -SkipPolicyTests:$SkipPolicyTests -SkipNonEssentialTests:$SkipNonEssentialTests -RunWithoutElevation:$RunWithoutElevation -IpsOfAllDcs $IpsOfAllDcs
     $localExecutionPayload = @{
       RootDir = $ROOT_DIR
       WrapperState = @{
@@ -1077,7 +1091,7 @@ foreach ($target in $targets) {
         }
 
         Write-Progress -Activity "Checking $target" -Status "Phase #2 (running remote update and health checks)"
-        $remoteChildHealthParams = Get-ChildHealthInvocationParameters -Hide $Hide -OnlyTheseTests $OnlyTheseTests -ExcludeTests $ExcludeTests -WhitelistSigs $WhitelistSigs -SkipSlowTests:$SkipSlowTests -SkipPolicyTests:$SkipPolicyTests -SkipNonEssentialTests:$SkipNonEssentialTests -RunWithoutElevation:$RunWithoutElevation -IpsOfAllDcs $IpsOfAllDcs
+        $remoteChildHealthParams = Get-ChildHealthInvocationParameters -Hide $Hide -OnlyTheseTests $OnlyTheseTests -ExcludeTests $ExcludeTests -WhitelistSigs $WhitelistSigs -IReallyWantToRunTestsThatChangeState:$IReallyWantToRunTestsThatChangeState -SkipSlowTests:$SkipSlowTests -SkipPolicyTests:$SkipPolicyTests -SkipNonEssentialTests:$SkipNonEssentialTests -RunWithoutElevation:$RunWithoutElevation -IpsOfAllDcs $IpsOfAllDcs
         $remoteExecutionPayload = @{
           RootDir = $remoteExecutionRoot
           WrapperState = @{

@@ -1,53 +1,59 @@
 Describe 'HealthTest help blocks' {
-  It 'keeps every HealthTest function in its same-name file with a direct-run guard' {
+  BeforeAll {
     $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-    $healthTestsPath = Join-Path $repoRoot 'health-tests'
+    $script:HealthTestDirectories = @(
+      (Join-Path $repoRoot 'health-tests')
+      (Join-Path $repoRoot 'health-tests\HealthTests-that-do-change-state')
+    )
+  }
+
+  It 'keeps every HealthTest function in its same-name file with a direct-run guard' {
     $violations = @()
 
-    Get-ChildItem -Path $healthTestsPath -Filter *.ps1 -File | ForEach-Object {
-      $content = Get-Content -Path $_.FullName -Raw
-      $matches = @([regex]::Matches($content, '(?m)^[ \t]*function[ \t]+(?<Name>HealthTest-[\w-]+)[ \t]*\{'))
+    foreach ($healthTestsPath in $script:HealthTestDirectories) {
+      Get-ChildItem -Path $healthTestsPath -Filter *.ps1 -File | ForEach-Object {
+        $content = Get-Content -Path $_.FullName -Raw
+        $matches = @([regex]::Matches($content, '(?m)^[ \t]*function[ \t]+(?<Name>HealthTest-[\w-]+)[ \t]*\{'))
 
-      if ($_.BaseName -like 'HealthTest-*') {
-        if ($matches.Count -ne 1) {
-          $violations += "$($_.FullName) must contain exactly one HealthTest function. Found $($matches.Count)."
-          return
-        }
+        if ($_.BaseName -like 'HealthTest-*') {
+          if ($matches.Count -ne 1) {
+            $violations += "$($_.FullName) must contain exactly one HealthTest function. Found $($matches.Count)."
+            return
+          }
 
-        $functionName = $matches[0].Groups['Name'].Value
-        if ($functionName -ne $_.BaseName) {
-          $violations += "$($_.FullName) contains $functionName but the file name requires $($_.BaseName)."
-        }
+          $functionName = $matches[0].Groups['Name'].Value
+          if ($functionName -ne $_.BaseName) {
+            $violations += "$($_.FullName) contains $functionName but the file name requires $($_.BaseName)."
+          }
 
-        $hasDirectRunCheck = $content -match [regex]::Escape('$MyInvocation.InvocationName')
-        $hasDirectFunctionCall = $false
-        foreach ($line in ($content -split '\r?\n')) {
-          if ($line.Trim() -eq $functionName) {
-            $hasDirectFunctionCall = $true
-            break
+          $hasDirectRunCheck = $content -match [regex]::Escape('$MyInvocation.InvocationName')
+          $hasDirectFunctionCall = $false
+          foreach ($line in ($content -split '\r?\n')) {
+            if ($line.Trim() -eq $functionName) {
+              $hasDirectFunctionCall = $true
+              break
+            }
+          }
+
+          if (-not $hasDirectRunCheck -or -not $hasDirectFunctionCall) {
+            $violations += "$($_.FullName) must execute $functionName when run directly."
           }
         }
-
-        if (-not $hasDirectRunCheck -or -not $hasDirectFunctionCall) {
-          $violations += "$($_.FullName) must execute $functionName when run directly."
+        elseif ($matches.Count -gt 0) {
+          $violations += "$($_.FullName) is a helper file and must not contain HealthTest functions."
         }
-      }
-      elseif ($matches.Count -gt 0) {
-        $violations += "$($_.FullName) is a helper file and must not contain HealthTest functions."
-      }
 
-      if ($_.BaseName -notlike 'HealthTest-*' -and
-          $_.Name -ne 'helpers-for-healthtests.ps1' -and
-          $_.Name -notlike 'helper-regarding-*.ps1') {
-        $violations += "$($_.FullName) must be helpers-for-healthtests.ps1 or follow helper-regarding-<DOMAIN DESCRIPTION>.ps1."
+        if ($_.BaseName -notlike 'HealthTest-*' -and
+            $_.Name -ne 'helpers-for-healthtests.ps1' -and
+            $_.Name -notlike 'helper-regarding-*.ps1') {
+          $violations += "$($_.FullName) must be helpers-for-healthtests.ps1 or follow helper-regarding-<DOMAIN DESCRIPTION>.ps1."
+        }
       }
     }
 
     @($violations) | Should -BeNullOrEmpty
   }
   It 'all HealthTest-* functions have the required help block format' {
-    $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-    $healthTestsPath = Join-Path $repoRoot 'health-tests'
     $requiredFields = @('Description', 'AppliesTo', 'Scope', 'Category', 'Impact', 'Uses')
     $allowedAppliesTo = @('All', 'VM', 'Mobile', 'DomainJoined', 'Server', 'Workstation', 'DC', 'PDC', 'HyperV', 'Hyper-V')
     $allowedScopes = @('Computer', 'Domain', 'Forest')
@@ -61,59 +67,61 @@ Describe 'HealthTest help blocks' {
     $functionPattern = '(?ms)^[ \t]*function[ \t]+(?<Name>HealthTest-[\w-]+)[ \t]*\{'
     $helpBlocks = @()
 
-    Get-ChildItem -Path $healthTestsPath -Filter *.ps1 -File | ForEach-Object {
-      $content = Get-Content -Path $_.FullName -Raw
+    foreach ($healthTestsPath in $script:HealthTestDirectories) {
+      Get-ChildItem -Path $healthTestsPath -Filter *.ps1 -File | ForEach-Object {
+        $content = Get-Content -Path $_.FullName -Raw
 
-      foreach ($functionMatch in [regex]::Matches($content, $functionPattern, [System.Text.RegularExpressions.RegexOptions]::IgnoreCase -bor [System.Text.RegularExpressions.RegexOptions]::Multiline -bor [System.Text.RegularExpressions.RegexOptions]::Singleline)) {
-        $remainder = $content.Substring($functionMatch.Index + $functionMatch.Length)
-        $blockMatch = [regex]::Match(
-          $remainder,
-          '^\s*<#[\r\n]+(?<Block>.*?)[\r\n]\s*#>',
-          [System.Text.RegularExpressions.RegexOptions]::Singleline
-        )
-
-        $blockText = if ($blockMatch.Success) { $blockMatch.Groups['Block'].Value } else { $null }
-        $lines = if ($blockText) {
-          @(
-            $blockText -split '\r?\n' |
-            ForEach-Object { $_.Trim() } |
-            Where-Object { $_ -ne '' }
+        foreach ($functionMatch in [regex]::Matches($content, $functionPattern, [System.Text.RegularExpressions.RegexOptions]::IgnoreCase -bor [System.Text.RegularExpressions.RegexOptions]::Multiline -bor [System.Text.RegularExpressions.RegexOptions]::Singleline)) {
+          $remainder = $content.Substring($functionMatch.Index + $functionMatch.Length)
+          $blockMatch = [regex]::Match(
+            $remainder,
+            '^\s*<#[\r\n]+(?<Block>.*?)[\r\n]\s*#>',
+            [System.Text.RegularExpressions.RegexOptions]::Singleline
           )
-        } else {
-          @()
-        }
 
-        $actualFields = @()
-        foreach ($line in $lines) {
-          if ($line -match '^(?<Field>[A-Za-z]+):\s+') {
-            $actualFields += $matches['Field']
+          $blockText = if ($blockMatch.Success) { $blockMatch.Groups['Block'].Value } else { $null }
+          $lines = if ($blockText) {
+            @(
+              $blockText -split '\r?\n' |
+              ForEach-Object { $_.Trim() } |
+              Where-Object { $_ -ne '' }
+            )
+          } else {
+            @()
           }
-        }
 
-        $helpBlocks += [pscustomobject]@{
-          FilePath                = $_.FullName
-          FunctionName            = $functionMatch.Groups['Name'].Value
-          BlockText               = $blockText
-          HasHelpBlock            = $blockMatch.Success
-          ActualFields            = $actualFields
-          HasLegacySyntax         = $blockText -match '(?im)^\s*\.(SYNOPSIS|DESCRIPTION)\b'
-          FirstLineIsDescription  = (@($lines).Count -gt 0) -and $lines[0] -match '^Description:\s+\S+'
-          HasAllFields            = @($requiredFields | Where-Object { $_ -in $actualFields }).Count -eq $requiredFields.Count
-          HasExpectedOrder        = $false
+          $actualFields = @()
+          foreach ($line in $lines) {
+            if ($line -match '^(?<Field>[A-Za-z]+):\s+') {
+              $actualFields += $matches['Field']
+            }
+          }
+
+          $helpBlocks += [pscustomobject]@{
+            FilePath                = $_.FullName
+            FunctionName            = $functionMatch.Groups['Name'].Value
+            BlockText               = $blockText
+            HasHelpBlock            = $blockMatch.Success
+            ActualFields            = $actualFields
+            HasLegacySyntax         = $blockText -match '(?im)^\s*\.(SYNOPSIS|DESCRIPTION)\b'
+            FirstLineIsDescription  = (@($lines).Count -gt 0) -and $lines[0] -match '^Description:\s+\S+'
+            HasAllFields            = @($requiredFields | Where-Object { $_ -in $actualFields }).Count -eq $requiredFields.Count
+            HasExpectedOrder        = $false
+          }
+          $fields = @($helpBlocks[-1].ActualFields)
+          $idx = @{}
+          for ($i = 0; $i -lt $fields.Count; $i++) {
+            if (-not $idx.ContainsKey($fields[$i])) { $idx[$fields[$i]] = $i }
+          }
+          $hasPrefixOrder = ($fields.Count -ge 5) -and ((@($fields)[0..4] -join '|') -eq 'Description|AppliesTo|Scope|Category|Impact')
+          $usesAfterImpact = $idx.ContainsKey('Uses') -and $idx.ContainsKey('Impact') -and ($idx['Uses'] -gt $idx['Impact'])
+          $tagsPositionOk = (-not $idx.ContainsKey('Tags')) -or (
+            $idx.ContainsKey('Impact') -and $idx.ContainsKey('Uses') -and
+            ($idx['Tags'] -gt $idx['Impact']) -and
+            ($idx['Tags'] -lt $idx['Uses'])
+          )
+          $helpBlocks[-1].HasExpectedOrder = $hasPrefixOrder -and $usesAfterImpact -and $tagsPositionOk
         }
-        $fields = @($helpBlocks[-1].ActualFields)
-        $idx = @{}
-        for ($i = 0; $i -lt $fields.Count; $i++) {
-          if (-not $idx.ContainsKey($fields[$i])) { $idx[$fields[$i]] = $i }
-        }
-        $hasPrefixOrder = ($fields.Count -ge 5) -and ((@($fields)[0..4] -join '|') -eq 'Description|AppliesTo|Scope|Category|Impact')
-        $usesAfterImpact = $idx.ContainsKey('Uses') -and $idx.ContainsKey('Impact') -and ($idx['Uses'] -gt $idx['Impact'])
-        $tagsPositionOk = (-not $idx.ContainsKey('Tags')) -or (
-          $idx.ContainsKey('Impact') -and $idx.ContainsKey('Uses') -and
-          ($idx['Tags'] -gt $idx['Impact']) -and
-          ($idx['Tags'] -lt $idx['Uses'])
-        )
-        $helpBlocks[-1].HasExpectedOrder = $hasPrefixOrder -and $usesAfterImpact -and $tagsPositionOk
       }
     }
 

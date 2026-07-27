@@ -3,6 +3,28 @@ Describe 'Invoke-GetComputerHealth update rerun handling' {
     $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
     $script:ScriptPath = Join-Path $repoRoot 'Invoke-GetComputerHealth.ps1'
     $script:ScriptText = Get-Content -LiteralPath $script:ScriptPath -Raw
+
+    $parseErrors = $null
+    $tokens = $null
+    $ast = [System.Management.Automation.Language.Parser]::ParseFile(
+      $script:ScriptPath,
+      [ref]$tokens,
+      [ref]$parseErrors
+    )
+    if ($parseErrors.Count -gt 0) {
+      throw ($parseErrors | Out-String)
+    }
+
+    $childParameterFunction = $ast.Find({
+        param($node)
+        $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+        $node.Name -eq 'Get-ChildHealthInvocationParameters'
+      }, $true)
+    if (-not $childParameterFunction) {
+      throw 'Get-ChildHealthInvocationParameters was not found.'
+    }
+
+    . ([scriptblock]::Create($childParameterFunction.Extent.Text))
   }
 
   It 'no longer accepts trailing free-form pass-through arguments' {
@@ -29,6 +51,8 @@ Describe 'Invoke-GetComputerHealth update rerun handling' {
     $script:ScriptText | Should -Match 'ExcludeTests\s*=\s*@\(\$ExcludeTests\)'
     $script:ScriptText | Should -Match 'SuppressSigs\s*=\s*@\(\$WhitelistSigs\)'
     $script:ScriptText | Should -Match 'RunWithoutElevation\s*=\s*\[bool\]\$RunWithoutElevation'
+    $script:ScriptText | Should -Match 'if \(\$IReallyWantToRunTestsThatChangeState\) \{\s*\$childParams\[''IReallyWantToRunTestsThatChangeState''\] = \$true'
+    @([regex]::Matches($script:ScriptText, 'Get-ChildHealthInvocationParameters[^\r\n]+-IReallyWantToRunTestsThatChangeState:\$IReallyWantToRunTestsThatChangeState')).Count | Should -Be 2
     $script:ScriptText | Should -Not -Match '@getHealthParams @PassThruArgs'
   }
 
@@ -36,6 +60,18 @@ Describe 'Invoke-GetComputerHealth update rerun handling' {
     $script:ScriptText | Should -Match '\[string\[\]\]\$WhitelistSigs\s*=\s*@\(\)'
     $script:ScriptText | Should -Match '\[string\[\]\]\$OnlyTheseTests\s*=\s*@\(\)'
     $script:ScriptText | Should -Match '\[string\[\]\]\$ExcludeTests\s*=\s*@\(\)'
+  }
+
+  It 'omits the guarded switch from child parameters by default' {
+    $childParameters = Get-ChildHealthInvocationParameters
+
+    $childParameters.ContainsKey('IReallyWantToRunTestsThatChangeState') | Should -BeFalse
+  }
+
+  It 'adds the guarded switch to child parameters only after explicit opt-in' {
+    $childParameters = Get-ChildHealthInvocationParameters -IReallyWantToRunTestsThatChangeState
+
+    $childParameters['IReallyWantToRunTestsThatChangeState'] | Should -BeTrue
   }
 
   It 'invokes the local health-check block with a single payload object' {

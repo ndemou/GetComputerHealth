@@ -30,6 +30,7 @@ This page is the routing table for the repository documentation. It is meant for
 | [`contributor/built-in-health-tests.md`](./contributor/built-in-health-tests.md) | Detailed conventions for built-in `HealthTest-*` functions and their help blocks. |
 | [`contributor/test-suite.md`](./contributor/test-suite.md) | Detailed explanation of test runners and validation choices. |
 | [`design/health-findings-and-noise.md`](./design/health-findings-and-noise.md) | Design decision defining the tool's administrative scope and preference for actionable, low-noise findings over broad threat detection. |
+| [`design/state-changing-health-tests.md`](./design/state-changing-health-tests.md) | Design decision for highly safe state-changing tests, their separate folder, and explicit execution guard. |
 | [`design/installation-migrations.md`](./design/installation-migrations.md) | On-disk format migration design and implementation rules. |
 | [`design/invoke-getcomputerhealth-flow.md`](./design/invoke-getcomputerhealth-flow.md) | Execution flow for `Invoke-GetComputerHealth.ps1`. |
 | [`../tests/testing-improvement-plan.md`](../tests/testing-improvement-plan.md) | Historical test-suite improvement plan. |

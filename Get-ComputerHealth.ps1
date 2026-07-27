@@ -8,6 +8,7 @@ Executes many health-test functions (named `HealthTest-*`) and emits their resul
 Supports:
 - Listing available built-in tests (`-ListAllBuiltInTests`).
 - Running only selected tests (`-OnlyTheseTests`) and/or skipping specific tests (`-ExcludeTests`).
+- Running the separately guarded state-changing built-in tests only when `-IReallyWantToRunTestsThatChangeState` is supplied.
 - Running custom tests by executing `.ps1` files directly. `-IncludeTestsFromFolder` remains as a deprecated compatibility parameter that selects which custom scripts to run.
 - Suppressing expected notices/warnings/failures by 8-hex "signature" hashes, either temporarily for the current run (`-WhitelistSigs`) or by appending a permanent suppression entry (`-AddWhitelisting`) to a suppression file.
 - Requiring specific findings from selected tests. If a required signature is not emitted when that test runs, a failure is emitted. Required findings are stored in `.\config\required_findings.psd1` and can be updated with `-SetAsRequired`.
@@ -19,7 +20,9 @@ When `-OutputObjects` is used, each emitted log object includes these fields:
 
 Notable side effects:
 - When custom tests are selected, the `.ps1` files are executed directly.
-- The health tests themselves may perform read/write operations depending on their implementation (this script invokes them; it does not enforce read-only behavior).
+- The default built-in test set is read-only.
+- Built-in tests that may change computer state are kept under `health-tests\HealthTests-that-do-change-state` and are not loaded or run unless `-IReallyWantToRunTestsThatChangeState` is supplied.
+- Custom tests may perform read/write operations depending on their implementation.
 
 Idempotency:
 - `-AddWhitelisting` is append-only (not strictly idempotent): repeated runs add additional lines; last matching line "wins" when loading suppressions.
@@ -27,7 +30,7 @@ Idempotency:
 
 Dependencies & execution context:
 - Requires elevation.
-- Relies on companion scripts: `lib-write-log-objects.ps1` and the modules/helpers under `health-tests\*.ps1` dot-sourced below.
+- Relies on companion scripts: `lib-write-log-objects.ps1` and the modules/helpers under `health-tests`.
 - Uses a suppression config file at `.\config\Get-ComputerHealth.sigs-to-suppress.txt`.
 - Uses a required-findings config file at `.\config\required_findings.psd1`.
 
@@ -59,6 +62,9 @@ Default: empty (show all). Typical value: `DIP`
 
 .PARAMETER ExcludeTests
 (Parameter set: Run) One or more function names to skip (treated as a list; values may be space/comma separated).
+
+.PARAMETER IReallyWantToRunTestsThatChangeState
+(Parameter set: Run) Loads and runs the separately guarded built-in tests that may make limited computer-state changes. Without this explicit switch, those tests are not loaded and cannot be selected by name.
 
 .PARAMETER IncludeTestsFromFolder
 (Parameter set: Run) Deprecated compatibility parameter. Path to a folder containing custom `.ps1` scripts (or a single `.ps1` path). Matching files are executed directly.
@@ -103,7 +109,7 @@ Default: empty (show all). Typical value: `DIP`
 (Parameter set: AddWhitelist) Optional expiry date for the suppression entry in `yyyy-MM-dd` format. After this date passes, the entry is treated as expired when loading.
 
 .PARAMETER ListAllBuiltInTests
-(Parameter set: List; Mandatory) Lists all currently loaded `HealthTest-*` functions with their synopsis text and exits.
+(Parameter set: List; Mandatory) Lists all built-in `HealthTest-*` functions, including the separately guarded state-changing tests, with their description text and exits.
 
 .EXAMPLE
 # Run all applicable built-in tests; show console output but hide Debug/Info/Pass; also return objects:
@@ -117,6 +123,10 @@ $out | Out-GridView
 .EXAMPLE
 # Run only a small subset of tests by name:
 .\Get-ComputerHealth.ps1 -OutputConsoleMessages -OnlyTheseTests HealthTest-PendingReboot,HealthTest-DisksHaveFreeSpace
+
+.EXAMPLE
+# Also load and run the highly safe state-changing tests such as gpupdate and DCDIAG:
+.\Get-ComputerHealth.ps1 -OutputConsoleMessages -IReallyWantToRunTestsThatChangeState
 
 .EXAMPLE
 # Temporarily suppress specific signatures just for this run:
@@ -136,6 +146,7 @@ $out | Out-GridView
 - Permanent suppression file: `.\config\Get-ComputerHealth.sigs-to-suppress.txt`.
 - Required findings file: `.\config\required_findings.psd1`.
 - Custom tests: scripts may execute arbitrary code when run.
+- State-changing built-ins: guarded by `-IReallyWantToRunTestsThatChangeState` and stored separately under `health-tests\HealthTests-that-do-change-state`.
 #>
 
 [CmdletBinding(DefaultParameterSetName = 'Run')]
@@ -170,6 +181,9 @@ param(
 
   [Parameter(ParameterSetName = 'Run')]
   [string[]]$ExcludeTests = @(),
+
+  [Parameter(ParameterSetName = 'Run')]
+  [switch]$IReallyWantToRunTestsThatChangeState,
 
   [Parameter(ParameterSetName = 'Run')]
   [string]$IncludeTestsFromFolder,
@@ -1115,6 +1129,24 @@ function Test-BuiltInHealthTestHostRequirement {
   }
 }
 
+function Get-BuiltInHealthTestDirectories {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)][string]$ScriptRoot,
+    [switch]$IncludeStateChangingTests
+  )
+
+  $directories = @(
+    Join-Path -Path $ScriptRoot -ChildPath 'health-tests'
+  )
+
+  if ($IncludeStateChangingTests) {
+    $directories += Join-Path -Path $ScriptRoot -ChildPath 'health-tests\HealthTests-that-do-change-state'
+  }
+
+  return $directories
+}
+
 function Get-BuiltInHealthTestScriptsToImport {
   [CmdletBinding()]
   param(
@@ -1499,12 +1531,17 @@ if ($PrettifyWriteWarning) {
 }
 
 if ($ListAllBuiltInTests) {
-  $importAllBuiltInHealthTestsParams = @{
-    HealthTestsPath = Join-Path -Path $PSScriptRoot -ChildPath 'health-tests'
-    IncludeAll      = $true
+  $allBuiltInHealthTestDirectories = @(
+    Get-BuiltInHealthTestDirectories -ScriptRoot $PSScriptRoot -IncludeStateChangingTests
+  )
+  foreach ($healthTestDirectory in $allBuiltInHealthTestDirectories) {
+    $importAllBuiltInHealthTestsParams = @{
+      HealthTestsPath = $healthTestDirectory
+      IncludeAll      = $true
+    }
+    Get-BuiltInHealthTestScriptsToImport @importAllBuiltInHealthTestsParams |
+      ForEach-Object { . $_.FullName }
   }
-  Get-BuiltInHealthTestScriptsToImport @importAllBuiltInHealthTestsParams |
-    ForEach-Object { . $_.FullName }
 
   $allHealthTests = Get-Command -CommandType Function -Name 'HealthTest-*' -ErrorAction SilentlyContinue |
     Sort-Object -Property Name
@@ -1646,20 +1683,25 @@ if ((-not $AddWhitelisting) -and (-not $SetAsRequired)) {
     #| Dot source health tests
     #|
 
-    $importBuiltInHealthTestsParams = @{
-      HealthTestsPath                = Join-Path -Path $PSScriptRoot -ChildPath 'health-tests'
-      HostIsVirtualMachine           = $isHostVM
-      HostIsMobile                   = $isHostMobile
-      HostIsInDomain                 = $IsHostInDomain
-      HostIsServer                   = $isHostServer
-      HostIsDomainController         = $isHostDC
-      HostIsPrimaryDomainController  = $isHostPDC
-      HostIsDnsServer                = $isHostDnsServer
-      HostIsDhcpServer               = $isHostDhcpServer
-      HostIsHyperV                   = $isHostHyperV
+    $builtInHealthTestDirectories = @(
+      Get-BuiltInHealthTestDirectories -ScriptRoot $PSScriptRoot -IncludeStateChangingTests:$IReallyWantToRunTestsThatChangeState
+    )
+    foreach ($healthTestDirectory in $builtInHealthTestDirectories) {
+      $importBuiltInHealthTestsParams = @{
+        HealthTestsPath                = $healthTestDirectory
+        HostIsVirtualMachine           = $isHostVM
+        HostIsMobile                   = $isHostMobile
+        HostIsInDomain                 = $IsHostInDomain
+        HostIsServer                   = $isHostServer
+        HostIsDomainController         = $isHostDC
+        HostIsPrimaryDomainController  = $isHostPDC
+        HostIsDnsServer                = $isHostDnsServer
+        HostIsDhcpServer               = $isHostDhcpServer
+        HostIsHyperV                   = $isHostHyperV
+      }
+      Get-BuiltInHealthTestScriptsToImport @importBuiltInHealthTestsParams |
+        ForEach-Object { . $_.FullName }
     }
-    Get-BuiltInHealthTestScriptsToImport @importBuiltInHealthTestsParams |
-      ForEach-Object { . $_.FullName }
     #|
     #| Dot source health tests
     #+-----------------------------------------------------------
@@ -1774,7 +1816,11 @@ ForEach-Object { $_.Trim() } |
 Where-Object { $_ }
 Log-Debug "-OnlyTheseTests (semicolon separated): $($OnlyTheseTests -join ';')"
 Log-Debug "-SkipNonEssentialTests '$SkipNonEssentialTests'"
+Log-Debug "-IReallyWantToRunTestsThatChangeState '$IReallyWantToRunTestsThatChangeState'"
 Log-Debug "-WhitelistSigs '$WhitelistSigs'"
+if ($IReallyWantToRunTestsThatChangeState) {
+  Log-Info 'Guarded state-changing built-in health tests are enabled for this run.'
+}
 $cfg = Get-LogConfig
 Log-debug "Final list of suppressed signatures: $((@($cfg.SuppressedSignatures) | Sort-Object -Unique) -join ', ')"
 

@@ -2,12 +2,14 @@
 
 function HealthTest-GpupdatePolicyApply {
 <#
-Description: Checks whether the machine secure channel is healthy enough for Group Policy processing.
+Description: Actively applies Group Policy with gpupdate and reports whether computer and user policy processing succeeds.
 AppliesTo: DomainJoined
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: High(Time)
 Uses: Test-ComputerSecureChannel, gpupdate.exe.
+
+This state-changing test actively refreshes Group Policy. The refresh can run policy scripts, recreate Immediate Tasks, apply settings, or start configured deployments. It is loaded only when -IReallyWantToRunTestsThatChangeState is used.
 #>
   [CmdletBinding()] param()
 

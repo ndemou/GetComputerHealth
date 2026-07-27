@@ -6,8 +6,10 @@ For the full documentation routing table, see [`README.md`](../README.md).
 
 ## Behavior Rules
 
-- Keep side effects at zero.
-  Functions **must never** change machine state, only inspect and report.
+- Keep ordinary built-in tests read-only.
+  Functions directly under `health-tests` **must never** change machine state; they only inspect and report.
+- Follow the [state-changing health-test design decision](../design/state-changing-health-tests.md).
+  An approved test that makes limited state changes must be highly safe for conventional systems, live under `health-tests\HealthTests-that-do-change-state`, describe the active behavior clearly, and remain guarded by `-IReallyWantToRunTestsThatChangeState`.
 - Follow the [health findings and noise design decision](../design/health-findings-and-noise.md).
   This is an administrative health tool rather than a threat-detection product; prefer actionable, low-noise findings when broader detection would create recurring false positives.
 - Report using the expected `Write-Warning` pattern:
@@ -43,6 +45,8 @@ Uses: Get-ChildItem.
 ```
 
 The function **must** include the top-level help block immediately after the opening `{`, and it must use standardized `field: value` lines.
+
+Place ordinary functions directly under `health-tests`. Use `health-tests\HealthTests-that-do-change-state` only for explicitly approved tests whose diagnostic value justifies limited, highly safe state changes. Their `Description:` and detailed help must say what operation changes state.
 
 The `Field: Value` lines follow this exact order (note that some are optional):
    1. `Description:` What kind of issues it detects or what findings it uncovers (160 chars max).

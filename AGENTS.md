@@ -13,7 +13,9 @@ Avoid using COM objects unless they are obviously read-only.
 Avoid clever pipelines if a loop is easier to audit.
 Avoid non-ASCII literals in PowerShell source files. Build required Unicode characters with `[char]` or `[char]::ConvertFromUtf32()` so Windows PowerShell 5.1 and GitHub Actions read the source consistently.
 
-Code outside the installer/updater must not change computer state. Saving useful and temporary files that are not larger than 100MB is OK.
+Code outside the installer/updater and approved state-changing health tests must not change computer state. Saving useful and temporary files that are not larger than 100MB is OK.
+
+State-changing built-in health tests are allowed only when they are considered highly safe for conventional systems, provide important diagnostic value, live under `health-tests\HealthTests-that-do-change-state`, and are guarded by the non-default `-IReallyWantToRunTestsThatChangeState` switch. Keep ordinary health tests read-only.
 
 ## Testing
 
@@ -57,6 +59,7 @@ Run tests from the repository root in Windows PowerShell (v5).
 
 - Pester 5 or newer must be installed. `.\tests\run-unit-tests.ps1` checks this explicitly.
 - Prefer the repo test runners over calling `Invoke-Pester` directly.
+- Routine unit, smoke, and integration tests must not enable `-IReallyWantToRunTestsThatChangeState`. Mock guarded operations or use a dedicated test computer when active validation is explicitly required.
 - If a full or integration run fails only because of sandbox or host restrictions, report that clearly instead of treating it as a product regression.
 
 ## Releases

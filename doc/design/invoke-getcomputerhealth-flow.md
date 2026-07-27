@@ -29,10 +29,10 @@ A run is controlled by these kinds of inputs:
 - **Target selection**: no target for the local computer, explicit computer names, or the special domain-server target set.
 - **Message filtering**: `-Hide` controls which message levels are hidden from normal console-style output.
 - **Test selection**: include only certain tests, exclude certain tests, or skip slow, policy, or non-essential tests.
+- **Guarded active diagnostics**: `-IReallyWantToRunTestsThatChangeState` explicitly enables the separately stored built-in tests that can make limited, highly safe state changes.
 - **Update behavior**: by default the wrapper may update the installed toolkit before running checks; `-NoUpdate` disables that for the run.
 - **Remote-update behavior**: optional push-update settings can stage an update zip for remote targets.
 - **Email behavior**: switches and configuration decide whether a report is sent.
-- **Pass-through arguments**: extra arguments can be forwarded to `Get-ComputerHealth.ps1` for supported lower-level options.
 
 ## Configuration used during a run
 
@@ -82,6 +82,7 @@ A typical invocation follows this flow:
    - For remote computers, the wrapper opens a PowerShell remoting session and runs the same target-side flow remotely.
    - Each target may run its own update step unless disabled for that path.
    - Each target then runs `Get-ComputerHealth.ps1` with the selected filters, test selections, suppression file, custom tests folder, and other applicable options.
+   - The guarded state-changing test directory is included only when the wrapper received `-IReallyWantToRunTestsThatChangeState`; that choice is preserved for local targets, remote targets, and the one-time post-update rerun.
 
 8. **Collect health messages**
    - Target output is normalized into health message records.
@@ -173,7 +174,7 @@ Think of the scripts as three layers:
 
 1. **`Invoke-GetComputerHealth.ps1`** orchestrates update, target selection, remoting, collection, artifacts, and email.
 2. **`Get-ComputerHealth.ps1`** runs the actual health tests for one target context.
-3. **Health-test scripts** produce individual health messages.
+3. **Health-test scripts** produce individual health messages. Read-only built-ins are the default; the separately stored state-changing built-ins require explicit opt-in.
 
 The wrapper should own wrapper-only control flow such as self-update reruns.
 The health script should only receive health-check options.
