@@ -145,6 +145,55 @@ Describe 'HealthTest-CertExpiry' {
         ($script:warnings -join "`n") | Should -Match 'Confirm recent Azure Backup jobs and required restore or encryption configuration\.'
     }
 
+    It 'suppresses upcoming-expiry findings for currently valid short-lived certificates' {
+        $notBefore = (Get-Date).AddHours(-23)
+        $notAfter = $notBefore.AddHours(24).AddMinutes(5)
+        Mock Get-ChildItem {
+            @(
+                New-TestCertificate -Subject 'CN=Short Lived' -SerialNumber 'SHORT' -NotBefore $notBefore -NotAfter $notAfter
+            )
+        }
+
+        HealthTest-CertExpiry
+
+        @($script:warnings | Where-Object { $_ -match '^\[(FAILURE|WARNING|NOTICE)\]' }).Count | Should -Be 0
+        @($script:warnings | Where-Object { $_ -match '^\[info\] Short-lived certificate expiry findings suppressed' }).Count | Should -Be 1
+        @($script:warnings | Where-Object { $_ -match '^\[PASS\]' }).Count | Should -Be 1
+        ($script:warnings -join "`n") | Should -Match "SerialNumber='SHORT'.*Reason=Currently valid"
+    }
+
+    It 'suppresses an expired short-lived certificate when a valid same-subject successor exists' {
+        $now = Get-Date
+        Mock Get-ChildItem {
+            @(
+                New-TestCertificate -Subject 'CN=Short Rotation' -SerialNumber 'OLD' -NotBefore ($now.AddDays(-2)) -NotAfter ($now.AddDays(-1))
+                New-TestCertificate -Subject 'CN=Short Rotation' -SerialNumber 'NEW' -NotBefore ($now.AddHours(-12)) -NotAfter ($now.AddHours(12))
+            )
+        }
+
+        HealthTest-CertExpiry
+
+        @($script:warnings | Where-Object { $_ -match '^\[(FAILURE|WARNING|NOTICE)\]' }).Count | Should -Be 0
+        @($script:warnings | Where-Object { $_ -match '^\[info\] Short-lived certificate expiry findings suppressed' }).Count | Should -Be 1
+        @($script:warnings | Where-Object { $_ -match '^\[PASS\]' }).Count | Should -Be 1
+        ($script:warnings -join "`n") | Should -Match "SerialNumber='OLD'.*Reason=Expired; a newer currently valid certificate with the same subject exists.*CandidateSerialNumber='NEW'"
+    }
+
+    It 'reports notice for an expired short-lived certificate without a valid successor' {
+        $now = Get-Date
+        Mock Get-ChildItem {
+            @(
+                New-TestCertificate -Subject 'CN=Short Unreplaced' -SerialNumber 'STALE' -NotBefore ($now.AddDays(-2)) -NotAfter ($now.AddDays(-1))
+            )
+        }
+
+        HealthTest-CertExpiry
+
+        @($script:warnings | Where-Object { $_ -match "^\[NOTICE\] Certificate validity issue:.*SerialNumber='STALE'" }).Count | Should -Be 1
+        @($script:warnings | Where-Object { $_ -match '^\[PASS\]' }).Count | Should -Be 0
+        ($script:warnings -join "`n") | Should -Match 'Check the issuing or enrollment system that normally rotates this short-lived certificate\.'
+    }
+
     It 'passes when all certificates are outside the warning window' {
         Mock Get-ChildItem {
             @(

@@ -188,6 +188,7 @@ Uses: None.
 The stable finding identity contains the store, subject, issuer, and serial number. It intentionally excludes the certificate thumbprint and volatile expiration details.
 Expiration status, validity dates, private-key presence, enhanced key usages, a newer same-subject candidate, and remediation guidance are included in the finding comments.
 Certificates expired for 60 days or more are notices because continued operation suggests that they were replaced or are no longer used; administrators must still verify bindings before removal.
+Certificates with a total validity period of four days or less do not produce upcoming-expiry findings. Expired short-lived certificates are notices unless a newer currently valid certificate with the same subject exists, in which case they are included in an informational summary.
 Expired Azure CRP certificates are summarized as informational noise only when a newer currently valid certificate with the same subject exists.
 The certificate store has no universal reverse lookup for service or application bindings. Those references are stored separately by each product, so a same-subject certificate is only a candidate replacement and not proof that migration is complete.
 #>
@@ -217,6 +218,8 @@ The certificate store has no universal reverse lookup for service or application
     }
 
     $findingCount = 0
+    $shortLivedMaxDays = 4
+    $suppressedShortLived = @()
     $suppressedAzureCrp = @()
     foreach ($certificate in $certificates) {
         $notAfterValue = Get-CertExpiryPropertyValue -InputObject $certificate -Name 'NotAfter'
@@ -234,6 +237,39 @@ The certificate store has no universal reverse lookup for service or application
             $title = Get-CertExpiryFindingTitle -Certificate $certificate -Store $store
             Write-Warning "[FAILURE] $title`nStatus: Expiration date is invalid: '$(ConvertTo-CertExpiryFindingValue -Value $notAfterValue)'.`nRecommended action: Inspect the certificate record and the certificate store provider."
             $findingCount++
+            continue
+        }
+
+        $isShortLived = $false
+        $notBeforeDate = $null
+        $notBeforeValue = Get-CertExpiryPropertyValue -InputObject $certificate -Name 'NotBefore'
+        if ($null -ne $notBeforeValue) {
+            try {
+                $notBeforeDate = [datetime]$notBeforeValue
+                $validityPeriod = $notAfter - $notBeforeDate
+                if ($validityPeriod.TotalSeconds -gt 0 -and
+                    $validityPeriod.TotalDays -le $shortLivedMaxDays) {
+                    $isShortLived = $true
+                }
+            }
+            catch {
+                $isShortLived = $false
+            }
+        }
+
+        if ($isShortLived -and
+            $notBeforeDate -le $now -and
+            $notAfter -gt $now) {
+            $suppressedShortLived += [pscustomobject]@{
+                Subject = ConvertTo-CertExpiryFindingValue -Value (Get-CertExpiryPropertyValue -InputObject $certificate -Name 'Subject')
+                Issuer = ConvertTo-CertExpiryFindingValue -Value (Get-CertExpiryPropertyValue -InputObject $certificate -Name 'Issuer')
+                SerialNumber = ConvertTo-CertExpiryFindingValue -Value (Get-CertExpiryPropertyValue -InputObject $certificate -Name 'SerialNumber')
+                NotBefore = Format-CertExpiryDate -Value $notBeforeDate
+                NotAfter = Format-CertExpiryDate -Value $notAfter
+                Reason = 'Currently valid; fixed upcoming-expiry thresholds do not apply.'
+                ReplacementSerialNumber = '(not applicable)'
+                ReplacementExpires = '(not applicable)'
+            }
             continue
         }
 
@@ -285,6 +321,24 @@ The certificate store has no universal reverse lookup for service or application
 
         $replacement = Get-CertExpiryReplacementCandidate -Certificate $certificate -Certificates $certificates -Now $now
         $subject = ConvertTo-CertExpiryFindingValue -Value (Get-CertExpiryPropertyValue -InputObject $certificate -Name 'Subject')
+        if ($isShortLived) {
+            if ($null -ne $replacement) {
+                $suppressedShortLived += [pscustomobject]@{
+                    Subject = $subject
+                    Issuer = ConvertTo-CertExpiryFindingValue -Value (Get-CertExpiryPropertyValue -InputObject $certificate -Name 'Issuer')
+                    SerialNumber = ConvertTo-CertExpiryFindingValue -Value (Get-CertExpiryPropertyValue -InputObject $certificate -Name 'SerialNumber')
+                    NotBefore = Format-CertExpiryDate -Value $notBeforeDate
+                    NotAfter = Format-CertExpiryDate -Value $notAfter
+                    Reason = 'Expired; a newer currently valid certificate with the same subject exists.'
+                    ReplacementSerialNumber = ConvertTo-CertExpiryFindingValue -Value (Get-CertExpiryPropertyValue -InputObject $replacement -Name 'SerialNumber')
+                    ReplacementExpires = Format-CertExpiryDate -Value (Get-CertExpiryPropertyValue -InputObject $replacement -Name 'NotAfter')
+                }
+                continue
+            }
+
+            $level = 'NOTICE'
+        }
+
         if ($notAfter -lt $now -and
             $subject -ieq 'DC=Windows Azure CRP Certificate Generator' -and
             $null -ne $replacement) {
@@ -340,6 +394,9 @@ The certificate store has no universal reverse lookup for service or application
         elseif ($subject -ieq 'DC=Windows Azure CRP Certificate Generator') {
             $recommendedAction = 'Check Azure VM Agent and extension health. Update or repair the agent if needed; remove stale CRP certificates only under the Azure VM extension cleanup guidance.'
         }
+        elseif ($isShortLived -and $notAfter -lt $now) {
+            $recommendedAction = 'Check the issuing or enrollment system that normally rotates this short-lived certificate. Confirm whether a service or application still uses it, and remove it only after confirming that it is unused.'
+        }
         elseif ($notAfter -lt $now) {
             $recommendedAction = 'Identify whether a service or application still uses this certificate. Renew or replace it if needed; remove it only after confirming it is unused and following the owning product runbook.'
         }
@@ -359,6 +416,22 @@ The certificate store has no universal reverse lookup for service or application
         )
         Write-Warning "[$level] $title`n$($commentLines -join "`n")"
         $findingCount++
+    }
+
+    if ($suppressedShortLived.Count -gt 0) {
+        $suppressedDetails = @()
+        foreach ($suppressedCertificate in $suppressedShortLived) {
+            $suppressedDetails += "Subject='$($suppressedCertificate.Subject)'; Issuer='$($suppressedCertificate.Issuer)'; SerialNumber='$($suppressedCertificate.SerialNumber)'; Validity='$($suppressedCertificate.NotBefore)' through '$($suppressedCertificate.NotAfter)' (local time); Reason=$($suppressedCertificate.Reason); CandidateSerialNumber='$($suppressedCertificate.ReplacementSerialNumber)'; CandidateExpires='$($suppressedCertificate.ReplacementExpires)'."
+        }
+
+        $summaryLines = @(
+            "Count: $($suppressedShortLived.Count).",
+            "Definition: Total validity is no more than $shortLivedMaxDays days.",
+            'Reason: Fixed upcoming-expiry thresholds are not useful for certificates designed with short validity periods.',
+            'Suppressed certificates:',
+            ($suppressedDetails -join "`n")
+        )
+        Write-Warning "[info] Short-lived certificate expiry findings suppressed`n$($summaryLines -join "`n")"
     }
 
     if ($suppressedAzureCrp.Count -gt 0) {
