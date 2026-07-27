@@ -51,6 +51,8 @@ This toolkit has **no external dependencies**.
 
 Aside from installation, this code *should not change the state of the system in any way*. The code is intentionally simple and clean so it can be audited with a modern AI agent.
 
+GetComputerHealth is not a malware or intrusion-detection product. It can incidentally expose suspicious traces, but it prioritizes actionable, low-noise administrative findings over broad detection with frequent false positives. Use an EDR product and purpose-built security monitoring for threat detection. See the [health findings and noise design decision](./doc/design/health-findings-and-noise.md).
+
 ---
 
 # 1. Admin Guide: Installation

@@ -8,6 +8,8 @@ For the full documentation routing table, see [`README.md`](../README.md).
 
 - Keep side effects at zero.
   Functions **must never** change machine state, only inspect and report.
+- Follow the [health findings and noise design decision](../design/health-findings-and-noise.md).
+  This is an administrative health tool rather than a threat-detection product; prefer actionable, low-noise findings when broader detection would create recurring false positives.
 - Report using the expected `Write-Warning` pattern:
   ```
   Write-Warning "[LEVEL] Description of the issue"

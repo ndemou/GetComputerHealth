@@ -14,6 +14,7 @@ Describe 'Scheduled task fact helpers' {
         [string]$PrincipalUserId = 'CONTOSO\User',
         [string]$RunLevel = 'LeastPrivilege',
         [string]$LogonType = 'Password',
+        [object]$DeleteExpiredTaskAfter = $null,
         [object[]]$Actions = @(),
         [object[]]$Triggers = @(),
         [bool]$HasEnabledTrigger = $false,
@@ -52,6 +53,7 @@ Describe 'Scheduled task fact helpers' {
         PrincipalDisplayName = ''
         RunLevel = $RunLevel
         LogonType = $LogonType
+        DeleteExpiredTaskAfter = $DeleteExpiredTaskAfter
         Actions = @($Actions)
         Triggers = @($Triggers)
         HasEnabledTrigger = $HasEnabledTrigger
@@ -101,16 +103,34 @@ Describe 'Scheduled task fact helpers' {
 
     function New-TestTriggerFact {
       param(
+        [string]$Type = 'Time',
         [string]$StartBoundary = '2026-01-01T00:00:00',
+        [string]$EndBoundary = '',
+        [string]$Interval = '',
+        [string]$DaysOfWeek = '',
+        [string]$DaysOfMonth = '',
+        [string]$MonthsOfYear = '',
         [bool]$Enabled = $true
       )
 
+      $repetition = $null
+      if (-not [string]::IsNullOrWhiteSpace($Interval)) {
+        $repetition = [pscustomobject]@{
+          Interval = $Interval
+          Duration = ''
+          StopAtDurationEnd = $false
+        }
+      }
+
       ConvertTo-ScheduledTaskTriggerFact -Trigger ([pscustomobject]@{
-          TriggerType = 'Time'
+          TriggerType = $Type
           Enabled = $Enabled
           StartBoundary = $StartBoundary
-          EndBoundary = ''
-          Repetition = $null
+          EndBoundary = $EndBoundary
+          Repetition = $repetition
+          DaysOfWeek = $DaysOfWeek
+          DaysOfMonth = $DaysOfMonth
+          MonthsOfYear = $MonthsOfYear
         })
     }
   }
@@ -136,6 +156,52 @@ Describe 'Scheduled task fact helpers' {
     $details | Should -Match '(?m)^Next run time: 2026-02-10 09:55:24$'
   }
 
+  It 'collects DeleteExpiredTaskAfter from scheduled task settings' {
+    Reset-ScheduledTaskFactsCache
+    Mock Get-ScheduledTask {
+      [pscustomobject]@{
+        TaskPath = '\'
+        TaskName = 'Transient'
+        State = 'Ready'
+        Author = 'CONTOSO\Administrator'
+        Settings = [pscustomobject]@{
+          Enabled = $true
+          Hidden = $false
+          DeleteExpiredTaskAfter = 'PT0S'
+        }
+        Principal = [pscustomobject]@{
+          UserId = 'SYSTEM'
+          DisplayName = ''
+          RunLevel = 'Highest'
+          LogonType = 'ServiceAccount'
+        }
+        Actions = @()
+        Triggers = @()
+      }
+    }
+    Mock Get-ScheduledTaskInfo {
+      [pscustomobject]@{
+        LastTaskResult = 0
+        LastRunTime = $null
+        NextRunTime = $null
+        NumberOfMissedRuns = 0
+      }
+    }
+    Mock Export-ScheduledTask {
+      '<Task><RegistrationInfo><Description>Transient test task</Description></RegistrationInfo></Task>'
+    }
+
+    try {
+      $facts = @(Get-ScheduledTaskFacts)
+    }
+    finally {
+      Reset-ScheduledTaskFactsCache
+    }
+
+    $facts | Should -HaveCount 1
+    $facts[0].DeleteExpiredTaskAfter | Should -Be 'PT0S'
+  }
+
   It 'changes the policy fingerprint when the action changes' {
     $old = New-TestScheduledTaskFact -Actions @(New-TestActionFact -Execute 'C:\Tools\old.exe')
     $new = New-TestScheduledTaskFact -Actions @(New-TestActionFact -Execute 'C:\Tools\new.exe')
@@ -157,6 +223,88 @@ Describe 'Scheduled task fact helpers' {
     $new = New-TestScheduledTaskFact -Triggers @(New-TestTriggerFact -StartBoundary '2026-01-02T00:00:00')
 
     $new.PolicyFingerprint | Should -Not -Be $old.PolicyFingerprint
+  }
+
+  It 'classifies short one-shot tasks with immediate or sub-hour deletion as transient' {
+    $trigger = New-TestTriggerFact -StartBoundary '2026-07-27T07:08:00' -EndBoundary '2026-07-27T07:13:00'
+
+    foreach ($deleteExpiredTaskAfter in @('PT0S', '00:30:00', 'PT59M')) {
+      $fact = New-TestScheduledTaskFact -Triggers @($trigger) -DeleteExpiredTaskAfter $deleteExpiredTaskAfter
+      $analysis = Get-ScheduledTaskTransientAnalysis -Fact $fact
+
+      $analysis.IsTransient | Should -BeTrue
+      $analysis.HasUnrecognizedDeleteExpiredTaskAfter | Should -BeFalse
+    }
+  }
+
+  It 'classifies an unrecognized deletion duration as transient but marks it for warning' {
+    $trigger = New-TestTriggerFact -StartBoundary '2026-07-27T07:08:00' -EndBoundary '2026-07-27T07:08:55'
+    $fact = New-TestScheduledTaskFact -Triggers @($trigger) -DeleteExpiredTaskAfter 'vendor-immediate'
+
+    $analysis = Get-ScheduledTaskTransientAnalysis -Fact $fact
+
+    $analysis.IsTransient | Should -BeTrue
+    $analysis.HasUnrecognizedDeleteExpiredTaskAfter | Should -BeTrue
+    $analysis.DeleteExpiredTaskAfterText | Should -Be 'vendor-immediate'
+  }
+
+  It 'requires every transient-task trigger and deletion criterion' {
+    $validTrigger = New-TestTriggerFact -StartBoundary '2026-07-27T07:08:00' -EndBoundary '2026-07-27T07:08:55'
+    $invalidFacts = @(
+      [pscustomobject]@{
+        Name = 'multiple triggers'
+        Fact = New-TestScheduledTaskFact -Triggers @($validTrigger, $validTrigger) -DeleteExpiredTaskAfter 'PT0S'
+      }
+      [pscustomobject]@{
+        Name = 'disabled trigger'
+        Fact = New-TestScheduledTaskFact -Triggers @(New-TestTriggerFact -Enabled $false -EndBoundary '2026-07-27T07:08:55') -DeleteExpiredTaskAfter 'PT0S'
+      }
+      [pscustomobject]@{
+        Name = 'different trigger type'
+        Fact = New-TestScheduledTaskFact -Triggers @(New-TestTriggerFact -Type 'LogonTrigger' -EndBoundary '2026-07-27T07:08:55') -DeleteExpiredTaskAfter 'PT0S'
+      }
+      [pscustomobject]@{
+        Name = 'repeating trigger'
+        Fact = New-TestScheduledTaskFact -Triggers @(New-TestTriggerFact -EndBoundary '2026-07-27T07:08:55' -Interval 'PT1M') -DeleteExpiredTaskAfter 'PT0S'
+      }
+      [pscustomobject]@{
+        Name = 'calendar schedule'
+        Fact = New-TestScheduledTaskFact -Triggers @(New-TestTriggerFact -EndBoundary '2026-07-27T07:08:55' -DaysOfWeek 'Monday') -DeleteExpiredTaskAfter 'PT0S'
+      }
+      [pscustomobject]@{
+        Name = 'missing start boundary'
+        Fact = New-TestScheduledTaskFact -Triggers @(New-TestTriggerFact -StartBoundary '' -EndBoundary '2026-07-27T07:08:55') -DeleteExpiredTaskAfter 'PT0S'
+      }
+      [pscustomobject]@{
+        Name = 'missing end boundary'
+        Fact = New-TestScheduledTaskFact -Triggers @(New-TestTriggerFact -StartBoundary '2026-07-27T07:08:00') -DeleteExpiredTaskAfter 'PT0S'
+      }
+      [pscustomobject]@{
+        Name = 'end before start'
+        Fact = New-TestScheduledTaskFact -Triggers @(New-TestTriggerFact -StartBoundary '2026-07-27T07:08:00' -EndBoundary '2026-07-27T07:07:59') -DeleteExpiredTaskAfter 'PT0S'
+      }
+      [pscustomobject]@{
+        Name = 'lifetime over five minutes'
+        Fact = New-TestScheduledTaskFact -Triggers @(New-TestTriggerFact -StartBoundary '2026-07-27T07:08:00' -EndBoundary '2026-07-27T07:13:01') -DeleteExpiredTaskAfter 'PT0S'
+      }
+      [pscustomobject]@{
+        Name = 'missing deletion setting'
+        Fact = New-TestScheduledTaskFact -Triggers @($validTrigger)
+      }
+      [pscustomobject]@{
+        Name = 'negative deletion duration'
+        Fact = New-TestScheduledTaskFact -Triggers @($validTrigger) -DeleteExpiredTaskAfter '-PT1S'
+      }
+      [pscustomobject]@{
+        Name = 'one-hour deletion duration'
+        Fact = New-TestScheduledTaskFact -Triggers @($validTrigger) -DeleteExpiredTaskAfter 'PT1H'
+      }
+    )
+
+    foreach ($invalidFact in $invalidFacts) {
+      $analysis = Get-ScheduledTaskTransientAnalysis -Fact $invalidFact.Fact
+      $analysis.IsTransient | Should -BeFalse -Because $invalidFact.Name
+    }
   }
 
   It 'classifies SYSTEM, service principals, highest run level, and unknown principal as privileged' {
@@ -192,6 +340,7 @@ Describe 'HealthTest-ScheduledTasks' {
         [string]$PrincipalUserId = 'CONTOSO\User',
         [string]$RunLevel = 'LeastPrivilege',
         [string]$LogonType = 'Password',
+        [object]$DeleteExpiredTaskAfter = $null,
         [object[]]$Actions = @(),
         [object[]]$Triggers = @(),
         [bool]$HasEnabledTrigger = $false,
@@ -226,6 +375,7 @@ Describe 'HealthTest-ScheduledTasks' {
         PrincipalDisplayName = ''
         RunLevel = $RunLevel
         LogonType = $LogonType
+        DeleteExpiredTaskAfter = $DeleteExpiredTaskAfter
         Actions = @($Actions)
         Triggers = @($Triggers)
         HasEnabledTrigger = $HasEnabledTrigger
@@ -415,6 +565,9 @@ Describe 'HealthTest-ListScheduledTasks' {
         [string]$TaskPath = '\Vendor\',
         [string]$TaskName = 'Task',
         [bool]$IsPrivileged = $false,
+        [object[]]$Actions = @(),
+        [object[]]$Triggers = @(),
+        [object]$DeleteExpiredTaskAfter = $null,
         [string]$PolicyFingerprint = 'fingerprint'
       )
 
@@ -431,9 +584,10 @@ Describe 'HealthTest-ListScheduledTasks' {
         PrincipalDisplayName = ''
         RunLevel = 'LeastPrivilege'
         LogonType = 'Password'
-        Actions = @()
-        Triggers = @()
-        HasEnabledTrigger = $false
+        DeleteExpiredTaskAfter = $DeleteExpiredTaskAfter
+        Actions = @($Actions)
+        Triggers = @($Triggers)
+        HasEnabledTrigger = (@($Triggers | Where-Object Enabled).Count -gt 0)
         LastRunTime = $null
         NextRunTime = $null
         NumberOfMissedRuns = 0
@@ -456,6 +610,19 @@ Describe 'HealthTest-ListScheduledTasks' {
         IsMicrosoftBuiltIn = $false
         PolicyFingerprint = $PolicyFingerprint
       }
+    }
+
+    function New-TestListTransientTrigger {
+      ConvertTo-ScheduledTaskTriggerFact -Trigger ([pscustomobject]@{
+          TriggerType = 'TimeTrigger'
+          Enabled = $true
+          StartBoundary = '2026-07-27T07:08:00'
+          EndBoundary = '2026-07-27T07:08:55'
+          Repetition = $null
+          DaysOfWeek = ''
+          DaysOfMonth = ''
+          MonthsOfYear = ''
+        })
     }
   }
 
@@ -480,6 +647,52 @@ Describe 'HealthTest-ListScheduledTasks' {
     HealthTest-ListScheduledTasks
 
     @($script:warnings | Where-Object { $_ -match '^\[WARNING\] Found scheduled task: \\Vendor\\Task fingerprint=priv' }).Count | Should -Be 1
+  }
+
+  It 'emits INFO with full details and no fingerprint for a transient task' {
+    $action = ConvertTo-ScheduledTaskActionFact -Action ([pscustomobject]@{
+        ActionType = 'ExecAction'
+        Execute = '\\domain.example\NETLOGON\Deploy.cmd'
+        Arguments = '/quiet'
+        WorkingDirectory = ''
+      })
+    $script:TestScheduledTaskFacts = @(
+      New-TestScheduledTaskFact -IsPrivileged $true -Actions @($action) -Triggers @(New-TestListTransientTrigger) -DeleteExpiredTaskAfter 'PT30M' -PolicyFingerprint 'volatile-fingerprint'
+    )
+
+    HealthTest-ListScheduledTasks
+
+    $script:warnings | Should -HaveCount 1
+    $script:warnings[0] | Should -Match '^\[INFO\] Found transient scheduled task: \\Vendor\\Task'
+    $script:warnings[0] | Should -Not -Match '(?i)fingerprint'
+    $script:warnings[0] | Should -Match '(?m)^Delete expired task after: PT30M$'
+    $script:warnings[0] | Should -Match '(?m)^Action: ExecAction Execute=\\\\domain\.example\\NETLOGON\\Deploy\.cmd Arguments=/quiet$'
+    $script:warnings[0] | Should -Match '(?m)^Trigger: TimeTrigger Enabled=True Start=2026-07-27T07:08:00 End=2026-07-27T07:08:55$'
+  }
+
+  It 'adds a warning when a transient task has an unrecognized deletion duration' {
+    $script:TestScheduledTaskFacts = @(
+      New-TestScheduledTaskFact -Triggers @(New-TestListTransientTrigger) -DeleteExpiredTaskAfter 'vendor-immediate' -PolicyFingerprint 'volatile-fingerprint'
+    )
+
+    HealthTest-ListScheduledTasks
+
+    $script:warnings | Should -HaveCount 2
+    @($script:warnings | Where-Object { $_ -match '^\[INFO\] Found transient scheduled task:' }).Count | Should -Be 1
+    @($script:warnings | Where-Object { $_ -match '^\[WARNING\] Transient scheduled task has an unrecognized DeleteExpiredTaskAfter value:' }).Count | Should -Be 1
+    $script:warnings -join "`n" | Should -Match "DeleteExpiredTaskAfter: 'vendor-immediate'\."
+    $script:warnings -join "`n" | Should -Not -Match '(?i)fingerprint'
+  }
+
+  It 'keeps an exact one-hour deletion duration as a normal fingerprinted finding' {
+    $script:TestScheduledTaskFacts = @(
+      New-TestScheduledTaskFact -IsPrivileged $true -Triggers @(New-TestListTransientTrigger) -DeleteExpiredTaskAfter 'PT1H' -PolicyFingerprint 'one-hour'
+    )
+
+    HealthTest-ListScheduledTasks
+
+    $script:warnings | Should -HaveCount 1
+    $script:warnings[0] | Should -Match '^\[WARNING\] Found scheduled task: \\Vendor\\Task fingerprint=one-hour'
   }
 
   It 'suppresses known noisy scheduled task definitions' {

@@ -372,6 +372,144 @@ function ConvertTo-ScheduledTaskTriggerFact {
   }
 }
 
+function Get-ScheduledTaskDurationAnalysis {
+  param([AllowNull()][object]$Value)
+
+  $text = ConvertTo-ScheduledTaskSimpleText -Value $Value
+  if ([string]::IsNullOrWhiteSpace($text)) {
+    return [pscustomobject]@{
+      IsPresent = $false
+      IsRecognized = $false
+      Value = $null
+      Text = ''
+    }
+  }
+
+  if ($Value -is [timespan]) {
+    return [pscustomobject]@{
+      IsPresent = $true
+      IsRecognized = $true
+      Value = [timespan]$Value
+      Text = $text
+    }
+  }
+
+  $duration = [timespan]::Zero
+  try {
+    $duration = [System.Xml.XmlConvert]::ToTimeSpan($text)
+    return [pscustomobject]@{
+      IsPresent = $true
+      IsRecognized = $true
+      Value = $duration
+      Text = $text
+    }
+  }
+  catch {
+  }
+
+  if ([timespan]::TryParse($text, [ref]$duration)) {
+    return [pscustomobject]@{
+      IsPresent = $true
+      IsRecognized = $true
+      Value = $duration
+      Text = $text
+    }
+  }
+
+  return [pscustomobject]@{
+    IsPresent = $true
+    IsRecognized = $false
+    Value = $null
+    Text = $text
+  }
+}
+
+function Get-ScheduledTaskTransientAnalysis {
+  param([Parameter(Mandatory=$true)]$Fact)
+
+  $notTransient = [pscustomobject]@{
+    IsTransient = $false
+    HasUnrecognizedDeleteExpiredTaskAfter = $false
+    DeleteExpiredTaskAfterText = ''
+  }
+
+  $triggers = @($Fact.Triggers)
+  if ($triggers.Count -ne 1) {
+    return $notTransient
+  }
+
+  $trigger = $triggers[0]
+  if (-not $trigger.Enabled) {
+    return $notTransient
+  }
+
+  if ($trigger.Type -notin @('Time', 'TimeTrigger')) {
+    return $notTransient
+  }
+
+  if (-not [string]::IsNullOrWhiteSpace($trigger.Interval)) {
+    return $notTransient
+  }
+
+  if (-not [string]::IsNullOrWhiteSpace($trigger.DaysOfWeek) -or
+      -not [string]::IsNullOrWhiteSpace($trigger.DaysOfMonth) -or
+      -not [string]::IsNullOrWhiteSpace($trigger.MonthsOfYear)) {
+    return $notTransient
+  }
+
+  $startBoundary = [datetimeoffset]::MinValue
+  $endBoundary = [datetimeoffset]::MinValue
+  $dateTimeStyles = [System.Globalization.DateTimeStyles]::AllowWhiteSpaces
+  $culture = [System.Globalization.CultureInfo]::InvariantCulture
+
+  if (-not [datetimeoffset]::TryParse(
+      $trigger.StartBoundary,
+      $culture,
+      $dateTimeStyles,
+      [ref]$startBoundary)) {
+    return $notTransient
+  }
+
+  if (-not [datetimeoffset]::TryParse(
+      $trigger.EndBoundary,
+      $culture,
+      $dateTimeStyles,
+      [ref]$endBoundary)) {
+    return $notTransient
+  }
+
+  $triggerLifetime = $endBoundary - $startBoundary
+  if ($triggerLifetime -le [timespan]::Zero -or
+      $triggerLifetime -gt [timespan]::FromMinutes(5)) {
+    return $notTransient
+  }
+
+  $deleteExpiredTaskAfter = Get-ScheduledTaskPropertyValue -InputObject $Fact -Name 'DeleteExpiredTaskAfter'
+  $durationAnalysis = Get-ScheduledTaskDurationAnalysis -Value $deleteExpiredTaskAfter
+  if (-not $durationAnalysis.IsPresent) {
+    return $notTransient
+  }
+
+  if ($durationAnalysis.IsRecognized) {
+    if ($durationAnalysis.Value -lt [timespan]::Zero -or
+        $durationAnalysis.Value -ge [timespan]::FromHours(1)) {
+      return $notTransient
+    }
+
+    return [pscustomobject]@{
+      IsTransient = $true
+      HasUnrecognizedDeleteExpiredTaskAfter = $false
+      DeleteExpiredTaskAfterText = $durationAnalysis.Text
+    }
+  }
+
+  return [pscustomobject]@{
+    IsTransient = $true
+    HasUnrecognizedDeleteExpiredTaskAfter = $true
+    DeleteExpiredTaskAfterText = $durationAnalysis.Text
+  }
+}
+
 function ConvertTo-ScheduledTaskLastResultCode {
   param([AllowNull()][object]$Value)
 
@@ -657,6 +795,9 @@ function Get-ScheduledTaskFacts {
     $hidden = $false
     $hiddenValue = Get-ScheduledTaskPropertyValue -InputObject $settings -Name 'Hidden'
     if ($null -ne $hiddenValue) { $hidden = [bool]$hiddenValue }
+    $deleteExpiredTaskAfter = ConvertTo-ScheduledTaskSimpleText -Value (
+      Get-ScheduledTaskPropertyValue -InputObject $settings -Name 'DeleteExpiredTaskAfter'
+    )
 
     $actions = New-Object System.Collections.Generic.List[object]
     foreach ($action in @((Get-ScheduledTaskPropertyValue -InputObject $task -Name 'Actions'))) {
@@ -733,6 +874,7 @@ function Get-ScheduledTaskFacts {
       PrincipalDisplayName = $principalDisplayName
       RunLevel = $runLevel
       LogonType = $logonType
+      DeleteExpiredTaskAfter = $deleteExpiredTaskAfter
       Actions = $actionFacts
       Triggers = $triggerFacts
       HasEnabledTrigger = $hasEnabledTrigger
@@ -1056,6 +1198,10 @@ function Format-ScheduledTaskFactDetails {
   if ($Fact.PrincipalUserId) { [void]$lines.Add('Run as: ' + $Fact.PrincipalUserId) }
   if ($Fact.RunLevel) { [void]$lines.Add('Run level: ' + $Fact.RunLevel) }
   if ($Fact.LogonType) { [void]$lines.Add('Logon type: ' + $Fact.LogonType) }
+  $deleteExpiredTaskAfter = Get-ScheduledTaskPropertyValue -InputObject $Fact -Name 'DeleteExpiredTaskAfter'
+  if ($deleteExpiredTaskAfter) {
+    [void]$lines.Add('Delete expired task after: ' + $deleteExpiredTaskAfter)
+  }
   if ($Fact.Description) { [void]$lines.Add('Description: ' + $Fact.Description) }
   if ($null -ne $Fact.LastRunTime) { [void]$lines.Add('Last run time: ' + (Format-ScheduledTaskDateTime -Value $Fact.LastRunTime)) }
   if ($null -ne $Fact.NextRunTime) { [void]$lines.Add('Next run time: ' + (Format-ScheduledTaskDateTime -Value $Fact.NextRunTime)) }
@@ -1084,17 +1230,26 @@ function Format-ScheduledTaskFactDetails {
 }
 
 function Format-ScheduledTaskDefinitionDetails {
-  param([Parameter(Mandatory=$true)]$Fact)
+  param(
+    [Parameter(Mandatory=$true)]$Fact,
+    [bool]$IncludeFingerprint = $true
+  )
 
   $lines = New-Object System.Collections.Generic.List[string]
   [void]$lines.Add('Task: ' + $Fact.StableKey)
-  [void]$lines.Add('Fingerprint: ' + $Fact.PolicyFingerprint)
+  if ($IncludeFingerprint) {
+    [void]$lines.Add('Fingerprint: ' + $Fact.PolicyFingerprint)
+  }
   [void]$lines.Add('Enabled: ' + $Fact.Enabled)
   [void]$lines.Add('Hidden: ' + $Fact.Hidden)
   if ($Fact.Author) { [void]$lines.Add('Author: ' + $Fact.Author) }
   if ($Fact.PrincipalUserId) { [void]$lines.Add('Run as: ' + $Fact.PrincipalUserId) }
   if ($Fact.RunLevel) { [void]$lines.Add('Run level: ' + $Fact.RunLevel) }
   if ($Fact.LogonType) { [void]$lines.Add('Logon type: ' + $Fact.LogonType) }
+  $deleteExpiredTaskAfter = Get-ScheduledTaskPropertyValue -InputObject $Fact -Name 'DeleteExpiredTaskAfter'
+  if ($deleteExpiredTaskAfter) {
+    [void]$lines.Add('Delete expired task after: ' + $deleteExpiredTaskAfter)
+  }
   if ($Fact.Description) { [void]$lines.Add('Description: ' + $Fact.Description) }
 
   foreach ($action in @($Fact.Actions)) {
