@@ -136,7 +136,15 @@ C:\IT\Get-ComputerHealth\bin\Update-GetHealthCode.ps1 -ScheduleDailyInvokationAt
 
 ```powershell
 # Executes Invoke-GetComputerHealth.ps1 on all domain-joined servers and any configured workstations
-param([string]$Hide="DIPS",[string]$OnlyTheseTests,[switch]$SkipSlowTests,[switch]$SkipPolicyTests,[switch]$NoSendMessage,[switch]$NoUpdate)
+param(
+    [string]$Hide = "DIPS",
+    [string]$OnlyTheseTests,
+    [switch]$SkipSlowTests,
+    [switch]$SkipPolicyTests,
+    [switch]$SkipNonEssentialTests,
+    [switch]$NoSendMessage,
+    [switch]$NoUpdate
+)
 
 #------------------CONFIGURATION---------------------------
 $IpsOfAllDcs = @("10.10.10.1", "10.10.10.2")
@@ -148,7 +156,21 @@ if (-not $NoUpdate) {
 	# Update local version of GetComputerHealth (only when a new version is found)
 	& C:\IT\Get-ComputerHealth\bin\Update-GetHealthCode.ps1
 }
-& C:\IT\Get-ComputerHealth\bin\Invoke-GetComputerHealth.ps1 -Computers "ALL_DOMAIN_SERVERS,$WorkstationsToInclude" -ExcludeServers $WindowsServersToExclude -Hide:$Hide -OnlyTheseTests $OnlyTheseTests -SkipSlowTests:$SkipSlowTests -SkipPolicyTests:$SkipPolicyTests -NoSendMessage:$NoSendMessage -NoUpdate:$NoUpdate -PushUpdate -IpsOfAllDcs $IpsOfAllDcs -IReallyWantToRunTestsThatChangeState
+
+$invokeParameters = @{}
+foreach ($entry in $PSBoundParameters.GetEnumerator()) {
+    $invokeParameters[$entry.Key] = $entry.Value
+}
+
+# Preserve this wrapper's default and add its domain-scan configuration.
+$invokeParameters['Hide'] = $Hide
+$invokeParameters['Computers'] = "ALL_DOMAIN_SERVERS,$WorkstationsToInclude"
+$invokeParameters['ExcludeServers'] = $WindowsServersToExclude
+$invokeParameters['PushUpdate'] = $true
+$invokeParameters['IpsOfAllDcs'] = $IpsOfAllDcs
+$invokeParameters['IReallyWantToRunTestsThatChangeState'] = $true
+
+& C:\IT\Get-ComputerHealth\bin\Invoke-GetComputerHealth.ps1 @invokeParameters
 ```
 
 3. Save it as `C:\IT\bin\Invoke-GetHealthDomainComputers.ps1`.
