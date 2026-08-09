@@ -107,6 +107,68 @@ function Get-CertExpiryFindingTitle {
     return "$($Summary): Store='$Store'; Subject='$subject'; Issuer='$issuer'; SerialNumber='$serialNumber'"
 }
 
+function Get-CertExpiryEnhancedKeyUsageIds {
+    param([Parameter(Mandatory=$true)]$Certificate)
+
+    $usageIds = @()
+    $usageObjects = @(Get-CertExpiryPropertyValue -InputObject $Certificate -Name 'EnhancedKeyUsageList')
+    foreach ($usage in $usageObjects) {
+        if ($null -eq $usage) {
+            continue
+        }
+
+        $usageId = Get-CertExpiryPropertyValue -InputObject $usage -Name 'Value'
+        if ($null -eq $usageId) {
+            $objectId = Get-CertExpiryPropertyValue -InputObject $usage -Name 'ObjectId'
+            if ($null -ne $objectId) {
+                $usageId = Get-CertExpiryPropertyValue -InputObject $objectId -Name 'Value'
+            }
+        }
+
+        if ($null -ne $usageId -and -not [string]::IsNullOrWhiteSpace($usageId.ToString())) {
+            $usageIds += $usageId.ToString().Trim().ToLowerInvariant()
+        }
+    }
+
+    return @($usageIds | Sort-Object -Unique)
+}
+
+function Test-CertExpiryStrongReplacementCandidate {
+    param(
+        [Parameter(Mandatory=$true)]$Certificate,
+        [Parameter(Mandatory=$true)]$Candidate
+    )
+
+    $issuer = ConvertTo-CertExpiryFindingValue -Value (Get-CertExpiryPropertyValue -InputObject $Certificate -Name 'Issuer')
+    $candidateIssuer = ConvertTo-CertExpiryFindingValue -Value (Get-CertExpiryPropertyValue -InputObject $Candidate -Name 'Issuer')
+    if (-not [string]::Equals($issuer, $candidateIssuer, [System.StringComparison]::OrdinalIgnoreCase)) {
+        return $false
+    }
+
+    $hasPrivateKey = Get-CertExpiryPropertyValue -InputObject $Certificate -Name 'HasPrivateKey'
+    $candidateHasPrivateKey = Get-CertExpiryPropertyValue -InputObject $Candidate -Name 'HasPrivateKey'
+    if ($null -eq $hasPrivateKey -or $null -eq $candidateHasPrivateKey) {
+        return $false
+    }
+    if ([bool]$hasPrivateKey -ne [bool]$candidateHasPrivateKey) {
+        return $false
+    }
+
+    $usageIds = @(Get-CertExpiryEnhancedKeyUsageIds -Certificate $Certificate)
+    $candidateUsageIds = @(Get-CertExpiryEnhancedKeyUsageIds -Certificate $Candidate)
+    if ($usageIds.Count -ne $candidateUsageIds.Count) {
+        return $false
+    }
+
+    for ($index = 0; $index -lt $usageIds.Count; $index++) {
+        if ($usageIds[$index] -ne $candidateUsageIds[$index]) {
+            return $false
+        }
+    }
+
+    return $true
+}
+
 function Get-CertExpiryReplacementCandidate {
     param(
         [Parameter(Mandatory=$true)]$Certificate,
@@ -131,6 +193,7 @@ function Get-CertExpiryReplacementCandidate {
 
     $bestCandidate = $null
     $bestCandidateNotAfter = [datetime]::MinValue
+    $bestCandidateIsStrong = $false
     foreach ($candidate in $Certificates) {
         $candidateSubject = ConvertTo-CertExpiryFindingValue -Value (Get-CertExpiryPropertyValue -InputObject $candidate -Name 'Subject')
         if (-not [string]::Equals($candidateSubject, $subject, [System.StringComparison]::OrdinalIgnoreCase)) {
@@ -165,12 +228,20 @@ function Get-CertExpiryReplacementCandidate {
         if ($candidateNotAfter -le $notAfter) {
             continue
         }
-        if ($candidateNotAfter -le $bestCandidateNotAfter) {
+
+        $candidateIsStrong = Test-CertExpiryStrongReplacementCandidate -Certificate $Certificate -Candidate $candidate
+        if ($null -ne $bestCandidate -and -not $candidateIsStrong -and $bestCandidateIsStrong) {
+            continue
+        }
+        if ($null -ne $bestCandidate -and
+            $candidateIsStrong -eq $bestCandidateIsStrong -and
+            $candidateNotAfter -le $bestCandidateNotAfter) {
             continue
         }
 
         $bestCandidate = $candidate
         $bestCandidateNotAfter = $candidateNotAfter
+        $bestCandidateIsStrong = $candidateIsStrong
     }
 
     return $bestCandidate
@@ -187,6 +258,7 @@ Tags: Essential
 Uses: None.
 The stable finding identity contains the store, subject, issuer, and serial number. It intentionally excludes the certificate thumbprint and volatile expiration details.
 Expiration status, validity dates, private-key presence, enhanced key usages, a newer same-subject candidate, and remediation guidance are included in the finding comments.
+When a newer valid same-subject candidate also has the same issuer, private-key capability, and enhanced key usages, it is a strong replacement candidate and the finding is lowered by one severity level. Bindings must still be checked.
 Certificates expired for 60 days or more are notices because continued operation suggests that they were replaced or are no longer used; administrators must still verify bindings before removal.
 Certificates with a total validity period of four days or less do not produce upcoming-expiry findings. Expired short-lived certificates are notices unless a newer currently valid certificate with the same subject exists, in which case they are included in an informational summary.
 Expired Azure CRP certificates are summarized as informational noise only when a newer currently valid certificate with the same subject exists.
@@ -351,6 +423,19 @@ The certificate store has no universal reverse lookup for service or application
             continue
         }
 
+        $isStrongReplacementCandidate = $false
+        if ($null -ne $replacement) {
+            $isStrongReplacementCandidate = Test-CertExpiryStrongReplacementCandidate -Certificate $certificate -Candidate $replacement
+            if ($isStrongReplacementCandidate) {
+                if ($level -eq 'FAILURE') {
+                    $level = 'WARNING'
+                }
+                elseif ($level -eq 'WARNING') {
+                    $level = 'NOTICE'
+                }
+            }
+        }
+
         $titleSummary = 'Certificate validity issue'
         if ($status -like 'Expires in *') {
             if ($level -eq 'FAILURE') {
@@ -404,6 +489,11 @@ The certificate store has no universal reverse lookup for service or application
             $recommendedAction = 'Identify the service or application using this certificate and renew or replace it before expiration.'
         }
 
+        $severityAdjustment = 'None.'
+        if ($isStrongReplacementCandidate) {
+            $severityAdjustment = 'Lowered one level because the candidate has the same issuer, private-key capability, and enhanced key usages.'
+        }
+
         $commentLines = @(
             "Status: $status",
             "Validity: '$notBefore' through '$formattedNotAfter' (local time).",
@@ -411,6 +501,7 @@ The certificate store has no universal reverse lookup for service or application
             "Has private key: $hasPrivateKey.",
             "Enhanced key usages: $enhancedKeyUsages.",
             "Newer valid same-subject candidate: $replacementText",
+            "Severity adjustment: $severityAdjustment",
             'Binding check: Not performed because the Windows certificate store has no universal reverse lookup for references kept separately by services and applications. Confirm whether IIS, HTTP.sys, RDP, WinRM, SQL Server, Azure Backup, or another service references this certificate.',
             "Recommended action: $recommendedAction"
         )
