@@ -101,6 +101,69 @@ Describe 'HealthTest-CertExpiry' {
         $finding = @($script:warnings | Where-Object { $_ -match "SerialNumber='OLD'" })[0]
         $finding | Should -Match "Newer valid same-subject candidate: Subject='CN=Shared'; Issuer='CN=New Issuer'; SerialNumber='NEW'"
         $finding | Should -Match 'Confirm that required bindings moved before treating it as a replacement\.'
+        $finding | Should -Match '(?m)^Severity adjustment: None\.$'
+    }
+
+    It 'lowers severity by one level when a strong replacement candidate exists' {
+        $eku = [pscustomobject]@{ FriendlyName = 'Server Authentication'; Value = '1.3.6.1.5.5.7.3.1' }
+        Mock Get-ChildItem {
+            @(
+                New-TestCertificate -Subject 'CN=Renewed' -Issuer 'CN=Shared Issuer' -SerialNumber 'OLD' -NotAfter (Get-Date).AddDays(-5) -EnhancedKeyUsageList @($eku)
+                New-TestCertificate -Subject 'CN=Renewed' -Issuer 'CN=Shared Issuer' -SerialNumber 'NEW' -NotBefore (Get-Date).AddDays(-1) -NotAfter (Get-Date).AddYears(1) -EnhancedKeyUsageList @($eku)
+            )
+        }
+
+        HealthTest-CertExpiry
+
+        $finding = @($script:warnings | Where-Object { $_ -match "SerialNumber='OLD'" })[0]
+        $finding | Should -Match '^\[WARNING\] Certificate validity issue:'
+        $finding | Should -Match '(?m)^Severity adjustment: Lowered one level because the candidate has the same issuer, private-key capability, and enhanced key usages\.$'
+    }
+
+    It 'lowers an upcoming warning to notice for a strong replacement candidate' {
+        Mock Get-ChildItem {
+            @(
+                New-TestCertificate -Subject 'CN=Renewed Soon' -SerialNumber 'OLD' -NotAfter (Get-Date).AddDays(45)
+                New-TestCertificate -Subject 'CN=Renewed Soon' -SerialNumber 'NEW' -NotBefore (Get-Date).AddDays(-1) -NotAfter (Get-Date).AddYears(1)
+            )
+        }
+
+        HealthTest-CertExpiry
+
+        @($script:warnings | Where-Object { $_ -match "^\[NOTICE\].*SerialNumber='OLD'" }).Count | Should -Be 1
+    }
+
+    It 'does not lower severity when the candidate usage does not match' {
+        $serverEku = [pscustomobject]@{ FriendlyName = 'Server Authentication'; Value = '1.3.6.1.5.5.7.3.1' }
+        $clientEku = [pscustomobject]@{ FriendlyName = 'Client Authentication'; Value = '1.3.6.1.5.5.7.3.2' }
+        Mock Get-ChildItem {
+            @(
+                New-TestCertificate -Subject 'CN=Different Usage' -SerialNumber 'OLD' -NotAfter (Get-Date).AddDays(-5) -EnhancedKeyUsageList @($serverEku)
+                New-TestCertificate -Subject 'CN=Different Usage' -SerialNumber 'NEW' -NotBefore (Get-Date).AddDays(-1) -NotAfter (Get-Date).AddYears(1) -EnhancedKeyUsageList @($clientEku)
+            )
+        }
+
+        HealthTest-CertExpiry
+
+        $finding = @($script:warnings | Where-Object { $_ -match "SerialNumber='OLD'" })[0]
+        $finding | Should -Match '^\[FAILURE\] Certificate validity issue:'
+        $finding | Should -Match '(?m)^Severity adjustment: None\.$'
+    }
+
+    It 'prefers a strong candidate over a longer-lived weak candidate' {
+        Mock Get-ChildItem {
+            @(
+                New-TestCertificate -Subject 'CN=Several Candidates' -Issuer 'CN=Original Issuer' -SerialNumber 'OLD' -NotAfter (Get-Date).AddDays(-5)
+                New-TestCertificate -Subject 'CN=Several Candidates' -Issuer 'CN=Original Issuer' -SerialNumber 'STRONG' -NotBefore (Get-Date).AddDays(-1) -NotAfter (Get-Date).AddMonths(6)
+                New-TestCertificate -Subject 'CN=Several Candidates' -Issuer 'CN=Other Issuer' -SerialNumber 'WEAK' -NotBefore (Get-Date).AddDays(-1) -NotAfter (Get-Date).AddYears(2)
+            )
+        }
+
+        HealthTest-CertExpiry
+
+        $finding = @($script:warnings | Where-Object { $_ -match "SerialNumber='OLD'" })[0]
+        $finding | Should -Match '^\[WARNING\] Certificate validity issue:'
+        $finding | Should -Match "Newer valid same-subject candidate:.*SerialNumber='STRONG'"
     }
 
     It 'suppresses an expired Azure CRP certificate when a newer valid same-subject candidate exists' {
