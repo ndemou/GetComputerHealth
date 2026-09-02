@@ -6,7 +6,7 @@ For the full documentation routing table, see [`README.md`](../README.md).
 
 ## TL;DR
   
-All `.ps1` files in `C:\IT\GetComputerHealth\config\Custom-HealthTests\` are executed directly. Your script should report its result(s) like this:
+All `.ps1` files in `C:\IT\Get-ComputerHealth\config\Custom-HealthTests\` are executed directly. Your script should report its result(s) like this:
 ```powershell
 Write-Warning "[PASS] Description of what's OK"
 Write-Warning "[FAILURE] Description of the issue"
