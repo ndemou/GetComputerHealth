@@ -588,3 +588,399 @@ param(
 
     return $null
 }
+
+
+function Get-HttpsCertificateStatus {
+<#
+.SYNOPSIS
+Checks the TLS certificate presented by an HTTPS URL.
+
+.EXAMPLE
+Get-HttpsCertificateStatus 'https://google.com/'
+
+
+Url           : https://google.com/
+Status        : Valid
+IsValid       : True
+ExpiresAt     : 2026-11-27 10:04:48 +02:00
+DaysRemaining : 70
+NotBefore     : 2026-09-04 11:04:49 +03:00
+Subject       : CN=*.google.com
+Issuer        : CN=WE2, O=Google Trust Services, C=US
+Thumbprint    : 6D8EE38ADF44FA74ED5B854060065A63B6085A8D
+Protocol      : Tls13
+StatusDetails : {}
+Error         :
+
+#>
+    [CmdletBinding()]
+    [OutputType([pscustomobject])]
+    param(
+        [Parameter(Mandatory, ValueFromPipeline)]
+        [ValidateNotNullOrEmpty()]
+        [string] $Url,
+
+        [ValidateRange(1, 300)]
+        [int] $TimeoutSeconds = 10
+    )
+
+    process {
+        [uri] $uri = $null
+
+        if (-not [uri]::TryCreate(
+                $Url,
+                [UriKind]::Absolute,
+                [ref] $uri
+            ) -or $uri.Scheme -ne 'https') {
+
+            return [pscustomobject]@{
+                Url           = $Url
+                Status        = 'InvalidUrl'
+                IsValid       = $false
+                ExpiresAt     = $null
+                DaysRemaining = $null
+                Error         = 'Supply an absolute HTTPS URL.'
+            }
+        }
+
+        $tcp = $null
+        $tls = $null
+        $certificate = $null
+
+        $state = [pscustomobject]@{
+            Certificate = $null
+            PolicyErrors = [Net.Security.SslPolicyErrors]::None
+            ChainStatus  = @()
+        }
+
+        try {
+            $tcp = [Net.Sockets.TcpClient]::new()
+
+            $connectTask = $tcp.ConnectAsync(
+                $uri.DnsSafeHost,
+                $uri.Port
+            )
+
+            if (-not $connectTask.Wait(
+                    [TimeSpan]::FromSeconds($TimeoutSeconds)
+                )) {
+                throw [TimeoutException]::new(
+                    'The TCP connection timed out.'
+                )
+            }
+
+            [void] $connectTask.GetAwaiter().GetResult()
+
+            $callback =
+                [Net.Security.RemoteCertificateValidationCallback] {
+                    param(
+                        $sender,
+                        $remoteCertificate,
+                        $chain,
+                        $policyErrors
+                    )
+
+                    if ($null -ne $remoteCertificate) {
+                        $state.Certificate =
+                            [Security.Cryptography.X509Certificates.X509Certificate2]::new(
+                                $remoteCertificate
+                            )
+                    }
+
+                    $state.PolicyErrors = $policyErrors
+
+                    if ($null -ne $chain) {
+                        $state.ChainStatus = @(
+                            $chain.ChainStatus |
+                                Where-Object Status -ne (
+                                    [Security.Cryptography.X509Certificates.X509ChainStatusFlags]::NoError
+                                ) |
+                                ForEach-Object {
+                                    $_.Status.ToString()
+                                }
+                        )
+                    }
+
+                    return $true
+                }
+
+            $tls = [Net.Security.SslStream]::new(
+                $tcp.GetStream(),
+                $false,
+                $callback
+            )
+
+            $tls.ReadTimeout = $TimeoutSeconds * 1000
+            $tls.WriteTimeout = $TimeoutSeconds * 1000
+            $tls.AuthenticateAsClient($uri.DnsSafeHost)
+
+            $certificate = $state.Certificate
+
+            if ($null -eq $certificate) {
+                throw 'The server did not supply a certificate.'
+            }
+
+            $now = [DateTimeOffset]::Now
+            $notBefore = [DateTimeOffset] $certificate.NotBefore
+            $expiresAt = [DateTimeOffset] $certificate.NotAfter
+            $reasons = [Collections.Generic.List[string]]::new()
+
+            if ($now -lt $notBefore) {
+                $reasons.Add(
+                    'The certificate is not valid yet.'
+                )
+            }
+
+            if ($now -gt $expiresAt) {
+                $reasons.Add(
+                    'The certificate has expired.'
+                )
+            }
+
+            if ($state.PolicyErrors -ne
+                [Net.Security.SslPolicyErrors]::None) {
+                $reasons.Add(
+                    $state.PolicyErrors.ToString()
+                )
+            }
+
+            foreach ($chainStatus in $state.ChainStatus) {
+                $reasons.Add($chainStatus)
+            }
+
+            $isValid = $reasons.Count -eq 0
+
+            [pscustomobject]@{
+                Url           = $uri.AbsoluteUri
+                Status        = if ($isValid) {
+                    'Valid'
+                }
+                else {
+                    'Invalid'
+                }
+                IsValid       = $isValid
+                ExpiresAt     = $expiresAt
+                DaysRemaining = [math]::Floor(
+                    ($expiresAt - $now).TotalDays
+                )
+                NotBefore     = $notBefore
+                Subject       = $certificate.Subject
+                Issuer        = $certificate.Issuer
+                Thumbprint    = $certificate.Thumbprint
+                Protocol      = $tls.SslProtocol.ToString()
+                StatusDetails = @($reasons)
+                Error         = $null
+            }
+        }
+        catch {
+            [pscustomobject]@{
+                Url           = $uri.AbsoluteUri
+                Status        = 'ConnectionError'
+                IsValid       = $false
+                ExpiresAt     = $null
+                DaysRemaining = $null
+                NotBefore     = $null
+                Subject       = $null
+                Issuer        = $null
+                Thumbprint    = $null
+                Protocol      = $null
+                StatusDetails = @()
+                Error         =
+                    $_.Exception.GetBaseException().Message
+            }
+        }
+        finally {
+            if ($null -ne $tls) {
+                $tls.Dispose()
+            }
+
+            if ($null -ne $tcp) {
+                $tcp.Dispose()
+            }
+
+            if ($null -ne $certificate) {
+                $certificate.Dispose()
+            }
+        }
+    }
+}
+
+
+function HealthTest-HttpsCertificate {
+<#
+Description: Checks configured HTTPS endpoints for certificate validation and upcoming expiration.
+AppliesTo: All
+Scope: Computer
+Category: Availability/Server Down Signals, Configuration Hygiene & Best Practices
+Impact: Medium(Network), Medium(Time)
+Uses: Get-HttpsCertificateStatus.
+#>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [ValidateNotNullOrEmpty()]
+        [string[]]$Url,
+
+        [ValidateRange(0, 3650)]
+        [int]$WarnDays = 60,
+
+        [ValidateRange(0, 3650)]
+        [int]$FailDays = 30,
+
+        [ValidateRange(1, 300)]
+        [int]$TimeoutSeconds = 10
+    )
+
+    if ($WarnDays -lt $FailDays) {
+        Write-Warning (
+            "[FAILURE] HTTPS certificate test configuration issue" +
+            "`nWarnDays ($WarnDays) must be greater than or equal to " +
+            "FailDays ($FailDays)."
+        )
+        return
+    }
+
+    $findingCount = 0
+
+    foreach ($targetUrl in $Url) {
+        try {
+            $result = Get-HttpsCertificateStatus -Url $targetUrl -TimeoutSeconds $TimeoutSeconds
+        }
+        catch {
+            $escapedUrl = ([string]$targetUrl).Replace("'", "''")
+
+            Write-Warning (
+                "[NOTICE] HTTPS certificate could not be inspected: " +
+                "Url='$escapedUrl'" +
+                "`nError: $($_.Exception.Message)"
+            )
+
+            $findingCount++
+            continue
+        }
+
+        $reportedUrl = [string]$result.Url
+        if ([string]::IsNullOrWhiteSpace($reportedUrl)) {
+            $reportedUrl = [string]$targetUrl
+        }
+
+        $escapedUrl = $reportedUrl.Replace("'", "''")
+
+        if ($result.Status -eq 'ConnectionError') {
+            $errorText = [string]$result.Error
+
+            if ([string]::IsNullOrWhiteSpace($errorText)) {
+                $errorText = 'No error details were reported.'
+            }
+
+            Write-Warning (
+                "[NOTICE] HTTPS certificate could not be inspected: " +
+                "Url='$escapedUrl'" +
+                "`nError: $errorText"
+            )
+
+            $findingCount++
+            continue
+        }
+
+        if ($result.Status -eq 'InvalidUrl') {
+            Write-Warning (
+                "[FAILURE] HTTPS certificate test configuration issue: " +
+                "Url='$escapedUrl'" +
+                "`nError: $($result.Error)"
+            )
+
+            $findingCount++
+            continue
+        }
+
+        if (-not [bool]$result.IsValid) {
+            $detailLines = @(
+                "Status: $($result.Status)."
+            )
+
+            foreach ($statusDetail in @($result.StatusDetails)) {
+                if (-not [string]::IsNullOrWhiteSpace(
+                        [string]$statusDetail
+                    )) {
+                    $detailLines += "Certificate status: $statusDetail"
+                }
+            }
+
+            if ($null -ne $result.ExpiresAt) {
+                $detailLines += "Expires: $($result.ExpiresAt)."
+            }
+
+            Write-Warning (
+                "[FAILURE] HTTPS certificate is invalid: " +
+                "Url='$escapedUrl'" +
+                "`n" +
+                ($detailLines -join "`n")
+            )
+
+            $findingCount++
+            continue
+        }
+
+        if ($null -eq $result.ExpiresAt) {
+            Write-Warning (
+                "[FAILURE] HTTPS certificate expiration was not reported: " +
+                "Url='$escapedUrl'"
+            )
+
+            $findingCount++
+            continue
+        }
+
+        try {
+            $expiresAt = [DateTimeOffset]$result.ExpiresAt
+        }
+        catch {
+            Write-Warning (
+                "[FAILURE] HTTPS certificate expiration is invalid: " +
+                "Url='$escapedUrl'" +
+                "`nReported value: '$($result.ExpiresAt)'."
+            )
+
+            $findingCount++
+            continue
+        }
+
+        $remainingDays = [int][Math]::Ceiling(
+            ($expiresAt - [DateTimeOffset]::Now).TotalDays
+        )
+
+        $formattedExpiry = $expiresAt.ToString(
+            'yyyy-MM-dd HH:mm:ss zzz',
+            [Globalization.CultureInfo]::InvariantCulture
+        )
+
+        if ($remainingDays -le $FailDays) {
+            Write-Warning (
+                "[FAILURE] HTTPS certificate will expire very soon: " +
+                "Url='$escapedUrl'" +
+                "`nExpires: $formattedExpiry." +
+                "`nRemaining days: $remainingDays."
+            )
+
+            $findingCount++
+        }
+        elseif ($remainingDays -le $WarnDays) {
+            Write-Warning (
+                "[WARNING] HTTPS certificate will expire soon: " +
+                "Url='$escapedUrl'" +
+                "`nExpires: $formattedExpiry." +
+                "`nRemaining days: $remainingDays."
+            )
+
+            $findingCount++
+        }
+    }
+
+    if ($findingCount -eq 0) {
+        Write-Warning (
+            "[PASS] All $($Url.Count) HTTPS certificates are valid " +
+            "for more than $WarnDays days"
+        )
+    }
+}

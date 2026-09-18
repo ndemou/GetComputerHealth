@@ -401,7 +401,7 @@ If you only want to add a few custom tests, you do not need to modify the core c
 | NetworkConnectionProfiles        | Checks network connection profiles and basic connectivity expectations for each active network |
 | Nic                              | Checks network adapters for unhealthy status or suspicious error counters |
 | NltestSiteDiscovery              | Checks whether site discovery returns a valid AD site for the computer |
-| ListScheduledTasks               | Lists scheduled task definitions with fingerprints for actions, triggers, identity, privilege, and enabled state |
+| ListScheduledTasks               | Lists persistent scheduled task definitions and reports short-lived one-shot tasks as informational |
 | ListShares                       | Lists SMB shares |
 | ListServices                     | Lists service definitions with payload publisher/hash context for policy review |
 | ListStartupItems                 | Lists startup items found in standard registry and startup-folder locations |

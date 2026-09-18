@@ -18,6 +18,20 @@ already-loaded functions and variables. See
 [`user/custom-tests.md`](./custom-tests.md) for the current
 execution-scope details and cautions.
 
+## How to check HTTPS certificates
+
+Use `HealthTest-HttpsCertificate` to check certificate validation and
+expiration for one or more HTTPS URLs:
+
+```powershell
+. 'C:\IT\Get-ComputerHealth\bin\helpers-for-custom-ht.ps1'
+
+HealthTest-HttpsCertificate -Url 'https://example.com/', 'https://www.example.com/' -WarnDays 60 -FailDays 30
+```
+
+`Get-HttpsCertificateStatus` returns the certificate details without writing a
+health finding. Use it when a custom test needs its own reporting logic.
+
 ## How to check whether recent Veeam backups exist in a folder
 
 ### For backups stored in local drives (NOT mapped drives)

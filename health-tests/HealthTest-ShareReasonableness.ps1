@@ -62,10 +62,8 @@ Uses: Get-SmbShare, Get-SmbShareAccess, Get-Acl.
     [switch]$IncludeAdminShares
   )
 
-  # Regarding BUILTIN\Power Users:
-  # I have included it in the list allthough it's not a Broad group (in fact it's usually empty).
-  # It is a legacy local group from pre-Vista/XP era. On modern Windows, it exists but is empty by default.
-  # If it appears, it often indicates old misapplied permissions and that's the reason I left it.
+  # BUILTIN\Power Users is usually empty on supported Windows versions.
+  # Its presence in a share ACL often indicates misapplied permissions, so treat it as broad.
 
   # 0(Workstation standalone),  1(Workstation domain joined), 2(Server standalone), 3(Server joined), 4(DC non-FSMO), 5(DC with FSMO role)
   $domainRole = (Get-CimInstance Win32_ComputerSystem).DomainRole
