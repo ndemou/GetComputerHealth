@@ -333,132 +333,22 @@ Or:
 }
 
 
-function Start-HealthTestVeeamRecentBackupsExist{
+function Start-HealthTestVeeamRecentConfigBackupsExist {
 <#
 .SYNOPSIS
-Reports if recent enough Veeam VM backups exist and have reasonable sizes.
-Expects at least on .VBK file and a fresh .VBM and either a fresh .VIB or a fresh .VBK
-
-.DESCRIPTION
-Supports configuration via either a JSON config file (-ConfigPath) or by passing -RootPath directly.
-If both are provided, values from -ConfigPath are used for credentials while -RootPath takes precedence
-for the backup path.
-
-Config file is json based. Examples:
-    {
-      "RootPath": "\\\\10.1.2.3\\share\\path\\to\\Backups",
-      "Username": "foo",
-      "Password": "bar"
-    }
-Or:
-    {
-      "RootPath": "C:\\path\\to\\Backups"
-    }
-
-.EXAMPLE
-
-    Start-HealthTestVeeamRecentBackupsExist `
-        -ConfigPath 'C:\Get-ComputerHealth\config\HealthTest-RecentBackupsExist.config' `
-        -MaxAgeHoursForVibVbm 23 `
-        -MaxAgeHoursForVBK 480
-
-.EXAMPLE
-    Start-HealthTestVeeamRecentBackupsExist `
-        -RootPath 'C:\path\to\Backups' `
-        -MaxAgeHoursForVibVbm 23 `
-        -MaxAgeHoursForVBK 480
-
+Reports if recent enough Veeam Configuration backups (.BCO) exist and have reasonable sizes.
 #>
-[CmdletBinding()]
-param(
-    [string]$ConfigPath,
-    [string]$RootPath,
-    [int]$MaxAgeHoursForVBK = 480,
-    [int]$MaxAgeHoursForVibVbm=23
-)
+    [CmdletBinding()]
+    param(
+        [string]$RootPath,
+        [int]$MaxAgeHours = 24
+    )
 
-    if ([string]::IsNullOrWhiteSpace($ConfigPath) -and [string]::IsNullOrWhiteSpace($RootPath)) {
-        Write-Warning "[FAILURE] Not running HealthTest-RecentBackupsExist because neither -ConfigPath nor -RootPath was provided"
-        return
+    if (Get-RecentFilesConditional -Path $RootPath -Pattern '*.BCO' -MinBytes 25000 -MaxAgeHours $MaxAgeHours) {
+        Write-Warning "[PASS] Found recent Configuration Backup in $RootPath"
     }
-
-    $username = ""
-    $password = ""
-
-    if (-not [string]::IsNullOrWhiteSpace($ConfigPath)) {
-        if (-not (Test-Path -LiteralPath $ConfigPath)) {
-            Write-Warning "[NOTICE] Not running HealthTest-RecentBackupsExist because settings file does not exist: $ConfigPath"
-            return
-        }
-
-        $settings = Read-JsonFile -Path $ConfigPath -Encoding UTF8
-
-        if ([string]::IsNullOrWhiteSpace($RootPath)) {
-            $RootPath = $settings.RootPath
-        }
-
-        try {
-            $username = $settings.Username
-            $password = $settings.Password
-        } catch {}
-    }
-
-    if ([string]::IsNullOrWhiteSpace($RootPath)) {
-        Write-Warning "[FAILURE] Not running HealthTest-RecentBackupsExist because no RootPath could be determined"
-        return
-    }
-
-    $driveName = $null
-    $root      = $RootPath
-
-    # Create a temp map drive for UNC paths
-    if ($RootPath -like '\\*') {
-        if ($username) {
-            $securePwd = ConvertTo-SecureString -String $password -AsPlainText -Force
-            $cred      = New-Object System.Management.Automation.PSCredential($username, $securePwd)
-
-            $driveName = "UNC$(Get-Random -Minimum 1000 -Maximum 9999)"
-            Write-Output "Creating temporary PSDrive $driveName for $RootPath using credentials from $ConfigPath"
-            New-PSDrive -Name $driveName -PSProvider FileSystem -Root $RootPath -Credential $cred -Scope Global -ErrorAction Stop | Out-Null
-
-            $root = "$driveName`:\"
-        } else {
-            try {
-                $null = Get-ChildItem $root
-            } catch {
-                $authHint = if ($ConfigPath) { " (try adding a username and password to config file $ConfigPath)" } else { "" }
-                Write-Warning "[FAILURE] Can't access $root$authHint"
-                return
-            }
-        }
-    }
-
-    try {
-        # VBM = metadata/index about the backups.
-        # VIB = incremental backup (changes since last full).
-        # VBK = full backup (also baseline for incremental ones).
-        $fresh_vbm       = Get-RecentFilesConditional -Path $root -Pattern '*.vbm' -MinBytes (          10*1024) -MaxAgeHours $MaxAgeHoursForVibVbm
-        $fresh_vib       = Get-RecentFilesConditional -Path $root -Pattern '*.vib' -MinBytes ( 1*1024*1024*1024) -MaxAgeHours $MaxAgeHoursForVibVbm
-        $fresh_vbk       = Get-RecentFilesConditional -Path $root -Pattern '*.vbk' -MinBytes (10*1024*1024*1024) -MaxAgeHours $MaxAgeHoursForVibVbm
-        $atleast_one_vbk = Get-RecentFilesConditional -Path $root -Pattern '*.vbk' -MinBytes (10*1024*1024*1024) -MaxAgeHours $MaxAgeHoursForVBK 
-
-        $configHint = if ($ConfigPath) { "If you want to change the configuration edit: $ConfigPath" } else { "" }
-
-        if ($fresh_vbm -and ($fresh_vib -or $fresh_vbk) -and $atleast_one_vbk) {
-            Write-Warning "[PASS] Found recent Veeam backups at $root"
-        } else {
-            Write-Warning ("[FAILURE] No recent Veeam backups found at: $RootPath" + "`n" + ("$configHint`n" + `
-                "fresh_vbm=$fresh_vbm, fresh_vib=$fresh_vib, fresh_vbk=$fresh_vbk, atleast_one_vbk=$atleast_one_vbk`n" + `
-                "Condition for pass is: " + `
-                '($fresh_vbm -and ($fresh_vib -or $fresh_vbk) -and $atleast_one_vbk)' + `
-                (Get-ChildItem $root|Out-String)))
-        }
-    }
-    finally {
-        if ($driveName) {
-            Write-Output "Removing PSDrive $driveName"
-            Remove-PSDrive -Name $driveName -ErrorAction SilentlyContinue
-        }
+    else {
+        Write-Warning "[FAILURE] No recent Configuration Backup in $RootPath"
     }
 }
 
