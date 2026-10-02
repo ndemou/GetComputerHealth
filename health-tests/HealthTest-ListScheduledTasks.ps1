@@ -12,7 +12,7 @@ Description: Lists persistent scheduled task definitions and reports short-lived
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
-Impact: Medium(Time)
+Impact: High(Time)
 Tags: Policy
 Uses: Get-ScheduledTask, Get-ScheduledTaskInfo, Export-ScheduledTask.
 

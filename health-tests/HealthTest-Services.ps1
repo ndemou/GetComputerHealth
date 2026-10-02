@@ -10,7 +10,7 @@ Description: Reviews service operational health, including auto-start services t
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
-Impact: low
+Impact: High(Time)
 Tags: Essential
 Uses: Win32_Service, Get-ServiceVendors.
 #>
