@@ -246,6 +246,7 @@ Uses: Get-NetConnectionProfile, Test-NetConnectivityToNetwork.
     Write-Warning "[PASS] Found interface on expected NLA category"
   } else {
     $synopsis = "No connection with a proper NLA category: $(($allowedCategories -join ', '))"
+    $details += "`nIf a brief network interruption is safe for this host, replace <INDEX> with the affected InterfaceIndex and run:`n    Get-NetAdapter -InterfaceIndex <INDEX> | Restart-NetAdapter"
     Write-Warning "[FAILURE] $synopsis$details"
   }
 }
