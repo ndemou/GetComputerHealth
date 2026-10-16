@@ -694,6 +694,7 @@ $localUpdateAlreadyRan = $false
 if (-not $NoUpdate) {
   $versionBeforeUpdate = $localEmbeddedVersion
   try {
+    write-output "Starting $UPDATE_SCRIPT_PATH"
     $earlyUpdateOutput = & $UPDATE_SCRIPT_PATH 2>&1 3>&1 4>&1 5>&1 6>&1
     foreach ($item in @($earlyUpdateOutput)) {
       if ($item -is [System.Management.Automation.ErrorRecord]) {
