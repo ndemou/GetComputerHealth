@@ -303,7 +303,7 @@ Uses: Check-PendingSecurityUpdates, Check-UpdateAge.
         }
         $message = "[FAILURE] Windows security updates are seriously overdue.`n$missingText`nThe last recorded Windows system update installation was $($age.AgeDays) days ago.`n"
       } else {
-        $message = "[$level] This computer is missing Windows security fixes.`n$missingText"
+        $message = "[$level] This computer is missing Windows security updates.`n$missingText"
       }
       Write-Warning "$message`nCheck Windows Update for failed or blocked installations.$targetText"
     }

@@ -238,7 +238,7 @@ Describe 'Windows update checks' {
       }
       HealthTest-WindowsUpdates
       $script:warnings.Count | Should -Be 1
-      $script:warnings[0] | Should -Match '^\[FAILURE\] This computer is missing Windows security fixes\.'
+      $script:warnings[0] | Should -Match '^\[FAILURE\] This computer is missing Windows security updates\.'
       $script:warnings[0] | Should -Match '21 days'
     }
 
@@ -311,7 +311,7 @@ Describe 'Windows update checks' {
       $script:pendingFacts.Errors = @('Cached inspection failed')
       $script:pendingFacts.Updates = @(New-TestPendingUpdate -Days 20)
       HealthTest-WindowsUpdates
-      ($script:warnings -join "`n") | Should -Match '\[FAILURE\] This computer is missing Windows security fixes'
+      ($script:warnings -join "`n") | Should -Match '\[FAILURE\] This computer is missing Windows security updates'
       ($script:warnings -join "`n") | Should -Match 'no recent successful check for updates'
       ($script:warnings -join "`n") | Should -Not -Match '\[PASS\]'
     }
@@ -342,7 +342,7 @@ Describe 'Windows update checks' {
       $script:pendingFacts.Updates = @(New-TestPendingUpdate -Days 40)
       HealthTest-WindowsUpdates
       ($script:warnings -join "`n") | Should -Match 'Current Windows security update information could not be confirmed'
-      ($script:warnings -join "`n") | Should -Match '\[FAILURE\] This computer is missing Windows security fixes'
+      ($script:warnings -join "`n") | Should -Match '\[FAILURE\] This computer is missing Windows security updates'
       ($script:warnings -join "`n") | Should -Not -Match '\[PASS\]'
     }
 
@@ -364,7 +364,7 @@ Describe 'Windows update checks' {
 
       $script:warnings | Should -HaveCount 1
       $script:warnings[0] | Should -Be (@(
-        '[FAILURE] This computer is missing Windows security fixes.'
+        '[FAILURE] This computer is missing Windows security updates.'
         'Missing monthly security updates since 184 days ago (2026-04-14).'
         'Check Windows Update for failed or blocked installations.'
         'Latest monthly security update to install: KB5126655.'
