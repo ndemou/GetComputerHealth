@@ -79,7 +79,7 @@ Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/ndemou/Get
             To     = 'ops@contoso.com;admin@contoso.com'
         }
         'gch.psd1' = @{
-            AutomaticUpdates = $false
+            AutomaticUpdates = $true
             SendReports = 'Auto' # 'Never', 'Always', or 'Auto'
             ShowAsPostponedWindowDays = 15
             IpsOfAllDCs = @('10.1.2.3', '10.1.2.4')
