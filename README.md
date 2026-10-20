@@ -24,12 +24,12 @@ This is a **robust production-tested toolkit** and I have been using it across s
 
 **BUT:**
 
- 1. **Don't expect official support.** I am happy to help when I can, but my availability is limited. You should be comfortable with PowerShell.
+ 1. **Don't expect official support.** I am happy to help when I can, but my availability is limited. You, or your AI agent, should be comfortable with PowerShell.
  2. **I am currently the only user I know of**, so there is a chance I have some blind spots.
  3. **There's a tiny chance of breaking changes.** I'll avoid them because I would have to clean up issues at several production sites. However, I *will do it* if the benefits are worth it to me.
  4. **I have not tested it on domains with more than a few dozen servers, or with DCs connected via WAN.** Some domain-related tests could cause excessive WAN traffic. Test while observing traffic. I would be glad to hear the results.
 
- > On the plus side, if you ever need to dive into the code, it is surprisingly small and straightforward: **the core is about 1,000 lines, including comments.** The only code that is not small is the HTML report code. The tests total more than ten thousand lines, but most are only a dozen or two dozen lines and self-contained. Only a few are a few hundred lines or depends on helper functions. All modern AI agents can easily understand and fix issues in such a simple codebase. In fact, the vast majority of the code *was* written by Codex, with me acting as the architect, lead developer, reviewer, and QC.
+ > On the plus side, if you ever need to dive into the code, it is surprisingly small and straightforward: **the core is about 1,000 lines, including comments.** The only code that is not small is the HTML report code. The tests total more than ten thousand lines, but most are only a dozen or two dozen lines and self-contained. Only a few are a few hundred lines or depend on helper functions. All modern AI agents can easily understand and fix issues in such a simple codebase. In fact, the vast majority of the code *was* written by Codex, with me acting as the architect, lead developer, reviewer, and QC.
 
 ## Comparison to PRTG, Zabbix
 
