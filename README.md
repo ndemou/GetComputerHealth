@@ -20,7 +20,7 @@ It produces **useful, concise reports and email alerts**. You can also add your 
 
 # Status / Is this toolkit for you?
 
-This is a **robust production-tested toolkit** and I have been using it across several domains and multiple servers for many months.
+This is a **robust production-tested toolkit** and I have been using it across several domains and multiple servers for more than a year.
 
 **BUT:**
 
@@ -29,7 +29,7 @@ This is a **robust production-tested toolkit** and I have been using it across s
  3. **There's a tiny chance of breaking changes.** I'll avoid them because I would have to clean up issues at several production sites. However, I *will do it* if the benefits are worth it to me.
  4. **I have not tested it on domains with more than a few dozen servers, or with DCs connected via WAN.** Some domain-related tests could cause excessive WAN traffic. Test while observing traffic. I would be glad to hear the results.
 
- > On the plus side, if you ever need to dive into the code, it is surprisingly small and straightforward: **the core is about 1,000 lines, including comments.** The HTML report code is heavier. The tests total more than ten thousand lines, but most are only a dozen or two dozen lines. Only a few are a few hundred lines. Any modern AI agent can understand and fix issues in this codebase. In fact, the vast majority of the code *was* written by Codex, with me acting as the architect, lead developer, reviewer, and QC.
+ > On the plus side, if you ever need to dive into the code, it is surprisingly small and straightforward: **the core is about 1,000 lines, including comments.** The only code that is not small is the HTML report code. The tests total more than ten thousand lines, but most are only a dozen or two dozen lines and self-contained. Only a few are a few hundred lines or depends on helper functions. All modern AI agents can easily understand and fix issues in such a simple codebase. In fact, the vast majority of the code *was* written by Codex, with me acting as the architect, lead developer, reviewer, and QC.
 
 ## Comparison to PRTG, Zabbix
 
