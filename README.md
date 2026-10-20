@@ -49,9 +49,11 @@ You can also disable automatic updates by setting `AutomaticUpdates = $false`.
 
 This toolkit has **no external dependencies**.
 
-The default built-in health-test suite is read-only. Built-in tests that make limited computer-state changes are kept in a separate folder and are not loaded or run unless the administrator explicitly supplies `-IReallyWantToRunTestsThatChangeState`. This keeps normal execution consistent with the advertised read-only policy while preserving valuable active diagnostics. Custom tests remain administrator-controlled code and can have their own side effects.
+The default built-in health-test suite is read-only. Built-in tests that make limited computer-state changes are kept in a separate folder and are not loaded or run unless the administrator explicitly supplies `-IReallyWantToRunTestsThatChangeState`. 
 
-GetComputerHealth is not a malware or intrusion-detection product. It can incidentally expose suspicious traces, but it prioritizes actionable, low-noise administrative findings over broad detection with frequent false positives. Use an EDR product and purpose-built security monitoring for threat detection. See the [health findings and noise design decision](./doc/design/health-findings-and-noise.md).
+Custom tests that you may, can have their own side effects. Be careful.
+
+GetComputerHealth may incidentally expose suspicious activity, but it is **not** a malware or intrusion-detection product. It prioritizes actionable, low-noise administrative findings over broad detection with frequent false positives. See the [health findings and noise design decision](./doc/design/health-findings-and-noise.md).
 
 ---
 
@@ -99,7 +101,7 @@ C:\IT\Get-ComputerHealth\bin\Invoke-GetComputerHealth.ps1
 
 ## Optional Active Diagnostics
 
-GetComputerHealth includes a small, separately guarded class of active diagnostics. We consider these tests highly safe on conventional systems and dangerous only in unusual or tightly constrained environments, but they are not observationally read-only. Enable them explicitly:
+GetComputerHealth includes a small, separately guarded class of diagnostics that may make small changes. We consider these tests highly safe on conventional systems and dangerous only in unusual or tightly constrained environments. To enable them on a particular run:
 
 ```powershell
 C:\IT\Get-ComputerHealth\bin\Invoke-GetComputerHealth.ps1 -IReallyWantToRunTestsThatChangeState
@@ -109,7 +111,7 @@ The gpupdate test actively refreshes Group Policy. A policy refresh is a routine
 
 The DCDIAG test actively runs comprehensive Microsoft domain-controller diagnostics. Some checks can create and remove temporary diagnostic data or refresh registrations while verifying Active Directory. These bounded actions are designed for routine domain administration and provide strong corroboration across important services, so we also encourage running DCDIAG on conventional domain controllers. Leave the switch off for unusually fragile, isolated, forensically preserved, or strictly change-controlled systems.
 
-See the [state-changing health-test design decision](./doc/design/state-changing-health-tests.md) for the repository rules behind this separation.
+> See the [state-changing health-test design decision](./doc/design/state-changing-health-tests.md) for the repository rules behind this separation.
 
 ## Automatic Daily Monitoring of One Computer
 
@@ -233,6 +235,8 @@ $results | ogv
 > * `-OutputObjects` is what populates `$results`.
 > * `-Hide DIP` hides **D**ebug, **I**nfo, and **P**ass messages from the console, showing only **N**otices, **W**arnings, **F**ailures, and **S**uppressed messages.
 > * Available options let you skip slow tests (`-SkipSlowTests`), skip non-essential tests (`-SkipNonEssentialTests`), exclude specific tests (`-ExcludeTests`), run specific tests (`-OnlyTheseTests`), or explicitly enable the guarded active diagnostics (`-IReallyWantToRunTestsThatChangeState`). Autocomplete using `-` + `TAB` is your friend. `-ListAllBuiltInTests` will give you a list of all tests, including guarded tests that are not loaded by default.
+
+> **Tip:** To perform one test, just execute the script with the same name.
 
 ---
 
