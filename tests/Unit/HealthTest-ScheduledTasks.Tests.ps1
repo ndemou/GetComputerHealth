@@ -156,6 +156,16 @@ Describe 'Scheduled task fact helpers' {
     $details | Should -Match '(?m)^Next run time: 2026-02-10 09:55:24$'
   }
 
+  It 'keeps the result code separate from known and fallback error descriptions' -ForEach @(
+    @{ Code = '0x800710E0' }, @{ Code = '0x8004131F' }, @{ Code = '0x80070020' }
+  ) {
+    $result = Get-ScheduledTaskLastResultAnalysis -RawValue $Code
+    $result.Hex | Should -Be $Code
+    $result.Description | Should -Not -BeNullOrEmpty
+    $result.Description | Should -Not -Match '0x[0-9a-fA-F]{8}'
+    $result.IsInformational | Should -BeFalse
+  }
+
   It 'collects DeleteExpiredTaskAfter from scheduled task settings' {
     Reset-ScheduledTaskFactsCache
     Mock Get-ScheduledTask {
@@ -421,6 +431,28 @@ Describe 'HealthTest-ScheduledTasks' {
 
     @($script:warnings | Where-Object { $_ -match 'LastTaskResult=0x80070002' }).Count | Should -Be 1
     @($script:warnings | Where-Object { $_ -match 'terminated with LastTaskResult' }).Count | Should -Be 1
+    ($script:warnings[0] -split "`n")[0] | Should -Match '; Last run time unknown\.$'
+  }
+
+  It 'identifies a failed task run by path, error code, and last run time without repeating the code' -ForEach @(
+    @{ RunTime = '2026-10-18 20:03:03' }, @{ RunTime = '2026-10-25 20:03:04' }
+  ) {
+    $result = Get-ScheduledTaskLastResultAnalysis -RawValue '0x800710E0'
+    $fact = New-TestScheduledTaskFact -TaskPath '\enLogic\' -TaskName 'Execute WindowsUpdatesHelper' -LastRunTime ([datetime]$RunTime) -IsPrivileged $true
+    $fact.LastTaskResult = $result.Code
+    $fact.LastResultCode = $result.Code
+    $fact.LastResultHex = $result.Hex
+    $fact.LastResultSeverity = $result.Severity
+    $fact.LastResultDescription = $result.Description
+    $fact.LastResultIsInformational = $result.IsInformational
+    $script:TestScheduledTaskFacts = @($fact)
+
+    HealthTest-ScheduledTasks -StaleDays 0
+
+    $script:warnings | Should -HaveCount 1
+    $parts = $script:warnings[0] -split "`n", 2
+    $parts[0] | Should -Be "[FAILURE] Scheduled task '\enLogic\Execute WindowsUpdatesHelper' terminated with LastTaskResult=0x800710E0 (Either wrong password or win32 error 'The operator or administrator has refused the request'); Last run time $RunTime."
+    $parts[1] | Should -Match ([regex]::Escape("Last run time: $RunTime"))
   }
 
   It 'suppresses standalone Microsoft built-in bad last result by default' {

@@ -129,7 +129,11 @@ or principal matching is inconclusive, the missed-run finding is retained.
       if (Test-ScheduledTaskLastResultReportable -Fact $fact -Required:$isRequired -IncludeBuiltIn:$IncludeBuiltIn) {
         $hadIssue = $true
         $level = Get-ScheduledTaskOperationalSeverity -Fact $fact -IssueType 'LastResult' -Required:$isRequired
-        Write-Warning "[$level] Scheduled task '$($fact.StableKey)' terminated with LastTaskResult=$($fact.LastResultHex) ($($fact.LastResultDescription)).`n$(Format-ScheduledTaskFactDetails -Fact $fact)"
+        $lastRunText = 'unknown'
+        if ($null -ne $fact.LastRunTime -and $fact.LastRunTime -ne [datetime]::MinValue) {
+          $lastRunText = Format-ScheduledTaskDateTime -Value $fact.LastRunTime
+        }
+        Write-Warning "[$level] Scheduled task '$($fact.StableKey)' terminated with LastTaskResult=$($fact.LastResultHex) ($($fact.LastResultDescription)); Last run time $lastRunText.`n$(Format-ScheduledTaskFactDetails -Fact $fact)"
       }
     }
 

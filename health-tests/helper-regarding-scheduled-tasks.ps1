@@ -79,22 +79,22 @@ function Convert-TaskResultCode {
   param([int64]$Code)
 
   $unsignedCode = ConvertTo-ScheduledTaskUInt32 -Code $Code
-  $hex = '0x{0:X8}' -f $unsignedCode
+  # Callers display the result code separately from its description.
   switch ($Code) {
-    0 { 'Success (0)' }
-    2147750687 { "Operator/admin refused ($hex)" }
-    2147942402 { "File not found ($hex)" }
-    2147942403 { "Path not found ($hex)" }
-    2147942405 { "Access denied ($hex)" }
-    2147954402 { "Service not started ($hex)" }
-    267008 { "Ready ($hex)" }
-    267009 { "Running ($hex)" }
-    267010 { "Disabled ($hex)" }
-    267011 { "Not yet run ($hex)" }
-    267012 { "No more runs ($hex)" }
-    267013 { "Terminated ($hex)" }
-    267014 { "No active triggers ($hex)" }
-    2147946720 { "Either wrong password or win32 error 0x800710E0('The operator or administrator has refused the request')" }
+    0 { 'Success' }
+    2147750687 { 'Operator/admin refused' }
+    2147942402 { 'File not found' }
+    2147942403 { 'Path not found' }
+    2147942405 { 'Access denied' }
+    2147954402 { 'Service not started' }
+    267008 { 'Ready' }
+    267009 { 'Running' }
+    267010 { 'Disabled' }
+    267011 { 'Not yet run' }
+    267012 { 'No more runs' }
+    267013 { 'Terminated' }
+    267014 { 'No active triggers' }
+    2147946720 { "Either wrong password or win32 error 'The operator or administrator has refused the request'" }
     default {
       $win32 = $Code
       $numberStyle = [System.Globalization.NumberStyles]::HexNumber
@@ -112,9 +112,9 @@ function Convert-TaskResultCode {
       }
 
       if ($win32Message) {
-        "Possible win32 error $hex('$win32Message')"
+        "Possible win32 error '$win32Message'"
       } else {
-        "Non standard code hex=$hex"
+        'Non standard code'
       }
     }
   }
