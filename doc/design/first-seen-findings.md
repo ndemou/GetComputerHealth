@@ -1,96 +1,51 @@
-# Σχεδιασμός SuppressRepeats findings
+# SuppressRepeats findings
 
-Κατάσταση: υλοποιημένο για μεμονωμένα findings, με αρχική εφαρμογή στις αποτυχημένες εκτελέσεις του `HealthTest-ScheduledTasks`.
+Status: implemented per finding, first used for failed executions reported by `HealthTest-ScheduledTasks`.
 
-## Τι θέλουμε να πετύχουμε
+For day-to-day behavior, see [automatic repeat suppression](../user/reporting.md#automatic-repeat-suppression). For the marker syntax and selection of suitable findings, see [findings that suppress repeats](../contributor/built-in-health-tests.md#findings-that-suppress-repeats). This document records the design decisions, state format, and implementation requirements.
 
-Ένα finding που περιγράφει ένα συγκεκριμένο συμβάν πρέπει να εμφανίζεται όταν το παρατηρούμε πρώτη φορά. Αν οι επόμενοι έλεγχοι βρίσκουν ακριβώς το ίδιο συμβάν, θέλουμε να το κρατάμε στα αναλυτικά αποτελέσματα αλλά ως suppressed. Αν περάσουν τουλάχιστον 45 ημέρες χωρίς παρατήρηση του ίδιου finding, θέλουμε να εμφανιστεί ξανά όταν και εφόσον επιστρέψει.
+## Intent
 
-Όσο το διάστημα μεταξύ διαδοχικών παρατηρήσεων παραμένει μικρότερο από 45 ημέρες, ο χρήστης δεν θα ειδοποιείται ξανά για το ίδιο finding. Οι 45 ημέρες επιτρέπουν ακόμα και μηνιαία εκτέλεση του `Get-ComputerHealth`.
+A finding that describes a specific event should be shown only when we first observe it. If later checks find exactly the same event, keep it in the full results as suppressed. After at least 45 days without observing that finding, show it again if it returns.
 
-Ο χρόνος μετράει από την τελευταία παρατήρηση, ακόμη κι αν το finding ήταν suppressed. Μετράει η ώρα του health check που το εντόπισε.
+Measure the interval from the last health check that observed the finding, even when it was suppressed. The 45-day interval allows monthly runs of `Get-ComputerHealth` to keep suppressing the same old event. Continuous observations can keep it suppressed indefinitely; that is intentional.
 
-## Παράδειγμα με scheduled task
+## Event identity and per-finding scope
 
-Το παρακάτω finding περιγράφει μια συγκεκριμένη αποτυχημένη εκτέλεση:
+This finding identifies a particular failed execution:
 
 ```text
 Scheduled task '\enLogic\Execute WindowsUpdatesHelper' terminated with LastTaskResult=0x800710E0 (Either wrong password or win32 error 'The operator or administrator has refused the request'); Last run time 2026-10-18 20:03:03.
 ```
 
-Τα στοιχεία που διακρίνουν το συμβάν είναι το full task path, το error code και το last run time. Το description περιλαμβάνει ήδη αυτά τα στοιχεία.
+The full task path, error code, and last run time distinguish the event. If the task does not run again, later checks observe the same finding. If it runs and fails again, the new last run time changes the description and its signature, so the new execution is shown unless another suppression covers it.
 
-- Την πρώτη φορά που το βρίσκουμε, εμφανίζεται κανονικά.
-- Αν το task δεν ξανατρέξει, οι επόμενοι έλεγχοι βρίσκουν το ίδιο finding και ανανεώνουν το SuppressRepeats state.
-- Αν το task ξανατρέξει και αποτύχει, το νέο last run time αλλάζει το description και τη signature. Η νέα αποτυχημένη εκτέλεση εμφανίζεται αμέσως, εκτός αν υπάρχει άλλο ενεργό suppression που την καλύπτει.
+The existing description signature identifies the finding. The marker, details, and severity are excluded from that signature. Changes only to details do not create a new notification. A severity increase from `WARNING` to `FAILURE` also keeps the existing repeat suppression; the current severity remains in the results.
 
-Η ίδια αρχή μπορεί να χρησιμοποιηθεί για άλλα findings.
+Apply the behavior to individual event findings. `HealthTest-ScheduledTasks` also reports disabled tasks, missed runs, stale tasks, and collection errors, which keep their normal behavior. The [authoring guide](../contributor/built-in-health-tests.md#findings-that-suppress-repeats) defines which findings use the marker. The test remains a single health test, and the runner owns all observation state.
 
-## Ο κανόνας των 45 ημερών
+## The 45-day rule
 
-Για κάθε SuppressRepeats finding, ο runner διαβάζει το προηγούμενο state και αποφασίζει πώς θα εμφανιστεί στο τρέχον run. Μετά ενημερώνει την τελευταία παρατήρηση.
-
-1. Ελέγχει πρώτα τα υφιστάμενα suppressions.
-2. Αν δεν υπάρχει άλλο ενεργό suppression, ελέγχει αν έχει καταγραφεί το ίδιο SuppressRepeats finding μέσα στις προηγούμενες 45 ημέρες.
-3. Αν υπάρχει πρόσφατη παρατήρηση, το finding είναι suppressed λόγω SuppressRepeats. Αν δεν υπάρχει, εμφανίζεται κανονικά με το αρχικό του severity.
-4. Σε κάθε περίπτωση που το finding εντοπίστηκε, αποθηκεύει `LastSeenUtc = τώρα`, ακόμη κι αν το finding ήταν suppressed από SuppressRepeats ή από configured suppression.
-
-Η απόφαση του τρέχοντος run πρέπει να προηγείται της ενημέρωσης. Διαφορετικά, θα κρύβαμε ακόμη και την πρώτη εμφάνιση. Η ίδια απόφαση πρέπει να ισχύει στην console και σε όλα τα reports που παράγονται από τα αποτελέσματα του run.
-
-Η ακριβής συνθήκη είναι:
+For each marked finding, the runner uses its previous observation to decide whether it is a repeat:
 
 ```text
 SuppressRepeats suppression is active when:
-    NowUtc < PreviousLastSeenUtc + 45 days
+    PreviousLastSeenUtc <= NowUtc < PreviousLastSeenUtc + 45 days
 ```
 
-Στις ακριβώς 45 ημέρες το SuppressRepeats suppression έχει λήξει. Χρησιμοποιούμε UTC timestamps, ώστε αλλαγές timezone ή θερινής ώρας να μην αλλάζουν το χρονικό διάστημα.
+At exactly 45 days, repeat suppression has expired. UTC timestamps keep timezone and daylight-saving changes from changing the interval.
 
-| Παρατηρήσεις | Συμπεριφορά |
-| --- | --- |
-| Πρώτη παρατήρηση, χωρίς άλλο suppression | Εμφανίζεται κανονικά και αποθηκεύεται η παρατήρηση. |
-| Το ίδιο finding κάθε ημέρα επί πολλούς μήνες | Εμφανίζεται μόνο την πρώτη φορά. Η λήξη ανανεώνεται σε κάθε παρατήρηση. |
-| Το ίδιο finding κάθε μήνα | Παραμένει suppressed εφόσον κάθε διάστημα είναι μικρότερο από 45 ημέρες. |
-| Επιστροφή 44 ημέρες μετά την τελευταία παρατήρηση | Παραμένει suppressed και ανανεώνεται η τελευταία παρατήρηση. |
-| Επιστροφή 45 ή περισσότερες ημέρες μετά την τελευταία παρατήρηση | Εμφανίζεται ξανά και ξεκινά νέο διάστημα. |
-| Το finding δεν εμφανίζεται σε ένα run | Το state του δεν ανανεώνεται και δεν διαγράφεται αμέσως. |
+1. Read the previous state and calculate the repeat decision for this run.
+2. Save `LastSeenUtc = NowUtc` for every observation, including findings already suppressed by configuration or repeat handling.
+3. Apply the suppression precedence below when emitting the finding. Save the observation successfully before applying automatic suppression; a state failure must not hide the finding.
 
-Ένα finding που παρατηρείται συνεχώς μπορεί να μείνει suppressed επ' αόριστον. Αυτό είναι η επιθυμητή συμπεριφορά για το ίδιο παλιό συμβάν.
+The repeat decision must use the previous timestamp. Calculating it from the newly saved timestamp would hide even the first observation. Saving state for later runs does not change the decision for the current run. Console output and reports use that same decision.
 
-## Δήλωση ανά finding
+A run that does not observe the finding neither refreshes nor immediately deletes its entry. The [reporting guide](../user/reporting.md#automatic-repeat-suppression) gives daily, monthly, and expiry examples.
 
-Το `HealthTest-ScheduledTasks` παράγει διαφορετικούς τύπους findings. Το SuppressRepeats αφορά μόνο αποτυχημένες εκτελέσεις που αναγνωρίζονται από συγκεκριμένο last run time.
+## Identity and stored state
 
-| Τύπος finding | Συμπεριφορά |
-| --- | --- |
-| Αποτυχημένη εκτέλεση με συγκεκριμένο last run time | συμπεριφορά SuppressRepeats |
-| Αποτυχημένη εκτέλεση με άγνωστο last run time | Κανονική, επειδή δεν μπορούμε να διακρίνουμε αξιόπιστα τις εκτελέσεις. |
-| Disabled task | Κανονική |
-| Missed runs | Κανονική |
-| Stale task | Κανονική |
-| Αποτυχία συλλογής ή ανάγνωσης δεδομένων | Κανονική |
-
-Το health test δηλώνει ρητά ποια findings ακολουθούν SuppressRepeats, στο σημείο όπου τα παράγει, με ένα προαιρετικό prefix μετά το υπάρχον severity:
-
-```powershell
-Write-Warning "[$level][SuppressRepeats] Scheduled task '$taskPath' terminated with LastTaskResult=$resultHex; Last run time $lastRunText.`n$details"
-```
-
-Το τελικό description μπορεί να περιλαμβάνει και την περιγραφή του error, όπως στο πλήρες παράδειγμα παραπάνω. Το marker υποστηρίζεται από τον runner και για custom scripts. Η απευθείας εκτέλεση ενός health-test αρχείου τυπώνει τα warnings του χωρίς να εφαρμόζει persistent repeat suppression.
-
-Ο runner αναγνωρίζει το `[SuppressRepeats]`, το μετατρέπει σε property `SuppressRepeats = $true` και το αφαιρεί πριν δημιουργήσει το καθαρό description και υπολογίσει τη signature. Έτσι η προσθήκη του marker δεν αλλάζει την ταυτότητα του finding. Το severity διατηρείται.
-
-Η συμπεριφορά αφορά findings επιπέδου `NOTICE`, `WARNING` και `FAILURE`. Τα `PASS`, `INFO`, `DEBUG` και τα errors του ίδιου του runner δεν αποκτούν αυτόματο SuppressRepeats suppression.
-
-Το `HealthTest-ScheduledTasks` παραμένει ένα test. Τα findings χωρίς marker συνεχίζουν να ακολουθούν την κανονική συμπεριφορά. Ο runner αναλαμβάνει κεντρικά το state και το suppression, ώστε τα επιμέρους health tests να χρειάζεται μόνο να δηλώνουν την πρόθεσή τους.
-
-## Ταυτότητα και state
-
-Το SuppressRepeats χρησιμοποιεί την υπάρχουσα signature του description. Τα details παραμένουν εκτός signature, ώστε μια αλλαγή μόνο στα details να μην δημιουργεί νέα ειδοποίηση.
-
-Το αρχείο είναι `state\suppress_repeats.json`, κάτω από το installation root και τοπικά στον υπολογιστή που ελέγχεται. Η ταυτότητα κάθε εγγραφής είναι το ζεύγος test name και finding signature. Για custom scripts χρησιμοποιείται το full script path αντί για test name. Έτσι διαχωρίζονται διαφορετικά tests, ενώ η τοπική αποθήκευση διαχωρίζει τους υπολογιστές.
-
-Το ελάχιστο state για τον χρονικό κανόνα περιέχει:
+Store state in `state\suppress_repeats.json` under the installation root on the computer being checked. Each entry is keyed by test name and finding signature. Custom scripts use their full script path instead of a built-in test name. Local storage separates computers; the key separates tests and findings.
 
 ```json
 [
@@ -103,88 +58,69 @@ Write-Warning "[$level][SuppressRepeats] Scheduled task '$taskPath' terminated w
 ]
 ```
 
+The example signature is illustrative. Calculate expiry as `LastSeenUtc + 45 days`; do not store a second expiry timestamp for the same fact.
 
-Η signature στο παράδειγμα είναι ενδεικτική. Η λήξη υπολογίζεται ως `LastSeenUtc + 45 ημέρες`. Δεν αποθηκεύουμε και δεύτερη ημερομηνία λήξης για το ίδιο γεγονός.
+`FirstSeenUtc` records the first retained observation and survives gaps of 45 days or more. If the clock moves backwards and the previous observation is in the future, treat the finding as a new observation and reset both timestamps. Other active suppressions still apply.
 
-Το `FirstSeenUtc` κρατά την πρώτη καταγεγραμμένη παρατήρηση του finding και διατηρείται ακόμη και μετά από απουσία 45 ημερών. Αν το ρολόι έχει μετακινηθεί προς τα πίσω και η προηγούμενη παρατήρηση φαίνεται μελλοντική, το finding εμφανίζεται και οι ημερομηνίες ξεκινούν από την τρέχουσα παρατήρηση.
+State survives subsequent runs and code updates. With no previous entry, the first observation is visible unless another active suppression covers it.
 
-Το state πρέπει να επιβιώνει μεταξύ runs και code updates. Αν δεν υπάρχει προηγούμενο SuppressRepeats state, η πρώτη παρατήρηση εμφανίζεται κανονικά, με την επιφύλαξη των ήδη ενεργών suppressions.
+## Suppression precedence
 
-## Διαχωρισμός από τα manual suppressions
+Keep automatic observation state separate from `config\Get-ComputerHealth.sigs-to-suppress.txt`. SuppressRepeats does not add entries to that file or change existing suppression dates or permanence. That file contains both manual choices and policy baselines, so its source is named `Configured`.
 
-Οι manual επιλογές παραμένουν στον υπάρχοντα μηχανισμό. Το SuppressRepeats δεν γράφει αυτόματες εγγραφές στο `Get-ComputerHealth.sigs-to-suppress.txt` και δεν αλλάζει τις ημερομηνίες ή τη μονιμότητα των υφιστάμενων επιλογών.
+Use the first applicable rule:
 
-Στα structured findings υπάρχουν τα εξής:
-
-| Property | Σημασία |
+| Condition | Suppression source in the current run |
 | --- | --- |
-| `SuppressRepeats` | Το finding έχει δηλωθεί ότι ακολουθεί τη συμπεριφορά SuppressRepeats. |
-| `Suppressed` | Το finding είναι suppressed στο συγκεκριμένο run, από οποιαδήποτε ισχύουσα αιτία. |
-| `SuppressionSource` | Η αιτία που καθόρισε το suppression του συγκεκριμένου run. |
+| The finding's signature has an active configured suppression | `Configured` |
+| The test has the `Suppressed` tag, or logging explicitly suppresses the finding | `SuppressedTag` or `Explicit` |
+| No earlier rule applies and a recent SuppressRepeats observation exists | `SuppressRepeats` |
+| No suppression applies | Empty; the finding is visible |
 
-Για το αυτόματο suppression το `SuppressionSource` είναι `SuppressRepeats`. Για τα configured suppressions είναι `Configured`, επειδή εκεί συνυπάρχουν manual suppressions και policy baselines. Η πηγή είναι κενή όταν το finding δεν είναι suppressed. Τα warnings από tests με tag `Suppressed` έχουν πηγή `SuppressedTag`. Ρητό suppression από legacy logging μπορεί να έχει πηγή `Explicit`.
+When both configured and repeat suppression apply, report `Configured` as the source and still refresh the repeat observation. Expiry of a manual suppression therefore does not guarantee a new notification. There is no additional mandatory reminder at that point.
 
-Η πρώτη εμφάνιση ενός SuppressRepeats finding έχει `SuppressRepeats = $true` και `Suppressed = $false`. Το ότι αποθηκεύτηκε state για τα επόμενα runs δεν αλλάζει αυτή την απόφαση.
+## Reporting contract
 
-| Ισχύουσα κατάσταση | Αποτέλεσμα |
-| --- | --- |
-| Υπάρχει ενεργό configured suppression | Suppressed με πηγή `Configured`. |
-| Δεν υπάρχει άλλο ενεργό suppression και υπάρχει πρόσφατη SuppressRepeats παρατήρηση | Suppressed με πηγή `SuppressRepeats`. |
-| Δεν ισχύει καμία αιτία suppression | Κανονική εμφάνιση. |
+Preserve `SuppressRepeats`, `Suppressed`, `SuppressionSource`, `FirstSeenUtc`, and `LastSeenUtc` through collection, serialization, saved report rows, and interactive reports. This applies to local runs and remote collection through `Invoke-GetComputerHealth.ps1`. The [report-field reference](../user/reporting.md#repeat-suppression-fields) explains their meanings and source values.
 
-Αν ένα finding καλύπτεται και από τους δύο μηχανισμούς, η πηγή του report είναι `Configured`. Η παρατήρηση SuppressRepeats ανανεώνεται κανονικά, χωρίς να τροποποιείται το configured suppression.
+Without another active suppression, the first occurrence has `SuppressRepeats = $true` and `Suppressed = $false`. Subsequent repeats remain in the full results with their current severity and details, subject to the existing display filters for suppressed findings.
 
-Με αυτή την προτεραιότητα, η λήξη ενός manual suppression δεν εγγυάται νέα ειδοποίηση. Αν το finding παρατηρείται συνεχώς, το SuppressRepeats μπορεί να εξακολουθεί να το κρύβει.
+Automatic repeat suppression never becomes `Postponed`. Existing postponement reminders use `SuppressedUntil` for configured suppressions. Do not overwrite that field with the calculated repeat-suppression expiry: observing an old event again is not a manual decision to postpone addressing it.
 
-## Συμπεριφορά στα reports
+## Limits and state failures
 
-Η πρώτη εμφάνιση και η επιστροφή μετά τη λήξη εμφανίζονται κανονικά, με το αρχικό severity. Οι επαναλήψεις παραμένουν στα structured αποτελέσματα και στα αναλυτικά reports ως suppressed. Οι υφιστάμενοι κανόνες προβολής suppressed findings εξακολουθούν να εφαρμόζονται.
+A gap in observations does not prove that the problem was resolved. A computer that is offline, or a test that does not run, for at least 45 days can produce another notification for the same event when checks resume. This is accepted behavior.
 
-Τα reports πρέπει να διατηρούν την πληροφορία `SuppressRepeats` και `SuppressionSource`, ώστε να μπορούν να δείχνουν "Suppressed by SuppressRepeats". Στα αναλυτικά στοιχεία μπορεί να εμφανίζεται και η τελευταία παρατήρηση από το SuppressRepeats state.
+Recording a first observation means that the finding was included normally in the results. It does not confirm that the user received or read the report.
 
-Το αυτόματο SuppressRepeats suppression δεν μετατρέπεται σε `Postponed`. Σήμερα τα reports χρησιμοποιούν το `SuppressedUntil` για να εμφανίζουν προσωρινά suppressions ως postponed κοντά στη λήξη τους. Η νέα λογική πρέπει να διακρίνει την πηγή και να μην αντιμετωπίζει το SuppressRepeats ως χειροκίνητη αναβολή αντιμετώπισης. Το `SuppressedUntil` του υπάρχοντος μηχανισμού δεν αντικαθίσταται από το υπολογιζόμενο SuppressRepeats όριο.
+On a state read or write failure, report an ordinary warning and leave the finding eligible for normal reporting. The warning itself does not use SuppressRepeats. Existing configured suppressions still apply, so a state error does not override the user's choices.
 
-Οι ιδιότητες αυτές πρέπει να μεταφέρονται μέχρι τα τελικά reports, και όταν το run γίνεται μέσω `Invoke-GetComputerHealth.ps1` σε τοπικό ή απομακρυσμένο υπολογιστή.
+Updates take an exclusive lock, write a temporary file, and atomically replace the previous state. The `.lock` file remains in place so successive writers lock the same file. If the state is locked, invalid, exceeds 10 MB, or cannot be saved, do not apply repeat suppression to that observation. This can produce repeat notifications, but avoids silently losing findings.
 
-## Όρια
+## Verification requirements
 
-Η απουσία παρατήρησης δεν αποδεικνύει ότι λύθηκε το πρόβλημα. Αν ο υπολογιστής είναι offline ή το test δεν τρέξει για τουλάχιστον 45 ημέρες, το ίδιο finding θα εμφανιστεί ξανά όταν το παρατηρήσουμε. Αυτό είναι αποδεκτό για τον προτεινόμενο μηχανισμό.
+Keep regression coverage for these behaviors:
 
-Η καταγραφή μιας πρώτης εμφάνισης σημαίνει ότι το finding συμπεριλήφθηκε κανονικά στα αποτελέσματα. Δεν αποτελεί επιβεβαίωση ότι ο χρήστης παρέλαβε ή διάβασε το report.
+- The first observation is visible in console output and reports even though state has been saved.
+- Suppressed observations refresh the interval, including monthly observations and findings covered by configured suppression.
+- A repeat before 45 days stays suppressed; a repeat at or after 45 days is visible again.
+- A run without the finding does not refresh its state.
+- A new last run time or error changes the finding identity; details or severity changes alone do not.
+- The marker is removed before calculating the signature and displaying the description; the severity is preserved.
+- Other ScheduledTasks findings, including collection failures, keep their normal behavior.
+- Configured suppressions retain their dates and precedence, and the reported source matches the decision.
+- Repeat suppression never becomes `Postponed`, and all metadata survives the reporting path.
+- State remains independent per computer and test, persists between runs, and handles a clock moving backwards.
+- Missing, invalid, locked, or unwritable state does not silently hide a new finding.
 
-Η signature δεν περιλαμβάνει το level. Η αύξηση severity δεν προκαλεί νέα εμφάνιση. Ένα ίδιο description που αλλάζει από `WARNING` σε `FAILURE` εξακολουθεί να θεωρείται το ίδιο finding.
+See [SuppressRepeats tests](../../tests/Unit/SuppressRepeats.Tests.ps1) and [ScheduledTasks tests](../../tests/Unit/HealthTest-ScheduledTasks.Tests.ps1).
 
-Σε αποτυχία ανάγνωσης ή αποθήκευσης του SuppressRepeats state, η υλοποίηση πρέπει να αποφεύγει τη σιωπηρή απώλεια findings. Μπορεί να προκύψουν επαναλαμβανόμενες ειδοποιήσεις και πρέπει να αναφέρεται το πρόβλημα του state χωρίς να γίνεται το ίδιο SuppressRepeats-suppressed.
+## Related implementation
 
-Η ενημέρωση προστατεύεται με αποκλειστικό lock και η νέα έκδοση γράφεται σε προσωρινό αρχείο πριν αντικαταστήσει το προηγούμενο. Αν το state είναι κλειδωμένο, μη έγκυρο ή μεγαλύτερο από 10 MB, αναφέρεται warning και δεν εφαρμόζεται repeat suppression στο συγκεκριμένο finding. Τα ήδη ενεργά configured suppressions εξακολουθούν να ισχύουν. Το αρχείο `.lock` διατηρείται για τον συντονισμό διαδοχικών writers.
-
-## Έλεγχοι για την υλοποίηση
-
-Η υλοποίηση πρέπει να ελεγχθεί τουλάχιστον για τις παρακάτω συμπεριφορές:
-
-- Η πρώτη παρατήρηση παραμένει ορατή σε console και reports, παρότι αποθηκεύεται state.
-- Οι επαναλήψεις ανανεώνουν την τελευταία παρατήρηση ακόμη κι όταν είναι suppressed.
-- Η μηνιαία παρατήρηση του ίδιου finding δεν παράγει επαναλαμβανόμενες ειδοποιήσεις.
-- Η επιστροφή πριν από τις 45 ημέρες παραμένει suppressed. Στο όριο των 45 ημερών και μετά εμφανίζεται ξανά.
-- Ένα run χωρίς το finding δεν ανανεώνει το state του.
-- Νέο last run time ή νέο error δημιουργεί νέα εμφάνιση. Αλλαγές μόνο στα details δεν την προκαλούν.
-- Το `[SuppressRepeats]` αφαιρείται πριν από τη signature και το description των reports. Το severity διατηρείται.
-- Τα υπόλοιπα findings του `HealthTest-ScheduledTasks`, μαζί με failures συλλογής δεδομένων, διατηρούν την κανονική συμπεριφορά.
-- Το SuppressRepeats δεν συντομεύει, ανανεώνει ή αντικαθιστά configured suppressions. Η πηγή και η προτεραιότητα αποτυπώνονται σωστά.
-- SuppressRepeats suppressions δεν εμφανίζονται ως `Postponed` και τα σχετικά properties επιβιώνουν μέχρι τα τελικά reports.
-- Το state παραμένει ανεξάρτητο ανά υπολογιστή και test και διατηρείται μεταξύ runs.
-- Η απουσία ή αποτυχία πρόσβασης στο state δεν αποκρύπτει σιωπηρά νέα findings.
-- Η αύξηση severity με ίδιο description διατηρεί το repeat suppression.
-
-Δεν υλοποιείται πρόσθετη υποχρεωτική υπενθύμιση στη λήξη manual suppression.
-
-## Σχετικά αρχεία
-
-- [Συμβάσεις των built-in health tests](../contributor/built-in-health-tests.md).
-- [Σχεδιασμός findings και περιορισμός θορύβου](health-findings-and-noise.md).
-- [Ροή του Invoke-GetComputerHealth](invoke-getcomputerhealth-flow.md).
-- [Get-ComputerHealth.ps1](../../Get-ComputerHealth.ps1), parsing των findings και εκτέλεση των tests.
-- [lib-write-log-objects.ps1](../../lib-write-log-objects.ps1), signatures και log records.
-- [lib-suppress-repeats.ps1](../../lib-suppress-repeats.ps1), παρατηρήσεις, χρονικό όριο και αποθήκευση state.
-- [HealthTest-ScheduledTasks.ps1](../../health-tests/HealthTest-ScheduledTasks.ps1), αρχική εφαρμογή ανά finding.
-- [reporting.ps1](../../reporting.ps1), προβολή suppressions και postponed findings.
+- [Health findings and noise](health-findings-and-noise.md): the preference for useful administrative findings with limited recurring noise.
+- [Invoke-GetComputerHealth flow](invoke-getcomputerhealth-flow.md): collection and reporting across computers.
+- [Get-ComputerHealth.ps1](../../Get-ComputerHealth.ps1): marker parsing and test execution.
+- [lib-write-log-objects.ps1](../../lib-write-log-objects.ps1): signatures, source precedence, and log records.
+- [lib-suppress-repeats.ps1](../../lib-suppress-repeats.ps1): observations, expiry, and state storage.
+- [HealthTest-ScheduledTasks.ps1](../../health-tests/HealthTest-ScheduledTasks.ps1): selection of failed-execution findings.
+- [reporting.ps1](../../reporting.ps1): report fields and postponed findings.

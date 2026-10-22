@@ -98,7 +98,9 @@ The second version is not good because it varies with a detail that is not essen
 
 ## Reporting repeated events
 
-Custom scripts may opt individual event findings into repeat suppression using `[WARNING][SuppressRepeats]`, `[NOTICE][SuppressRepeats]`, or `[FAILURE][SuppressRepeats]`. The description must identify the event, including its timestamp when necessary. The first observation is shown normally. Repeats refresh a 45-day interval and are suppressed; an observation after a gap of at least 45 days is shown again. Keep ongoing health problems and collection errors unmarked. See [findings that suppress repeats](../contributor/built-in-health-tests.md#findings-that-suppress-repeats).
+Custom scripts may opt individual event findings into repeat suppression using `[WARNING][SuppressRepeats]`, `[NOTICE][SuppressRepeats]`, or `[FAILURE][SuppressRepeats]`. The first-line description must identify the event, including its timestamp when necessary. Keep ongoing health problems and collection errors unmarked.
+
+See [findings that suppress repeats](../contributor/built-in-health-tests.md#findings-that-suppress-repeats) for the authoring rules and an example, and [automatic repeat suppression](reporting.md#automatic-repeat-suppression) for the 45-day rule and interaction with manual suppressions. The runner manages the state; directly executing a custom script does not apply persistent repeat suppression.
 
 ## When to Handle Exceptions
 

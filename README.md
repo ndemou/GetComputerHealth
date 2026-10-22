@@ -203,7 +203,7 @@ If a finding is expected or a false positive, you can permitlist it.
 > Advanced Tip: You can also permitlist findings manually:
 > `C:\IT\Get-ComputerHealth\bin\Get-ComputerHealth.ps1 -AddWhitelisting -ComputerName $env:computername -Signature 12345678 -Comment "Usually the description of the finding" -Until 2099-12-31`
 
-Some event findings use automatic `SuppressRepeats` handling. A failed scheduled-task execution with a known last run time is reported once, then kept suppressed while the same execution continues to be observed. Each observation refreshes a 45-day interval. A new failed execution or a return after at least 45 days without observation is reported normally. Configured suppressions still take precedence. See [reporting behavior](./doc/user/reporting.md).
+`SuppressRepeats` prevents repeated alerts for the same event, including a failed scheduled-task execution with a known last run time. See [automatic repeat suppression](./doc/user/reporting.md#automatic-repeat-suppression) for the 45-day rule, configured-suppression precedence, and report fields.
 
 ## How to Require a Finding That Proves Something Good Is Present
 

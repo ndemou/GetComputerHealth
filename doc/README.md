@@ -10,6 +10,7 @@ This page is the routing table for the repository documentation. It is meant for
 | Contribute code or docs to the repo | [`CONTRIBUTING.md`](../CONTRIBUTING.md) |
 | Follow repo-specific coding, test, and release instructions as an agent | [`AGENTS.md`](../AGENTS.md) |
 | Add local custom health tests without changing the repo | [`user/custom-tests.md`](./user/custom-tests.md) |
+| Understand repeated findings, suppression, and postponement reminders | [Automatic repeat suppression](./user/reporting.md#automatic-repeat-suppression) |
 | Understand the test suite and choose validation commands | [`contributor/test-suite.md`](./contributor/test-suite.md) |
 | Review current backlog and rough ideas | [`TODO.md`](../TODO.md) |
 
@@ -20,7 +21,7 @@ This page is the routing table for the repository documentation. It is meant for
 | [`README.md`](../README.md) | User-facing overview, installation, common operations, architecture summary, and generated built-in test catalog. |
 | [`user/custom-tests.md`](./user/custom-tests.md) | User-facing guide for out-of-tree custom tests under `config\Custom-HealthTests`. |
 | [`user/custom-test-helpers.md`](./user/custom-test-helpers.md) | Optional helper examples for custom health tests. |
-| [`user/reporting.md`](./user/reporting.md) | Notes about reporting behavior and artifacts. |
+| [`user/reporting.md`](./user/reporting.md) | Report artifacts, automatic repeat suppression, configured-suppression reminders, and finding metadata. |
 | [`user/windows-updates.md`](./user/windows-updates.md) | Windows Update checks, reporting thresholds, and reasons for keeping both update sources. |
 
 ## Contributor And Design Guides
@@ -31,7 +32,7 @@ This page is the routing table for the repository documentation. It is meant for
 | [`contributor/built-in-health-tests.md`](./contributor/built-in-health-tests.md) | Detailed conventions for built-in `HealthTest-*` functions and their help blocks. |
 | [`contributor/test-suite.md`](./contributor/test-suite.md) | Detailed explanation of test runners and validation choices. |
 | [`design/health-findings-and-noise.md`](./design/health-findings-and-noise.md) | Design decision defining the tool's administrative scope and preference for actionable, low-noise findings over broad threat detection. |
-| [`design/first-seen-findings.md`](./design/first-seen-findings.md) | SuppressRepeats design: per-finding handling with a rolling 45-day interval and separate state from configured suppressions. |
+| [`design/first-seen-findings.md`](./design/first-seen-findings.md) | SuppressRepeats rationale, observation state, suppression precedence, and failure handling. |
 | [`design/state-changing-health-tests.md`](./design/state-changing-health-tests.md) | Design decision for highly safe state-changing tests, their separate folder, and explicit execution guard. |
 | [`design/installation-migrations.md`](./design/installation-migrations.md) | On-disk format migration design and implementation rules. |
 | [`design/invoke-getcomputerhealth-flow.md`](./design/invoke-getcomputerhealth-flow.md) | Execution flow for `Invoke-GetComputerHealth.ps1`. |

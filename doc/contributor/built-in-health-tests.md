@@ -100,17 +100,30 @@ Suppressed Inventory Tests can be extremely useful for "Required findings".
 
 ## Findings that suppress repeats
 
-Use `[SuppressRepeats]` immediately after the level to report a particular event once while it continues to be observed:
+Use `[SuppressRepeats]` immediately after the level for individual event findings. It is a per-finding marker, not a test-wide tag, and is supported for `NOTICE`, `WARNING`, and `FAILURE`:
 
 ```powershell
 Write-Warning "[FAILURE][SuppressRepeats] Task '$taskPath' failed at $lastRunTime with result $resultCode.`n$details"
 ```
 
-The runner removes the marker before calculating the signature. It reports the first observation normally, then suppresses repeats while each observation is less than 45 days after the previous one. Every observation refreshes the interval, including findings already suppressed by configuration. A gap of 45 days makes the next observation visible again. Severity changes alone do not create a new finding.
+Put everything that distinguishes the event in the first-line description. For a failed scheduled-task execution, this means the full task path, error code, and last run time. The details after the newline are excluded from the signature. A new execution must change the description so it can be reported as a new finding.
 
-This is a per-finding marker for `NOTICE`, `WARNING`, and `FAILURE`, not a test-wide tag. Use it for events with stable identities, such as a failed task execution with a known timestamp. Keep continuing health problems and failures to collect data unmarked. The state belongs to the runner under `state\suppress_repeats.json`; health tests only emit findings.
+The runner sets `SuppressRepeats = $true` and removes the marker before displaying the description or calculating its signature. Adding the marker therefore preserves existing finding signatures. Severity is also preserved, but is not part of the signature: changing only details or severity does not create a new notification.
 
-See the [SuppressRepeats design](../design/first-seen-findings.md) for state, precedence, and reporting rules. Running a health-test file directly prints its warning text; persistent repeat handling requires `Get-ComputerHealth.ps1` or `Invoke-GetComputerHealth.ps1`.
+Use the marker for events with stable identities. Keep continuing health problems and failures to collect data unmarked. `HealthTest-ScheduledTasks` uses these rules:
+
+| Finding | Repeat handling |
+| --- | --- |
+| Failed execution with a known last run time | Use `[SuppressRepeats]`; the description identifies the execution. |
+| Failed execution with an unknown last run time | Leave unmarked; separate executions cannot be identified reliably. |
+| Disabled task | Leave unmarked. |
+| Missed runs | Leave unmarked. |
+| Stale task | Leave unmarked. |
+| Failure to collect or read data | Leave unmarked. |
+
+The runner owns observation state and suppression; health tests only emit findings. Unmarked findings keep their existing behavior. `PASS`, `INFO`, `DEBUG`, and the runner's own errors do not acquire automatic repeat suppression.
+
+See [automatic repeat suppression](../user/reporting.md#automatic-repeat-suppression) for the 45-day rule, configured-suppression precedence, and report fields, and the [SuppressRepeats design](../design/first-seen-findings.md) for state storage and implementation requirements. The same marker works in custom scripts. Running a health-test file directly prints its warning text; persistent repeat handling requires `Get-ComputerHealth.ps1` or `Invoke-GetComputerHealth.ps1`.
 
 ## Policy Inventory Tests
 
