@@ -1,6 +1,6 @@
-# Πρόταση για SuppressRepeats findings
+# Σχεδιασμός SuppressRepeats findings
 
-Κατάσταση: πρόταση σχεδιασμού, δεν έχει υλοποιηθεί.
+Κατάσταση: υλοποιημένο για μεμονωμένα findings, με αρχική εφαρμογή στις αποτυχημένες εκτελέσεις του `HealthTest-ScheduledTasks`.
 
 ## Τι θέλουμε να πετύχουμε
 
@@ -37,7 +37,7 @@ Scheduled task '\enLogic\Execute WindowsUpdatesHelper' terminated with LastTaskR
 
 Η απόφαση του τρέχοντος run πρέπει να προηγείται της ενημέρωσης. Διαφορετικά, θα κρύβαμε ακόμη και την πρώτη εμφάνιση. Η ίδια απόφαση πρέπει να ισχύει στην console και σε όλα τα reports που παράγονται από τα αποτελέσματα του run.
 
-Η προτεινόμενη ακριβής συνθήκη είναι:
+Η ακριβής συνθήκη είναι:
 
 ```text
 SuppressRepeats suppression is active when:
@@ -59,9 +59,9 @@ SuppressRepeats suppression is active when:
 
 ## Δήλωση ανά finding
 
-Το `HealthTest-ScheduledTasks` παράγει διαφορετικούς τύπους findings. Η αρχική εφαρμογή του SuppressRepeats θα αφορά μόνο αποτυχημένες εκτελέσεις που αναγνωρίζονται από συγκεκριμένο last run time.
+Το `HealthTest-ScheduledTasks` παράγει διαφορετικούς τύπους findings. Το SuppressRepeats αφορά μόνο αποτυχημένες εκτελέσεις που αναγνωρίζονται από συγκεκριμένο last run time.
 
-| Τύπος finding | Προτεινόμενη συμπεριφορά |
+| Τύπος finding | Συμπεριφορά |
 | --- | --- |
 | Αποτυχημένη εκτέλεση με συγκεκριμένο last run time | συμπεριφορά SuppressRepeats |
 | Αποτυχημένη εκτέλεση με άγνωστο last run time | Κανονική, επειδή δεν μπορούμε να διακρίνουμε αξιόπιστα τις εκτελέσεις. |
@@ -70,13 +70,13 @@ SuppressRepeats suppression is active when:
 | Stale task | Κανονική |
 | Αποτυχία συλλογής ή ανάγνωσης δεδομένων | Κανονική |
 
-Το health test δηλώνει ρητά ποια findings ακολουθούν SuppressRepeats, στο σημείο όπου τα παράγει. Προτείνεται ένα προαιρετικό prefix μετά το υπάρχον severity:
+Το health test δηλώνει ρητά ποια findings ακολουθούν SuppressRepeats, στο σημείο όπου τα παράγει, με ένα προαιρετικό prefix μετά το υπάρχον severity:
 
 ```powershell
 Write-Warning "[$level][SuppressRepeats] Scheduled task '$taskPath' terminated with LastTaskResult=$resultHex; Last run time $lastRunText.`n$details"
 ```
 
-Το παράδειγμα δείχνει την προτεινόμενη σύνταξη. Δεν είναι σήμερα υποστηριζόμενο API. Το τελικό description μπορεί να περιλαμβάνει και την περιγραφή του error, όπως στο πλήρες παράδειγμα παραπάνω.
+Το τελικό description μπορεί να περιλαμβάνει και την περιγραφή του error, όπως στο πλήρες παράδειγμα παραπάνω. Το marker υποστηρίζεται από τον runner και για custom scripts. Η απευθείας εκτέλεση ενός health-test αρχείου τυπώνει τα warnings του χωρίς να εφαρμόζει persistent repeat suppression.
 
 Ο runner αναγνωρίζει το `[SuppressRepeats]`, το μετατρέπει σε property `SuppressRepeats = $true` και το αφαιρεί πριν δημιουργήσει το καθαρό description και υπολογίσει τη signature. Έτσι η προσθήκη του marker δεν αλλάζει την ταυτότητα του finding. Το severity διατηρείται.
 
@@ -88,7 +88,7 @@ Write-Warning "[$level][SuppressRepeats] Scheduled task '$taskPath' terminated w
 
 Το SuppressRepeats χρησιμοποιεί την υπάρχουσα signature του description. Τα details παραμένουν εκτός signature, ώστε μια αλλαγή μόνο στα details να μην δημιουργεί νέα ειδοποίηση.
 
-Το προτεινόμενο αρχείο είναι `state\suppress_repeats.json`, κάτω από το installation root και τοπικά στον υπολογιστή που ελέγχεται. Η ταυτότητα κάθε εγγραφής είναι το ζεύγος test name και finding signature. Έτσι διαχωρίζονται διαφορετικά tests, ενώ η τοπική αποθήκευση διαχωρίζει τους υπολογιστές.
+Το αρχείο είναι `state\suppress_repeats.json`, κάτω από το installation root και τοπικά στον υπολογιστή που ελέγχεται. Η ταυτότητα κάθε εγγραφής είναι το ζεύγος test name και finding signature. Για custom scripts χρησιμοποιείται το full script path αντί για test name. Έτσι διαχωρίζονται διαφορετικά tests, ενώ η τοπική αποθήκευση διαχωρίζει τους υπολογιστές.
 
 Το ελάχιστο state για τον χρονικό κανόνα περιέχει:
 
@@ -106,13 +106,15 @@ Write-Warning "[$level][SuppressRepeats] Scheduled task '$taskPath' terminated w
 
 Η signature στο παράδειγμα είναι ενδεικτική. Η λήξη υπολογίζεται ως `LastSeenUtc + 45 ημέρες`. Δεν αποθηκεύουμε και δεύτερη ημερομηνία λήξης για το ίδιο γεγονός.
 
+Το `FirstSeenUtc` κρατά την πρώτη καταγεγραμμένη παρατήρηση του finding και διατηρείται ακόμη και μετά από απουσία 45 ημερών. Αν το ρολόι έχει μετακινηθεί προς τα πίσω και η προηγούμενη παρατήρηση φαίνεται μελλοντική, το finding εμφανίζεται και οι ημερομηνίες ξεκινούν από την τρέχουσα παρατήρηση.
+
 Το state πρέπει να επιβιώνει μεταξύ runs και code updates. Αν δεν υπάρχει προηγούμενο SuppressRepeats state, η πρώτη παρατήρηση εμφανίζεται κανονικά, με την επιφύλαξη των ήδη ενεργών suppressions.
 
 ## Διαχωρισμός από τα manual suppressions
 
 Οι manual επιλογές παραμένουν στον υπάρχοντα μηχανισμό. Το SuppressRepeats δεν γράφει αυτόματες εγγραφές στο `Get-ComputerHealth.sigs-to-suppress.txt` και δεν αλλάζει τις ημερομηνίες ή τη μονιμότητα των υφιστάμενων επιλογών.
 
-Στα structured findings προτείνονται τα εξής:
+Στα structured findings υπάρχουν τα εξής:
 
 | Property | Σημασία |
 | --- | --- |
@@ -120,7 +122,7 @@ Write-Warning "[$level][SuppressRepeats] Scheduled task '$taskPath' terminated w
 | `Suppressed` | Το finding είναι suppressed στο συγκεκριμένο run, από οποιαδήποτε ισχύουσα αιτία. |
 | `SuppressionSource` | Η αιτία που καθόρισε το suppression του συγκεκριμένου run. |
 
-Για το νέο αυτόματο suppression το `SuppressionSource` είναι `SuppressRepeats`. Για τις εγγραφές από το υπάρχον config προτείνεται η τιμή `Configured`, επειδή εκεί σήμερα συνυπάρχουν manual suppressions και policy baselines. Η πηγή είναι κενή όταν το finding δεν είναι suppressed. Το υπάρχον tag `Suppressed` χρειάζεται δική του διακριτή τιμή, αν η καταγραφή πηγής επεκταθεί και σε αυτό.
+Για το αυτόματο suppression το `SuppressionSource` είναι `SuppressRepeats`. Για τα configured suppressions είναι `Configured`, επειδή εκεί συνυπάρχουν manual suppressions και policy baselines. Η πηγή είναι κενή όταν το finding δεν είναι suppressed. Τα warnings από tests με tag `Suppressed` έχουν πηγή `SuppressedTag`. Ρητό suppression από legacy logging μπορεί να έχει πηγή `Explicit`.
 
 Η πρώτη εμφάνιση ενός SuppressRepeats finding έχει `SuppressRepeats = $true` και `Suppressed = $false`. Το ότι αποθηκεύτηκε state για τα επόμενα runs δεν αλλάζει αυτή την απόφαση.
 
@@ -144,17 +146,17 @@ Write-Warning "[$level][SuppressRepeats] Scheduled task '$taskPath' terminated w
 
 Οι ιδιότητες αυτές πρέπει να μεταφέρονται μέχρι τα τελικά reports, και όταν το run γίνεται μέσω `Invoke-GetComputerHealth.ps1` σε τοπικό ή απομακρυσμένο υπολογιστή.
 
-## Όρια και εκκρεμότητες
+## Όρια
 
 Η απουσία παρατήρησης δεν αποδεικνύει ότι λύθηκε το πρόβλημα. Αν ο υπολογιστής είναι offline ή το test δεν τρέξει για τουλάχιστον 45 ημέρες, το ίδιο finding θα εμφανιστεί ξανά όταν το παρατηρήσουμε. Αυτό είναι αποδεκτό για τον προτεινόμενο μηχανισμό.
 
 Η καταγραφή μιας πρώτης εμφάνισης σημαίνει ότι το finding συμπεριλήφθηκε κανονικά στα αποτελέσματα. Δεν αποτελεί επιβεβαίωση ότι ο χρήστης παρέλαβε ή διάβασε το report.
 
-Χρειάζεται επίσης κανόνας για αύξηση severity. Σήμερα η signature δεν περιλαμβάνει το level. Ένα ίδιο description που αλλάζει από `WARNING` σε `FAILURE` μπορεί επομένως να εξακολουθεί να θεωρείται το ίδιο finding.
-
-Η αύξηση severity δεν προκαλεί νέα εμφάνιση.
+Η signature δεν περιλαμβάνει το level. Η αύξηση severity δεν προκαλεί νέα εμφάνιση. Ένα ίδιο description που αλλάζει από `WARNING` σε `FAILURE` εξακολουθεί να θεωρείται το ίδιο finding.
 
 Σε αποτυχία ανάγνωσης ή αποθήκευσης του SuppressRepeats state, η υλοποίηση πρέπει να αποφεύγει τη σιωπηρή απώλεια findings. Μπορεί να προκύψουν επαναλαμβανόμενες ειδοποιήσεις και πρέπει να αναφέρεται το πρόβλημα του state χωρίς να γίνεται το ίδιο SuppressRepeats-suppressed.
+
+Η ενημέρωση προστατεύεται με αποκλειστικό lock και η νέα έκδοση γράφεται σε προσωρινό αρχείο πριν αντικαταστήσει το προηγούμενο. Αν το state είναι κλειδωμένο, μη έγκυρο ή μεγαλύτερο από 10 MB, αναφέρεται warning και δεν εφαρμόζεται repeat suppression στο συγκεκριμένο finding. Τα ήδη ενεργά configured suppressions εξακολουθούν να ισχύουν. Το αρχείο `.lock` διατηρείται για τον συντονισμό διαδοχικών writers.
 
 ## Έλεγχοι για την υλοποίηση
 
@@ -172,8 +174,9 @@ Write-Warning "[$level][SuppressRepeats] Scheduled task '$taskPath' terminated w
 - SuppressRepeats suppressions δεν εμφανίζονται ως `Postponed` και τα σχετικά properties επιβιώνουν μέχρι τα τελικά reports.
 - Το state παραμένει ανεξάρτητο ανά υπολογιστή και test και διατηρείται μεταξύ runs.
 - Η απουσία ή αποτυχία πρόσβασης στο state δεν αποκρύπτει σιωπηρά νέα findings.
+- Η αύξηση severity με ίδιο description διατηρεί το repeat suppression.
 
-Μετά την απόφαση για την αύξηση severity θα προστεθούν αντίστοιχα tests. Αν επιλεγεί υποχρεωτική υπενθύμιση στη λήξη manual suppression, θα χρειαστούν και tests για την αλληλεπίδρασή της με το SuppressRepeats.
+Δεν υλοποιείται πρόσθετη υποχρεωτική υπενθύμιση στη λήξη manual suppression.
 
 ## Σχετικά αρχεία
 
@@ -182,5 +185,6 @@ Write-Warning "[$level][SuppressRepeats] Scheduled task '$taskPath' terminated w
 - [Ροή του Invoke-GetComputerHealth](invoke-getcomputerhealth-flow.md).
 - [Get-ComputerHealth.ps1](../../Get-ComputerHealth.ps1), parsing των findings και εκτέλεση των tests.
 - [lib-write-log-objects.ps1](../../lib-write-log-objects.ps1), signatures και log records.
+- [lib-suppress-repeats.ps1](../../lib-suppress-repeats.ps1), παρατηρήσεις, χρονικό όριο και αποθήκευση state.
 - [HealthTest-ScheduledTasks.ps1](../../health-tests/HealthTest-ScheduledTasks.ps1), αρχική εφαρμογή ανά finding.
 - [reporting.ps1](../../reporting.ps1), προβολή suppressions και postponed findings.

@@ -7,7 +7,10 @@ Messages are emitted (Write-Output) as PSCustomObjects with the following proper
   Level      : string   # debug, info, pass, notice, warning, failure
   Message    : string   # Primary human-readable message
   Hash       : string   # 8-character message signature (MD5 prefix); empty for debug
-  Suppressed : bool     # True if message signature is configured as suppressed
+  Suppressed : bool     # True if the message is suppressed for this run
+  SuppressRepeats : bool # Finding opts into repeat suppression
+  SuppressionSource : string # Configured, SuppressedTag, Explicit, SuppressRepeats, or empty
+  FirstSeenUtc / LastSeenUtc : string # UTC observation timestamps, when available
   Comment    : string   # Optional additional information
 
 These objects are suitable for filtering, aggregation, and export (e.g. CLIXML).
@@ -356,7 +359,10 @@ function Log-Msg {
     [Parameter(Mandatory)][string]$Msg,
     [string]$Comment = "",
     [string]$Emitter,
-    [switch]$Suppressed
+    [switch]$Suppressed,
+    [string]$SuppressionSource = 'Explicit',
+    [switch]$SuppressRepeats,
+    [AllowNull()][object]$RepeatObservation
   )
 
   [string]$SigColor = 'DarkGray'
@@ -402,11 +408,18 @@ function Log-Msg {
   if ($Level -ne 'debug') { $sig = Get-StringSignature $Msg } else { $sig = '' }
 
   $must_suppress_sig = $false
-  if ($Suppressed -and $sig) {
+  $source = ''
+  if ($sig -and $sig -in $script:cfgSuppressedSignatures) {
     $must_suppress_sig = $true
+    $source = 'Configured'
   }
-  elseif ($script:cfgSuppressedSignatures -and $sig) {
-    $must_suppress_sig = $sig -in $script:cfgSuppressedSignatures
+  elseif ($Suppressed -and $sig) {
+    $must_suppress_sig = $true
+    $source = $SuppressionSource
+  }
+  elseif ($SuppressRepeats -and $null -ne $RepeatObservation -and $RepeatObservation.Suppressed) {
+    $must_suppress_sig = $true
+    $source = 'SuppressRepeats'
   }
 
   # The name of the HealthTest function that emitted this log object
@@ -427,6 +440,10 @@ function Log-Msg {
     Level      = $Level
     Hash       = $sig
     Suppressed = $must_suppress_sig
+    SuppressRepeats = [bool]$SuppressRepeats
+    SuppressionSource = $source
+    FirstSeenUtc = if ($null -ne $RepeatObservation) { $RepeatObservation.FirstSeenUtc } else { $null }
+    LastSeenUtc = if ($null -ne $RepeatObservation) { $RepeatObservation.LastSeenUtc } else { $null }
     Message    = $Msg
     Comment    = $Comment
     Emitter    = $logEmitter

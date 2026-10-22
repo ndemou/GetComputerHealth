@@ -54,6 +54,8 @@ Uses: Get-ScheduledTask, Get-ScheduledTaskInfo, Export-ScheduledTask.
 Missed runs are not reported for Interactive or InteractiveToken tasks when the
 configured user is confirmed not to be logged on. If logged-on-user inspection
 or principal matching is inconclusive, the missed-run finding is retained.
+Failed executions with a known last run time use SuppressRepeats: the same
+execution is reported again only after 45 days without observing it.
 #>
   [CmdletBinding()]
   param(
@@ -130,10 +132,12 @@ or principal matching is inconclusive, the missed-run finding is retained.
         $hadIssue = $true
         $level = Get-ScheduledTaskOperationalSeverity -Fact $fact -IssueType 'LastResult' -Required:$isRequired
         $lastRunText = 'unknown'
+        $repeatMarker = ''
         if ($null -ne $fact.LastRunTime -and $fact.LastRunTime -ne [datetime]::MinValue) {
           $lastRunText = Format-ScheduledTaskDateTime -Value $fact.LastRunTime
+          $repeatMarker = '[SuppressRepeats]'
         }
-        Write-Warning "[$level] Scheduled task '$($fact.StableKey)' terminated with LastTaskResult=$($fact.LastResultHex) ($($fact.LastResultDescription)); Last run time $lastRunText.`n$(Format-ScheduledTaskFactDetails -Fact $fact)"
+        Write-Warning "[$level]$repeatMarker Scheduled task '$($fact.StableKey)' terminated with LastTaskResult=$($fact.LastResultHex) ($($fact.LastResultDescription)); Last run time $lastRunText.`n$(Format-ScheduledTaskFactDetails -Fact $fact)"
       }
     }
 

@@ -272,12 +272,14 @@ $script:Config = [pscustomobject]@{
   SuppressSignaturesPath = Join-Path $CONFIG_DIR 'Get-ComputerHealth.sigs-to-suppress.txt'
   RequiredFindingsPath = Join-Path $CONFIG_DIR 'required_findings.psd1'
   DefaultCustomTestsPath = Join-Path $CONFIG_DIR 'Custom-HealthTests'
+  RepeatSuppressionPath = Join-Path $ROOT_DIR 'state\suppress_repeats.json'
 }
 
 #------------------------------------------
 # Dot source libraries of functions
 #
 . (Join-Path -Path $PSScriptRoot -ChildPath "lib-write-log-objects.ps1")
+. (Join-Path -Path $PSScriptRoot -ChildPath 'lib-suppress-repeats.ps1')
 . (Join-Path -Path $PSScriptRoot -ChildPath "health-tests\helpers-for-healthtests.ps1")
 
 #------------------------------------------
@@ -631,6 +633,27 @@ function Invoke-RequiredFindingsValidation {
 }
 
 
+function Write-HealthFinding {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)][object]$Record,
+    [Parameter(Mandatory)][string]$Emitter,
+    [switch]$Suppressed
+  )
+
+  $observation = $null
+  if ($Record.SuppressRepeats) {
+    try {
+      $hash = Get-StringSignature -InputString $Record.Msg
+      $observation = Update-RepeatSuppressionState -Path $script:Config.RepeatSuppressionPath -TestName $Emitter -Hash $hash
+    }
+    catch {
+      Log-Warning 'Could not update SuppressRepeats state; repeat suppression was not applied.' -Comment "Test: $Emitter`n$($_.Exception.Message)" -Emitter 'Get-ComputerHealth'
+    }
+  }
+  Log-Msg -Level $Record.Level -Msg $Record.Msg -Comment $Record.Comment -Emitter $Emitter -Suppressed:$Suppressed -SuppressionSource 'SuppressedTag' -SuppressRepeats:$Record.SuppressRepeats -RepeatObservation $observation
+}
+
 function Invoke-HealthTest {
   <#
 .SYNOPSIS
@@ -694,6 +717,9 @@ FunctionName, Time, ElapsedMilliseconds, Output, Success, Error, Category, Reaso
         $cntProperRecord += 1
         if ($markTestMessagesSuppressed -and ([string]$item.level).ToLowerInvariant() -ne 'debug') {
           $item | Add-Member -NotePropertyName Suppressed -NotePropertyValue $true -Force
+          if (-not $item.PSObject.Properties['SuppressionSource'] -or -not $item.SuppressionSource) {
+            $item | Add-Member -NotePropertyName SuppressionSource -NotePropertyValue 'SuppressedTag' -Force
+          }
         }
         [void]$pendingOutputRecords.Add([pscustomobject]@{
             Type = 'legacy'
@@ -749,7 +775,7 @@ FunctionName, Time, ElapsedMilliseconds, Output, Success, Error, Category, Reaso
     foreach ($pendingRecord in $pendingOutputRecords) {
       if ($pendingRecord.Type -eq 'warning') {
         $record = $pendingRecord.Value
-        Log-Msg -Level $record.Level -Msg $record.Msg -Comment $record.Comment -Emitter $FunctionName -Suppressed:$markTestMessagesSuppressed
+        Write-HealthFinding -Record $record -Emitter $FunctionName -Suppressed:$markTestMessagesSuppressed
       }
       else {
         Write-Output $pendingRecord.Value
@@ -960,8 +986,8 @@ function Invoke-CustomHealthTestScript {
     foreach ($item in $result) {
       if ($item -is [System.Management.Automation.WarningRecord]) {
         $record = Convert-WarningLikeObjectToLogRecord -Value $item
-        $comment = Add-CustomTestScriptReferenceComment -Comment $record.Comment -ScriptPath $ScriptPath
-        Log-Msg -Level $record.Level -Msg $record.Msg -Comment $comment -Emitter $ScriptPath
+        $record.Comment = Add-CustomTestScriptReferenceComment -Comment $record.Comment -ScriptPath $ScriptPath
+        Write-HealthFinding -Record $record -Emitter $ScriptPath
         $cntProperRecord += 1
       }
       elseif ($item -and $item.PSObject.Properties['Hash'] -and $null -ne $item.PSObject.Properties['Message'] -and $item.PSObject.Properties['level']) {
@@ -1480,11 +1506,18 @@ function Convert-WarningLikeObjectToLogRecord {
     }
   }
 
+  $suppressRepeats = $false
+  if ($msg -match '^\s*\[SuppressRepeats\]\s*(.*)$') {
+    $msg = [string]$matches[1]
+    $suppressRepeats = $level -in @('notice', 'warning', 'failure')
+  }
+
   if ([string]::IsNullOrWhiteSpace($msg)) { $msg = '<empty warning message>' }
   [pscustomobject]@{
     Level   = $level
     Msg     = $msg.Trim()
     Comment = $comment
+    SuppressRepeats = $suppressRepeats
   }
 }
 

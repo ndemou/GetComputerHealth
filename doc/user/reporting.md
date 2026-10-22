@@ -26,3 +26,7 @@ Notes:
 - `-Timestamp` is optional. If omitted, reporting uses the current time formatted as `yyyy-MM-dd_HH.mm`.
 - `-Targets` is optional. If omitted, reporting derives unique target names from each message's `Computer` property.
 - `-NoSendReport` and `-SendReport` keep the same interactive vs non-interactive defaults as `Invoke-GetComputerHealth.ps1`.
+
+Findings marked `SuppressRepeats` are shown on their first observation and again after at least 45 days without observing them. Repeated observations remain in the full results with `Suppressed = $true` and `SuppressionSource = 'SuppressRepeats'`. They do not enter the notable report as `Postponed`.
+
+Saved report rows and interactive-report details preserve `SuppressRepeats`, `SuppressionSource`, `FirstSeenUtc`, and `LastSeenUtc`. `FirstSeenUtc` records the earliest observation retained for that finding; `LastSeenUtc` is refreshed on each observation. Configured suppressions take precedence, retain their existing expiry and reminders, and do not stop this observation tracking.

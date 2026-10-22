@@ -96,6 +96,10 @@ The second version is not good because it varies with a detail that is not essen
 
 > **TIP** This matters because an issue's signature, and therefore its suppression, depends on stable description text. Punctuation is discarded and spacing is normalized, but otherwise every character matters.
 
+## Reporting repeated events
+
+Custom scripts may opt individual event findings into repeat suppression using `[WARNING][SuppressRepeats]`, `[NOTICE][SuppressRepeats]`, or `[FAILURE][SuppressRepeats]`. The description must identify the event, including its timestamp when necessary. The first observation is shown normally. Repeats refresh a 45-day interval and are suppressed; an observation after a gap of at least 45 days is shown again. Keep ongoing health problems and collection errors unmarked. See [findings that suppress repeats](../contributor/built-in-health-tests.md#findings-that-suppress-repeats).
+
 ## When to Handle Exceptions
 
 The wrapper that invokes your scripts will catch and report exceptions in detail. It will then continue with the next script. Therefore, you do not need to catch exceptions if you are going to abort execution anyway and will not collect more information than the exception already provides.

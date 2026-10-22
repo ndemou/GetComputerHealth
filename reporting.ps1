@@ -622,11 +622,12 @@ function Get-HealthEffectiveLevel {
     [bool]$Suppressed,
     [AllowNull()][object]$SuppressedUntil,
     [int]$ShowAsPostponedWindowDays,
-    [datetime]$Today = (Get-Date).Date
+    [datetime]$Today = (Get-Date).Date,
+    [string]$SuppressionSource = ''
   )
 
   $realLevel = ([string]$Level).Trim().ToLowerInvariant()
-  if ($Suppressed -and ($null -ne $SuppressedUntil)) {
+  if ($Suppressed -and $SuppressionSource -ne 'SuppressRepeats' -and ($null -ne $SuppressedUntil)) {
     $suppressedUntilDate = [datetime]$SuppressedUntil
     $cutoffDate = $Today.Date.AddDays($ShowAsPostponedWindowDays)
     if (($Today.Date -le $suppressedUntilDate.Date) -and ($suppressedUntilDate.Date -le $cutoffDate)) {
@@ -687,6 +688,10 @@ function Convert-HealthMessagesToReportRows {
       TimeUtc              = $timeUtc
       Computer             = if ($message.PSObject.Properties['Computer']) { [string]$message.Computer } else { '' }
       Suppressed           = $suppressed
+      SuppressRepeats       = if ($message.PSObject.Properties['SuppressRepeats']) { [bool]$message.SuppressRepeats } else { $false }
+      SuppressionSource    = if ($message.PSObject.Properties['SuppressionSource']) { [string]$message.SuppressionSource } else { '' }
+      FirstSeenUtc         = if ($message.PSObject.Properties['FirstSeenUtc'] -and $message.FirstSeenUtc) { Convert-HealthTimeValueToUtcIsoString -Value $message.FirstSeenUtc } else { '' }
+      LastSeenUtc          = if ($message.PSObject.Properties['LastSeenUtc'] -and $message.LastSeenUtc) { Convert-HealthTimeValueToUtcIsoString -Value $message.LastSeenUtc } else { '' }
       Level                = $level
       EffectiveLevel       = if ($message.PSObject.Properties['EffectiveLevel']) { [string]$message.EffectiveLevel } else { $level }
       WhatToDo             = 'not-sure'
@@ -757,6 +762,10 @@ function Convert-HealthReportRowsToInteractiveRows {
     [pscustomobject]@{
       Computer       = if ($row.PSObject.Properties['Computer']) { [string]$row.Computer } else { '' }
       Suppressed     = if ($row.PSObject.Properties['Suppressed']) { [bool]$row.Suppressed } else { $false }
+      SuppressRepeats = if ($row.PSObject.Properties['SuppressRepeats']) { [bool]$row.SuppressRepeats } else { $false }
+      SuppressionSource = if ($row.PSObject.Properties['SuppressionSource']) { [string]$row.SuppressionSource } else { '' }
+      FirstSeenUtc   = if ($row.PSObject.Properties['FirstSeenUtc']) { [string]$row.FirstSeenUtc } else { '' }
+      LastSeenUtc    = if ($row.PSObject.Properties['LastSeenUtc']) { [string]$row.LastSeenUtc } else { '' }
       Level          = if ($row.PSObject.Properties['Level']) { [string]$row.Level } else { '' }
       EffectiveLevel = if ($row.PSObject.Properties['EffectiveLevel']) { [string]$row.EffectiveLevel } else { '' }
       Message        = if ($row.PSObject.Properties['Message']) { [string]$row.Message } else { '' }

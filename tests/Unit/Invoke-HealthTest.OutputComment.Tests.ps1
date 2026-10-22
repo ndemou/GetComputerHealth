@@ -8,7 +8,7 @@ Describe 'Invoke-HealthTest output stream comment capture' {
     $tokens = $null
     $ast = [System.Management.Automation.Language.Parser]::ParseFile($script:GetComputerHealthScript, [ref]$tokens, [ref]$parseErrors)
 
-    foreach ($functionName in @('Convert-TextToLogRecord', 'Convert-WarningLikeObjectToLogRecord', 'Invoke-HealthTest')) {
+    foreach ($functionName in @('Convert-TextToLogRecord', 'Convert-WarningLikeObjectToLogRecord', 'Write-HealthFinding', 'Invoke-HealthTest')) {
       $funcAst = $ast.Find({
           param($node)
           $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
@@ -73,7 +73,10 @@ Describe 'Invoke-HealthTest output stream comment capture' {
         [string]$Msg,
         [string]$Comment = '',
         [string]$Emitter = '',
-        [switch]$Suppressed
+        [switch]$Suppressed,
+        [string]$SuppressionSource,
+        [switch]$SuppressRepeats,
+        [object]$RepeatObservation
       )
 
       $record = [pscustomobject]@{

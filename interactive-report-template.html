@@ -587,6 +587,7 @@
           row.EffectiveLevel || row.Level || '',
           row.Message || '',
           row.Comment || '',
+          row.SuppressionSource || '',
           row.Emitter || ''
         ].join(' ').toLowerCase();
       }
@@ -750,10 +751,22 @@
           var key = htmlEncode(keyForRow(row));
           var isPostponed = String(row.EffectiveLevel || row.Level || '').toLowerCase() === 'postponed';
           var postponedClass = isPostponed ? ' postponed-text' : '';
-          var commentHtml = htmlEncode(row.Comment || '').replace(/\r?\n/g, '<br>');
+          var commentText = row.Comment || '';
+          if (row.SuppressRepeats) {
+            var repeatDetails = row.SuppressionSource === 'SuppressRepeats'
+              ? 'Suppressed by SuppressRepeats'
+              : 'Repeat handling: SuppressRepeats';
+            if (row.SuppressionSource && row.SuppressionSource !== 'SuppressRepeats') {
+              repeatDetails += '\nSuppressed by ' + row.SuppressionSource;
+            }
+            if (row.FirstSeenUtc) { repeatDetails += '\nFirst seen (UTC): ' + row.FirstSeenUtc; }
+            if (row.LastSeenUtc) { repeatDetails += '\nLast seen (UTC): ' + row.LastSeenUtc; }
+            commentText += (commentText ? '\n\n' : '') + repeatDetails;
+          }
+          var commentHtml = htmlEncode(commentText).replace(/\r?\n/g, '<br>');
           var commandHtml = htmlEncode(buildWhitelistCommand(row)).replace(/\r?\n/g, '<br>');
           var actionHtml = '';
-          var hasComment = Boolean(row.Comment);
+          var hasComment = Boolean(commentText);
           var showComment = Boolean(expandedComments[keyForRow(row)]);
           var messageCommentClass = 'message-comment' + (showComment ? '' : ' hidden-column') + postponedClass;
           var infoButtonHtml = '';

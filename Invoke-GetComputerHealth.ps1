@@ -888,11 +888,12 @@ foreach ($target in $targets) {
         [bool]$Suppressed,
         [AllowNull()][object]$SuppressedUntil,
         [int]$ShowAsPostponedWindowDays,
-        [datetime]$Today = (Get-Date).Date
+        [datetime]$Today = (Get-Date).Date,
+        [string]$SuppressionSource = ''
       )
 
       $realLevel = ([string]$Level).Trim().ToLowerInvariant()
-      if ($Suppressed -and ($null -ne $SuppressedUntil)) {
+      if ($Suppressed -and $SuppressionSource -ne 'SuppressRepeats' -and ($null -ne $SuppressedUntil)) {
         $suppressedUntilDate = [datetime]$SuppressedUntil
         $cutoffDate = $Today.Date.AddDays($ShowAsPostponedWindowDays)
         if (($Today.Date -le $suppressedUntilDate.Date) -and ($suppressedUntilDate.Date -le $cutoffDate)) {
@@ -961,8 +962,9 @@ foreach ($target in $targets) {
         if ($item -and $item.PSObject.Properties['Level'] -and $item.PSObject.Properties['Message']) {
           $hash = if ($item.PSObject.Properties['Hash']) { [string]$item.Hash } else { '00000000' }
           $suppressed = if ($item.PSObject.Properties['Suppressed']) { [bool]$item.Suppressed } else { $false }
+          $suppressionSource = if ($item.PSObject.Properties['SuppressionSource']) { [string]$item.SuppressionSource } elseif ($suppressed) { 'Configured' } else { '' }
           $suppressedUntil = $null
-          if ($suppressed -and $hash -and $suppressionExpiryMap.ContainsKey($hash.ToLowerInvariant())) {
+          if ($suppressed -and $suppressionSource -ne 'SuppressRepeats' -and $hash -and $suppressionExpiryMap.ContainsKey($hash.ToLowerInvariant())) {
             $suppressedUntil = $suppressionExpiryMap[$hash.ToLowerInvariant()]
           }
           $level = [string]$item.Level
@@ -970,10 +972,14 @@ foreach ($target in $targets) {
               TimeUtc    = if ($item.PSObject.Properties['TimeUtc']) { $item.TimeUtc } else { $null }
               Computer   = if ($item.PSObject.Properties['Computer']) { [string]$item.Computer } else { $env:COMPUTERNAME }
               Level      = $level
-              EffectiveLevel = Get-HealthEffectiveLevelLocal -Level $level -Suppressed:$suppressed -SuppressedUntil $suppressedUntil -ShowAsPostponedWindowDays $showAsPostponedWindowDays
+              EffectiveLevel = Get-HealthEffectiveLevelLocal -Level $level -Suppressed:$suppressed -SuppressedUntil $suppressedUntil -ShowAsPostponedWindowDays $showAsPostponedWindowDays -SuppressionSource $suppressionSource
               Hash       = $hash
               Suppressed = $suppressed
               SuppressedUntil = $suppressedUntil
+              SuppressRepeats = if ($item.PSObject.Properties['SuppressRepeats']) { [bool]$item.SuppressRepeats } else { $false }
+              SuppressionSource = $suppressionSource
+              FirstSeenUtc = if ($item.PSObject.Properties['FirstSeenUtc']) { $item.FirstSeenUtc } else { $null }
+              LastSeenUtc = if ($item.PSObject.Properties['LastSeenUtc']) { $item.LastSeenUtc } else { $null }
               Message    = [string]$item.Message
               Comment    = if ($item.PSObject.Properties['Comment']) { [string]$item.Comment } else { '' }
               Emitter    = if ($item.PSObject.Properties['Emitter']) { $item.Emitter } else { $null }

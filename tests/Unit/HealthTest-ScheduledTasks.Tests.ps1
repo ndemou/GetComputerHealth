@@ -432,6 +432,7 @@ Describe 'HealthTest-ScheduledTasks' {
     @($script:warnings | Where-Object { $_ -match 'LastTaskResult=0x80070002' }).Count | Should -Be 1
     @($script:warnings | Where-Object { $_ -match 'terminated with LastTaskResult' }).Count | Should -Be 1
     ($script:warnings[0] -split "`n")[0] | Should -Match '; Last run time unknown\.$'
+    $script:warnings[0] | Should -Not -Match '\[SuppressRepeats\]'
   }
 
   It 'identifies a failed task run by path, error code, and last run time without repeating the code' -ForEach @(
@@ -451,7 +452,7 @@ Describe 'HealthTest-ScheduledTasks' {
 
     $script:warnings | Should -HaveCount 1
     $parts = $script:warnings[0] -split "`n", 2
-    $parts[0] | Should -Be "[FAILURE] Scheduled task '\enLogic\Execute WindowsUpdatesHelper' terminated with LastTaskResult=0x800710E0 (Either wrong password or win32 error 'The operator or administrator has refused the request'); Last run time $RunTime."
+    $parts[0] | Should -Be "[FAILURE][SuppressRepeats] Scheduled task '\enLogic\Execute WindowsUpdatesHelper' terminated with LastTaskResult=0x800710E0 (Either wrong password or win32 error 'The operator or administrator has refused the request'); Last run time $RunTime."
     $parts[1] | Should -Match ([regex]::Escape("Last run time: $RunTime"))
   }
 

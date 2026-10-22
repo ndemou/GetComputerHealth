@@ -98,6 +98,20 @@ Use `Suppressed` only when every message from the test is expected inventory dat
 
 Suppressed Inventory Tests can be extremely useful for "Required findings".
 
+## Findings that suppress repeats
+
+Use `[SuppressRepeats]` immediately after the level to report a particular event once while it continues to be observed:
+
+```powershell
+Write-Warning "[FAILURE][SuppressRepeats] Task '$taskPath' failed at $lastRunTime with result $resultCode.`n$details"
+```
+
+The runner removes the marker before calculating the signature. It reports the first observation normally, then suppresses repeats while each observation is less than 45 days after the previous one. Every observation refreshes the interval, including findings already suppressed by configuration. A gap of 45 days makes the next observation visible again. Severity changes alone do not create a new finding.
+
+This is a per-finding marker for `NOTICE`, `WARNING`, and `FAILURE`, not a test-wide tag. Use it for events with stable identities, such as a failed task execution with a known timestamp. Keep continuing health problems and failures to collect data unmarked. The state belongs to the runner under `state\suppress_repeats.json`; health tests only emit findings.
+
+See the [SuppressRepeats design](../design/first-seen-findings.md) for state, precedence, and reporting rules. Running a health-test file directly prints its warning text; persistent repeat handling requires `Get-ComputerHealth.ps1` or `Invoke-GetComputerHealth.ps1`.
+
 ## Policy Inventory Tests
 
 Tests with the `Policy` tag inventory a system aspect where the initial controlled state is accepted as a baseline. For example, this can cover open ports, installed software, and enabled services after a clean server installation.
