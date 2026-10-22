@@ -98,32 +98,67 @@ Use `Suppressed` only when every message from the test is expected inventory dat
 
 Suppressed Inventory Tests can be extremely useful for "Required findings".
 
-## Findings that suppress repeats
+## Findings that must only be reported once
 
-Use `[SuppressRepeats]` immediately after the level for individual event findings. It is a per-finding marker, not a test-wide tag, and is supported for `NOTICE`, `WARNING`, and `FAILURE`:
+Some findings describe an event at a specific point in time (e.g. the failed execution of a Scheduled Task). In such cases it's very convenient for the first observation to be reported but all later observations of the *same* event to be silent. In practice if there's a gap of at 45 days without any observation and then the finding reappears it will be reported again.
+
+To enable this behavior for a finding, add `[SuppressRepeats]` immediately after its severity prefix, as shown below.
 
 ```powershell
-Write-Warning "[FAILURE][SuppressRepeats] Task '$taskPath' failed at $lastRunTime with result $resultCode.`n$details"
+Write-Warning "[FAILURE][SuppressRepeats] Event $eventName occured at $($timestamp).`n$details"
 ```
 
-Put everything that distinguishes the event in the first-line description. For a failed scheduled-task execution, this means the full task path, error code, and last run time. The details after the newline are excluded from the signature. A new execution must change the description so it can be reported as a new finding.
+It is supported for `NOTICE`, `WARNING`, and `FAILURE`. Put everything that distinguishes the specific event in the first-line description (e.g. its timestamp). The runner handles everything else.
 
-The runner sets `SuppressRepeats = $true` and removes the marker before displaying the description or calculating its signature. Adding the marker therefore preserves existing finding signatures. Severity is also preserved, but is not part of the signature: changing only details or severity does not create a new notification.
+### Implementation details for `SuppressRepeats`
 
-Use the marker for events with stable identities. Keep continuing health problems and failures to collect data unmarked. `HealthTest-ScheduledTasks` uses these rules:
+The runner sets `SuppressRepeats = $true` and removes the marker before displaying the description or calculating its signature. Adding the marker therefore preserves existing finding signatures. Severity is also preserved, but is not part of the signature: changing only details or severity does not create a new notification. See [automatic repeat suppression](../user/reporting.md#automatic-repeat-suppression), and the [SuppressRepeats design](../design/first-seen-findings.md) for details.
 
-| Finding | Repeat handling |
+For example, `HealthTest-ScheduledTasks` uses this behavior for a failed execution at a specific last run time. A new failed execution will have a different last run time and will be reported as a new finding. 
+
+The following assumes no other active suppression covers the finding:
+
+| Observation | Result |
 | --- | --- |
-| Failed execution with a known last run time | Use `[SuppressRepeats]`; the description identifies the execution. |
-| Failed execution with an unknown last run time | Leave unmarked; separate executions cannot be identified reliably. |
-| Disabled task | Leave unmarked. |
-| Missed runs | Leave unmarked. |
-| Stale task | Leave unmarked. |
-| Failure to collect or read data | Leave unmarked. |
+| First observation | Shown normally; the observation is saved. |
+| The same event every day for months | Shown only the first time; each observation refreshes the interval. |
+| The same event every month | Remains suppressed while every gap is shorter than 45 days. |
+| Return 44 days after the last observation | Suppressed; the observation is refreshed. |
+| Return exactly 45 days or more after the last observation | Shown again; a new interval starts. |
+| A run does not find the event | Its observation is not refreshed. |
 
-The runner owns observation state and suppression; health tests only emit findings. Unmarked findings keep their existing behavior. `PASS`, `INFO`, `DEBUG`, and the runner's own errors do not acquire automatic repeat suppression.
+A continuously observed event can stay suppressed indefinitely. Changes only to details or severity, including an increase from `WARNING` to `FAILURE`, do not create a new notification. Repeats remain in the full results with their current severity and details, and the existing filters control whether suppressed findings are displayed.
 
-See [automatic repeat suppression](../user/reporting.md#automatic-repeat-suppression) for the 45-day rule, configured-suppression precedence, and report fields, and the [SuppressRepeats design](../design/first-seen-findings.md) for state storage and implementation requirements. The same marker works in custom scripts. Running a health-test file directly prints its warning text; persistent repeat handling requires `Get-ComputerHealth.ps1` or `Invoke-GetComputerHealth.ps1`.
+An offline computer or a skipped test can also create a 45-day gap. Seeing the finding again after that gap does not prove that the underlying problem was resolved and then returned. Recording an observation also does not confirm that someone read the report.
+
+### Manual suppressions and Postponed
+
+Configured suppressions, including manual choices and policy baselines, take precedence. SuppressRepeats keeps observing the finding but does not modify `config\Get-ComputerHealth.sigs-to-suppress.txt`, its expiry dates, or permanent entries.
+
+This means that **expiry of a manual suppression does not guarantee a new notification**. A continuously observed finding can still be covered by repeat suppression.
+
+Automatic repeats never become `Postponed`. That report level belongs to configured suppressions approaching their expiry within `ShowAsPostponedWindowDays`. Repeat suppression does not populate or replace `SuppressedUntil` with its own calculated expiry. Configured suppressions retain their existing postponement reminders.
+
+### Repeat suppression fields
+
+Saved report rows retain these properties. Interactive-report details show the repeat-handling source and observation timestamps when available.
+
+| Property | Meaning |
+| --- | --- |
+| `SuppressRepeats` | The finding opts into repeat handling, including on its first visible occurrence. |
+| `Suppressed` | The finding is suppressed in this run by any applicable mechanism. |
+| `SuppressionSource` | `Configured`, `SuppressedTag`, `Explicit`, or `SuppressRepeats`; empty when no suppression applies. `Configured` covers manual suppressions and policy baselines. |
+| `FirstSeenUtc` | The earliest retained observation, preserved even across a gap of 45 days or more. |
+| `LastSeenUtc` | The time of the current observation, refreshed even for suppressed findings. |
+| `SuppressedUntil` | The existing configured suppression expiry, when available; never the calculated SuppressRepeats expiry. |
+
+### State and troubleshooting
+
+Each checked computer stores observations in `state\suppress_repeats.json` under its installation root. State persists across runs and code updates. With no previous entry, the next observation is treated as new, subject to other active suppressions. If the clock moves backwards and makes the previous observation appear to be in the future, that observation history is restarted.
+
+If state cannot be read or saved, the runner emits a warning and does not apply repeat suppression to that finding. Configured suppressions still apply. Repeated notifications alongside a state warning therefore indicate a problem with observation tracking; inspect the warning's details for the cause.
+
+See the [SuppressRepeats design](../design/first-seen-findings.md) for state format, precedence, locking, and failure handling. To mark findings in built-in or custom tests, see the [authoring guide](../contributor/built-in-health-tests.md#findings-that-suppress-repeats). Persistent repeat handling requires `Get-ComputerHealth.ps1` or `Invoke-GetComputerHealth.ps1`; directly executing a health-test file only prints its warnings.
 
 ## Policy Inventory Tests
 

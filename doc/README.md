@@ -10,7 +10,6 @@ This page is the routing table for the repository documentation. It is meant for
 | Contribute code or docs to the repo | [`CONTRIBUTING.md`](../CONTRIBUTING.md) |
 | Follow repo-specific coding, test, and release instructions as an agent | [`AGENTS.md`](../AGENTS.md) |
 | Add local custom health tests without changing the repo | [`user/custom-tests.md`](./user/custom-tests.md) |
-| Understand repeated findings, suppression, and postponement reminders | [Automatic repeat suppression](./user/reporting.md#automatic-repeat-suppression) |
 | Understand the test suite and choose validation commands | [`contributor/test-suite.md`](./contributor/test-suite.md) |
 | Review current backlog and rough ideas | [`TODO.md`](../TODO.md) |
 
@@ -21,7 +20,7 @@ This page is the routing table for the repository documentation. It is meant for
 | [`README.md`](../README.md) | User-facing overview, installation, common operations, architecture summary, and generated built-in test catalog. |
 | [`user/custom-tests.md`](./user/custom-tests.md) | User-facing guide for out-of-tree custom tests under `config\Custom-HealthTests`. |
 | [`user/custom-test-helpers.md`](./user/custom-test-helpers.md) | Optional helper examples for custom health tests. |
-| [`user/reporting.md`](./user/reporting.md) | Report artifacts, automatic repeat suppression, configured-suppression reminders, and finding metadata. |
+| [`user/reporting.md`](./user/reporting.md) | Reporting API usage: calling `Invoke-GetComputerHealthReporting` with saved findings, with an example and parameter notes. |
 | [`user/windows-updates.md`](./user/windows-updates.md) | Windows Update checks, reporting thresholds, and reasons for keeping both update sources. |
 
 ## Contributor And Design Guides
