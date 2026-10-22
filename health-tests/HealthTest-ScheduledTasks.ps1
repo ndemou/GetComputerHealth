@@ -56,6 +56,9 @@ configured user is confirmed not to be logged on. If logged-on-user inspection
 or principal matching is inconclusive, the missed-run finding is retained.
 Failed executions with a known last run time use SuppressRepeats: the same
 execution is reported again only after 45 days without observing it.
+Ready tasks that have never run and have no missed runs are exempt from the
+stale check while their single enabled, non-repeating TimeTrigger is still
+in the future. Uncertain or more complex schedules retain the stale check.
 #>
   [CmdletBinding()]
   param(
@@ -175,6 +178,7 @@ execution is reported again only after 45 days without observing it.
     }
 
     if ($StaleDays -gt 0 -and $fact.HasEnabledTrigger -and $isThirdPartyOrRequired) {
+      $now = Get-Date
       $lastRun = $fact.LastRunTime
       $isStale = $false
       $lastRunText = 'never'
@@ -183,12 +187,30 @@ execution is reported again only after 45 days without observing it.
       } else {
         $lastRunDate = [datetime]$lastRun
         $lastRunText = $lastRunDate.ToString('yyyy-MM-dd')
-        if (((Get-Date) - $lastRunDate).TotalDays -gt $StaleDays) {
+        if (($now - $lastRunDate).TotalDays -gt $StaleDays) {
           $isStale = $true
         }
       }
 
-      if ($isStale) {
+      $awaitingFirstRun = $false
+      $triggers = @($fact.Triggers)
+      # SCHED_S_TASK_HAS_NOT_RUN is more reliable than a placeholder LastRunTime.
+      if ($fact.LastResultCode -eq 0x00041303 -and $fact.State -eq 'Ready' -and
+          $fact.NumberOfMissedRuns -eq 0 -and $triggers.Count -eq 1) {
+        $trigger = $triggers[0]
+        if ($trigger.Enabled -and $trigger.Type -in @('Time', 'TimeTrigger') -and
+            [string]::IsNullOrWhiteSpace($trigger.Interval) -and
+            [string]::IsNullOrWhiteSpace($trigger.Duration)) {
+          $start = [datetimeoffset]::MinValue
+          $awaitingFirstRun = [datetimeoffset]::TryParse(
+            $trigger.StartBoundary,
+            [Globalization.CultureInfo]::InvariantCulture,
+            [Globalization.DateTimeStyles]::AllowWhiteSpaces,
+            [ref]$start) -and $start -gt [datetimeoffset]$now
+        }
+      }
+
+      if ($isStale -and -not $awaitingFirstRun) {
         $hadIssue = $true
         $level = Get-ScheduledTaskOperationalSeverity -Fact $fact -IssueType 'Stale' -Required:$isRequired
         Write-Warning "[$level] Scheduled task appears stale: $($fact.StableKey) LastRun=$lastRunText (> $StaleDays days or never).`n$(Format-ScheduledTaskFactDetails -Fact $fact)"

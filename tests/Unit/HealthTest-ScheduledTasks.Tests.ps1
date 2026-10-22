@@ -508,6 +508,143 @@ Describe 'HealthTest-ScheduledTasks' {
     @($script:warnings | Where-Object { $_ -match 'Scheduled task appears stale' }).Count | Should -Be 1
   }
 
+  Context 'stale checks before the first scheduled execution' {
+    BeforeEach {
+      Mock Get-Date { ([datetimeoffset]'2026-10-23T03:00:00Z').UtcDateTime }
+      $trigger = ConvertTo-ScheduledTaskTriggerFact -Trigger ([pscustomobject]@{
+          TriggerType = 'TimeTrigger'
+          Enabled = $true
+          StartBoundary = '2026-10-23T06:14:00+03:00'
+          EndBoundary = '2026-10-23T06:15:00+03:00'
+        })
+      $taskParameters = @{
+        TaskPath = '\'
+        TaskName = 'WindowsUpdateHelper-ScheduledReboot'
+        PrincipalUserId = 'SYSTEM'
+        IsSystemPrincipal = $true
+        IsPrivileged = $true
+        HasEnabledTrigger = $true
+        Triggers = @($trigger)
+        LastRunTime = [datetime]'1999-11-30'
+        LastTaskResult = 267011
+        LastResultCode = 267011
+        LastResultHex = '0x00041303'
+        LastResultDescription = 'Not yet run'
+        DeleteExpiredTaskAfter = 'PT1H'
+      }
+      $script:futureTask = New-TestScheduledTaskFact @taskParameters
+      $script:futureTask.NextRunTime = ([datetimeoffset]'2026-10-23T06:14:14+03:00').LocalDateTime
+      $script:TestScheduledTaskFacts = @($script:futureTask)
+    }
+
+    It 'does not report the scheduled reboot as stale before its first run' {
+      HealthTest-ScheduledTasks
+
+      $script:warnings | Should -HaveCount 1
+      $script:warnings[0] | Should -Be '[PASS] Scheduled tasks healthy'
+    }
+
+    It 'also accepts an absent last run time when the scheduler confirms that the task has never run' {
+      $script:futureTask.LastRunTime = $null
+      HealthTest-ScheduledTasks
+
+      $script:warnings | Should -HaveCount 1
+      $script:warnings[0] | Should -Be '[PASS] Scheduled tasks healthy'
+    }
+
+    It 'compares the start instant correctly for <Boundary>' -ForEach @(
+      @{ Boundary = '2026-10-23T03:14:00Z'; ExpectedStale = 0 },
+      @{ Boundary = '2026-10-22T23:14:00-04:00'; ExpectedStale = 0 },
+      @{ Boundary = '2026-10-23T06:00:00+03:00'; ExpectedStale = 1 },
+      @{ Boundary = '2026-10-23T05:59:59+03:00'; ExpectedStale = 1 },
+      @{ Boundary = '2026-10-23T06:14:00+04:00'; ExpectedStale = 1 },
+      @{ Boundary = ''; ExpectedStale = 1 },
+      @{ Boundary = 'unknown'; ExpectedStale = 1 },
+      @{ Boundary = '2026-10-23T06:14:00+25:00'; ExpectedStale = 1 }
+    ) {
+      $script:futureTask.Triggers[0].StartBoundary = $Boundary
+      HealthTest-ScheduledTasks
+
+      $script:warnings | Should -HaveCount 1
+      @($script:warnings | Where-Object { $_ -match 'Scheduled task appears stale' }).Count | Should -Be $ExpectedStale
+    }
+
+    It 'uses local time for a start boundary without an explicit offset' {
+      $localStart = ([datetimeoffset]'2026-10-23T03:14:00Z').LocalDateTime
+      $script:futureTask.Triggers[0].StartBoundary = $localStart.ToString('yyyy-MM-ddTHH:mm:ss')
+      HealthTest-ScheduledTasks
+
+      $script:warnings | Should -HaveCount 1
+      $script:warnings[0] | Should -Be '[PASS] Scheduled tasks healthy'
+    }
+
+    It 'retains stale reporting for a recurring or uncertain schedule: <Type>, <Interval>, <Duration>' -ForEach @(
+      @{ Type = 'CalendarTrigger'; Interval = ''; Duration = '' },
+      @{ Type = 'TimeTrigger'; Interval = 'PT1H'; Duration = '' },
+      @{ Type = 'TimeTrigger'; Interval = ''; Duration = 'PT1H' },
+      @{ Type = 'UnknownTrigger'; Interval = ''; Duration = '' }
+    ) {
+      $script:futureTask.Triggers[0].Type = $Type
+      $script:futureTask.Triggers[0].Interval = $Interval
+      $script:futureTask.Triggers[0].Duration = $Duration
+      HealthTest-ScheduledTasks
+
+      @($script:warnings | Where-Object { $_ -match 'Scheduled task appears stale' }).Count | Should -Be 1
+    }
+
+    It 'retains stale reporting when another trigger exists' {
+      $script:futureTask.Triggers += $script:futureTask.Triggers[0]
+      HealthTest-ScheduledTasks
+
+      @($script:warnings | Where-Object { $_ -match 'Scheduled task appears stale' }).Count | Should -Be 1
+    }
+
+    It 'retains stale reporting for a previously successful execution despite a future next run' {
+      $script:futureTask.LastRunTime = (Get-Date).AddDays(-60)
+      $script:futureTask.LastTaskResult = 0
+      $script:futureTask.LastResultCode = 0
+      $script:futureTask.LastResultHex = '0x00000000'
+      $script:futureTask.LastResultDescription = 'Success (0)'
+      $script:futureTask.Triggers[0].Type = 'CalendarTrigger'
+      HealthTest-ScheduledTasks
+
+      @($script:warnings | Where-Object { $_ -match 'Scheduled task appears stale' }).Count | Should -Be 1
+    }
+
+    It 'keeps genuine execution failures visible even with a future one-shot trigger' {
+      $script:futureTask.LastRunTime = (Get-Date).AddDays(-60)
+      $script:futureTask.LastTaskResult = 2147942402
+      $script:futureTask.LastResultCode = 2147942402
+      $script:futureTask.LastResultHex = '0x80070002'
+      $script:futureTask.LastResultSeverity = 'Error'
+      $script:futureTask.LastResultDescription = 'File or path not found'
+      $script:futureTask.LastResultIsInformational = $false
+      HealthTest-ScheduledTasks
+
+      $script:warnings | Should -HaveCount 2
+      @($script:warnings | Where-Object { $_ -match 'terminated with LastTaskResult=0x80070002' }).Count | Should -Be 1
+      @($script:warnings | Where-Object { $_ -match 'Scheduled task appears stale' }).Count | Should -Be 1
+    }
+
+    It 'keeps missed runs and stale findings visible when the task has missed an execution' {
+      $script:futureTask.NumberOfMissedRuns = 1
+      HealthTest-ScheduledTasks
+
+      $script:warnings | Should -HaveCount 2
+      @($script:warnings | Where-Object { $_ -match 'Scheduled task missed 1 runs' }).Count | Should -Be 1
+      @($script:warnings | Where-Object { $_ -match 'Scheduled task appears stale' }).Count | Should -Be 1
+    }
+
+    It 'keeps a disabled required task visible despite a future first execution' {
+      $script:futureTask.Enabled = $false
+      $script:futureTask.State = 'Disabled'
+      HealthTest-ScheduledTasks -MustBeEnabled $script:futureTask.StableKey
+
+      $script:warnings | Should -HaveCount 1
+      $script:warnings[0] | Should -Match '^\[FAILURE\] Required SYSTEM scheduled task is disabled:'
+    }
+  }
+
   It 'reports one missed run as notice' {
     $script:TestScheduledTaskFacts = @(
       New-TestScheduledTaskFact -NumberOfMissedRuns 1
