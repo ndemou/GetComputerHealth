@@ -269,49 +269,44 @@ Uses: Check-PendingSecurityUpdates, Check-UpdateAge.
     if ($age.AgeDays -ge $UpdateAgeFailDays) { $ageLevel = 'FAILURE' }
     elseif ($age.AgeDays -ge $UpdateAgeWarnDays) { $ageLevel = 'WARNING' }
   }
-  $combinedUpdate = $null
-  if ($ageLevel -eq 'FAILURE') {
-    $combinedUpdate = $pending.Updates |
-      Where-Object { $null -ne $_.AgeDays -and $_.AgeDays -ge $PendingFailDays } |
-      Sort-Object IsMonthlyBaseline, AgeDays -Descending |
-      Select-Object -First 1
-  }
+  $pendingLevel = $null
+  $updateDetails = @()
   foreach ($update in $pending.Updates) {
     Write-Debug "Pending Windows update: id=$($update.Id); title=$($update.Title); KB=$($update.KB); age days=$($update.AgeDays); publication/gap date (UTC)=$($update.PublishedDate); source=$($update.Source)."
-    if ($null -eq $update.AgeDays) { continue }
-    $level = $null
-    if ($update.AgeDays -ge $PendingFailDays) { $level = 'FAILURE' }
-    elseif ($update.AgeDays -ge $PendingWarnDays) { $level = 'WARNING' }
-    if ($level) {
-      $hadIssue = $true
-      # The combined finding already identifies this monthly target. Retain all
-      # other pending updates, including unrelated component/security failures.
-      if ($combinedUpdate -and $combinedUpdate.IsMonthlyBaseline -and $update -ne $combinedUpdate -and
-          ($update.KB -replace 'KB', '') -eq ($combinedUpdate.KB -replace 'KB', '')) { continue }
+    if ($null -eq $update.AgeDays) {
+      $missingText = 'The age of this missing update could not be determined.'
+    } else {
+      if ($update.AgeDays -ge $PendingFailDays) { $pendingLevel = 'FAILURE' }
+      elseif ($update.AgeDays -ge $PendingWarnDays -and -not $pendingLevel) { $pendingLevel = 'WARNING' }
       $dateText = $update.PublishedDate.ToString('yyyy-MM-dd')
-      $targetText = ''
       if ($update.IsMonthlyBaseline) {
         $missingText = "Missing monthly security updates since $($update.AgeDays) days ago ($dateText)."
-        $targetText = "`nLatest monthly security update to install: $($update.KB)."
       } else {
         $missingText = "An uninstalled security or critical update was last published $($update.AgeDays) days ago ($dateText)."
-        if ($update.KB) { $targetText = "`nUpdate to check: $($update.KB)." }
       }
-      if ($update -eq $combinedUpdate) {
-        if ($update.IsMonthlyBaseline) {
-          $missingText = "Security fixes released $($update.AgeDays) days ago are still missing."
-        }
-        $message = "[FAILURE] Windows security updates are seriously overdue.`n$missingText`nThe last recorded Windows system update installation was $($age.AgeDays) days ago.`n"
-      } else {
-        $message = "[$level] This computer is missing Windows security updates.`n$missingText"
-      }
-      Write-Warning "$message`nCheck Windows Update for failed or blocked installations.$targetText"
     }
+    if ($update.IsMonthlyBaseline) {
+      $targetText = "`nLatest monthly security update to install: $($update.KB)."
+    } elseif ($update.KB) {
+      $targetText = "`nUpdate to check: $($update.KB)."
+    } else {
+      $targetText = "`nUpdate to check: $($update.Title)."
+    }
+    $updateDetails += "$missingText$targetText"
+  }
+  $combineInstallationFailure = $pendingLevel -eq 'FAILURE' -and $ageLevel -eq 'FAILURE'
+  if ($pendingLevel) {
+    $hadIssue = $true
+    if ($combineInstallationFailure) {
+      $updateDetails += "The last recorded Windows system update installation was $($age.AgeDays) days ago."
+    }
+    $details = $updateDetails -join "`n`n"
+    Write-Warning "[$pendingLevel] This computer is missing Windows security or critical updates.`nCheck Windows Update for failed or blocked installations.`n`n$details"
   }
   if (-not $age.Succeeded) {
     $hadIssue = $true
     Write-Warning "[WARNING] The last Windows system update installation could not be determined.`nCheck Windows Update installation history."
-  } elseif ($ageLevel -and -not $combinedUpdate) {
+  } elseif ($ageLevel -and -not $combineInstallationFailure) {
     $hadIssue = $true
     Write-Warning "[$ageLevel] No recent Windows system update installation was found.`nLast recorded installation: $($age.AgeDays) days ago ($($age.LastInstallDate.ToString('yyyy-MM-dd'))).`nCheck why Windows system updates are not being installed."
   }

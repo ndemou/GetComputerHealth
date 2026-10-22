@@ -238,7 +238,7 @@ Describe 'Windows update checks' {
       }
       HealthTest-WindowsUpdates
       $script:warnings.Count | Should -Be 1
-      $script:warnings[0] | Should -Match '^\[FAILURE\] This computer is missing Windows security updates\.'
+      $script:warnings[0] | Should -Match '^\[FAILURE\] This computer is missing Windows security or critical updates\.'
       $script:warnings[0] | Should -Match '21 days'
     }
 
@@ -311,7 +311,7 @@ Describe 'Windows update checks' {
       $script:pendingFacts.Errors = @('Cached inspection failed')
       $script:pendingFacts.Updates = @(New-TestPendingUpdate -Days 20)
       HealthTest-WindowsUpdates
-      ($script:warnings -join "`n") | Should -Match '\[FAILURE\] This computer is missing Windows security updates'
+      ($script:warnings -join "`n") | Should -Match '\[FAILURE\] This computer is missing Windows security or critical updates'
       ($script:warnings -join "`n") | Should -Match 'no recent successful check for updates'
       ($script:warnings -join "`n") | Should -Not -Match '\[PASS\]'
     }
@@ -342,7 +342,7 @@ Describe 'Windows update checks' {
       $script:pendingFacts.Updates = @(New-TestPendingUpdate -Days 40)
       HealthTest-WindowsUpdates
       ($script:warnings -join "`n") | Should -Match 'Current Windows security update information could not be confirmed'
-      ($script:warnings -join "`n") | Should -Match '\[FAILURE\] This computer is missing Windows security updates'
+      ($script:warnings -join "`n") | Should -Match '\[FAILURE\] This computer is missing Windows security or critical updates'
       ($script:warnings -join "`n") | Should -Not -Match '\[PASS\]'
     }
 
@@ -352,6 +352,68 @@ Describe 'Windows update checks' {
       $script:warnings[0] | Should -Match '^\[FAILURE\]'
       { HealthTest-WindowsUpdates -PendingWarnDays 15 -PendingFailDays 8 } | Should -Throw
       { HealthTest-WindowsUpdates -UpdateAgeWarnDays 60 -UpdateAgeFailDays 45 } | Should -Throw
+    }
+
+    It 'reports the same nine-day KB from both sources as one warning with both details' {
+      $cached = New-TestPendingUpdate -Days 9
+      $monthly = New-TestPendingUpdate -Days 9 -Monthly
+      $cached.KB = 'KB5126655'
+      $monthly.KB = 'KB5126655'
+      $script:pendingFacts.Updates = @($cached, $monthly)
+      HealthTest-WindowsUpdates
+
+      $script:warnings | Should -HaveCount 1
+      $script:warnings[0] | Should -Match '^\[WARNING\] This computer is missing Windows security or critical updates\.'
+      $script:warnings[0] | Should -Match 'An uninstalled security or critical update was last published 9 days ago'
+      $script:warnings[0] | Should -Match 'Missing monthly security updates since 9 days ago'
+      $script:warnings[0] | Should -Match 'Update to check: KB5126655'
+      $script:warnings[0] | Should -Match 'Latest monthly security update to install: KB5126655'
+    }
+
+    It 'uses the highest pending severity regardless of order and retains newer updates in details' -ForEach @(
+      @{ Reverse = $false }, @{ Reverse = $true }
+    ) {
+      $monthly = New-TestPendingUpdate -Days 40 -Monthly
+      $cached = New-TestPendingUpdate -Days 2
+      $other = New-TestPendingUpdate -Days 9 -Id 'other-component'
+      $other.KB = 'KB7654321'
+      $script:pendingFacts.Updates = @($monthly, $other, $cached)
+      if ($Reverse) { [array]::Reverse($script:pendingFacts.Updates) }
+      HealthTest-WindowsUpdates
+
+      $script:warnings | Should -HaveCount 1
+      $script:warnings[0] | Should -Match '^\[FAILURE\] This computer is missing Windows security or critical updates\.'
+      $script:warnings[0] | Should -Match 'Missing monthly security updates since 40 days ago'
+      $script:warnings[0] | Should -Match 'last published 2 days ago'
+      $script:warnings[0] | Should -Match 'last published 9 days ago'
+      $script:warnings[0] | Should -Match 'Update to check: KB7654321'
+    }
+
+    It 'passes when all known pending updates are below the warning threshold' {
+      $script:pendingFacts.Updates = @((New-TestPendingUpdate -Days 2), (New-TestPendingUpdate -Days 7 -Monthly))
+      HealthTest-WindowsUpdates
+      $script:warnings | Should -HaveCount 1
+      $script:warnings[0] | Should -Match '^\[PASS\]'
+    }
+
+    It 'retains an undated update in details without hiding a known overdue update or its collection error' {
+      $undated = New-TestPendingUpdate -Days 0 -Id 'undated'
+      $undated.AgeDays = $null
+      $undated.PublishedDate = $null
+      $undated.KB = ''
+      $undated.Title = 'Undated component update'
+      $script:pendingFacts.Updates = @((New-TestPendingUpdate -Days 20), $undated)
+      $script:pendingFacts.Succeeded = $false
+      $script:pendingFacts.Errors = @('Unknown publication date')
+      HealthTest-WindowsUpdates
+
+      $script:warnings | Should -HaveCount 2
+      $script:warnings[0] | Should -Match 'Some Windows update checks could not be completed'
+      $script:warnings[1] | Should -Match '^\[FAILURE\] This computer is missing Windows security or critical updates\.'
+      $script:warnings[1] | Should -Match 'last published 20 days ago'
+      $script:warnings[1] | Should -Match 'The age of this missing update could not be determined'
+      $script:warnings[1] | Should -Match 'Update to check: Undated component update'
+      ($script:warnings -join "`n") | Should -Not -Match '\[PASS\]'
     }
 
     It 'explains an old monthly security gap separately from the latest recommended KB' {
@@ -364,9 +426,10 @@ Describe 'Windows update checks' {
 
       $script:warnings | Should -HaveCount 1
       $script:warnings[0] | Should -Be (@(
-        '[FAILURE] This computer is missing Windows security updates.'
-        'Missing monthly security updates since 184 days ago (2026-04-14).'
+        '[FAILURE] This computer is missing Windows security or critical updates.'
         'Check Windows Update for failed or blocked installations.'
+        ''
+        'Missing monthly security updates since 184 days ago (2026-04-14).'
         'Latest monthly security update to install: KB5126655.'
       ) -join "`n")
       ($script:debugMessages -join "`n") | Should -Match 'OS baseline 20348.5761'
@@ -395,12 +458,13 @@ Describe 'Windows update checks' {
       HealthTest-WindowsUpdates
       $script:warnings | Should -HaveCount 1
       $script:warnings[0] | Should -Be (@(
-        '[FAILURE] Windows security updates are seriously overdue.'
-        'Security fixes released 184 days ago are still missing.'
-        'The last recorded Windows system update installation was 202 days ago.'
-        ''
+        '[FAILURE] This computer is missing Windows security or critical updates.'
         'Check Windows Update for failed or blocked installations.'
+        ''
+        'Missing monthly security updates since 184 days ago (2026-04-14).'
         'Latest monthly security update to install: KB5126655.'
+        ''
+        'The last recorded Windows system update installation was 202 days ago.'
       ) -join "`n")
     }
 
@@ -409,13 +473,14 @@ Describe 'Windows update checks' {
       $script:ageFacts.AgeDays = 70
       HealthTest-WindowsUpdates
       $script:warnings | Should -HaveCount 1
-      $script:warnings[0] | Should -Match '^\[FAILURE\] Windows security updates are seriously overdue'
+      $script:warnings[0] | Should -Match '^\[FAILURE\] This computer is missing Windows security or critical updates\.'
       $script:warnings[0] | Should -Match 'An uninstalled security or critical update was last published 20 days ago'
+      $script:warnings[0] | Should -Match 'last recorded Windows system update installation was 70 days ago'
       $script:warnings[0] | Should -Not -Match 'monthly|Security fixes released'
       $script:warnings[0] | Should -Match 'Update to check: KB1234567'
     }
 
-    It 'avoids duplicating the combined monthly KB but retains unrelated pending findings' {
+    It 'combines installation failure with all pending update details including overlapping sources' {
       $monthly = New-TestPendingUpdate -Days 30 -Monthly
       $sameKB = New-TestPendingUpdate -Days 20 -Id 'cached-monthly'
       $sameKB.KB = '1234567'
@@ -424,9 +489,12 @@ Describe 'Windows update checks' {
       $script:pendingFacts.Updates = @($sameKB, $other, $monthly)
       $script:ageFacts.AgeDays = 70
       HealthTest-WindowsUpdates
-      $script:warnings | Should -HaveCount 2
+      $script:warnings | Should -HaveCount 1
       @($script:warnings | Where-Object { $_ -match '^\[FAILURE\]' }) | Should -HaveCount 1
-      ($script:warnings -join "`n") | Should -Match 'KB7654321'
+      $script:warnings[0] | Should -Match 'KB7654321'
+      $script:warnings[0] | Should -Match 'last published 20 days ago'
+      $script:warnings[0] | Should -Match 'Missing monthly security updates since 30 days ago'
+      $script:warnings[0] | Should -Match 'last recorded Windows system update installation was 70 days ago'
       @($script:debugMessages | Where-Object { $_ -like 'Pending Windows update:*' }) | Should -HaveCount 3
     }
 
