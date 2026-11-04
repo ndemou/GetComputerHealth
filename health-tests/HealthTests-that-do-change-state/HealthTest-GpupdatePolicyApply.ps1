@@ -9,7 +9,7 @@ Category: Configuration Hygiene & Best Practices
 Impact: High(Time)
 Uses: Test-ComputerSecureChannel, gpupdate.exe.
 
-This state-changing test actively refreshes Group Policy. The refresh can run policy scripts, recreate Immediate Tasks, apply settings, or start configured deployments. It is loaded only when -IReallyWantToRunTestsThatChangeState is used.
+This state-changing test actively refreshes Group Policy. The refresh can run policy scripts, recreate Immediate Tasks, apply settings, or start configured deployments. The normal runner requires -IReallyWantToRunTestsThatChangeState to run it. Listing mode only loads its definition. Direct execution of this script bypasses the runner's opt-in guard.
 #>
   [CmdletBinding()] param()
 

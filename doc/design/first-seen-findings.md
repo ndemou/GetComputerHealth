@@ -2,7 +2,7 @@
 
 Status: implemented per finding, first used for failed executions reported by `HealthTest-ScheduledTasks`.
 
-For day-to-day behavior, see [automatic repeat suppression](../user/reporting.md#automatic-repeat-suppression). For the marker syntax and selection of suitable findings, see [findings that suppress repeats](../contributor/built-in-health-tests.md#findings-that-suppress-repeats). This document records the design decisions, state format, and implementation requirements.
+For day-to-day behavior, see [automatic repeat suppression](../user/reporting.md#automatic-repeat-suppression). For the marker syntax and selection of suitable findings, see [findings that suppress repeats](../contributor/built-in-health-tests.md#findings-that-must-only-be-reported-once). This document records the design decisions, state format, and implementation requirements.
 
 ## Intent
 
@@ -22,7 +22,7 @@ The full task path, error code, and last run time distinguish the event. If the 
 
 The existing description signature identifies the finding. The marker, details, and severity are excluded from that signature. Changes only to details do not create a new notification. A severity increase from `WARNING` to `FAILURE` also keeps the existing repeat suppression; the current severity remains in the results.
 
-Apply the behavior to individual event findings. `HealthTest-ScheduledTasks` also reports disabled tasks, missed runs, stale tasks, and collection errors, which keep their normal behavior. The [authoring guide](../contributor/built-in-health-tests.md#findings-that-suppress-repeats) defines which findings use the marker. The test remains a single health test, and the runner owns all observation state.
+Apply the behavior to individual event findings. `HealthTest-ScheduledTasks` also reports disabled tasks, missed runs, stale tasks, and collection errors, which keep their normal behavior. The [authoring guide](../contributor/built-in-health-tests.md#findings-that-must-only-be-reported-once) defines which findings use the marker. The test remains a single health test, and the runner owns all observation state.
 
 ## The 45-day rule
 
@@ -41,7 +41,7 @@ At exactly 45 days, repeat suppression has expired. UTC timestamps keep timezone
 
 The repeat decision must use the previous timestamp. Calculating it from the newly saved timestamp would hide even the first observation. Saving state for later runs does not change the decision for the current run. Console output and reports use that same decision.
 
-A run that does not observe the finding neither refreshes nor immediately deletes its entry. The [reporting guide](../user/reporting.md#automatic-repeat-suppression) gives daily, monthly, and expiry examples.
+A run that does not observe the finding neither refreshes nor immediately deletes its entry. The [reporting guide](../user/reporting.md#automatic-repeat-suppression) explains regular observations and expiry.
 
 ## Identity and stored state
 

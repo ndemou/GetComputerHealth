@@ -79,7 +79,7 @@ This change should also include an On-Disk Format migration; see the relevant de
 
 `CustomTests.ps1 -List` should return a list of all scripts with custom health tests (file objects).
 
-`CustomTests.ps1 -Invoke ScriptFilenName.ps1` should call `Get-ComputerHealth.ps1 -Hide "" -OnlyTheseTests ScriptFilenName.ps1` with the options needed to invoke the specific custom test.
+`CustomTests.ps1 -Invoke ScriptFileName.ps1` should call `Get-ComputerHealth.ps1 -OutputConsoleMessages -Hide "" -OnlyTheseTests ScriptFileName.ps1` with the options needed to invoke the specific custom test.
 
 Update our documentation with the above info.
 
@@ -304,7 +304,6 @@ See also : .\tests\script-analysis.ps1
     This style works like this:
 ```
  -Arg1 test,foo,bar             --> @("test","foo","bar")
--Arg1 test -Arg1 foo -Arg1 bar --> @("test","foo","bar")
 -Arg1 @("test","foo","bar")    --> @("test","foo","bar")
 -Arg1 "test,foo,bar"           --> "test,foo,bar"
 -Arg1 "test foo bar"           --> "test foo bar"

@@ -6,6 +6,8 @@ This guide explains the test and validation scripts in this repository in simple
 
 For the full documentation routing table, see [`README.md`](../README.md).
 
+Run the commands below from the repository root in Windows PowerShell 5.1. The unit suite requires Pester 5 or newer. The full suite and `-Category Unit` also call PSScriptAnalyzer; install that module before using its results.
+
 It is written for:
 
 - human contributors
@@ -22,6 +24,8 @@ This repo uses two main testing styles:
 Some checks are fully isolated and deterministic.
 
 Some checks depend on the local machine, the filesystem, installed services, or the installer/update flow.
+
+Routine unit, smoke, and integration checks must not enable `-IReallyWantToRunTestsThatChangeState`. Mock active operations or use a dedicated test computer when active validation is explicitly required. Integration checks still make diagnostic queries and create temporary installation files; they are not isolated unit tests.
 
 Because of that, the normal order is:
 
@@ -83,10 +87,8 @@ This runs the broader integration-like checks only.
 
 What it does:
 
-- runs the repo-wide PowerShell syntax pass
-- runs the ScriptAnalyzer wrapper
 - runs machine-coupled validation
-- runs standalone `test-*.ps1` scripts in [`tests`](../../tests)
+- runs standalone `test*.ps1` scripts in [`tests`](../../tests), excluding `test-helpers.ps1`
 - runs the real-service executable resolution check
 
 Use it when:
@@ -98,6 +100,8 @@ Use it when:
 
 This can be slower and more environment-sensitive than the unit suite.
 
+`-Category Integration` does not run the syntax parser, ScriptAnalyzer, or Pester. Run smoke or unit coverage separately when those checks are needed.
+
 ### `.\tests\run-all-tests.ps1`
 
 This is the main “run everything in the normal suite” command.
@@ -105,7 +109,7 @@ This is the main “run everything in the normal suite” command.
 What it does:
 
 - runs repo-wide syntax validation
-- runs static-analysis validation
+- runs the ScriptAnalyzer wrapper; inspect individual findings with the direct command described below
 - runs unit-like coverage
 - runs integration-like coverage
 - combines the checks from both categories
@@ -118,7 +122,7 @@ Use it when:
 
 ### `.\tests\run-all-tests.ps1 -Detailed`
 
-This is the same broad suite, but with more output.
+This is the same broad suite, but with more output. `-Detailed` can also be combined with `-Smoke` or `-Category` without changing their selection.
 
 What it does:
 
@@ -131,6 +135,18 @@ Use it when:
 - a test failed and you want better visibility
 - you want easier troubleshooting
 - you want the closest local view to the detailed CI path
+
+### Selection reference
+
+| Command | Syntax | ScriptAnalyzer wrapper | Pester | Real-service resolution | Standalone scripts |
+| --- | --- | --- | --- | --- | --- |
+| `run-unit-tests.ps1` | No | No | Yes | No | No |
+| `run-all-tests.ps1 -Smoke` | Yes | No | Yes | No | Installer only, two versioned-zip scenarios |
+| `run-all-tests.ps1 -Category Unit` | Yes | Yes | Yes | No | No |
+| `run-all-tests.ps1 -Category Integration` | No | No | No | Yes | All, including versionless-zip installer scenario |
+| `run-all-tests.ps1` | Yes | Yes | Yes | Yes | All, including versionless-zip installer scenario |
+
+`-Smoke` takes precedence over `-Category` if both are supplied. The real-service check is skipped whenever `GITHUB_ACTIONS` equals `true`.
 
 ## What `run-all-tests.ps1` Actually Runs
 
@@ -152,7 +168,7 @@ Use this group when:
 
 This is the `ScriptAnalyzer` test group inside the runner.
 
-In practice, it calls [`tests/script-analysis.ps1`](../../tests/script-analysis.ps1), which runs `Invoke-ScriptAnalyzer` against the repo and reports errors.
+In practice, it calls [`tests/script-analysis.ps1`](../../tests/script-analysis.ps1), which runs `Invoke-ScriptAnalyzer -Path .\ -Severity Error` without `-Recurse`, checking the current directory rather than every repository subdirectory. The wrapper does not throw when findings exist. The main runner also discards the individual diagnostic objects while keeping the wrapper's final success value, so it can print an error banner and still mark the group passed. Run `.\tests\script-analysis.ps1` directly from the repository root to inspect the findings.
 
 Use this group when:
 
@@ -190,14 +206,16 @@ Use it when:
 Important note:
 
 - this is machine-coupled
-- it is skipped on GitHub-hosted runners
+- it is skipped when `GITHUB_ACTIONS` is `true`, including self-hosted Actions jobs
 - it is not part of smoke mode
 
 ### 5. Standalone script tests
 
-The runner also executes standalone files named `test-*.ps1` under [`tests`](../../tests), excluding helper files.
+The runner also executes files matching `test*.ps1` directly under [`tests`](../../tests), explicitly excluding `test-helpers.ps1`. New helpers must not use names that match this discovery pattern.
 
 These are script-based integration-style tests.
+
+Failures caught by this standalone runner are saved under `tests\artifacts\last-run\`. The directory is reset at the start of each main-runner invocation. The other test groups report to the console and do not use this failure-log path.
 
 ## Standalone Test Scripts
 
@@ -208,10 +226,11 @@ This is the most important installer/update validation script.
 What it does:
 
 - creates a temporary test area
-- copies the repo into that area
-- builds a zip package from the copied repo
-- copies `Update-GetHealthCode.ps1` into a temp install location
+- copies the repo into that area and builds a zip package from the source checkout
+- invokes `Update-GetHealthCode.ps1` from a temp install location or from the repo with an explicit test installation root
 - runs the updater against the generated zip
+- checks legacy custom-script migration and the persisted disk-format version
+- cleans up its per-scenario temporary directories and archives in `finally`
 
 Why it matters:
 
@@ -229,6 +248,10 @@ Use it when:
 Important note:
 
 - this script is included in smoke mode
+- it always checks a versioned zip with both installation-root approaches
+- full and integration runs also enable the versionless-zip scenario with an explicit `-Version`
+- to include that third scenario when running the script directly, use `.\tests\test-installer.ps1 -IncludeVersionlessZipScenario`
+- zip creation stages files in a temporary sibling of the source checkout, so that parent directory must also be writable
 
 ### [`tests/test-Get-ComputerHealth.ps1`](../../tests/test-Get-ComputerHealth.ps1)
 
@@ -291,7 +314,7 @@ Use it when:
 
 ### [`tests/Unit/Invoke-GetComputerHealth.EmailSignature.Tests.ps1`](../../tests/Unit/Invoke-GetComputerHealth.EmailSignature.Tests.ps1)
 
-This test file checks the email-signature helper functions in `Invoke-GetComputerHealth.ps1`.
+This test file checks the email-signature helper functions in `reporting.ps1`, used by `Invoke-GetComputerHealth.ps1`.
 
 Examples it covers:
 
@@ -304,7 +327,7 @@ Use it when:
 
 - you changed alert email formatting
 - you changed version-signature behavior
-- you changed email helper functions in `Invoke-GetComputerHealth.ps1`
+- you changed email helper functions in `reporting.ps1`
 
 ### [`tests/Unit/HealthTest-ListInstalledPrograms.Classification.Tests.ps1`](../../tests/Unit/HealthTest-ListInstalledPrograms.Classification.Tests.ps1)
 
@@ -375,9 +398,10 @@ This is a very useful safety net because syntax errors can appear in files that 
 
 What it does:
 
-- runs `Invoke-ScriptAnalyzer` against the repo
+- runs `Invoke-ScriptAnalyzer` against the current directory without recursion
 - reports errors from ScriptAnalyzer
 - ignores one specific rule: `PSAvoidUsingConvertToSecureStringWithPlainText`
+- prints matching findings without turning them into a failed test group
 
 Use it when:
 
@@ -387,7 +411,7 @@ Use it when:
 
 Important note:
 
-- this adds static-analysis coverage, but it can still be more environment-dependent than the parser-based syntax pass
+- PSScriptAnalyzer must be available. Run `.\tests\script-analysis.ps1` directly to review its diagnostic rows even when the main runner exits successfully.
 
 ## Support Files Used by Tests
 
@@ -461,32 +485,3 @@ If you are preparing a release:
 - run `.\tests\run-all-tests.ps1 -Smoke`
 - run broader integration coverage if the release touches machine-coupled behavior
 - use [`scripts/release/New-GetComputerHealthRelease.ps1`](../../scripts/release/New-GetComputerHealthRelease.ps1) for the release workflow itself
-
-## Simple Mental Model For New Contributors
-
-Use this shortcut:
-
-- `run-unit-tests.ps1`
-  Start here. Fast and focused.
-
-- `run-all-tests.ps1 -Smoke`
-  Quick broader confidence.
-
-- `run-all-tests.ps1 -Category Integration`
-  Real-machine and installer-related checks.
-
-- `run-all-tests.ps1`
-  Full normal test suite.
-
-- `run-all-tests.ps1 -Smoke`
-  Includes the repo-wide syntax safety net and the fast broader checks.
-
-- `run-all-tests.ps1`
-  Includes syntax parsing, ScriptAnalyzer, unit tests, and integration-style checks.
-
-If you are unsure, the safest normal sequence is:
-
-1. `.\tests\run-unit-tests.ps1`
-2. `.\tests\run-all-tests.ps1 -Smoke`
-
-That gives good coverage without being as heavy as the full suite.

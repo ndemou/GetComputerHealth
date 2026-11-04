@@ -21,6 +21,8 @@ When broader attack detection would materially increase false positives or recur
 
 Short-lived one-shot scheduled tasks can be created by legitimate deployment and Group Policy mechanisms. Similar task structures can also be used by attackers.
 
-GetComputerHealth deliberately treats a strictly classified short-lived task as informational. Its complete task definition remains available in the comments, but the task does not receive a policy fingerprint or a notable severity merely because it was observed during its brief lifetime.
+`HealthTest-ListScheduledTasks` treats a task matching its transient-task criteria as informational. Its complete task definition remains available in the comments, but the inventory finding does not receive a policy fingerprint or a notable severity merely because the task was observed during its brief lifetime. If its non-empty `DeleteExpiredTaskAfter` value cannot be parsed, the inventory still treats the task as transient and emits a separate warning asking the administrator to check that value.
+
+This inventory classification does not suppress independent operational findings from `HealthTest-ScheduledTasks`, such as a failed execution. See the [scheduled-task helpers](../../health-tests/helper-regarding-scheduled-tasks.ps1) and [inventory test](../../health-tests/HealthTest-ListScheduledTasks.ps1) for the current criteria and exclusions.
 
 This accepts reduced visibility of malicious tasks that imitate the same lifecycle. The tradeoff is intentional: detecting that technique reliably belongs to EDR and security-event monitoring, while repeatedly alerting on legitimate transient deployment tasks would reduce the usefulness of routine health reports.

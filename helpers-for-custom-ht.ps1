@@ -362,10 +362,11 @@ Tests whether a directory contains a number of recent files within given size an
 Counts files in a directory that:
  - Match one or more DOS patterns (e.g. "*.vbk", "*.vib").
  - Are at least MinBytes in size (if specified).
- - Were created within the last MaxAgeHours hours (if specified).
-It returns $true if the final count is between MinCount and MaxCount (inclusive), otherwise $false.
+ - Have LastWriteTime within the last MaxAgeHours hours (if specified).
+It returns the matching FileInfo objects in ascending LastWriteTime order when
+the final count is between MinCount and MaxCount (inclusive), otherwise $null.
 
-If the path does not exist, the function always returns $false, regardless of MinCount/MaxCount.
+Missing paths are skipped. If no files match, there is no file output, even when MinCount is zero.
 
 .PARAMETER Path
 One or more directories to search.
@@ -384,7 +385,7 @@ Example:
     If omitted, size is not checked.
 
 .PARAMETER MaxAgeHours
-    Only files with CreationTime within the last MaxAgeHours hours are counted.
+    Only files with LastWriteTime within the last MaxAgeHours hours are counted.
     If omitted, age is not checked.
 
 .PARAMETER MinCount
@@ -398,29 +399,29 @@ Example:
 .PARAMETER Recurse
     If supplied, search subfolders recursively; otherwise only the top-level folder is searched.
 
-RETURN VALUE
+.OUTPUTS
     The matching files ordered by LastWriteTime, if their number is between MinCount
     and MaxCount (inclusive), otherwise $null. You can use the return value as a boolean
     because $null is falsy and 1 or more items are truthy
 
-EXAMPLE
-    # At least one .vbk in C:\Backups, >= 100 GB, created within the last 24 hours
+.EXAMPLE
+    # At least one .vbk in C:\Backups, >= 100 GB, last written within the last 24 hours
     Get-RecentFilesConditional -Path 'C:\Backups' -Pattern '*.vbk' -MinBytes 100GB -MaxAgeHours 24
 
-EXAMPLE
+.EXAMPLE
     # Any combination of .vbk or .vib files, >= 1 GB, in the last 12 hours, including subfolders
     Get-RecentFilesConditional -Path 'C:\Backups' -Pattern '*.vbk','*.vib' -MinBytes 1GB -MaxAgeHours 12 -Recurse
 
-EXAMPLE
+.EXAMPLE
     # Check there are between 3 and 10 recent *.log files of any size in the last 2 hours
     Get-RecentFilesConditional -Path 'C:\Logs' -Pattern '*.log' -MaxAgeHours 2 -MinCount 3 -MaxCount 10
 
-EXAMPLE
+.EXAMPLE
     # Treat "any files at all in the folder" as success (MinCount = 1 by default)
     Get-RecentFilesConditional -Path 'C:\SomeFolder'
 
-EXAMPLE
-    # Path does not exist: always returns $false, regardless of MinCount/MaxCount
+.EXAMPLE
+    # A missing path produces no file output, including when MinCount is zero
     Get-RecentFilesConditional -Path 'C:\NotARealFolder' -MinCount 0
 #>
 [CmdletBinding()]

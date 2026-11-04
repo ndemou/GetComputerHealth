@@ -110,7 +110,7 @@ Category: Configuration Hygiene & Best Practices
 Impact: High(Time)
 Uses: dcdiag.exe.
 
-This state-changing test runs DCDIAG /c /v. Some DCDIAG checks can create and remove temporary diagnostic data or refresh registrations while verifying Active Directory. It is loaded only when -IReallyWantToRunTestsThatChangeState is used.
+This state-changing test runs DCDIAG /c /v. Some DCDIAG checks can create and remove temporary diagnostic data or refresh registrations while verifying Active Directory. The normal runner requires -IReallyWantToRunTestsThatChangeState to run it. Listing mode only loads its definition. Direct execution of this script bypasses the runner's opt-in guard.
 #>
 
     write-progress "Runing DCDIAG /c /v"

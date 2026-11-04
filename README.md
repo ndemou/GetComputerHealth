@@ -29,7 +29,7 @@ This is a **robust production-tested toolkit** and I have been using it across s
  3. **There's a tiny chance of breaking changes.** I'll avoid them because I would have to clean up issues at several production sites. However, I *will do it* if the benefits are worth it to me.
  4. **I have not tested it on domains with more than a few dozen servers, or with DCs connected via WAN.** Some domain-related tests could cause excessive WAN traffic. Test while observing traffic. I would be glad to hear the results.
 
- > On the plus side, if you ever need to dive into the code, it is surprisingly small and straightforward: **the core is about 1,000 lines, including comments.** The only code that is not small is the HTML report code. The tests total more than ten thousand lines, but most are only a dozen or two dozen lines and self-contained. Only a few are a few hundred lines or depend on helper functions. All modern AI agents can easily understand and fix issues in such a simple codebase. In fact, the vast majority of the code *was* written by Codex, with me acting as the architect, lead developer, reviewer, and QC.
+ > On the plus side, if you ever need to dive into the code, it is still approachable: the main health-test runner is about 2,000 lines, including comments. The built-in health tests add up to more than 10,000 lines, but most are individual scripts under 75 lines; some are longer or use shared helpers. The updater and HTML reporting code are more involved. Modern AI agents can readily navigate this structure and help understand or fix issues. In fact, the vast majority of the code *was* written by Codex, with me acting as the architect, lead developer, reviewer, and QC.
 
 ## Comparison to PRTG, Zabbix
 
@@ -43,15 +43,17 @@ Examples include AD/GPO consistency, DNS/DHCP configuration hygiene, local harde
 
 # Security
 
-By default, the installer downloads and updates files from this GitHub repository every time you call any of the `Invoke-*.ps1` scripts. You can point the updater to a clone of this repo that you control by setting `RepoUrl` in `./config/gch.psd1`.
+By default, `Invoke-GetComputerHealth.ps1` checks for updates before running health tests. The updater downloads and installs the selected GitHub release when it is not already installed. You can select another GitHub repository that publishes compatible release packages by setting `RepoUrl` in `config\gch.psd1`.
 
-You can also disable automatic updates by setting `AutomaticUpdates = $false`.
+You can disable automatic updates by setting `AutomaticUpdates = $false`, or skip the update step for one run with `-NoUpdate`.
 
-This toolkit has **no external dependencies**.
+The toolkit runs in Windows PowerShell 5.1 without third-party PowerShell modules.
 
-The default built-in health-test suite is read-only. Built-in tests that make limited computer-state changes are kept in a separate folder and are not loaded or run unless the administrator explicitly supplies `-IReallyWantToRunTestsThatChangeState`. 
+The default built-in health-test suite is read-only: its tests do not intentionally modify system configuration or the application data they inspect. Diagnostic queries may generate network traffic, update caches or logs, and activate services on demand. For example, a WMI query can start the WMI service, and listing VSS writers can trigger writer callbacks and diagnostic logging.
 
-Custom tests that you may, can have their own side effects. Be careful.
+Built-in tests that intentionally make computer-state changes live under `health-tests\HealthTests-that-do-change-state`. The normal runner loads and runs them only when the administrator supplies `-IReallyWantToRunTestsThatChangeState`. `-ListAllBuiltInTests` loads their definitions for listing without executing the tests. Directly executing a script in that folder bypasses the runner's opt-in guard.
+
+This read-only description applies to the default health checks. Installation, updates, reports, and suppression or policy-baseline tracking write the toolkit's own files. Custom tests can have additional side effects determined by their code.
 
 GetComputerHealth may incidentally expose suspicious activity, but it is **not** a malware or intrusion-detection product. It prioritizes actionable, low-noise administrative findings over broad detection with frequent false positives. See the [health findings and noise design decision](./doc/design/health-findings-and-noise.md).
 
@@ -59,7 +61,9 @@ GetComputerHealth may incidentally expose suspicious activity, but it is **not**
 
 # 1. Admin Guide: Installation
 
-## Optional Requirements
+## Requirements
+
+Run installation and normal health scans from an elevated Windows PowerShell 5.1 session. `-RunWithoutElevation` bypasses the health runner's elevation check for diagnosis, but some tests will fail or return incomplete results without administrator access.
 
 **To receive emails** with results/alerts, you need a mail server that permits unauthenticated delivery.
 
@@ -82,9 +86,7 @@ Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/ndemou/Get
         }
         'gch.psd1' = @{
             AutomaticUpdates = $true
-            SendReports = 'Auto' # 'Never', 'Always', or 'Auto'
             ShowAsPostponedWindowDays = 15
-            IpsOfAllDCs = @('10.1.2.3', '10.1.2.4')
         }
     }
 }
@@ -98,6 +100,14 @@ Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/ndemou/Get
 ```powershell
 C:\IT\Get-ComputerHealth\bin\Invoke-GetComputerHealth.ps1
 ```
+
+For a domain-joined computer, supply the domain controllers' IPv4 addresses on the first run:
+
+```powershell
+C:\IT\Get-ComputerHealth\bin\Invoke-GetComputerHealth.ps1 -IpsOfAllDcs @('10.1.2.3', '10.1.2.4')
+```
+
+The wrapper caches these addresses in `temp\cache.IpsOfAllDcs.clixml` for later runs. Without valid addresses, the runner skips domain-dependent tests. An `IpsOfAllDCs` key in `gch.psd1` is not currently read.
 
 ## Optional Active Diagnostics
 
@@ -117,10 +127,10 @@ The DCDIAG test actively runs comprehensive Microsoft domain-controller diagnost
 
 1. Test email delivery:
 ```powershell
-C:\IT\Get-ComputerHealth\bin\Send-Message.ps1 -Subject "First test from $($env:COMPUTERNAME)" -ConfigFile "C:\IT\Get-ComputerHealth\config\Send-Message.conf" -Verbose
+C:\IT\Get-ComputerHealth\bin\Send-Message.ps1 -Subject "First test from $($env:COMPUTERNAME)" -ConfigFile "C:\IT\Get-ComputerHealth\config\Send-Message.psd1" -Verbose
 ```
 
-> If it doesn't work, check the settings in `.\config\Send-Message.psd1`.
+> If it doesn't work, check the settings in `config\Send-Message.psd1`. Existing installations may use the legacy JSON file `Send-Message.conf`; reporting prefers that file when both exist.
 
 2. Schedule daily execution of `Invoke-GetComputerHealth.ps1` (change `07:12`):
 
@@ -134,13 +144,13 @@ C:\IT\Get-ComputerHealth\bin\Update-GetHealthCode.ps1 -ScheduleDailyInvokationAt
 
 2. Copy the code below into your editor and fill in the proper values on the three lines under `CONFIGURATION`:
 
-> **State-change warning:** This conventional domain-scan example deliberately enables `-IReallyWantToRunTestsThatChangeState`, so gpupdate and DCDIAG may perform their documented, normally safe administrative changes on target computers. Remove the switch for a strictly read-only scan or for an unusual environment where the timing of even routine diagnostic changes is unacceptable.
+> **State-change warning:** This conventional domain-scan example deliberately enables `-IReallyWantToRunTestsThatChangeState`, so gpupdate and DCDIAG may perform their documented administrative changes on target computers. Remove the `$invokeParameters['IReallyWantToRunTestsThatChangeState'] = $true` line to use only the default built-in suite. The diagnostic side effects described under Security still apply, and updates and custom tests are controlled separately.
 
 ```powershell
 # Executes Invoke-GetComputerHealth.ps1 on all domain-joined servers and any configured workstations
 param(
     [string]$Hide = "DIPS",
-    [string]$OnlyTheseTests,
+    [string[]]$OnlyTheseTests,
     [switch]$SkipSlowTests,
     [switch]$SkipPolicyTests,
     [switch]$SkipNonEssentialTests,
@@ -187,23 +197,23 @@ $invokeParameters['IReallyWantToRunTestsThatChangeState'] = $true
 
 Run `C:\IT\bin\Invoke-GetHealthDomainComputers.ps1`.
 
-> This scans all domain servers and any workstations you have configured, saves CLIXML data plus an interactive HTML report, and emails you any **notable** issues.
+> This scans all domain servers and any workstations you have configured and saves all findings as compressed CLIXML. When reportable findings exist, it also generates an interactive HTML report. Email follows the interactive/non-interactive defaults described below; use `-SendReport` on `Invoke-GetComputerHealth.ps1` to force delivery.
 > The options mentioned above can also be used.
 > Extra options like `-NoUpdate` and `-NoSendMessage` are particularly handy here.
 
 ## How to Suppress a finding (Permitlisting)
 
-By default, health tests flag any deviation from a pristine Windows installation. Examples include a custom service, an extra member in the Administrators group, or an additional listening TCP port. 
+Policy inventory tests track items such as installed software, local Administrators group members, services, and listening TCP ports. On their first run, the runner normally records a baseline and suppresses that test's current notice/warning findings. Later additions produce findings for review. Use `-DontAutosetPolicy` on `Get-ComputerHealth.ps1` to review the initial inventory without creating that baseline. Other health tests evaluate their own operational and configuration checks.
 
 If a finding is expected or a false positive, you can permitlist it.
 
-1. **Identify the permitlisting command:** Open the generated HTML report or import the matching CLIXML file. Every message includes the exact command needed to permitlist it.
+1. **Identify the permitlisting command:** Open the generated HTML report or import `temp\last-all-findings.clixml`. Report rows include the command needed to permitlist the finding.
 2. **Run that command** on the target machine.
 
 > Advanced Tip: You can also permitlist findings manually:
 > `C:\IT\Get-ComputerHealth\bin\Get-ComputerHealth.ps1 -AddWhitelisting -ComputerName $env:computername -Signature 12345678 -Comment "Usually the description of the finding" -Until 2099-12-31`
 
-`SuppressRepeats` prevents repeated alerts for the same event, including a failed scheduled-task execution with a known last run time. See [automatic repeat suppression](./doc/user/reporting.md#automatic-repeat-suppression) for the 45-day rule, configured-suppression precedence, and report fields.
+`SuppressRepeats` prevents repeated alerts for the same event, including a failed scheduled-task execution with a known last run time. See [automatic repeat suppression](./doc/design/first-seen-findings.md) for the 45-day rule, configured-suppression precedence, and report fields.
 
 ## How to Require a Finding That Proves Something Good Is Present
 
@@ -238,7 +248,7 @@ $results | ogv
 > * `-Hide DIP` hides **D**ebug, **I**nfo, and **P**ass messages from the console, showing only **N**otices, **W**arnings, **F**ailures, and **S**uppressed messages.
 > * Available options let you skip slow tests (`-SkipSlowTests`), skip non-essential tests (`-SkipNonEssentialTests`), exclude specific tests (`-ExcludeTests`), run specific tests (`-OnlyTheseTests`), or explicitly enable the guarded active diagnostics (`-IReallyWantToRunTestsThatChangeState`). Autocomplete using `-` + `TAB` is your friend. `-ListAllBuiltInTests` will give you a list of all tests, including guarded tests that are not loaded by default.
 
-> **Tip:** To perform one test, just execute the script with the same name.
+> **Tip:** Run one built-in test through the runner with `Get-ComputerHealth.ps1 -OutputConsoleMessages -OnlyTheseTests PendingReboot`. Direct script execution skips the runner's host-applicability checks, suppression handling, and state-change opt-in guard. `HealthTest-DomainARecordPointsToDcIp.ps1` and `HealthTest-InterfaceDnsServersUseDcs.ps1` also depend on the DC IP list that the runner initializes from `-IpsOfAllDcs`.
 
 ---
 
@@ -246,12 +256,12 @@ $results | ogv
 
 The toolkit operates on a **Controller–Agent** model, though it is agentless via PowerShell Remoting. You run the orchestration script on your management machine (the Controller). It executes tests on your servers or workstations (the Targets), aggregates the results into CLIXML and HTML reports, and emails them.
 
-Think of the scripts as three layers:
+Think of the scripts as these layers:
 
  0. (**Only for multiple domain joined targets**) `Invoke-GetHealthDomainComputers.ps1` is a very light wrapper around `Invoke-GetComputerHealth.ps1`.
  1. `Invoke-GetComputerHealth.ps1` orchestrates update, target selection, remoting, collection, artifacts, and email.
  2. `Get-ComputerHealth.ps1` runs the actual health tests for one target context.
- 3. `health-tests\*.ps1` scripts produce individual read-only health messages. The separately guarded `health-tests\HealthTests-that-do-change-state\*.ps1` scripts are loaded only with the explicit opt-in switch.
+ 3. `health-tests\HealthTest-*.ps1` scripts implement the default checks, with helper scripts alongside them. The runner includes `health-tests\HealthTests-that-do-change-state\*.ps1` for execution only with the explicit opt-in switch; listing mode can load their definitions without running them.
 
 ## Relationship Diagram
 
@@ -268,7 +278,7 @@ flowchart BT
         Entry["Invoke-GetHealthDomainComputers.ps1"]
         Report["CLIXML + HTML files"]
         Mailer["Send-Message.ps1"]
-        Files[".\data\*.clixml"]
+        Files[".\data\all-messages-*.clixml.zip"]
  end
  subgraph Target["Target Computer"]
         LocalRunner["Get-ComputerHealth.ps1"]
@@ -282,7 +292,7 @@ flowchart BT
     Orchestrator -- "4. Aggregates results" --> Report
     Report -- "5. Send HTML reports" --> Mailer
     Mailer -.-> Operator
-    Report -- "Keep *.clixml data" --> Files
+    Report -- "Archive CLIXML data" --> Files
     Updater -- "2. Updates Scripts" --> LocalRunner
     LocalRunner -- "3. Executes" --> Tests
     LocalRunner -- "Only with explicit state-change switch" --> StateChangingTests
@@ -314,16 +324,17 @@ These are the scripts you actually execute.
 * **Usage:** Run this manually or schedule it to run daily (via the SYSTEM account) to check the entire domain.
 * **Note:** You need to create this script yourself; an example is provided in this documentation.
 
-### `Invoke-GetComputerHealth.ps1` (for one computer)
+### `Invoke-GetComputerHealth.ps1` (for one or more computers)
 
 * **Role:** The Engine/Orchestrator. It tests the local host by default or the computers you specify and generates reports.
 * **Function:** It manages the workflow:
   1. Connects to the local host or one or more remote computers.
-  2. Triggers a self-update on the remote target.
+  2. Checks for updates unless disabled; remote targets with the same embedded version can skip the update step.
   3. Runs the health checks.
-  4. Collects output, saves it in CLIXML, generates HTML reports, and emails *notable* (non-success) messages.
+  4. Saves all findings as compressed CLIXML, generates HTML for reportable findings, and optionally emails the report or an all-clear message. See [reporting](./doc/user/reporting.md) for artifact paths and suppression rules.
 * **Key Parameters:** `-Computers` (list of targets, local host by default), `-ExcludeServers`, `-Hide` (defines which message types to hide from console output, usually "DIPS").
 * **Email default caveat:** `Invoke-GetComputerHealth.ps1` sends email by default in non-interactive contexts, and does not send by default in interactive contexts. If you first connect with `Enter-PSSession` and then run the script on the remote host, that remote PowerShell host can still appear non-interactive to the script. Use `-NoSendReport` inside `Enter-PSSession` when you do not want the default email report.
+* **Email controls:** `-SendReport` forces email, and `-NoSendReport` disables it and takes precedence if both are supplied. A `SendReports` key in `gch.psd1` is not currently read by the reporting code.
 
 # 5. Directory Structure Reference
 
@@ -333,7 +344,9 @@ These are the scripts you actually execute.
 | `C:\IT\Get-ComputerHealth\config\` | Configuration files. |
 | `C:\IT\Get-ComputerHealth\config\required_findings.psd1` | Optional required findings that must be emitted by selected built-in tests. |
 | `C:\IT\Get-ComputerHealth\config\Custom-HealthTests` | [Optional custom health tests.](./doc/user/custom-tests.md)  |
-| `C:\IT\Get-ComputerHealth\temp\`   | Temp files like downloads and generated email HTML. |
+| `C:\IT\Get-ComputerHealth\temp\`   | Downloads, working files, latest CLIXML findings, and generated HTML reports. |
+| `C:\IT\Get-ComputerHealth\data\`   | Compressed CLIXML report archives and disk-format migration state. |
+| `C:\IT\Get-ComputerHealth\state\`  | Finding-observation state for automatic repeat suppression. |
 | `C:\IT\Get-ComputerHealth\log\`    | Logs of script execution. |
 
 # 6. Contributing
@@ -456,3 +469,5 @@ If you only want to add a few custom tests, you do not need to modify the core c
 | WinRMListening                   | Checks whether the WinRM service is running and responds to WSMan requests |
 | WindowsUpdates                   | Checks pending security updates, cached scan freshness, the online OS security baseline, and installation age |
 | WmiRepository                    | Checks whether the WMI repository is consistent |
+
+Known limitation: `EfsRecoveryAgents` calls `certutil -recoveryagent`. If `certutil` rejects that argument, the current test interprets the failed command as no recovery agents being configured. Verify the EFS recovery policy separately before acting on that finding.

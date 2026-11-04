@@ -34,7 +34,7 @@ Run tests from the repository root in Windows PowerShell (v5).
    ```powershell
    .\scripts\syntax\Test-RepoPowerShellSyntax.ps1
    ```
-  It parses all tracked `.ps1` files except generated content under `.git` and `temp`, and caches file timestamps so later runs only re-check changed files.
+  It parses all `.ps1` files under the repository, including untracked files, except those under `.git` and `temp`, and caches file timestamps so later runs only re-check changed files.
 
 2. Quick smoke coverage:
   ```powershell

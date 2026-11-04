@@ -3,28 +3,28 @@
 Updates and then runs Get-ComputerHealth locally and/or via PowerShell remoting across multiple target computers, exports CLIXML plus HTML reports, and emails a summary.
 
 .DESCRIPTION
-Wraps `.\bin\Get-ComputerHealth.ps1` to support multiple targets (including an AD-derived "all domain servers" set), then collects all returned health messages into CLIXML data files and optionally emails "notable" (non-suppressed, non-pass/info/debug/help) messages with an attached interactive HTML report.
+Wraps `.\bin\Get-ComputerHealth.ps1` to support multiple targets (including an AD-derived "all domain servers" set), saves all returned health messages as compressed CLIXML, and optionally emails a report. Reportable findings include unsuppressed messages other than pass/info/debug/help, plus findings whose effective level is postponed.
 
 Per target:
-- Runs `.\bin\Update-GetHealthCode.ps1` then executes `.\bin\Get-ComputerHealth.ps1` with `-OutputObjects -OutputConsoleMessages`, plus the provided filters and optional custom tests folder (`.\config\Custom-HealthTests\`).
+- Checks for updates unless disabled, then executes `.\bin\Get-ComputerHealth.ps1` with `-OutputObjects -OutputConsoleMessages`, the provided filters, and the custom tests folder (`.\config\Custom-HealthTests\`) when present. Remote targets whose embedded version matches the controller skip the updater.
 - Passes `-IReallyWantToRunTestsThatChangeState` through only when the caller explicitly supplies it.
 - For remote targets, checks basic TCP reachability and if reachable, uses `New-PSSession` to run the tests.
 
 After collection:
-- Exports all messages to `${DATA_DIR}\all-messages-<timestamp>.clixml`
-- Exports notable messages (if any) to `${DATA_DIR}\notable-messages-<timestamp>.clixml`
-- Generates an interactive HTML report for notable messages and attaches it to email when notable messages exist
+- Archives all messages in `data\all-messages-<timestamp>.clixml.zip` and keeps `temp\last-all-findings.clixml` for inspection.
+- For reportable findings, generates `temp\last-interactive-report.html` and an email body in `temp\last-report.html`; the interactive report is attached when email is enabled.
+- With no reportable findings, writes an all-clear email body and sends it when email is enabled. An earlier interactive report is not replaced in this case.
 
 Other effects:
 - Starts a transcript at `.\log\Invoke-GetHealthDomainComputers-<timestamp>.log`.
 - Sends email and may attach the notable-messages HTML report.
 
 Dependencies & execution context:
-- Requires `.\bin\lib-write-log-objects.ps1` (dot-sourced) for logging/report export helper(s).
+- Requires `.\bin\lib-write-log-objects.ps1` and `.\bin\reporting.ps1` (dot-sourced), plus the companion health-test files.
 - Requires these local scripts to exist and be runnable (locally and on remotes):
   - `.\bin\Update-GetHealthCode.ps1`
   - `.\bin\Get-ComputerHealth.ps1`
-  - `.\bin\Send-Message.ps1` and `.\config\Send-Message.conf`
+  - For email on the controller: `.\bin\Send-Message.ps1` and `.\config\Send-Message.conf` (JSON), or `.\config\Send-Message.psd1` when the legacy JSON file is absent
 - Remote execution requires WinRM / PowerShell remoting connectivity and permissions sufficient to create sessions and run the above scripts remotely.
 
 .PARAMETER Computers
@@ -62,7 +62,16 @@ Skips execution of `.\bin\Update-GetHealthCode.ps1` before running `Get-Computer
 Passes `-RunWithoutElevation` through to `Get-ComputerHealth.ps1` on each target, bypassing its normal elevation guard.
 
 .PARAMETER PushUpdate
-When targeting remote computers, copies the latest locally cached release zip from `${TEMP_DIR}` to each target and runs `Update-GetHealthCode.ps1 -UpdateFromZip <copied-zip>` before tests.
+Requests a warning if no locally cached release zip is available. When updates are enabled, the wrapper automatically pushes a validated cached zip to remote targets with a different embedded version, even without this switch. Matching versions skip updates; otherwise unavailable or mismatched packages fall back to the target updater's normal source resolution.
+
+.PARAMETER SkipSlowTests
+Passed through to Get-ComputerHealth to skip tests with high time impact. Alias: `-DebugSkipSlowTests`.
+
+.PARAMETER SkipPolicyTests
+Passed through to Get-ComputerHealth to skip tests tagged as policy inventory tests.
+
+.PARAMETER SkipNonEssentialTests
+Passed through to Get-ComputerHealth to run only tests tagged `Essential`. Alias: `-Quick`.
 
 .PARAMETER NoSendReport
 Suppresses email sending regardless of whether the script is running in an interactive or non-interactive context.
@@ -71,15 +80,16 @@ Aliases: `NoSendMessage`, `NoSendMail`.
 .PARAMETER SendReport
 Forces email sending regardless of whether the script is running in an interactive or non-interactive context.
 
-.NOTES ON EMAIL DEFAULTS
+.NOTES
 - In an interactive session, email sending defaults to off.
 - In a non-interactive session, email sending defaults to on.
 - When you run this script after `Enter-PSSession`, the remote PowerShell host can look non-interactive to the script even though you are typing at an interactive prompt. This behavior is expected; use `-NoSendReport` in that case if you do not want the default email report.
 - `-NoSendReport` overrides the default and disables email sending.
 - `-SendReport` overrides the default and enables email sending.
+- If both switches are supplied, `-NoSendReport` wins. The `SendReports` config key is not read.
 
 .EXAMPLE
-# Run against the local computer, export report data, and email if notable messages exist:
+# Run against the local computer and export report data; email follows the session default:
 .\Invoke-GetComputerHealth.ps1
 
 .EXAMPLE
@@ -99,8 +109,9 @@ Forces email sending regardless of whether the script is running in an interacti
 - Remote targets are executed via PowerShell remoting sessions; ensure WinRM is enabled and reachable (5985/5986) and that `.\bin\` and `.\config\` content exists on the remote machines as referenced.
 - Output paths used:
   - Transcript: `.\log\Invoke-GetHealthDomainComputers-<timestamp>.log`
-- Data: `${DATA_DIR}\all-messages-<timestamp>.clixml`, `${DATA_DIR}\notable-messages-<timestamp>.clixml`
-- HTML: `${DATA_DIR}\notable-messages-<timestamp>.html`
+- Data archive: `.\data\all-messages-<timestamp>.clixml.zip`
+- Latest findings: `.\temp\last-all-findings.clixml`
+- HTML: `.\temp\last-report.html`, `.\temp\last-interactive-report.html`
 #>
 
 param(

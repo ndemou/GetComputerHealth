@@ -17,7 +17,7 @@ This page is the routing table for the repository documentation. It is meant for
 
 | File | Owner |
 | --- | --- |
-| [`README.md`](../README.md) | User-facing overview, installation, common operations, architecture summary, and generated built-in test catalog. |
+| [`README.md`](../README.md) | User-facing overview, installation, common operations, architecture summary, and built-in test catalog checked against `-ListAllBuiltInTests`. |
 | [`user/custom-tests.md`](./user/custom-tests.md) | User-facing guide for out-of-tree custom tests under `config\Custom-HealthTests`. |
 | [`user/custom-test-helpers.md`](./user/custom-test-helpers.md) | Optional helper examples for custom health tests. |
 | [`user/reporting.md`](./user/reporting.md) | Reporting API usage: calling `Invoke-GetComputerHealthReporting` with saved findings, with an example and parameter notes. |

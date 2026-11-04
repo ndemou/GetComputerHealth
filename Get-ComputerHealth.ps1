@@ -20,8 +20,9 @@ When `-OutputObjects` is used, each emitted log object includes these fields:
 
 Notable side effects:
 - When custom tests are selected, the `.ps1` files are executed directly.
-- The default built-in test set is read-only.
-- Built-in tests that may change computer state are kept under `health-tests\HealthTests-that-do-change-state` and are not loaded or run unless `-IReallyWantToRunTestsThatChangeState` is supplied.
+- Default built-in tests do not intentionally modify system configuration or the application data they inspect. Diagnostic queries may generate traffic, update caches or logs, and activate services on demand.
+- For normal runs, tests under `health-tests\HealthTests-that-do-change-state` are loaded and run only with `-IReallyWantToRunTestsThatChangeState`. Listing mode loads their definitions without executing them; direct script execution bypasses this runner's guard.
+- The runner writes its own policy-baseline, suppression, and repeat-observation files as needed.
 - Custom tests may perform read/write operations depending on their implementation.
 
 Idempotency:
@@ -29,7 +30,7 @@ Idempotency:
 - `-SetAsRequired` updates or creates a single required-finding entry for the specified test/signature pair.
 
 Dependencies & execution context:
-- Requires elevation.
+- Requires elevation for normal runs and suppression/required-finding updates, unless `-RunWithoutElevation` is supplied. Listing tests does not require elevation.
 - Relies on companion scripts: `lib-write-log-objects.ps1` and the modules/helpers under `health-tests`.
 - Uses a suppression config file at `.\config\Get-ComputerHealth.sigs-to-suppress.txt`.
 - Uses a required-findings config file at `.\config\required_findings.psd1`.
@@ -52,6 +53,7 @@ Default: empty (show all). Typical value: `DIP`
   N = hide Notice messages
   W = hide Warning messages
   F = hide Failure messages
+  S = hide Suppressed messages
   C = hide Comments (messages still print, but without their Comment lines)
 
 .PARAMETER WhitelistSigs
@@ -78,6 +80,9 @@ Default: empty (show all). Typical value: `DIP`
 .PARAMETER SkipPolicyTests
 (Parameter set: Run) Skips health tests tagged as policy inventory tests (`Tags: Policy` in their help block), such as `HealthTest-ListInstalledPrograms`.
 
+.PARAMETER SkipNonEssentialTests
+(Parameter set: Run) Runs only tests whose help block includes `Tags: Essential`. Alias: `-Quick`.
+
 .PARAMETER DontAutosetPolicy
 (Parameter set: Run) Disables first-run auto-baselining for policy tests (`Tags: Policy`, e.g. `HealthTest-ListInstalledPrograms`). By default, first run auto-suppresses emitted `[NOTICE]`/`[WARNING]` findings for each policy test and records a marker in the suppression file. The marker includes the policy baseline version from the test help block (`Policy baseline version: N`, default 0) so a rewritten list test can establish a fresh baseline when the version is intentionally increased. Legacy markers without a baseline value are treated as baseline version 1.
 
@@ -85,7 +90,13 @@ Default: empty (show all). Typical value: `DIP`
 (Parameter set: Run) Optional list of Domain Controller IP addresses passed in by the orchestrator. Stored in `$Global:GchData.IpsOfAllDcs` for health tests that need it.
 
 .PARAMETER DoNothing
-(Parameter set: Run) Immediate no-op return (useful for smoke-testing invocation/parameter binding).
+(Parameter set: Run) Initializes the runner, checks elevation, and then returns before invoking health tests. It still reads configuration, discovers host capabilities, and loads applicable test definitions.
+
+.PARAMETER PrettifyWriteWarning
+(Parameter set: PrettifyWarning) Formats warning-like input as console health messages without running tests. Alias: `-Prettify`.
+
+.PARAMETER InputObject
+(Parameter set: PrettifyWarning) Warning-like values to format, supplied directly or through the pipeline.
 
 .PARAMETER AddWhitelisting
 (Parameter set: AddWhitelist) Appends a suppression entry for a specific signature to the suppression file and exits (does not run health tests).

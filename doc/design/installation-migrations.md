@@ -34,7 +34,7 @@ The basic rules are these:
   * When the On-Disk Format needs to change, we also increase the code's major version number and both values above (`CurrentDiskFormat`, `LatestCompatibleCodeVersion`).
   * When the code's major version number needs to increase but the On-Disk Format does not need to change, we only increment `LatestCompatibleCodeVersion`.
 
-As a result `LatestCompatibleCodeVersion` is expected to be always aligned with the latest installed code release.
+As a result `LatestCompatibleCodeVersion` is expected to track the installed code's major version. `CurrentDiskFormat` tracks the last applied migration, so it can remain lower when later major releases do not contain a migration.
 
 > NOTE: The code version is declared inside `Get-ComputerHealth.ps1` (in a line like `$VERSION="1.2.3"`).
 
@@ -54,10 +54,13 @@ A short description of what the script does (the changes it performs on the On-D
 .MANIFEST
 ModifiedTopFolders = temp, config
 # comma separated list of top folders (spaces are ignored)
-# 'bin' is always modified, so no need to include it
+# List the folders this migration modifies; normal code replacement is separate.
 NewTopFolders = foo
+#>
 ```
 Modified top folders are top-level installation folders such as `config`, `log`, and similar folders. If a migration may modify a folder itself or any file under it, that folder is considered modified.
+
+The updater does not automatically add `bin` to the manifest's backup list. If a migration itself modifies `bin`, declare it. The updater's later replacement of release files is a separate operation.
 
 Migration scripts must:
   1. Optionally run one or more precondition tests.
@@ -78,7 +81,7 @@ The updater must:
 
 1. acquire a mutex so that two updates (and migrations) can never overlap
 2. detect the source On-Disk Format version from `data\disk-format.psd1`. If no such file exists, assume CurrentDiskFormat = 4 and LatestCompatibleCodeVersion = 4.
-3. determine the target On-Disk Format version from the version of the zip file (`$versionToInstall`)
+3. determine the target code major version from the release version (`$versionToInstall`) and select the migration scripts that establish the resulting On-Disk Format
 4. Decide what to do:
   4.1. If the source On-Disk Format version already matches the target On-Disk Format version, no On-Disk Format Migration is needed.
   4.2. If the target On-Disk Format version is lower than the source On-Disk Format version, that is a format downgrade request and must throw.
@@ -94,7 +97,7 @@ The updater must:
     4.4.5. If everything appears to have gone well
        4.4.5.1. persist the final On-Disk Format version in `data\disk-format.psd1`.
        4.4.5.2. release the mutex
-       4.4.5.3. execute the updater that is returned by the last migration script
+       4.4.5.3. hand control to a different existing updater path returned by a successful migration, or continue normal code replacement when the path is unchanged or is the expected destination that has not been staged yet
 
 Migrations are not required to be adjacent. For example, to go from disk format 3 to 11, you may need to run migrations 4, 6, 10, and 11. Skipping versions 5, 7, 8, and 9 is normal because On-Disk Format is tied to the code's major version number, and not every major code version requires a migration.
 
@@ -107,6 +110,16 @@ The updater must print at least:
     2. the target format
     3. the backups created
     4. the final persisted format
+
+## Current implementation and limits
+
+`Invoke-DiskFormatMigrations` reads scripts from the extracted release's `disk-format-migrations` folder and runs each one in Windows PowerShell with the installation root as its working directory. It uses the last non-empty stdout line for the exit protocol. An exit code of 1 with `No migration is needed` still advances the format to that migration's version. The final state is saved after all selected migrations complete.
+
+The mutex wait is currently 60 seconds. The implementation does not yet satisfy the full serialization requirement above: it reads `data\disk-format.psd1` before acquiring the mutex and releases the mutex before replacing toolkit files. Do not treat it as a lock covering the entire update. See [the updater implementation](../../Update-GetHealthCode.ps1).
+
+Rollback is scoped to the failing migration's declared folders. Earlier successful migrations are not undone if a later migration fails, although the final format state has not yet been written. Migration scripts therefore need the retry and validation behavior specified below. Existing folders named in `NewTopFolders` are preserved during cleanup; a migration must also declare them in `ModifiedTopFolders` if it may change their existing contents.
+
+The shipped migration scripts also call `Write-Error` in their catch blocks while `$ErrorActionPreference` is `Stop`. That can terminate the script before its final `Migration failed` line and explicit `exit 2`. The updater detects the failed subprocess, but these scripts do not reliably produce the exact failure protocol required above.
 
 ## Safety Requirements
 

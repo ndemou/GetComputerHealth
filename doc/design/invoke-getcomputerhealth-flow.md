@@ -31,7 +31,7 @@ A run is controlled by these kinds of inputs:
 - **Test selection**: include only certain tests, exclude certain tests, or skip slow, policy, or non-essential tests.
 - **Guarded active diagnostics**: `-IReallyWantToRunTestsThatChangeState` explicitly enables the separately stored built-in tests that can make limited, highly safe state changes.
 - **Update behavior**: by default the wrapper may update the installed toolkit before running checks; `-NoUpdate` disables that for the run.
-- **Remote-update behavior**: optional push-update settings can stage an update zip for remote targets.
+- **Remote-update behavior**: the wrapper can automatically stage a validated local update zip for targets whose version differs from the controller. `-PushUpdate` is not required for this automatic path.
 - **Email behavior**: switches and configuration decide whether a report is sent.
 
 ## Configuration used during a run
@@ -47,6 +47,8 @@ The most important configuration areas are:
 
 Configuration is combined with command-line arguments. Explicit command-line switches generally control the current run, while configuration supplies defaults and environment-specific settings.
 
+The default built-in tests avoid intentional configuration and application-data changes. This does not make the wrapper read-only: it updates toolkit files, writes report and suppression data, and maintains logs and caches. Even with `-NoUpdate`, those bookkeeping writes and ordinary diagnostic side effects remain. See the [state-changing test decision](state-changing-health-tests.md).
+
 ## High-level run sequence
 
 A typical invocation follows this flow:
@@ -57,12 +59,12 @@ A typical invocation follows this flow:
 
 2. **Read local configuration**
    - The wrapper reads available configuration files.
-   - It resolves settings such as postponed-suppression display windows, email behavior, and domain-controller IPs.
+   - It resolves the postponed-suppression display window. Domain-controller IPs are resolved after logging starts, and email settings are read when reports are prepared.
 
 3. **Check for an update**
    - Unless update behavior is disabled, the wrapper runs the updater before health checks.
-   - If the installed script version changes, the wrapper starts itself again once so the rest of the run uses the updated code.
-   - After starting the updated copy, the original pre-update process exits instead of continuing. 
+   - If the installed script version changes, the wrapper invokes its updated file once in the same PowerShell process so the rest of the run uses the updated code.
+   - After that invocation returns, the original invocation returns without performing a second health scan or sending a second report.
 
 4. **Start run logging**
    - The wrapper starts a transcript log for the run.
@@ -73,9 +75,10 @@ A typical invocation follows this flow:
    - If explicit computers are supplied, those names are normalized into a target list.
    - If the special domain-server target set is supplied, domain servers are discovered and excluded servers are removed.
 
-6. **Optionally prepare a local update package for remotes**
-   - When push-update behavior is requested, the wrapper finds the newest local release zip it can use for target machines.
-   - If no suitable package is available, the run continues with normal update behavior.
+6. **Find a local update package for remotes**
+   - When updates are enabled and remote targets exist, the wrapper looks for a local release zip and checks that its embedded version matches the controller's code.
+   - A target already matching the controller skips its updater. A target with a different or unknown version receives the validated zip automatically when one is available.
+   - If no suitable package is available, targets needing an update use the normal updater path. `-PushUpdate` adds a warning when no local zip is found; it is not required to enable the automatic copy.
 
 7. **Run health checks for each target**
    - For the local computer, the wrapper invokes the health-check flow directly.
@@ -90,9 +93,9 @@ A typical invocation follows this flow:
    - Suppression signatures are applied and messages near suppression expiry can be displayed as postponed.
 
 9. **Write report artifacts**
-   - All collected messages are saved as data.
-   - Notable messages are saved separately.
-   - An interactive HTML report is generated when there is report data to send to the operator.
+   - All messages are saved in a compressed CLIXML archive under `data` and a latest-findings CLIXML file under `temp`.
+   - When notable messages exist, an interactive HTML report containing those messages is saved under `temp`, even if email is disabled.
+   - No report artifacts are generated if the collected message list is empty.
 
 10. **Decide whether to send email**
     - Explicit email switches and configuration determine whether the report should be sent.
@@ -101,22 +104,21 @@ A typical invocation follows this flow:
 
 11. **Send the report or finish quietly**
     - If notable messages exist and email is enabled, the wrapper sends a report email with the summary and report artifact.
-    - If no notable messages exist, the wrapper may send an all-good message depending on configuration.
+    - If messages exist but none are notable, the wrapper sends an all-good message when email is enabled and configured. It does not replace the previous interactive report in this case.
     - If email is disabled, artifacts are still available on disk.
 
 ## The self-update rerun handoff
 
 The update handoff is the easiest part of the flow to get wrong and introduce subtle bugs.
-When the wrapper updates itself, continuing in the original process is unsafe because that process has already loaded and evaluated old code.
-The intended behavior is:
+When the wrapper updates itself, the original invocation has already loaded old code. The current handoff re-reads the updated script in a new invocation within the same PowerShell process:
 
 1. the original invocation detects that the installed version changed
-2. it launches a second invocation of `Invoke-GetComputerHealth.ps1`
+2. it calls the updated `Invoke-GetComputerHealth.ps1` with the call operator
 3. it marks that second invocation as the one allowed post-update rerun
-4. it exits immediately
-5. the second invocation performs target checks and report delivery
+4. the second invocation performs target checks and report delivery
+5. the original invocation returns as soon as the second invocation completes
 
-That one-time marker (`-AlreadyReranAfterUpdate`) is internal to `Invoke-GetComputerHealth.ps1`. If it reaches the child script(`Get-ComputerHealth.ps1`), PowerShell can bind it in surprising ways and produce misleading parameter errors.
+That one-time marker (`-AlreadyReranAfterUpdate`) is internal to `Invoke-GetComputerHealth.ps1`. It must not be forwarded to `Get-ComputerHealth.ps1`, which does not declare that parameter.
 
 ## Local target flow
 
@@ -136,12 +138,12 @@ For a remote target, the wrapper:
 
 1. creates a PowerShell remoting session to the target
 2. determines the target-side installation root
-3. optionally stages update material when push-update mode is requested
+3. skips updating an already matching version, or copies the updater and any validated local release zip when updates are enabled
 4. runs the target-side health-check flow in the remote session
 5. receives health message records back from the remote target
 6. closes the remote session when finished
 
-Remote targets therefore need working PowerShell remoting and access to the expected GetComputerHealth installation layout on the target.
+Remote targets need working PowerShell remoting and an installed toolkit. The wrapper creates missing target `bin` and `temp` folders, but it loads the target's logging helper before running the updater. Copying the updater alone therefore does not bootstrap an empty installation. With `-NoUpdate`, the expected health-test files must also already be present.
 
 ## Outputs from a run
 
@@ -149,9 +151,10 @@ A run can produce several observable outputs:
 
 - console progress and status messages
 - a transcript log under the installation log folder
-- all-message data files under the data folder
-- notable-message data files under the data folder
-- an interactive HTML report under the data folder
+- compressed all-message CLIXML archives under `data`
+- `temp\last-all-findings.clixml` containing the latest full result set
+- `temp\last-interactive-report.html` containing the most recent report with notable messages
+- `temp\last-report.html` containing the latest email body, also saved when email is disabled
 - an email summary and attachment, when email sending is enabled and warranted
 
 The exact report content depends on message levels, suppression settings, test selection, and whether targets returned failures, warnings, notices, or only routine messages.
@@ -161,12 +164,14 @@ The exact report content depends on message levels, suppression settings, test s
 The wrapper tries to make operational failures visible in the same reporting channel as health findings.
 For example:
 
-- update-script PowerShell errors become failure records
+- target-side update-script PowerShell errors become failure records
 - terminating update errors become failure records for that target
 - health-script PowerShell errors become failure records
 - remoting or target execution problems become notable results where possible
 
 This means a report can describe both true health findings and problems encountered while trying to run the health checks.
+
+The controller's initial update check is an exception: non-terminating errors are written to the error stream, and a terminating failure produces a warning before target execution continues. Those early messages are not added directly to the collected report records.
 
 ## Mental model
 
@@ -174,7 +179,7 @@ Think of the scripts as three layers:
 
 1. **`Invoke-GetComputerHealth.ps1`** orchestrates update, target selection, remoting, collection, artifacts, and email.
 2. **`Get-ComputerHealth.ps1`** runs the actual health tests for one target context.
-3. **Health-test scripts** produce individual health messages. Read-only built-ins are the default; the separately stored state-changing built-ins require explicit opt-in.
+3. **Health-test scripts** produce individual health messages. Read-only built-ins are the default; the runner includes separately stored state-changing built-ins only with explicit opt-in. Direct execution of an individual guarded test file bypasses that runner selection.
 
 The wrapper should own wrapper-only control flow such as self-update reruns.
 The health script should only receive health-check options.

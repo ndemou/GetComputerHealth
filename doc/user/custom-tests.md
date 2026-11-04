@@ -6,7 +6,11 @@ For the full documentation routing table, see [`README.md`](../README.md).
 
 ## TL;DR
   
-All `.ps1` files in `C:\IT\Get-ComputerHealth\config\Custom-HealthTests\` are executed directly. Your script should report its result(s) like this:
+`Invoke-GetComputerHealth.ps1` executes the top-level `.ps1` files in
+`C:\IT\Get-ComputerHealth\config\Custom-HealthTests\` on each target computer,
+unless `-OnlyTheseTests` limits the selection or `-ExcludeTests` excludes a script.
+Subfolders are not searched. Adjust this path if you installed elsewhere.
+Your script should report its result(s) like this:
 ```powershell
 Write-Warning "[PASS] Description of what's OK"
 Write-Warning "[FAILURE] Description of the issue"
@@ -14,14 +18,24 @@ Write-Warning ("[FAILURE] Description of the issue" + "`n" + $details)
 # Choose between [NOTICE], [WARNING], or [FAILURE] depending on severity
 ```
 
-The code you write will run with **high privileges** and, apart from any temporary files or similar artifacts it may need, it **MUST not change** the system state.
+The code you write normally runs with **high privileges** and **MUST not change**
+the system state. Useful output and temporary files no larger than 100 MB are
+allowed. The runner does not sandbox custom scripts or enforce this rule.
+`-IReallyWantToRunTestsThatChangeState` only enables the designated built-in tests;
+it does not authorize state-changing custom scripts.
 
 To add a custom test:
 
-1. Create the folder `C:\IT\GetComputerHealth\config\Custom-HealthTests\` on the target computer.
+1. Create the folder `C:\IT\Get-ComputerHealth\config\Custom-HealthTests\` on the target computer.
 2. Create one or more `.ps1` scripts in that folder (for example, `"tests-for-$env:COMPUTERNAME.ps1"`).
 3. Put the test logic in the script and make the script emit `Write-Warning` messages for its findings.
 4. Run the script directly to test it.
+
+The script must call its test logic. Defining a function without invoking it does
+not run a test. The runner reports a notice when a custom script produces no output.
+The lower-level `Get-ComputerHealth.ps1` does not run the default custom folder
+automatically. Select a script with `-OnlyTheseTests` as shown below, or pass the
+folder using the compatibility parameter `-IncludeTestsFromFolder`.
 
 ## More details and examples
 
@@ -49,13 +63,17 @@ Test-IsFooLessThanLimit
 
 ### Pattern 2, “Enumeration of findings/issues”
 
+This example loads `Find-LargeDirectory` explicitly so it also works when run
+directly. This is an internal built-in helper; see the compatibility caution below.
+
 ```powershell
+. 'C:\IT\Get-ComputerHealth\bin\health-tests\HealthTest-LargeDirectories.ps1'
+
 function Test-LargeDirectories {
     $issueFound = $false
     foreach ($dir in Find-LargeDirectory -Path 'C:\' -Threshold 10000) {
         $issueFound = $true
-        $details = "$($dir.ItemsCount) items in folder" + "`n" + `
-            "Most of them ($($dir.MostCommonExtCount)) are .$($dir.MostCommonExt)"
+        $details = "$($dir.ItemsCount) items in folder"
         Write-Warning ("[NOTICE] Directory $($dir.Path) has more than 10000 child items" + "`n" + $details)
     }
     if (-not $issueFound) {
@@ -71,12 +89,12 @@ Test-LargeDirectories
 Often this style covers your needs:
 ```powershell
 Write-Warning "[PASS] <A single terse line that describes the good status>"
-Write-Warning "[FAILURE] <A single terse line that uniquely describes the issue>""
+Write-Warning "[FAILURE] <A single terse line that uniquely describes the issue>"
 ```
 
 But if you have details to report, use this style:
 ```powershell
-$details = "More details" + "`n" + "Even in multiple lines" + "`n" + "Up to 32K characters."
+$details = "More details" + "`n" + "Even in multiple lines."
 Write-Warning ("[NOTICE] <A single terse line that uniquely describes the issue>" + "`n" + $details)
 ```
 
@@ -89,23 +107,28 @@ For example, suppose you want to flag folders with too many files. Consider thes
 "Directory $dir has $FilesCount items"            # bad description
 ```
 
-Folder `C:\foo` having 1002 files is essentially the same issue as `C:\foo` having 1003 files. Both situations should therefore produce the same description string.
+Folder `C:\foo` having 10002 files is essentially the same issue as `C:\foo` having 10003 files. Both situations should therefore produce the same description string.
 The second version is not good because it varies with a detail that is not essential to the identity of the issue: exactly how many files the folder contains.
 
 > **NOTICE** Both descriptions contain variables, but the variable in the good description (`$dir`) identifies an essential aspect of the finding: which folder has too many files. The variable in the improper description adds irrelevant noise.
 
-> **TIP** This matters because an issue's signature, and therefore its suppression, depends on stable description text. Punctuation is discarded and spacing is normalized, but otherwise every character matters.
+> **TIP** This matters because an issue's signature, and therefore its suppression, depends on stable description text. Case is ignored, common punctuation is replaced with spaces, and spacing is normalized. Other text changes can change the signature. Details do not contribute to the signature.
 
 ## When to Handle Exceptions
 
-The wrapper that invokes your scripts will catch and report exceptions in detail. It will then continue with the next script. Therefore, you do not need to catch exceptions if you are going to abort execution anyway and will not collect more information than the exception already provides.
+The wrapper invokes custom scripts with `$ErrorActionPreference = 'Stop'`, catches
+and reports exceptions, then continues with the next script. Therefore, you do
+not need to catch exceptions if you are going to abort execution anyway and will
+not collect more information than the exception already provides. Findings are
+processed after the script returns, so an unhandled exception can also prevent
+earlier output from that script from becoming findings.
 
 ## Execution Scope and Available Symbols
 
 Custom test scripts are currently executed with:
 
 ```powershell
-& $ScriptPath
+& $ScriptPath 3>&1
 ```
 
 inside the already prepared `Get-ComputerHealth.ps1` session.
@@ -142,22 +165,22 @@ There are also some specialized helper functions you may wish to use. See [`user
 First, ask your human to run these commands on the computer where they are writing the test. The output will help you understand whether the expected folders exist and whether any custom tests already exist.
 
 ```powershell
-Test-Path C:\IT\GetComputerHealth\ # must exist
-Test-Path C:\IT\GetComputerHealth\config\Custom-HealthTests\ # create it if it does not exist
-Get-ChildItem C:\IT\GetComputerHealth\config\Custom-HealthTests\
-if (Test-Path C:\IT\GetComputerHealth\config\Custom-HealthTests\) { ls C:\IT\GetComputerHealth\config\Custom-HealthTests\*.ps1 } # shows existing health tests
+Test-Path C:\IT\Get-ComputerHealth\ # must exist
+Test-Path C:\IT\Get-ComputerHealth\config\Custom-HealthTests\ # create it if it does not exist
+Get-ChildItem C:\IT\Get-ComputerHealth\config\Custom-HealthTests\
+if (Test-Path C:\IT\Get-ComputerHealth\config\Custom-HealthTests\) { ls C:\IT\Get-ComputerHealth\config\Custom-HealthTests\*.ps1 } # shows existing health tests
 ```
 
 Then ask your human to describe the test they want to implement and choose an appropriate file name that is not already used.
 
-Write the code for the requested test and give your human step-by-step instructions for adding it. For example: `notepad C:\IT\GetComputerHealth\config\Custom-HealthTests\<a nice name not already existing>.ps1`
+Write the code for the requested test and give your human step-by-step instructions for adding it. For example: `notepad C:\IT\Get-ComputerHealth\config\Custom-HealthTests\<a nice name not already existing>.ps1`
 
 Ask the user to execute it and verify it works. (See notes below.)
 
 ## How to Test Your Script
 
 ```powershell
-& C:\IT\Get-ComputerHealth\config\Custom-HealthTests\my-cooll-test.ps1
+& C:\IT\Get-ComputerHealth\config\Custom-HealthTests\my-cool-test.ps1
 # WARNING: [PASS] All is cool!
 ```
 
@@ -166,9 +189,13 @@ Ask the user to execute it and verify it works. (See notes below.)
 OR
 
 ```powershell
-$results = C:\IT\Get-ComputerHealth\bin\Get-ComputerHealth.ps1 -OnlyTheseTests "my-cooll-test.ps1"
+$results = & C:\IT\Get-ComputerHealth\bin\Get-ComputerHealth.ps1 -OutputConsoleMessages -OutputObjects -OnlyTheseTests 'my-cool-test.ps1'
 # or if the script is not under .\config
-$results = C:\IT\Get-ComputerHealth\bin\Get-ComputerHealth.ps1 -OnlyTheseTests "C:\temp\my-cooll-test.ps1"
+$results = & C:\IT\Get-ComputerHealth\bin\Get-ComputerHealth.ps1 -OutputConsoleMessages -OutputObjects -OnlyTheseTests 'C:\temp\my-cool-test.ps1'
 ```
 
 > This gives you nicely colored console output and structured results.
+
+Current limitation: `-OnlyTheseTests` and `-ExcludeTests` split their values on
+commas and whitespace, including whitespace inside a quoted argument. Use names
+and paths without those characters when selecting individual custom scripts.

@@ -1,13 +1,13 @@
 ﻿<#
 .SYNOPSIS
-Ensures all health-check scripts and PS Modules are installed & up-to-date.
+Installs or updates the GetComputerHealth scripts from a release package.
 
 .DESCRIPTION
 Missing files are created. Existing files that differ are replaced.
 Identical files are left unchanged. If this script updates itself,
 it re-invokes the updated copy. When replacing a file, backup copies
-are created in the backups directory.
-Will set PSGallery as Trusted.
+are created in the installation's temp directory.
+Does not install PowerShell modules or change PSGallery trust settings.
 
 The updater also tracks a small "release marker" for the currently
 installed code and for the target update source. A release marker is a
@@ -43,11 +43,6 @@ Internal use only. Tracks the one-time self-rerun pass count.
 .PARAMETER PersistReleaseMarker
 Internal use only. Carries the resolved release marker across self-rerun.
 
-.PARAMETER Config
-Optional installer customization. Pass either a hashtable or the path to a PowerShell data file.
-The top-level Options branch changes installer behavior. The top-level ConfigFiles branch
-creates PowerShell data files under the installation config directory.
-
 .PARAMETER GenerateConfigPsd1
 Creates a template PowerShell data file named GetComputerHealth.install.psd1 in the current
 working directory, then exits. Customize that file and pass its path to -Config.
@@ -60,8 +55,8 @@ at the specified 24-hour time in HH:mm format, then exits.
 .\Update-GetHealthCode.ps1
 
 Checks the locally cached latest-release metadata, refreshes it from
-GitHub when needed, and installs the latest published release when it is
-newer than the currently installed release marker.
+GitHub when needed, and installs the latest published release when its
+marker/version is not equivalent to the installed release, unless disabled by config.
 
 .EXAMPLE
 .\Update-GetHealthCode.ps1 -UpdateFromZip C:\Downloads\GetComputerHealth-v4.4.3.zip

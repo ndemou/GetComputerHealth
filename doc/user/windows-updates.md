@@ -13,10 +13,13 @@ the reporting thresholds:
 |---|---:|---|
 | `PendingWarnDays` | 8 | Warn when a pending security/critical update reaches this age |
 | `PendingFailDays` | 15 | Fail when a pending security/critical update reaches this age |
-| `UpdateAgeWarnDays` | 45 | Warn after this many days without a successful CBS update installation |
-| `UpdateAgeFailDays` | 60 | Fail after this many days without a successful CBS update installation |
+| `UpdateAgeWarnDays` | 45 | Warn when the last recorded CBS update installation reaches this age |
+| `UpdateAgeFailDays` | 60 | Fail when the last recorded CBS update installation reaches this age |
 | `MaxScanAgeHours` | 48 | Warn when the last successful automatic update scan is older or unknown |
 | `MaxBaselineAgeDays` | 45 | Warn when the latest public monthly OS security baseline is older or unknown |
+
+Each warning threshold must be lower than its corresponding failure threshold.
+Day parameters accept 1 through 3650; `MaxScanAgeHours` accepts 1 through 8760.
 
 The cached check queries uninstalled, non-hidden software updates in Microsoft's
 Security Updates and Critical Updates classifications. It preserves the configured
@@ -51,8 +54,10 @@ server, not first detection or the first failed installation on this machine.
 WSUS approvals, deferrals, and republishing can affect that approximation. The
 supplementary installation-age helper reads installed CBS updates with
 `Get-HotFix`; it is an activity signal, not proof of OS patch completeness.
-The wrapper emits a pass only when both sources are usable, freshness checks pass,
-and no threshold is exceeded. `PendingReboot` remains a separate test.
+The wrapper emits a pass only when both pending-update sources and the
+installation-age result are usable, freshness checks pass, and no warning or
+failure threshold is reached. Pending updates younger than `PendingWarnDays` can
+therefore coexist with a pass. `PendingReboot` remains a separate test.
 
 Missing security or critical updates produce one finding when any update reaches
 the pending warning or failure threshold. Its severity is the highest threshold

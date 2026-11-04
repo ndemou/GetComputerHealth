@@ -7,9 +7,9 @@ For the full documentation routing table, see [`README.md`](../README.md).
 ## Behavior Rules
 
 - Keep ordinary built-in tests read-only.
-  Functions directly under `health-tests` **must never** change machine state; they only inspect and report.
+  Functions directly under `health-tests` must not intentionally change system configuration or application data. Useful or temporary files no larger than 100 MB are allowed. Diagnostic queries can cause network traffic, logs, caches, or demand-started services, so read-only does not mean zero observable side effects.
 - Follow the [state-changing health-test design decision](../design/state-changing-health-tests.md).
-  An approved test that makes limited state changes must be highly safe for conventional systems, live under `health-tests\HealthTests-that-do-change-state`, describe the active behavior clearly, and remain guarded by `-IReallyWantToRunTestsThatChangeState`.
+  An approved test that intentionally changes state must be highly safe for conventional systems, live under `health-tests\HealthTests-that-do-change-state`, and describe the active behavior clearly. The runners require `-IReallyWantToRunTestsThatChangeState` to include these tests. Directly executing a test file or calling its function bypasses that runner guard.
 - Follow the [health findings and noise design decision](../design/health-findings-and-noise.md).
   This is an administrative health tool rather than a threat-detection product; prefer actionable, low-noise findings when broader detection would create recurring false positives.
 - Report using the expected `Write-Warning` pattern:
@@ -19,13 +19,15 @@ For the full documentation routing table, see [`README.md`](../README.md).
   ```
   Where `LEVEL` is one of `PASS`, `INFO`, `NOTICE`, `WARNING`, or `FAILURE`. See [`user/custom-tests.md`](../user/custom-tests.md) for more information.
 - Be explicit about scope and prerequisites.
-  If a test only applies to DCs, domain-joined machines, laptops, and so on, use the special fields in the top-level help block. If they don't cover your situation, short-circuit early.
+  The file-level `# HostRequirement:` comment controls runner applicability. The function's `AppliesTo:` help field documents applicability but does not enforce it. Add early checks for prerequisites that the loader cannot express, including those needed when a file is run directly.
 - Catch exceptions only when you can recover or downgrade cleanly. Otherwise, do nothing because the framework that invokes the functions catches exceptions, reports them, and aborts the rest of the HealthTest code. A typical example is iterating over a list and testing each item, where you do not want an exception for one item to skip all the others.
 
 ## Function Shape
 
 Use this structure and PascalCase after the `HealthTest-` prefix:
 ```powershell
+# HostRequirement: All
+
 function HealthTest-YourTestName {
 <#
 Description: Finds directories with more than 10000 files.
@@ -48,15 +50,17 @@ The function **must** include the top-level help block immediately after the ope
 
 Place ordinary functions directly under `health-tests`. Use `health-tests\HealthTests-that-do-change-state` only for explicitly approved tests whose diagnostic value justifies limited, highly safe state changes. Their `Description:` and detailed help must say what operation changes state.
 
+The loader reads `HostRequirement` from the first 12 lines and defaults to `All` when it is absent. Supported values are `All`, `VM`, `Mobile`, `DomainJoined`, `DomainJoinedNotDC`, `Server`, `Workstation`, `DC`, `PDC`, `DnsServer`, `DhcpServer`, and `HyperV`. This filtering is only applied by the runner, not by direct script execution.
+
 The `Field: Value` lines follow this exact order (note that some are optional):
    1. `Description:` What kind of issues it detects or what findings it uncovers (160 chars max).
    2. `AppliesTo:`. Options are `All`, `VM`, `Mobile`, `DomainJoined`, `Server`, `Workstation`, `DC`, `PDC`, `HyperV`
       `Hyper-V` is accepted as an alias spelling for `HyperV`, but use `HyperV` in new help blocks for consistency.
    3. `Scope:`. Options are `Computer`, `Domain`, `Forest`
    4. `Category:` primary plus optional secondary category. Options are: `Availability/Server Down Signals`,`Security & Stability Risks`,`Configuration Hygiene & Best Practices`,`Audit/Compliance/Informational`
-   5. `Impact:` either "low" when all dimensions have low impact, or one or more "<level>(<dimension>)" pairs. In those pairs, <level> is either "Medium" or "High", and <dimension> is one of "CPU", "Disk", "Network", "RAM", or "Time".
+   5. `Impact:` either `low` when all dimensions have low impact, or one or more `<level>(<dimension>)` pairs. In those pairs, `<level>` is either `Medium` or `High`, and `<dimension>` is one of `CPU`, `Disk`, `Network`, `RAM`, or `Time`.
    6. `Tags:` optional comma-separated values. Supported values: `Essential`, `Policy`, `Suppressed`.
-   7. `Uses:` optional, up to three essential non-built-in commands or helper functions used by the test.
+   7. `Uses:` required, with up to three essential non-built-in commands or helper functions used by the test. Use `Uses: None.` if none apply.
    8. `FalsePositives:` optional short note, only if false positives are expected.
 
   If `Tags:` includes `Policy`, the detailed part of the help block must also include `Policy identity:` and `Policy baseline version: N`. See below.
@@ -100,19 +104,19 @@ Suppressed Inventory Tests can be extremely useful for "Required findings".
 
 ## Findings that must only be reported once
 
-Some findings describe an event at a specific point in time (e.g. the failed execution of a Scheduled Task). In such cases it's very convenient for the first observation to be reported but all later observations of the *same* event to be silent. In practice if there's a gap of at 45 days without any observation and then the finding reappears it will be reported again.
+Some findings describe an event at a specific point in time, such as a failed scheduled-task execution. Report the first observation and suppress later observations of the same event. If the finding reappears after a gap of at least 45 days without an observation, it is reported again.
 
 To enable this behavior for a finding, add `[SuppressRepeats]` immediately after its severity prefix, as shown below.
 
 ```powershell
-Write-Warning "[FAILURE][SuppressRepeats] Event $eventName occured at $($timestamp).`n$details"
+Write-Warning "[FAILURE][SuppressRepeats] Event $eventName occurred at $($timestamp).`n$details"
 ```
 
 It is supported for `NOTICE`, `WARNING`, and `FAILURE`. Put everything that distinguishes the specific event in the first-line description (e.g. its timestamp). The runner handles everything else.
 
 ### Implementation details for `SuppressRepeats`
 
-The runner sets `SuppressRepeats = $true` and removes the marker before displaying the description or calculating its signature. Adding the marker therefore preserves existing finding signatures. Severity is also preserved, but is not part of the signature: changing only details or severity does not create a new notification. See [automatic repeat suppression](../user/reporting.md#automatic-repeat-suppression), and the [SuppressRepeats design](../design/first-seen-findings.md) for details.
+The runner sets `SuppressRepeats = $true` and removes the marker before displaying the description or calculating its signature. Adding the marker therefore preserves existing finding signatures. Severity is also preserved, but is not part of the signature: changing only details or severity does not create a new notification. See [event identity in the SuppressRepeats design](../design/first-seen-findings.md#event-identity-and-per-finding-scope) for details.
 
 For example, `HealthTest-ScheduledTasks` uses this behavior for a failed execution at a specific last run time. A new failed execution will have a different last run time and will be reported as a new finding. 
 
@@ -158,7 +162,7 @@ Each checked computer stores observations in `state\suppress_repeats.json` under
 
 If state cannot be read or saved, the runner emits a warning and does not apply repeat suppression to that finding. Configured suppressions still apply. Repeated notifications alongside a state warning therefore indicate a problem with observation tracking; inspect the warning's details for the cause.
 
-See the [SuppressRepeats design](../design/first-seen-findings.md) for state format, precedence, locking, and failure handling. To mark findings in built-in or custom tests, see the [authoring guide](../contributor/built-in-health-tests.md#findings-that-suppress-repeats). Persistent repeat handling requires `Get-ComputerHealth.ps1` or `Invoke-GetComputerHealth.ps1`; directly executing a health-test file only prints its warnings.
+See the [SuppressRepeats design](../design/first-seen-findings.md) for state format, precedence, locking, and failure handling. The marker syntax is shown [above](#findings-that-must-only-be-reported-once). Persistent repeat handling requires `Get-ComputerHealth.ps1` or `Invoke-GetComputerHealth.ps1`; directly executing a health-test file does not save repeat-suppression state.
 
 ## Policy Inventory Tests
 
@@ -205,7 +209,7 @@ Use a shared normalized fact collector only when it pays for itself: when enumer
 
 Scheduled tasks are the full version of this pattern:
 
-- `HealthTest-ListScheduledTasks` is a `Policy` test that emits one finding per task definition.
+- `HealthTest-ListScheduledTasks` is a `Policy` test that reports task definitions outside its built-in exclusions. Recognized transient one-shot tasks are informational and do not get a definition fingerprint.
 - The stable object key is task path plus task name.
 - The policy fingerprint includes review-worthy definition fields: actions, triggers, run account, run level, logon type, hidden state, and enabled state.
 - Runtime fields such as last run time, missed runs, and last result are deliberately excluded from that fingerprint.

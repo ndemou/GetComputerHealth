@@ -1,6 +1,8 @@
 # Test Improvement Plan
 
-This repo does not need a full testing framework migration right now. The current script-based approach is acceptable. However, a few small changes would materially improve reliability, maintainability, diagnostics, and day-to-day usage.
+This is the original improvement proposal, retained for context rather than as a current backlog. Several proposed features now exist, including shared test helpers, unique temporary run roots, category selection, smoke mode, detailed output, and standalone failure logs. The numbered items below do not track completion status.
+
+The proposal keeps the script-based approach and focuses on reliability, diagnostics, and day-to-day usage without a full testing framework migration.
 
 For current test commands and runner behavior, use [`../doc/contributor/test-suite.md`](../doc/contributor/test-suite.md).
 
@@ -27,7 +29,7 @@ Keep the current "run PowerShell scripts directly" model. Make failures easier t
    This removes repeated `if (...) { throw ... }` blocks and makes failures read more clearly.
 
 3. Make `run-all-tests.ps1` print a final summary with counts.
-   It already does this partly. Tighten it so the output always clearly shows:
+   The proposed summary should clearly show:
    - total test groups run
    - passed groups
    - failed groups
@@ -44,7 +46,7 @@ Keep the current "run PowerShell scripts directly" model. Make failures easier t
    Put them in one helper function or one config section at the top of the runner.
 
 5. Prefer unique temp folders for test runs when possible.
-   `test-Get-ComputerHealth.ps1` and `test-installer.ps1` currently reuse fixed folders. That makes cleanup and parallel runs harder.
+   The fixed folders used when this plan was written made cleanup and parallel runs harder. Both scripts now use `New-TestRunRoot`; this item records the original motivation.
    
    Improve this slightly by creating a per-run folder under `%TEMP%` or by allowing an override path parameter.
 
@@ -89,7 +91,7 @@ Keep the current "run PowerShell scripts directly" model. Make failures easier t
     - temporary directory creation
 
 11. Separate "unit-ish" tests from "machine/integration" tests.
-    You already have both types mixed together.
+    Both types were mixed together when this plan was written.
     
     A simple improvement is naming or grouping:
     - `test-unit-*.ps1`
@@ -121,9 +123,9 @@ Keep the current "run PowerShell scripts directly" model. Make failures easier t
 15. Add a lightweight "smoke only" mode.
     Some checks are expensive or machine-sensitive. Add a switch so the runner can execute just the fastest, lowest-risk checks when needed.
 
-## Recommended Order
+## Original Recommended Order
 
-If you only do a little work now, do these first:
+The proposed implementation order was:
 
 1. Add `tests/test-helpers.ps1` with a few assertion functions.
 2. Centralize test paths and temp folder creation.
