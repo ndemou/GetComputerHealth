@@ -504,7 +504,7 @@ Describe 'HealthTest-ScheduledTasks' {
 
     HealthTest-ScheduledTasks -StaleDays 30
 
-    @($script:warnings | Where-Object { $_ -match 'Scheduled task missed 6 runs' }).Count | Should -Be 1
+    @($script:warnings | Where-Object { $_ -match 'Scheduled task has missed runs:' }).Count | Should -Be 1
     @($script:warnings | Where-Object { $_ -match 'Scheduled task appears stale' }).Count | Should -Be 1
   }
 
@@ -631,7 +631,7 @@ Describe 'HealthTest-ScheduledTasks' {
       HealthTest-ScheduledTasks
 
       $script:warnings | Should -HaveCount 2
-      @($script:warnings | Where-Object { $_ -match 'Scheduled task missed 1 runs' }).Count | Should -Be 1
+      @($script:warnings | Where-Object { $_ -match 'Scheduled task has missed runs:' }).Count | Should -Be 1
       @($script:warnings | Where-Object { $_ -match 'Scheduled task appears stale' }).Count | Should -Be 1
     }
 
@@ -645,14 +645,23 @@ Describe 'HealthTest-ScheduledTasks' {
     }
   }
 
-  It 'reports one missed run as notice' {
+  It 'keeps the missed-run count only in details for <MissedRuns> runs at <Level> severity' -ForEach @(
+    @{ MissedRuns = 1; Level = 'NOTICE' }
+    @{ MissedRuns = 2; Level = 'NOTICE' }
+    @{ MissedRuns = 4; Level = 'NOTICE' }
+    @{ MissedRuns = 5; Level = 'WARNING' }
+    @{ MissedRuns = 6; Level = 'WARNING' }
+  ) {
     $script:TestScheduledTaskFacts = @(
-      New-TestScheduledTaskFact -NumberOfMissedRuns 1
+      New-TestScheduledTaskFact -NumberOfMissedRuns $MissedRuns
     )
 
     HealthTest-ScheduledTasks -StaleDays 0
 
-    @($script:warnings | Where-Object { $_ -match '^\[NOTICE\] Scheduled task missed 1 runs: \\Vendor\\Task' }).Count | Should -Be 1
+    $script:warnings | Should -HaveCount 1
+    $lines = $script:warnings[0] -split "`r?`n"
+    $lines[0] | Should -Be "[$Level] Scheduled task has missed runs: \Vendor\Task"
+    $lines[1..($lines.Count - 1)] | Should -Contain "Missed runs: $MissedRuns"
   }
 
   It 'does not report missed runs for logged-off Interactive and InteractiveToken users' {
@@ -668,7 +677,7 @@ Describe 'HealthTest-ScheduledTasks' {
 
       HealthTest-ScheduledTasks -StaleDays 0
 
-      @($script:warnings | Where-Object { $_ -match 'Scheduled task missed' }).Count | Should -Be 0
+      @($script:warnings | Where-Object { $_ -match 'Scheduled task has missed runs:' }).Count | Should -Be 0
       @($script:warnings | Where-Object { $_ -match '^\[PASS\] Scheduled tasks healthy$' }).Count | Should -Be 1
     }
   }
@@ -683,7 +692,7 @@ Describe 'HealthTest-ScheduledTasks' {
 
     HealthTest-ScheduledTasks -StaleDays 0
 
-    @($script:warnings | Where-Object { $_ -match 'Scheduled task missed 2 runs' }).Count | Should -Be 1
+    @($script:warnings | Where-Object { $_ -match 'Scheduled task has missed runs:' }).Count | Should -Be 1
   }
 
   It 'retains missed-run findings when logged-on-user inspection fails' {
@@ -696,7 +705,7 @@ Describe 'HealthTest-ScheduledTasks' {
 
     HealthTest-ScheduledTasks -StaleDays 0
 
-    @($script:warnings | Where-Object { $_ -match 'Scheduled task missed 2 runs' }).Count | Should -Be 1
+    @($script:warnings | Where-Object { $_ -match 'Scheduled task has missed runs:' }).Count | Should -Be 1
   }
 
   It 'still reports stale Interactive tasks when only the missed-run finding is skipped' {
@@ -709,7 +718,7 @@ Describe 'HealthTest-ScheduledTasks' {
 
     HealthTest-ScheduledTasks -StaleDays 30
 
-    @($script:warnings | Where-Object { $_ -match 'Scheduled task missed' }).Count | Should -Be 0
+    @($script:warnings | Where-Object { $_ -match 'Scheduled task has missed runs:' }).Count | Should -Be 0
     @($script:warnings | Where-Object { $_ -match 'Scheduled task appears stale' }).Count | Should -Be 1
   }
 

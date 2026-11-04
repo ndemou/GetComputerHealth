@@ -173,7 +173,7 @@ in the future. Uncertain or more complex schedules retain the stale check.
         } else {
           $level = Get-ScheduledTaskOperationalSeverity -Fact $fact -IssueType 'FewMissedRuns' -Required:$isRequired
         }
-        Write-Warning "[$level] Scheduled task missed $($fact.NumberOfMissedRuns) runs: $($fact.StableKey)`n$(Format-ScheduledTaskFactDetails -Fact $fact)"
+        Write-Warning "[$level] Scheduled task has missed runs: $($fact.StableKey)`n$(Format-ScheduledTaskFactDetails -Fact $fact)"
       }
     }
 
