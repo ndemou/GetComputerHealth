@@ -28,16 +28,34 @@ Uses: Get-WindowsFeature, Get-Website, Get-WebBinding.
         return
     }
     $problem_found = $false
-    $sites = Get-Website
+    $sites = @(Get-Website)
     foreach ($s in $sites) {
       $b = Get-WebBinding -Name $s.Name
       foreach ($x in $b) {
-        if ($x.protocol -eq 'http' -and ($x.bindingInformation -like '*:80:*') -and ($sites.count -gt 1)) {
-            $comment = "`nSince multiple sites are hosted, wildcard bindins may expose unintended content"
+        if ($x.protocol -notin 'http', 'https') { continue }
+
+        # Match the port and host from the right, leaving IPv6 colons in the address.
+        $binding = [regex]::Match([string]$x.bindingInformation, '^(?<address>\S*):(?<port>[0-9]+):(?<hostname>[^:\s]*)$')
+        $address = $binding.Groups['address'].Value
+        $port = 0
+        $ip = $null
+        if (-not $binding.Success -or
+            -not [int]::TryParse($binding.Groups['port'].Value, [ref]$port) -or
+            $port -lt 1 -or $port -gt 65535 -or
+            ($address -notin '', '*' -and -not [ipaddress]::TryParse($address, [ref]$ip))) {
+            Write-Warning "[WARNING] $($s.Name): Could not parse IIS $($x.protocol) binding`n$($x.bindingInformation)"
+            $problem_found = $true
+            continue
+        }
+
+        $allAddresses = $address -in '', '*' -or $ip -in [ipaddress]::Any, [ipaddress]::IPv6Any
+        if ($x.protocol -eq 'http' -and $port -eq 80 -and $allAddresses -and
+            -not $binding.Groups['hostname'].Value -and $sites.Count -gt 1) {
+            $comment = "`nSince multiple sites are hosted, wildcard bindings may expose unintended content"
             Write-Warning "[NOTICE] $($s.Name): site serves plain HTTP with wildcard bindings$comment"
             $problem_found = $true
         }
-        if ($x.protocol -eq 'https' -and ($x.bindingInformation -like '*:443:*') -and -not $x.certificateHash) {
+        if ($x.protocol -eq 'https' -and $port -eq 443 -and -not $x.certificateHash) {
             Write-Warning "[WARNING] $($s.Name): site is configured for HTTPS, but it has no certificate assigned"
             $problem_found = $true
         }
