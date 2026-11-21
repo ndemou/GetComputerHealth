@@ -45,7 +45,7 @@ Uses: Get-DnsServerForwarder, Test-Connection.
     Write-Warning "[PASS] All DNS forwarders are private/internal: $($ips -join ', ')"
   }
 
-  if(-not $bad){ Write-Warning ("[PASS] DNS forwarders are reachable`nForwarders: " + ($ips -join ', ')) }
+  if(-not $bad){ Write-Warning "[PASS] DNS forwarders are reachable`nForwarders: $($ips -join ', ')" }
 }
 
 if ($MyInvocation.InvocationName -ne '.') {

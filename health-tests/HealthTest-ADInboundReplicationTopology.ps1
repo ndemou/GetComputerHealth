@@ -35,11 +35,11 @@ Uses: Get-ADDomainController, Get-ADReplicationPartnerMetadata, Get-ADObject.
     if($metaCount -eq 0 -and $enabledCount -eq 0){
       $anyFail = $true
       $details = "PartnerMetadata=$metaCount; EnabledConnectionObjects=$enabledCount; NTDS=$($dc.NTDSSettingsObjectDN)"
-      Write-Warning ("[FAILURE] No inbound replication detected for $($dc.HostName)" + "`n" + $details)
+      Write-Warning "[FAILURE] No inbound replication detected for $($dc.HostName)`n$details"
       continue
     }
     if($metaCount -eq 0 -and $enabledCount -gt 0){
-      Write-Warning ("[NOTICE] Inbound connection objects exist but partner metadata returned none for {0}. Recheck with: repadmin /showrepl {0}" -f $dc.HostName)
+      Write-Warning "[NOTICE] Inbound connection objects exist but partner metadata returned none for $($dc.HostName). Recheck with: repadmin /showrepl $($dc.HostName)"
     }
     if($metaCount -gt 0 -and $enabledCount -eq 0){
       Write-Warning "[NOTICE] Inbound partners reported by $($dc.HostName) but no enabled nTDSConnection objects under NTDS Settings. Possible permission/cache/KCC timing; investigate ISTG/KCC."

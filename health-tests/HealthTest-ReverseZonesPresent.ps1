@@ -11,7 +11,11 @@ Uses: Get-DnsServerZone.
 #>
   [CmdletBinding()] param([string[]]$ExpectedReverseZones)
   $zones=Get-DnsServerZone | Where-Object {$_.IsReverseLookupZone} | Select-Object -ExpandProperty ZoneName
-  if(-not $ExpectedReverseZones){ Write-Warning ("[PASS] Reverse zones present: " + (($zones -join ', ') -replace '^$','<none>')); return }
+  if(-not $ExpectedReverseZones){
+    $zoneList = $zones -join ', '
+    Write-Warning "[PASS] Reverse zones present: $($zoneList -replace '^$', '<none>')"
+    return
+  }
   $missing=@()
   foreach($z in $ExpectedReverseZones){
     if($zones -notcontains $z){ $missing+=$z; Write-Warning "[FAILURE] Reverse zone missing: $z" }

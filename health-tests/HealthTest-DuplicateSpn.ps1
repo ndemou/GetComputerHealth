@@ -26,7 +26,7 @@ Uses: Get-ADObject.
     $owners = @($map[$spn] | Sort-Object -Unique)
     if($owners.Count -gt 1){
       $dupsFound=$true
-      Write-Warning ("[FAILURE] Duplicate SPN detected`n$spn -> " + ($owners -join ', '))
+      Write-Warning "[FAILURE] Duplicate SPN detected`n$spn -> $($owners -join ', ')"
     }
   }
   if(-not $dupsFound){ Write-Warning "[PASS] No duplicate SPNs detected" }

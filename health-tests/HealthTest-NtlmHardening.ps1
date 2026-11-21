@@ -61,10 +61,7 @@ Uses: None.
       $configurationReference = "Related registry path: '$lsa\LmCompatibilityLevel'."
     }
 
-    Write-Warning (
-      "[NOTICE] NTLM hardening: LAN Manager authentication level is below 5`n" +
-      "$details`n$configurationReference"
-    )
+    Write-Warning "[NOTICE] NTLM hardening: LAN Manager authentication level is below 5`n$details`n$configurationReference"
   } else {
     Write-Warning "[PASS] NTLM is fully hardened`n$details"
   }

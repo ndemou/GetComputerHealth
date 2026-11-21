@@ -174,7 +174,7 @@ Uses: Resolve-DnsName, w32tm.exe, Test-IsLaptopOrMobile.
       # Syncing from myself
       $cleanSource = $currentTimeSource.ToLowerInvariant() -replace '\.$','' # remove trailing dot if any
       if ($cleanSource -match "^$($env:COMPUTERNAME.ToLowerInvariant())(\.|$)") {
-          Write-Warning ("[FAILURE] Misconfiguration: syncing from myself.`n" + ($evidences -join "`r`n"))
+          Write-Warning "[FAILURE] Misconfiguration: syncing from myself.`n$($evidences -join "`r`n")"
       }
       # Confusion: NTP from a DC
       if ($timeSyncType -eq 'NTP' -and $isSourceDC) {

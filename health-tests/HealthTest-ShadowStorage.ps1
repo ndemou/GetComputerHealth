@@ -170,22 +170,24 @@ Uses: None.
     }
 
     if ($missing.Count -eq 0) {
-      Write-Warning ("[PASS] Shadow storage on required volumes`nConfigured on: " + ((@($present.Keys) | Sort-Object) -join ', '))
+      $volumes = $present.Keys | Sort-Object
+      Write-Warning "[PASS] Shadow storage on required volumes`nConfigured on: $($volumes -join ', ')"
     }
   } else {
     if ($present.Count -gt 0) {
-      Write-Warning ("[PASS] Shadow storage configured`nOn: " + ((@($present.Keys) | Sort-Object) -join ', '))
+      $volumes = $present.Keys | Sort-Object
+      Write-Warning "[PASS] Shadow storage configured`nOn: $($volumes -join ', ')"
     } else {
       Write-Warning "[NOTICE] Shadow storage (Volume Shadow Copies) is not enabled`nUsers won't see Previous Version for files/folders. (Note that this issue is UNRELATED to the VSS service that backup software use.)"
     }
   }
 
   if ($outOfRange -and $rangeOutOfBounds.Count -gt 0) {
-    Write-Warning ("[NOTICE] Shadow storage size outside recommended range`n" + ($rangeOutOfBounds -join '; '))
+    Write-Warning "[NOTICE] Shadow storage size outside recommended range`n$($rangeOutOfBounds -join '; ')"
   }
 
   if ($rangeUnknown.Count -gt 0) {
-    Write-Warning ("[info] Shadow storage size could not be determined`n" + ($rangeUnknown -join '; '))
+    Write-Warning "[info] Shadow storage size could not be determined`n$($rangeUnknown -join '; ')"
   }
 }
 

@@ -165,21 +165,13 @@ Uses: repadmin.exe, Get-ADReplicationPartnerMetadata.
     } else {
       $badFails = @($rows | Where-Object { $_.Fails -gt 0 })
       foreach ($b in $badFails) {
-        Write-Warning (
-          "[FAILURE] Replication failures reported for DSA $($b.DSA)" +
-          "`nFails: $($b.Fails) / $($b.Total)" +
-          "`nLargest delta: $($b.DeltaText)" +
-          "`nError percentage: $($b.Percent)%"
-        )
+        $details = "Fails: $($b.Fails) / $($b.Total)`nLargest delta: $($b.DeltaText)`nError percentage: $($b.Percent)%"
+        Write-Warning "[FAILURE] Replication failures reported for DSA $($b.DSA)`n$details"
       }
       $badDeltaFail = @($rows | Where-Object { $null -ne $_.Delta -and $_.Delta -ge $FailLargestDelta })
       foreach ($b in $badDeltaFail) {
-        Write-Warning (
-          "[FAILURE] Replication largest delta too high for DSA $($b.DSA)" +
-          "`nLargest delta: $($b.DeltaText)" +
-          "`nFail threshold: $($FailLargestDelta.ToString())" +
-          "`nFails: $($b.Fails) / $($b.Total)"
-        )
+        $details = "Largest delta: $($b.DeltaText)`nFail threshold: $($FailLargestDelta.ToString())`nFails: $($b.Fails) / $($b.Total)"
+        Write-Warning "[FAILURE] Replication largest delta too high for DSA $($b.DSA)`n$details"
       }
       $badDeltaWarn = @(
         $rows |
@@ -190,13 +182,13 @@ Uses: repadmin.exe, Get-ADReplicationPartnerMetadata.
         }
       )
       foreach ($b in $badDeltaWarn) {
-        Write-Warning (
-          "[WARNING] Replication largest delta elevated for DSA $($b.DSA)" +
-          "`nLargest delta: $($b.DeltaText)" +
-          "`nWarning threshold: $($WarnLargestDelta.ToString())" +
-          "`nFail threshold: $($FailLargestDelta.ToString())" +
-          "`nFails: $($b.Fails) / $($b.Total)"
-        )
+        $details = @(
+          "Largest delta: $($b.DeltaText)"
+          "Warning threshold: $($WarnLargestDelta.ToString())"
+          "Fail threshold: $($FailLargestDelta.ToString())"
+          "Fails: $($b.Fails) / $($b.Total)"
+        ) -join "`n"
+        Write-Warning "[WARNING] Replication largest delta elevated for DSA $($b.DSA)`n$details"
       }
 
       if ($badFails.Count -eq 0 -and $badDeltaFail.Count -eq 0) {
@@ -267,22 +259,13 @@ Uses: repadmin.exe, Get-ADReplicationPartnerMetadata.
     } else {
       $notOk = @($attempts | Where-Object { -not $_.Successful })
       foreach ($a in $notOk) {
-        Write-Warning (
-          "[FAILURE] Replication last attempt was unsuccessful" +
-          "`nDC: $($a.DC)" +
-          "`nNaming context: $($a.NamingCtx)" +
-          "`nNeighbor: $($a.Neighbor)" +
-          "`n$($a.AttemptLine)"
-        )
+        $details = "DC: $($a.DC)`nNaming context: $($a.NamingCtx)`nNeighbor: $($a.Neighbor)`n$($a.AttemptLine)"
+        Write-Warning "[FAILURE] Replication last attempt was unsuccessful`n$details"
       }
 
       if ($notOk.Count -eq 0) {
         $dcCount = (@($attempts | Select-Object -ExpandProperty DC -Unique) | Measure-Object).Count
-        Write-Warning (
-          "[PASS] repadmin /showrepl * found all last attempts successful" +
-          "`nChecked $($attempts.Count) inbound neighbor attempt line(s)" +
-          "`nAcross $dcCount DC(s)"
-        )
+        Write-Warning "[PASS] repadmin /showrepl * found all last attempts successful`nChecked $($attempts.Count) inbound neighbor attempt line(s)`nAcross $dcCount DC(s)"
       }
     }
   }

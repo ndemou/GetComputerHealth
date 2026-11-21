@@ -37,13 +37,8 @@ Uses: Get-SmbServerConfiguration.
       )
     }
 
-    Write-Warning (
-      "[NOTICE] SMB hardening: server signing is not required`n" +
-      "RequireSecuritySignature=$($c.RequireSecuritySignature); " +
-      "EnableSecuritySignature=$($c.EnableSecuritySignature).`n" +
-      "Requiring SMB signing protects traffic integrity and helps prevent session tampering.`n" +
-      $configurationReference
-    )
+    $settings = "RequireSecuritySignature=$($c.RequireSecuritySignature); EnableSecuritySignature=$($c.EnableSecuritySignature)."
+    Write-Warning "[NOTICE] SMB hardening: server signing is not required`n$settings`nRequiring SMB signing protects traffic integrity and helps prevent session tampering.`n$configurationReference"
   }
 }
 

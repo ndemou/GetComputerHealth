@@ -21,7 +21,8 @@ Uses: Get-NetAdapterBinding.
     }
     if(-not $bad){ Write-Warning "[PASS] IPv6 enabled on all adapters" }
   } else {
-    Write-Warning ("[PASS] IPv6 binding state reported`n" + (($rows | ForEach-Object { "$($_.Name)=$($_.Enabled)" }) -join '; '))
+    $states = $rows | ForEach-Object { "$($_.Name)=$($_.Enabled)" }
+    Write-Warning "[PASS] IPv6 binding state reported`n$($states -join '; ')"
   }
 }
 

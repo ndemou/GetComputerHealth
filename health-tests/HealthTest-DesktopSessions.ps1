@@ -838,14 +838,14 @@ Uses: Get-LiveSessionInfo.
             $null -ne $session.MemoryMB -and
             [double]$session.MemoryMB -gt ($availableRamMB * 0.2)) {
             $issueFound = $true
-            Write-Warning ("[WARNING] User $who has a disconnected session materially impacting RAM availability" + $(if ($details) { "`n$details" } else { '' }))
+            Write-Warning "[WARNING] User $who has a disconnected session materially impacting RAM availability`n$details"
         }
 
         if ($session.State -eq 'WTSDisconnected' -and
             $null -ne $session.CPUPercent -and
             [double]$session.CPUPercent -gt 20) {
             $issueFound = $true
-            Write-Warning ("[WARNING] User $who has a disconnected session with considerable CPU usage" + $(if ($details) { "`n$details" } else { '' }))
+            Write-Warning "[WARNING] User $who has a disconnected session with considerable CPU usage`n$details"
         }
 
         $problemType = $null
@@ -862,7 +862,7 @@ Uses: Get-LiveSessionInfo.
         $issueFound = $true
 
         $issueSynopsis = "User $who has a $problemType session for more than $([int]$Threshold.TotalHours) hours"
-        Write-Warning ("[NOTICE] $issueSynopsis" + $(if ($details) { "`n$details" } else { '' }))
+        Write-Warning "[NOTICE] $issueSynopsis`n$details"
     }
 
     if (-not $issueFound) {

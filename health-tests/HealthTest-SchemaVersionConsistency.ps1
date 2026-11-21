@@ -24,7 +24,7 @@ Uses: Get-ADRootDSE, Get-ADDomainController, Get-ADObject.
   }
 
   if($vers.Count -eq 0){
-    Write-Warning ("[FAILURE] AD schema version consistency`nNo schema versions retrieved. Errors: " + ($errs -join ' | '))
+    Write-Warning "[FAILURE] AD schema version consistency`nNo schema versions retrieved. Errors: $($errs -join ' | ')"
     return
   }
 

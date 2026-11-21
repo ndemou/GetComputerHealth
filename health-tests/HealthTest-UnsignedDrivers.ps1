@@ -322,7 +322,7 @@ namespace Toula.HealthTestUnsignedDrivers
   try {
     Ensure-SetupApiInterop
   } catch {
-    Write-Warning ("[WARNING] Could not initialize SetupAPI interop for driver-package signature verification: {0}" -f $_.Exception.Message)
+    Write-Warning "[WARNING] Could not initialize SetupAPI interop for driver-package signature verification: $($_.Exception.Message)"
     return
   }
 
@@ -337,7 +337,7 @@ namespace Toula.HealthTestUnsignedDrivers
       Where-Object { -not [string]::IsNullOrWhiteSpace($_.DeviceName) }
     )
   } catch {
-    Write-Warning ("[WARNING] Could not enumerate PnP signed drivers: {0}" -f $_.Exception.Message)
+    Write-Warning "[WARNING] Could not enumerate PnP signed drivers: $($_.Exception.Message)"
     return
   }
 

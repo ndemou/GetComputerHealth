@@ -66,10 +66,7 @@ Uses: None.
       $commentLines += 'This exposure is more significant on a server or domain controller.'
     }
 
-    Write-Warning (
-      "[NOTICE] RDP is not hardened (NLA and/or TLS certificate binding missing)`n" +
-      ($commentLines -join "`n")
-    )
+    Write-Warning "[NOTICE] RDP is not hardened (NLA and/or TLS certificate binding missing)`n$($commentLines -join "`n")"
   }
 }
 

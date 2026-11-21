@@ -12,7 +12,7 @@ Uses: Get-DnsServerZone.
   $zones = Get-DnsServerZone -ErrorAction Stop | Where-Object { $_.IsDsIntegrated }
   if(-not $zones){ Write-Warning "[PASS] No AD-integrated zones present"; return }
   $lines = ($zones | ForEach-Object { "{0}:{1}" -f $_.ZoneName, $_.ReplicationScope })
-  Write-Warning ("[PASS] DNS zone replication scope reviewed`n" + ($lines -join '; '))
+  Write-Warning "[PASS] DNS zone replication scope reviewed`n$($lines -join '; ')"
 }
 
 if ($MyInvocation.InvocationName -ne '.') {

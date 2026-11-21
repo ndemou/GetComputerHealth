@@ -68,11 +68,11 @@ Uses: w32tm.exe.
 
   if ($abs -ge $FailOffsetSeconds) {
     $details = "$offsetSec s exceeds $FailOffsetSeconds s (2-samples)"
-    Write-Warning ("[FAILURE] Time offset too high" + "`n" + $details)
+    Write-Warning "[FAILURE] Time offset too high`n$details"
     $ok = $false
   } elseif ($abs -ge $WarnOffsetSeconds) {
     $details = "$offsetSec s exceeds $WarnOffsetSeconds s (2-samples)"
-    Write-Warning ("[WARNING] Time offset rather high" + "`n" + $details)
+    Write-Warning "[WARNING] Time offset rather high`n$details"
     $ok = $false
   }
 

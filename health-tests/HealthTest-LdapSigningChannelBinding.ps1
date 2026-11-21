@@ -48,10 +48,7 @@ Uses: None.
             )
         }
 
-        Write-Warning (
-            "[NOTICE] LDAP hardening: signing and/or channel binding is not enforced`n" +
-            ($commentLines -join "`n")
-        )
+        Write-Warning "[NOTICE] LDAP hardening: signing and/or channel binding is not enforced`n$($commentLines -join "`n")"
     }
 }
 

@@ -32,7 +32,7 @@ Uses: None.
   }
 
   if(-not $entries){
-    Write-Warning ("[FAILURE] No pagefile detected`nAutomaticManagedPagefile=" + [int]$auto)
+    Write-Warning "[FAILURE] No pagefile detected`nAutomaticManagedPagefile=$([int]$auto)"
     return
   }
 

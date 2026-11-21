@@ -105,14 +105,13 @@ Transient tasks: A task is treated as transient when it has exactly one enabled 
 
       if ($transientAnalysis.HasUnrecognizedDeleteExpiredTaskAfter) {
         $unrecognizedValue = $transientAnalysis.DeleteExpiredTaskAfterText
-        Write-Warning (
-          "[WARNING] Transient scheduled task has an unrecognized DeleteExpiredTaskAfter value: " +
-          "$($fact.StableKey)`n" +
-          "DeleteExpiredTaskAfter: '$unrecognizedValue'.`n" +
-          "The task otherwise matches the transient-task criteria and was treated as transient. " +
-          "Confirm that this value means the task will be deleted shortly after expiration.`n" +
+        $message = @(
+          "[WARNING] Transient scheduled task has an unrecognized DeleteExpiredTaskAfter value: $($fact.StableKey)"
+          "DeleteExpiredTaskAfter: '$unrecognizedValue'."
+          'The task otherwise matches the transient-task criteria and was treated as transient. Confirm that this value means the task will be deleted shortly after expiration.'
           $details
-        )
+        ) -join "`n"
+        Write-Warning $message
       }
 
       continue

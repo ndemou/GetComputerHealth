@@ -72,23 +72,23 @@ from the AD DNS name.
         # 3a) Registration flags must both be True
         if ($n.RegisterThisConnectionsAddress -and $n.UseSuffixWhenRegistering) {
             $details = "RegisterThisConnectionsAddress=True, UseSuffixWhenRegistering=True"
-            Write-Warning ("[PASS] NIC '$nicName' DNS registration" + "`n" + $details)
+            Write-Warning "[PASS] NIC '$nicName' DNS registration`n$details"
         } else {
             $details = "RegisterThisConnectionsAddress=$($n.RegisterThisConnectionsAddress), UseSuffixWhenRegistering=$($n.UseSuffixWhenRegistering)`nEnable both flags on important interfaces."
-            Write-Warning ("[FAILURE] NIC '$nicName' DNS registration" + "`n" + $details)
+            Write-Warning "[FAILURE] NIC '$nicName' DNS registration`n$details"
         }
 
         # 3b) Connection-specific suffix: must be Empty OR exactly the domain
         $css = $n.ConnectionSpecificSuffix
         if ([string]::IsNullOrWhiteSpace($css)) {
             $details = "Empty"
-            Write-Warning ("[PASS] NIC '$nicName' Conn.-specific suffix" + "`n" + $details)
+            Write-Warning "[PASS] NIC '$nicName' Conn.-specific suffix`n$details"
         } elseif ($css -ieq $DomainName) {
             $details = "Equals $DomainName"
-            Write-Warning ("[PASS] NIC '$nicName' Conn.-specific suffix" + "`n" + $details)
+            Write-Warning "[PASS] NIC '$nicName' Conn.-specific suffix`n$details"
         } else {
             $details = "Set to '$css'`nLeave blank for single-domain setups unless a specific suffix is required."
-            Write-Warning ("[FAILURE] NIC '$nicName' Conn.-specific suffix" + "`n" + $details)
+            Write-Warning "[FAILURE] NIC '$nicName' Conn.-specific suffix`n$details"
         }
     }
 }

@@ -45,10 +45,7 @@ Uses: None.
       $commentLines += "Related registry path: '$p\EveryoneIncludesAnonymous'."
     }
 
-    Write-Warning (
-      "[FAILURE] Anonymous access hardening not at baseline`n" +
-      ($commentLines -join "`n")
-    )
+    Write-Warning "[FAILURE] Anonymous access hardening not at baseline`n$($commentLines -join "`n")"
   }
 }
 

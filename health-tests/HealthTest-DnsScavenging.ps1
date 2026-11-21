@@ -21,13 +21,13 @@ Uses: Get-DnsServerScavenging, Get-DnsServerZone, Get-DnsServerZoneAging.
     if(-not ($ai -and $ai.AgingEnabled)){ 
         $flagged=$true
         $details = "zone: $($z.ZoneName) `nNote that scavenging must be enabled both at the server level and at the zone`n$comment"
-        Write-Warning ("[WARNING] DNS zone aging is disabled" + "`n" + $details)
+        Write-Warning "[WARNING] DNS zone aging is disabled`n$details"
     }
   }
 
   if(-not $flagged){
     $on=@($zones | ForEach-Object { $_.ZoneName })
-    Write-Warning ("[PASS] DNS scavenging configured on server and zones`nZones: " + ($on -join ', '))
+    Write-Warning "[PASS] DNS scavenging configured on server and zones`nZones: $($on -join ', ')"
   }
 }
 

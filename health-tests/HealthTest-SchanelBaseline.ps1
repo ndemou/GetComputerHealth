@@ -23,11 +23,8 @@ are detailed WARNING findings with raw values, registry types, and recommended a
         $operatingSystem = Get-TlsOperatingSystemInfo
     }
     catch {
-        Write-Warning (
-            "[FAILURE] Schannel operating system detection failed`n" +
-            "The test cannot interpret absent protocol values without the Windows version and product type.`n" +
-            "Error: $($_.Exception.Message)"
-        )
+        $details = 'The test cannot interpret absent protocol values without the Windows version and product type.'
+        Write-Warning "[FAILURE] Schannel operating system detection failed`n$details`nError: $($_.Exception.Message)"
         return
     }
 
@@ -42,11 +39,8 @@ are detailed WARNING findings with raw values, registry types, and recommended a
             }
             catch {
                 $findingCount++
-                Write-Warning (
-                    "[FAILURE] TLS protocol inspection failed: Protocol='$protocol'; Role='$role'`n" +
-                    "Registry path: 'HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols\$protocol\$role'.`n" +
-                    "Error: $($_.Exception.Message)"
-                )
+                $registryPath = "HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols\$protocol\$role"
+                Write-Warning "[FAILURE] TLS protocol inspection failed: Protocol='$protocol'; Role='$role'`nRegistry path: '$registryPath'.`nError: $($_.Exception.Message)"
                 continue
             }
 
@@ -95,11 +89,7 @@ are detailed WARNING findings with raw values, registry types, and recommended a
                     )
                 }
 
-                Write-Warning (
-                    "[NOTICE] SCHANNEL hardening: $title`n" +
-                    "$explanation`n" +
-                    "Related Registry path: $($configuration.Path)"
-                )
+                Write-Warning "[NOTICE] SCHANNEL hardening: $title`n$explanation`nRelated Registry path: $($configuration.Path)"
                 continue
             }
 
@@ -171,18 +161,12 @@ are detailed WARNING findings with raw values, registry types, and recommended a
                 'and outbound application connections.'
             )
 
-            Write-Warning (
-                "[WARNING] SCHANNEL hardening: protocol posture issue: Protocol='$protocol'; Role='$role'`n" +
-                ($commentLines -join "`n")
-            )
+            Write-Warning "[WARNING] SCHANNEL hardening: protocol posture issue: Protocol='$protocol'; Role='$role'`n$($commentLines -join "`n")"
         }
     }
 
     if ($findingCount -eq 0) {
-        Write-Warning (
-            '[PASS] Schannel protocol posture matches the baseline for Client and Server roles ' +
-            "on $($operatingSystem.Caption) $($operatingSystem.Version)"
-        )
+        Write-Warning "[PASS] Schannel protocol posture matches the baseline for Client and Server roles on $($operatingSystem.Caption) $($operatingSystem.Version)"
     }
 }
 

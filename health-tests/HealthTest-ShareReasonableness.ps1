@@ -108,9 +108,9 @@ Uses: Get-SmbShare, Get-SmbShareAccess, Get-Acl.
         $ntfsPrincipalsText = if($ntfsPrincipals){ $ntfsPrincipals -join ', ' } else { '<none>' }
         $effectivePrincipalsText = if($effectivePrincipals){ $effectivePrincipals -join ', ' } else { '<none>' }
         Write-Warning "[info] Accounts for share '$($s.Name)' (Path: $path)"
-        Write-Warning ("[info]     Share-level : {0}" -f $sharePrincipalsText)
-        Write-Warning ("[info]     NTFS-level  : {0}" -f $ntfsPrincipalsText)
-        Write-Warning ("[info]     Effective(*) : {0}" -f $effectivePrincipalsText)
+        Write-Warning "[info]     Share-level : $sharePrincipalsText"
+        Write-Warning "[info]     NTFS-level  : $ntfsPrincipalsText"
+        Write-Warning "[info]     Effective(*) : $effectivePrincipalsText"
         Write-Warning "[info]     (*) Effective here means present on both lists; this is a coarse check without group nesting resolution."
     }
 
@@ -142,12 +142,12 @@ Uses: Get-SmbShare, Get-SmbShareAccess, Get-Acl.
     }
 
     if($report.Count -eq 0){
-      Write-Warning ("[PASS] Share '{0}' has no broad-principal read or write access; ABE={1}; EncryptData={2}" -f $s.Name,$s.FolderEnumerationMode,$s.EncryptData)
+      Write-Warning "[PASS] Share '$($s.Name)' has no broad-principal read or write access; ABE=$($s.FolderEnumerationMode); EncryptData=$($s.EncryptData)"
     } else {
       foreach($r in $report){
         if($r.Effective -eq 'Full' -or $r.Effective -eq 'Write'){
           $details = "Restrict to specific groups; ensure share grants Read or None to broad principals and tighten NTFS. Path: $($r.Path)"
-          Write-Warning ("[FAILURE] '$($r.Principal)' can write share '$($r.Share)'('$($r.Path)')" + "`n" + $details)
+          Write-Warning "[FAILURE] '$($r.Principal)' can write share '$($r.Share)'('$($r.Path)')`n$details"
           $riskFound = $true
         } elseif($r.Effective -eq 'Read') {
             if ($r.Share -ne 'SYSVOL'){
@@ -155,7 +155,7 @@ Uses: Get-SmbShare, Get-SmbShareAccess, Get-Acl.
                 $riskFound = $true
             }
         } else {
-          Write-Warning ("[PASS] No effective access for {0} on '{1}' (blocked by layer intersection)" -f $r.Principal,$r.Share)
+          Write-Warning "[PASS] No effective access for $($r.Principal) on '$($r.Share)' (blocked by layer intersection)"
         }
       }
       # Log-Info ("ABE={0}; EncryptData={1}; Caching={2}" -f $s.FolderEnumerationMode,$s.EncryptData,$s.CachingMode)
@@ -191,10 +191,7 @@ Uses: Get-SmbShare, Get-SmbShareAccess, Get-Acl.
       )
     }
 
-    Write-Warning (
-      "[FAILURE] Null session shares configured: $($nullShares -join ', ')`n" +
-      "Remove these entries unless a documented legacy requirement exists.`n$configurationReference"
-    )
+    Write-Warning "[FAILURE] Null session shares configured: $($nullShares -join ', ')`nRemove these entries unless a documented legacy requirement exists.`n$configurationReference"
     $riskFound = $true
   }
 
@@ -233,12 +230,8 @@ Uses: Get-SmbShare, Get-SmbShareAccess, Get-Acl.
       )
     }
 
-    Write-Warning (
-      "[NOTICE] Null session pipes (Named Pipes that can be accessed anonymously) found: $($nullPipes -join ', ')`n" +
-      'Anonymous users are allowed to open these named pipes. They increase attack surface when other anonymous ' +
-      "access policies are loose. Keep the list empty unless legacy trusts or applications require it.`n" +
-      $configurationReference
-    )
+    $guidance = 'Anonymous users are allowed to open these named pipes. They increase attack surface when other anonymous access policies are loose. Keep the list empty unless legacy trusts or applications require it.'
+    Write-Warning "[NOTICE] Null session pipes (Named Pipes that can be accessed anonymously) found: $($nullPipes -join ', ')`n$guidance`n$configurationReference"
     $riskFound = $true
   }
 

@@ -32,12 +32,8 @@ Uses: Get-WindowsOptionalFeature.
   if ($state -in @('Disabled', 'DisabledWithPayloadRemoved')) {
     Write-Warning "[PASS] SMBv1 is disabled"
   } elseif ($state -eq 'Enabled') {
-    Write-Warning (
-      "[WARNING] SMBv1 is enabled`n" +
-      "State=$state.`n" +
-      "Recommended configuration: Remove the Windows optional feature 'SMB1Protocol' after confirming that no " +
-      'legacy client or application requires it.'
-    )
+    $recommendation = "Remove the Windows optional feature 'SMB1Protocol' after confirming that no legacy client or application requires it."
+    Write-Warning "[WARNING] SMBv1 is enabled`nState=$state.`nRecommended configuration: $recommendation"
   } else {
     Write-Warning "[WARNING] SMBv1 feature state is inconclusive`nState=$state."
   }

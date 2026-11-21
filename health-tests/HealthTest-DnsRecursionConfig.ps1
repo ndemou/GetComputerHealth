@@ -54,8 +54,7 @@ Uses: Get-DnsServerRecursion, Get-DnsServerCache, Get-DnsServerEDns.
     if ($ecsEnabled -ne $null) { $ecsText = [string]$ecsEnabled } else { $ecsText = 'n/a' }
 
     if ($rec -or $cache -or $edns) {
-        Write-Warning (("[PASS] No issues found in the DNS recursion configuration`nEnableRecursion={0}; MaxTTL={1}; EDNS-ECS={2}" `
-                    -f $recText, $ttlText, $ecsText))
+        Write-Warning "[PASS] No issues found in the DNS recursion configuration`nEnableRecursion=$recText; MaxTTL=$ttlText; EDNS-ECS=$ecsText"
     } else {
         Write-Warning "[NOTICE] Unable to read DNS recursion configuration on this host`nHost is probably not a DNS server"
     }
