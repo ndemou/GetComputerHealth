@@ -1,3 +1,7 @@
+enum Smb1OptionalFeatureStateFixture {
+    Disabled = 0
+}
+
 Describe 'HealthTest-Smb1Disabled' {
     BeforeAll {
         . "$PSScriptRoot\..\..\health-tests\HealthTest-Smb1Disabled.ps1"
@@ -34,9 +38,19 @@ Describe 'HealthTest-Smb1Disabled' {
         $warnings[0].Message | Should -Match ([regex]::Escape($Message))
     }
 
+    It 'accepts the zero-valued Disabled enum returned by DISM' {
+        $script:feature = [pscustomobject]@{ State = [Smb1OptionalFeatureStateFixture]::Disabled }
+
+        $warnings = @(HealthTest-Smb1Disabled 3>&1)
+
+        $warnings | Should -HaveCount 1
+        $warnings[0].Message | Should -Be '[PASS] SMBv1 is disabled'
+    }
+
     It 'warns for <Case>' -ForEach @(
         @{ Case = 'no feature'; Feature = $null }
         @{ Case = 'missing State'; Feature = [pscustomobject]@{ FeatureName = 'SMB1Protocol' } }
+        @{ Case = 'null State'; Feature = [pscustomobject]@{ State = $null } }
         @{ Case = 'empty State'; Feature = [pscustomobject]@{ State = '' } }
     ) {
         $script:feature = $Feature

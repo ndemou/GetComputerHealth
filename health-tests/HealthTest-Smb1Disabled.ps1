@@ -21,12 +21,14 @@ Uses: Get-WindowsOptionalFeature.
     return
   }
 
-  if (-not $feature -or -not $feature.PSObject.Properties['State'] -or -not $feature.State) {
+  $state = if ($null -ne $feature -and $null -ne $feature.PSObject.Properties['State']) {
+    [string]$feature.State
+  }
+  if ([string]::IsNullOrWhiteSpace($state)) {
     Write-Warning "[WARNING] SMBv1 feature state is unavailable"
     return
   }
 
-  $state = $feature.State
   if ($state -in @('Disabled', 'DisabledWithPayloadRemoved')) {
     Write-Warning "[PASS] SMBv1 is disabled"
   } elseif ($state -eq 'Enabled') {
