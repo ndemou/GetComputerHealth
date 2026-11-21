@@ -26,8 +26,8 @@ Uses: None.
     if ($r.state -in 1,2,3) {
       Write-Warning "[WARNING] DFSR replication for '$($r.ReplicatedFolderName)' is at state $($r.state) ($name) instead of 4 (Normal)"
     } else {
-      Write-Warning "[FAILURE] DFSR replication for '$($r.ReplicatedFolderName)' is at state $($r.state) ($name) instead of 4 (Normal)" `
-        -comment ("Group: {0}. States: 0 Uninitialized, 1 Initialized, 2 Initial_Sync, 3 Auto_Recovery, 4 Normal, 5 Error." -f $r.ReplicationGroupName)
+      $details = "Group: $($r.ReplicationGroupName). States: 0 Uninitialized, 1 Initialized, 2 Initial_Sync, 3 Auto_Recovery, 4 Normal, 5 Error."
+      Write-Warning "[FAILURE] DFSR replication for '$($r.ReplicatedFolderName)' is at state $($r.state) ($name) instead of 4 (Normal)`n$details"
     }
   }
 
