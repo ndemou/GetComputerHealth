@@ -14,18 +14,30 @@ Uses: Get-WindowsOptionalFeature.
     return
   }
 
-  $f=Get-WindowsOptionalFeature -Online -FeatureName SMB1Protocol -ErrorAction SilentlyContinue
-  $state=$f.State
-  $disabled=($state -eq 'Disabled' -or -not $f -or $state -eq 'DisabledWithPayloadRemoved')
-  if($disabled){
+  try {
+    $feature = Get-WindowsOptionalFeature -Online -FeatureName SMB1Protocol -ErrorAction Stop
+  } catch {
+    Write-Warning "[WARNING] Could not read SMBv1 feature state`n$($_.Exception.Message)"
+    return
+  }
+
+  if (-not $feature -or -not $feature.PSObject.Properties['State'] -or -not $feature.State) {
+    Write-Warning "[WARNING] SMBv1 feature state is unavailable"
+    return
+  }
+
+  $state = $feature.State
+  if ($state -in @('Disabled', 'DisabledWithPayloadRemoved')) {
     Write-Warning "[PASS] SMBv1 is disabled"
-  } else {
+  } elseif ($state -eq 'Enabled') {
     Write-Warning (
       "[WARNING] SMBv1 is enabled`n" +
       "State=$state.`n" +
       "Recommended configuration: Remove the Windows optional feature 'SMB1Protocol' after confirming that no " +
       'legacy client or application requires it.'
     )
+  } else {
+    Write-Warning "[WARNING] SMBv1 feature state is inconclusive`nState=$state."
   }
 }
 
