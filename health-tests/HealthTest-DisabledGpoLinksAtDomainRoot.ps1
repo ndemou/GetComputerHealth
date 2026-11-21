@@ -46,12 +46,13 @@ Uses: Get-GPO, Get-ADDomain.
     }catch{
       $parseFailures++
       $msg=($_.Exception.Message -replace '\s+',' ').Trim()
-      Write-Warning "[WARNING] Failed to parse GPO report; skipping GPO: $($g.DisplayName) ($($g.Id)) - $msg"
+      Write-Warning "[WARNING] Failed to parse GPO report; skipping GPO: $($g.DisplayName) ($($g.Id))`nError: $msg"
     }
   }
 
   if($parseFailures -gt 0){
-    Write-Warning "[WARNING] One or more GPO reports could not be read/parsed ($parseFailures). Results may be incomplete."}
+    Write-Warning "[WARNING] One or more GPO reports could not be read/parsed. Results may be incomplete.`nFailed reports: $parseFailures."
+  }
 
   if(-not $links){
     Write-Warning "[PASS] No GPO links found at the domain root ($root)."; return

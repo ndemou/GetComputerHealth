@@ -15,7 +15,11 @@ Uses: Get-DhcpServerDnsCredential, Get-ADUser.
   $u=Get-ADUser -Identity $cred.UserName -Properties Enabled,pwdLastSet
   $age=[int]((Get-Date) - [DateTime]::FromFileTime($u.pwdLastSet)).TotalDays
   if(-not $u.Enabled){ Write-Warning "[FAILURE] DHCP DNS credential account is disabled: $($cred.UserName)"; return }
-  if($age -gt $MaxPwdAgeDays){ Write-Warning "[FAILURE] DHCP DNS credential password age too high ($age days > $MaxPwdAgeDays): $($cred.UserName)" } else { Write-Warning "[PASS] DHCP DNS credential healthy (Enabled, pwd age $age days <= $MaxPwdAgeDays)" }
+  if($age -gt $MaxPwdAgeDays){
+    Write-Warning "[FAILURE] DHCP DNS credential password is older than $MaxPwdAgeDays days: $($cred.UserName)`nPassword age: $age days."
+  } else {
+    Write-Warning "[PASS] DHCP DNS credential healthy (Enabled, pwd age $age days <= $MaxPwdAgeDays)"
+  }
 }
 
 if ($MyInvocation.InvocationName -ne '.') {

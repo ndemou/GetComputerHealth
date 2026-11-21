@@ -19,7 +19,7 @@ Uses: Get-GPO.
       $uGpt=$gptVer -shr 16; $cGpt=$gptVer -band 0xFFFF
       if($uGpt -ne $g.User.DSVersion -or $cGpt -ne $g.Computer.DSVersion){
         $bad=$true
-        Write-Warning "[FAILURE] GPO GPT/AD version mismatch: '$($g.DisplayName)' User AD=$($g.User.DSVersion) GPT=$uGpt; Computer AD=$($g.Computer.DSVersion) GPT=$cGpt"
+        Write-Warning "[FAILURE] GPO GPT/AD version mismatch: '$($g.DisplayName)' ($($g.Id))`nUser AD=$($g.User.DSVersion) GPT=$uGpt; Computer AD=$($g.Computer.DSVersion) GPT=$cGpt"
       }
     }
   if(-not $bad){ Write-Warning "[PASS] All GPOs have matching GPT/GPC versions" }

@@ -508,6 +508,20 @@ Describe 'HealthTest-ScheduledTasks' {
     @($script:warnings | Where-Object { $_ -match 'Scheduled task appears stale' }).Count | Should -Be 1
   }
 
+  It 'keeps a stable stale-task message when the last run was <DaysAgo> days ago' -ForEach @(
+    @{ DaysAgo = 60 }, @{ DaysAgo = 90 }
+  ) {
+    $lastRun = (Get-Date).AddDays(-$DaysAgo)
+    $script:TestScheduledTaskFacts = @(New-TestScheduledTaskFact -HasEnabledTrigger $true -LastRunTime $lastRun)
+
+    HealthTest-ScheduledTasks -StaleDays 30
+
+    $script:warnings | Should -HaveCount 1
+    $lines = $script:warnings[0] -split '\r?\n'
+    $lines[0] | Should -Be '[NOTICE] Scheduled task appears stale: \Vendor\Task'
+    $lines | Should -Contain "LastRun=$($lastRun.ToString('yyyy-MM-dd')) (> 30 days or never)."
+  }
+
   Context 'stale checks before the first scheduled execution' {
     BeforeEach {
       Mock Get-Date { ([datetimeoffset]'2026-10-23T03:00:00Z').UtcDateTime }
@@ -722,15 +736,32 @@ Describe 'HealthTest-ScheduledTasks' {
     @($script:warnings | Where-Object { $_ -match 'Scheduled task appears stale' }).Count | Should -Be 1
   }
 
-  It 'does not emit PASS when task-info collection failed' {
+  It 'reports task-info failure with the error code and text in the details' {
     $script:TestScheduledTaskFacts = @(
       New-TestScheduledTaskFact -InfoQueryFailed $true -InfoErrorKind 'QueryFailure' -InfoErrorHexCode '0x80004005' -InfoErrorMessage 'boom'
     )
 
     HealthTest-ScheduledTasks -StaleDays 0
 
-    @($script:warnings | Where-Object { $_ -match '^\[FAILURE\] Task' }).Count | Should -Be 1
-    @($script:warnings | Where-Object { $_ -match '^\[PASS\]' }).Count | Should -Be 0
+    $script:warnings | Should -HaveCount 1
+    $lines = $script:warnings[0] -split '\r?\n'
+    $lines[0] | Should -Be "[FAILURE] Task '\Vendor\Task' failed Get-ScheduledTaskInfo."
+    $lines | Should -Contain 'Error: 0x80004005 (boom).'
+  }
+
+  It 'reports XML query failure with the error code and text in the details' {
+    $fact = New-TestScheduledTaskFact
+    $fact.XmlQueryFailed = $true
+    $fact.XmlErrorHexCode = '0x80070005'
+    $fact.XmlErrorMessage = 'Access denied'
+    $script:TestScheduledTaskFacts = @($fact)
+
+    HealthTest-ScheduledTasks -StaleDays 0
+
+    $script:warnings | Should -HaveCount 1
+    $lines = $script:warnings[0] -split '\r?\n'
+    $lines[0] | Should -Be "[WARNING] Task XML for '\Vendor\Task' could not be read."
+    $lines | Should -Contain 'Error: 0x80070005 (Access denied).'
   }
 }
 

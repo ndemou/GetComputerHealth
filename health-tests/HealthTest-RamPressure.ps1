@@ -353,7 +353,10 @@ Uses: Get-Counter, Get-TopRamProcess.
   $vals = @()
   for ($i=0; $i -lt $Samples; $i++) {
     $v = Get-AvailMB
-    if ($null -eq $v) { Write-Warning "[WARNING] Skipped a failed \\Memory\\Available MBytes read (sample $($i+1)/$Samples)."; continue }
+    if ($null -eq $v) {
+      Write-Warning "[WARNING] Skipped a failed \\Memory\\Available MBytes read.`nFailed sample: $($i+1)/$Samples."
+      continue
+    }
     $vals += $v
     if (($i+1) -lt $Samples -and $SampleDelayMs) { Write-Verbose "waiting $SampleDelayMs ms"; Start-Sleep -Milliseconds $SampleDelayMs }
   }

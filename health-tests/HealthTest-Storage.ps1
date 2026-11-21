@@ -44,7 +44,7 @@ Uses: Get-PhysicalDisk, Get-StorageReliabilityCounter.
             if ($c) {
                 if ($c.PSObject.Properties.Name -contains 'Temperature') {
                     if ([double]$c.Temperature -gt $MaxTemperatureC) {
-                        Write-Warning ("[FAILURE] Temperature({0}) exceeds max for disk '{1}'" -f $c.Temperature,$d.FriendlyName)
+                        Write-Warning "[FAILURE] Disk temperature exceeds $MaxTemperatureC C: '$($d.FriendlyName)'`nCurrent temperature: $($c.Temperature) C."
                         $allHealthy = $false
                     }
                 }

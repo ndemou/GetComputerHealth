@@ -78,7 +78,7 @@ in the future. Uncertain or more complex schedules retain the stale check.
   try {
     $facts = @(Get-ScheduledTaskFacts)
   } catch {
-    Write-Warning "[FAILURE] Failed to collect scheduled task facts: $($_.Exception.Message)"
+    Write-Warning "[FAILURE] Failed to collect scheduled task facts`nError: $($_.Exception.Message)"
     return
   }
 
@@ -99,7 +99,7 @@ in the future. Uncertain or more complex schedules retain the stale check.
         Write-Warning "[WARNING] Task XML for '$($fact.StableKey)' is corrupted.`n$(Format-ScheduledTaskFactDetails -Fact $fact)"
       }
       else {
-        Write-Warning "[FAILURE] Task '$($fact.StableKey)' failed Get-ScheduledTaskInfo with $($fact.InfoErrorHexCode) ($($fact.InfoErrorMessage)).`n$(Format-ScheduledTaskFactDetails -Fact $fact)"
+        Write-Warning "[FAILURE] Task '$($fact.StableKey)' failed Get-ScheduledTaskInfo.`nError: $($fact.InfoErrorHexCode) ($($fact.InfoErrorMessage)).`n$(Format-ScheduledTaskFactDetails -Fact $fact)"
       }
       continue
     }
@@ -107,7 +107,7 @@ in the future. Uncertain or more complex schedules retain the stale check.
     if ($fact.XmlQueryFailed) {
       $hadIssue = $true
       $level = Get-ScheduledTaskOperationalSeverity -Fact $fact -IssueType 'CorruptXml' -Required:$isRequired
-      Write-Warning "[$level] Task XML for '$($fact.StableKey)' could not be read: $($fact.XmlErrorHexCode) ($($fact.XmlErrorMessage)).`n$(Format-ScheduledTaskFactDetails -Fact $fact)"
+      Write-Warning "[$level] Task XML for '$($fact.StableKey)' could not be read.`nError: $($fact.XmlErrorHexCode) ($($fact.XmlErrorMessage)).`n$(Format-ScheduledTaskFactDetails -Fact $fact)"
       continue
     }
 
@@ -213,7 +213,7 @@ in the future. Uncertain or more complex schedules retain the stale check.
       if ($isStale -and -not $awaitingFirstRun) {
         $hadIssue = $true
         $level = Get-ScheduledTaskOperationalSeverity -Fact $fact -IssueType 'Stale' -Required:$isRequired
-        Write-Warning "[$level] Scheduled task appears stale: $($fact.StableKey) LastRun=$lastRunText (> $StaleDays days or never).`n$(Format-ScheduledTaskFactDetails -Fact $fact)"
+        Write-Warning "[$level] Scheduled task appears stale: $($fact.StableKey)`nLastRun=$lastRunText (> $StaleDays days or never).`n$(Format-ScheduledTaskFactDetails -Fact $fact)"
       }
     }
   }

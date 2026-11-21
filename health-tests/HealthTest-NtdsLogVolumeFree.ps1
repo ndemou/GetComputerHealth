@@ -18,12 +18,7 @@ Uses: None.
   if($freeGB -ge $MinFreeGB){
     Write-Warning "[PASS] NTDS log volume free space OK ($freeGB GB >= $MinFreeGB GB)"
   } else {
-    Write-Warning (
-      "[FAILURE] " +
-      "NTDS log volume low free space ($freeGB GB < $MinFreeGB GB)" +
-      "`n" +
-      "Log path: $logPath"
-    )
+    Write-Warning "[FAILURE] NTDS log volume has less than $MinFreeGB GB free: $drive`nFree space: $freeGB GB.`nLog path: $logPath"
   }
 }
 

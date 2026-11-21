@@ -16,7 +16,11 @@ Uses: Get-Volume, fsutil.exe.
       $out = (& fsutil dirty query $d.DriveLetter`: 2>$null)
       if ($out -and ($out -match 'is dirty')) { $dirty += $d.DriveLetter }
     }
-    if ($dirty.Count -gt 0) { Write-Warning "[WARNING] NTFS dirty bit set on: $($dirty -join ', ')"; return }
+    if ($dirty.Count -gt 0) {
+      $driveLetters = ($dirty | Sort-Object) -join ', '
+      Write-Warning "[WARNING] NTFS dirty bit set on: $driveLetters"
+      return
+    }
     Write-Warning "[PASS] No NTFS dirty volumes"
 }
 

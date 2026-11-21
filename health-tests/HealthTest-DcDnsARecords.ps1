@@ -9,15 +9,23 @@ Category: Configuration Hygiene & Best Practices
 Impact: Medium(Network)
 Uses: Get-ADDomainController, Resolve-DnsName.
 #>
-  $bad=@()
+  $bad=$false
   foreach($dc in (Get-ADDomainController -Filter *)){
     $hn=$dc.HostName; $ip=$dc.IPv4Address
     if(-not $hn -or -not $ip){ continue }
     $ares=(Resolve-DnsName -Name $hn -Type A -ErrorAction SilentlyContinue).IPAddress
-    if(-not $ares){ $msg="$hn has no A records in DNS"; $bad+=$msg; Write-Warning "[FAILURE] $msg"; continue }
-    if($ares -notcontains $ip){ $msg="$hn A record mismatch: AD IP=$ip, DNS IPs="+($ares -join ','); $bad+=$msg; Write-Warning "[FAILURE] $msg" }
+    if(-not $ares){
+      $bad = $true
+      Write-Warning "[FAILURE] $hn has no A records in DNS"
+      continue
+    }
+    if($ares -notcontains $ip){
+      $bad = $true
+      $dnsIps = ($ares | Sort-Object) -join ','
+      Write-Warning "[FAILURE] $hn A record mismatch: AD IP=$ip, DNS IPs=$dnsIps"
+    }
   }
-  if($bad.Count -eq 0){ Write-Warning "[PASS] DC DNS A records match AD IPs for all DCs" }
+  if(-not $bad){ Write-Warning "[PASS] DC DNS A records match AD IPs for all DCs" }
 }
 
 if ($MyInvocation.InvocationName -ne '.') {
