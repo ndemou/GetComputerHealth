@@ -1,9 +1,9 @@
-# HostRequirement: DnsServer
+# HostRequirement: DC
 
 function HealthTest-DcDnsRegistration {
 <#
 Description: Checks whether this domain controller has registered its expected DNS records.
-AppliesTo: Server
+AppliesTo: DC
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Network)
@@ -11,6 +11,18 @@ Uses: Resolve-DnsName.
 #>
     [CmdletBinding()]
     param()
+
+    try {
+        $role = (Get-CimInstance -ClassName Win32_ComputerSystem -ErrorAction Stop).DomainRole
+        if ($role -notin (0..5)) { throw 'Win32_ComputerSystem returned no valid DomainRole.' }
+    } catch {
+        Write-Warning "[WARNING] Could not determine whether this computer is a domain controller`n$($_.Exception.Message)"
+        return
+    }
+    if ($role -notin 4, 5) {
+        Write-Warning '[INFO] DC DNS registration check applies only to domain controllers'
+        return
+    }
 
     $domain = $env:USERDNSDOMAIN
     $dcFqdn = "$($env:COMPUTERNAME).$domain"
