@@ -174,3 +174,89 @@ Describe 'HealthTest-SeriousRecentEventLogs' {
     @($script:warnings | Where-Object { $_ -match '^\[info\] Recent minidump file\(s\) found' }).Count | Should -Be 1
   }
 }
+
+Describe 'HealthTest-SeriousRecentEventLogs inspection completeness' {
+  BeforeAll {
+    . "$PSScriptRoot\..\..\health-tests\HealthTest-SeriousRecentEventLogs.ps1"
+
+    function Get-WinEvent {
+      [CmdletBinding()]
+      param([hashtable]$FilterHashtable)
+
+      if ($script:event -and $FilterHashtable.Id -eq 41) {
+        $script:event
+      }
+      if ($script:failureMode -eq 'total') {
+        throw 'Event log service unavailable'
+      }
+      if ($script:failureMode -eq 'partial' -and $FilterHashtable.LogName -eq 'Application') {
+        throw 'Access denied to the application log'
+      }
+      if ($script:failureMode -eq 'after-event' -and $FilterHashtable.Id -eq 41) {
+        Write-Error -ErrorId 'ReadFailed' -Message 'Event enumeration interrupted'
+      }
+      Write-Error -ErrorId 'NoMatchingEventsFound' -Message 'No events'
+    }
+  }
+
+  BeforeEach {
+    $script:event = $null
+    $script:failureMode = $null
+    Mock Get-ChildItem {}
+  }
+
+  It 'treats the specific no-match error ID as a successful empty result' {
+    $findings = @(HealthTest-SeriousRecentEventLogs 3>&1)
+
+    $findings | Should -HaveCount 1
+    $findings[0].Message | Should -Match '^\[PASS\]'
+  }
+
+  It 'preserves events and summarizes read errors for <Mode>' -ForEach @(
+    @{ Mode = 'partial'; Detail = 'Application.*Access denied' }
+    @{ Mode = 'after-event'; Detail = 'Kernel-Power.*ReadFailed.*enumeration interrupted' }
+  ) {
+    $script:failureMode = $Mode
+    $script:event = [pscustomobject]@{
+      Id = 41
+      LogName = 'System'
+      ProviderName = 'Microsoft-Windows-Kernel-Power'
+      RecordId = 1
+      TimeCreated = [datetime]'2026-11-21T10:00:00'
+      Message = 'Unexpected shutdown'
+    }
+
+    $findings = @(HealthTest-SeriousRecentEventLogs 3>&1)
+
+    $findings | Should -HaveCount 2
+    $findings[0].Message | Should -Match '^\[FAILURE\]'
+    $findings[1].Message | Should -Match '^\[WARNING\].*inspection was incomplete'
+    $findings[1].Message | Should -Match $Detail
+    $findings[1].Message | Should -Not -Match 'NoMatchingEventsFound'
+  }
+
+  It 'reports one summary when every query fails' {
+    $script:failureMode = 'total'
+    $findings = @(HealthTest-SeriousRecentEventLogs 3>&1)
+
+    $findings | Should -HaveCount 1
+    $findings[0].Message | Should -Match '^\[WARNING\].*inspection was incomplete'
+    $findings[0].Message | Should -Match 'Event log service unavailable'
+  }
+
+  It 'reports <Level> for a minidump read with <ErrorId>' -ForEach @(
+    @{ ErrorId = 'PathNotFound'; Level = 'PASS' }
+    @{ ErrorId = 'DirUnauthorizedAccessError'; Level = 'WARNING' }
+  ) {
+    $script:minidumpErrorId = $ErrorId
+    Mock Get-ChildItem {
+      Write-Error -Message 'Minidump query failed' -ErrorId $script:minidumpErrorId -ErrorAction Stop
+    }
+
+    $findings = @(HealthTest-SeriousRecentEventLogs 3>&1)
+
+    $findings | Should -HaveCount 1
+    $findings[0].Message | Should -Match "^\[$Level\]"
+    if ($Level -eq 'WARNING') { $findings[0].Message | Should -Match $ErrorId }
+  }
+}

@@ -16,6 +16,33 @@ Uses: Get-WinEvent, Get-ChildItem.
     if ($Hours -lt 1) { $Hours = 1 }
     $cutoff = (Get-Date).AddHours(-$Hours)
     $totalFindings = 0
+    $incompleteSources = [System.Collections.Generic.List[string]]::new()
+
+    function Read-RecentEvents([hashtable]$Filter) {
+        $errors = [System.Collections.Generic.List[System.Management.Automation.ErrorRecord]]::new()
+        try {
+            Get-WinEvent -FilterHashtable $Filter -ErrorAction Continue 2>&1 | ForEach-Object {
+                if ($_ -is [System.Management.Automation.ErrorRecord]) {
+                    $errors.Add($_)
+                } else {
+                    $_
+                }
+            }
+        } catch {
+            $errors.Add($_)
+        }
+
+        $details = foreach ($readError in $errors) {
+            if (($readError.FullyQualifiedErrorId -split ',', 2)[0] -ne 'NoMatchingEventsFound') {
+                "$($readError.FullyQualifiedErrorId): $($readError.Exception.Message)"
+            }
+        }
+        if ($details) {
+            $source = (($Filter.Keys | Where-Object { $_ -ne 'StartTime' } | Sort-Object |
+                ForEach-Object { "$_=$($Filter[$_] -join ',')" }) -join ', ')
+            $incompleteSources.Add("$($source): $($details -join ' | ')")
+        }
+    }
 
     function Get-FirstLine([string]$Text) {
         if ([string]::IsNullOrWhiteSpace($Text)) { return "" }
@@ -115,19 +142,20 @@ Uses: Get-WinEvent, Get-ChildItem.
     }
 
     function Get-RecentMinidumpFiles([datetime]$AfterTime) {
-        $files = @()
-
-        if ([string]::IsNullOrWhiteSpace($env:SystemRoot)) { return $files }
-
-        $minidumpPath = Join-Path $env:SystemRoot 'Minidump'
-        $dumpItems = @(Get-ChildItem -LiteralPath $minidumpPath -Filter '*.dmp' -ErrorAction SilentlyContinue)
-        foreach ($dumpItem in $dumpItems) {
-            if ($dumpItem.LastWriteTime -gt $AfterTime) {
-                $files += $dumpItem
-            }
+        if ([string]::IsNullOrWhiteSpace($env:SystemRoot)) {
+            $incompleteSources.Add('Minidump: SystemRoot is unavailable.')
+            return
         }
 
-        return $files
+        $minidumpPath = Join-Path $env:SystemRoot 'Minidump'
+        try {
+            Get-ChildItem -LiteralPath $minidumpPath -Filter '*.dmp' -ErrorAction Stop |
+                Where-Object { $_.LastWriteTime -gt $AfterTime }
+        } catch {
+            if (($_.FullyQualifiedErrorId -split ',', 2)[0] -ne 'PathNotFound') {
+                $incompleteSources.Add("$($minidumpPath): $($_.FullyQualifiedErrorId): $($_.Exception.Message)")
+            }
+        }
     }
 
     function Get-MinidumpDetailText([object[]]$MinidumpFiles) {
@@ -150,7 +178,7 @@ Uses: Get-WinEvent, Get-ChildItem.
         @{ LogName = 'System'; Id = 1001; ProviderName = 'Microsoft-Windows-WER-SystemErrorReporting'; StartTime = $cutoff }
     )
     foreach ($filter in $failureFilters) {
-        Get-WinEvent -FilterHashtable $filter -ErrorAction SilentlyContinue | ForEach-Object {
+        Read-RecentEvents -Filter $filter | ForEach-Object {
             if (-not (Test-MarkEventSeen -EventRecord $_ -SeenEvents $seenEvents)) {
                 $totalFindings++
                 $systemCrashEventFindings++
@@ -163,7 +191,7 @@ Uses: Get-WinEvent, Get-ChildItem.
     # [WARNING] Disk errors
     $diskProviders = @('disk', 'Ntfs', 'stornvme', 'storahci', 'iaStorA', 'iaStorAVC', 'iaStorV')
     $diskEventIds = @(7, 51, 52, 55, 98, 129, 153, 157)
-    Get-WinEvent -FilterHashtable @{ LogName = 'System'; StartTime = $cutoff; Level = 2 } -ErrorAction SilentlyContinue |
+    Read-RecentEvents -Filter @{ LogName = 'System'; StartTime = $cutoff; Level = 2 } |
         Where-Object { ($diskProviders -contains $_.ProviderName) -or ($diskEventIds -contains $_.Id) } |
         ForEach-Object {
             if (-not (Test-MarkEventSeen -EventRecord $_ -SeenEvents $seenEvents)) {
@@ -174,7 +202,7 @@ Uses: Get-WinEvent, Get-ChildItem.
 
     # [NOTICE] Application crashes
     $applicationCrashGroups = @{}
-    Get-WinEvent -FilterHashtable @{ LogName = 'Application'; Id = 1000; ProviderName = 'Application Error'; StartTime = $cutoff } -ErrorAction SilentlyContinue |
+    Read-RecentEvents -Filter @{ LogName = 'Application'; Id = 1000; ProviderName = 'Application Error'; StartTime = $cutoff } |
         ForEach-Object {
             if (-not (Test-MarkEventSeen -EventRecord $_ -SeenEvents $seenEvents)) {
                 $appName = Get-FaultingApplicationName -EventRecord $_
@@ -209,7 +237,9 @@ Uses: Get-WinEvent, Get-ChildItem.
         }
     }
 
-    if ($totalFindings -eq 0) {
+    if ($incompleteSources.Count -gt 0) {
+        Write-Warning "[WARNING] Serious recent event log or minidump inspection was incomplete`n$($incompleteSources -join "`n")"
+    } elseif ($totalFindings -eq 0) {
         Write-Warning "[PASS] No serious shutdown, bugcheck, disk error, application crash, or minidump signals found in the last $Hours hour(s)"
     }
 }
