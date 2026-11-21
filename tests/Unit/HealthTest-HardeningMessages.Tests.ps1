@@ -61,7 +61,7 @@ Describe 'Hardening health-test messages' {
         HealthTest-NtlmHardening
 
         $script:warnings | Should -HaveCount 1
-        $script:warnings[0] | Should -Match '^\[WARNING\] NTLM hardening:'
+        $script:warnings[0] | Should -Match '^\[NOTICE\] NTLM hardening: LAN Manager authentication level is below 5'
         $script:warnings[0] | Should -Match 'Related domain policy path:.*Network security: LAN Manager authentication level'
         $script:warnings[0] | Should -Not -Match 'Related registry path'
     }
@@ -83,6 +83,27 @@ Describe 'Hardening health-test messages' {
         $script:warnings[0] | Should -Not -Match 'Related domain policy path'
     }
 
+    It 'reports the Windows default as NOTICE when NoLMHash is absent' {
+        Mock Test-IsDomainJoinedComputer { $false }
+        Mock Get-ItemProperty { [pscustomobject]@{ LmCompatibilityLevel = 5 } }
+
+        HealthTest-NtlmHardening
+
+        $script:warnings | Should -HaveCount 1
+        $script:warnings[0] | Should -Match '^\[NOTICE\] NTLM hardening: NoLMHash is not explicitly configured'
+        $script:warnings[0] | Should -Match 'Windows defaults to not storing LM hashes'
+    }
+
+    It 'warns when the NTLM settings could not be read' {
+        Mock Get-ItemProperty { throw 'Access denied' }
+
+        HealthTest-NtlmHardening
+
+        $script:warnings | Should -HaveCount 1
+        $script:warnings[0] | Should -Match '^\[WARNING\] Could not read NTLM hardening registry settings'
+        $script:warnings[0] | Should -Match 'Access denied'
+    }
+
     It 'shows the applicable RDP domain policies for both missing protections' {
         Mock Get-ItemProperty {
             [pscustomobject]@{
@@ -97,7 +118,7 @@ Describe 'Hardening health-test messages' {
         HealthTest-RdpHardening
 
         $script:warnings | Should -HaveCount 1
-        $script:warnings[0] | Should -Match '^\[WARNING\] RDP is not hardened \(NLA and/or TLS certificate binding missing\)'
+        $script:warnings[0] | Should -Match '^\[NOTICE\] RDP is not hardened \(NLA and/or TLS certificate binding missing\)'
         $script:warnings[0] | Should -Match 'Require user authentication for remote connections by using Network Level Authentication'
         $script:warnings[0] | Should -Match 'Server authentication certificate template'
         $script:warnings[0] | Should -Not -Match 'Related registry path'
@@ -168,7 +189,7 @@ Describe 'Hardening health-test messages' {
 
         HealthTest-SmbSigningRequired
 
-        $script:warnings[0] | Should -Match '^\[WARNING\] SMB hardening: server signing is not required'
+        $script:warnings[0] | Should -Match '^\[NOTICE\] SMB hardening: server signing is not required'
         $script:warnings[0] | Should -Match 'Microsoft network server: Digitally sign communications \(always\)'
         $script:warnings[0] | Should -Not -Match 'Related registry path'
 

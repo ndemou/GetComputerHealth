@@ -28,7 +28,7 @@ Uses: Get-Service, Win32_ComputerSystem, Win32_Share.
 
   if (-not $isHostDC -and ($lanManServerService.Status -ne 'Stopped' -or $lanManServerService.StartType -ne 'Disabled')) {
     if ($domainRole -ge 2) {
-      Write-Warning "[WARNING] File and print sharing is enabled but no SMB shares were discovered.`nRun this if you want to disable it:`n   Set-Service -Name 'LanmanServer' -StartupType Disabled; Stop-Service -Name 'LanmanServer'"
+      Write-Warning "[NOTICE] File and print sharing is enabled but no SMB shares were discovered.`nRun this if you want to disable it:`n   Set-Service -Name 'LanmanServer' -StartupType Disabled; Stop-Service -Name 'LanmanServer'"
     } else {
       Write-Warning "[NOTICE] File and print sharing is enabled on a workstation but no SMB shares were discovered.`nConsider disabling LanmanServer to reduce attack surface if sharing is not needed."
     }

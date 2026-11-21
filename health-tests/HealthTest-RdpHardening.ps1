@@ -63,17 +63,11 @@ Uses: None.
     }
 
     if ($isServer) {
-      $level = 'WARNING'
-    } else {
-      $level = 'NOTICE'
-    }
-
-    if ($isServer) {
       $commentLines += 'This exposure is more significant on a server or domain controller.'
     }
 
     Write-Warning (
-      "[$level] RDP is not hardened (NLA and/or TLS certificate binding missing)`n" +
+      "[NOTICE] RDP is not hardened (NLA and/or TLS certificate binding missing)`n" +
       ($commentLines -join "`n")
     )
   }

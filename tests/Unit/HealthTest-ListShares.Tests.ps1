@@ -80,7 +80,7 @@ Describe 'HealthTest-Shares' {
     . (Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) 'health-tests\HealthTest-Shares.ps1')
   }
 
-  It 'reports hygiene warning when file and print sharing is enabled on a server with no shares' {
+  It 'reports a notice when file and print sharing is enabled on a server with no shares' {
     Mock Get-CimInstance {
       [pscustomobject]@{
         DomainRole = 3
@@ -103,7 +103,7 @@ Describe 'HealthTest-Shares' {
     HealthTest-Shares
 
     Should -Invoke Write-Warning -Times 1 -ParameterFilter {
-      $Message -match '^\[WARNING\] File and print sharing is enabled but no SMB shares were discovered'
+      $Message -match '^\[NOTICE\] File and print sharing is enabled but no SMB shares were discovered'
     }
   }
 }
