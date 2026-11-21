@@ -264,7 +264,7 @@ param(
   [switch]$ListAllBuiltInTests
 )
 
-$VERSION="8.15.1"
+$VERSION="8.16.0"
 
 if ($null -ne $Hide) {
   $Hide = ([string]$Hide).ToUpperInvariant()
