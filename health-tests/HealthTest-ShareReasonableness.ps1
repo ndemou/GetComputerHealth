@@ -152,6 +152,7 @@ Uses: Get-SmbShare, Get-SmbShareAccess, Get-Acl.
         } elseif($r.Effective -eq 'Read') {
             if ($r.Share -ne 'SYSVOL'){
                 Write-Warning "[WARNING] '$($r.Principal)' can read share '$($r.Share)'('$($r.Path)')"
+                $riskFound = $true
             }
         } else {
           Write-Warning ("[PASS] No effective access for {0} on '{1}' (blocked by layer intersection)" -f $r.Principal,$r.Share)
@@ -238,6 +239,7 @@ Uses: Get-SmbShare, Get-SmbShareAccess, Get-Acl.
       "access policies are loose. Keep the list empty unless legacy trusts or applications require it.`n" +
       $configurationReference
     )
+    $riskFound = $true
   }
 
   if (!$riskFound) {Write-Warning "[PASS] No risks related to SMB shares were detected"}
