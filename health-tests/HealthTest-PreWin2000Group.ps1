@@ -9,10 +9,25 @@ Category: Configuration Hygiene & Best Practices
 Impact: low
 Uses: Get-ADGroup, Get-ADGroupMember.
 #>
-  $g=Get-ADGroup -Identity 'Pre-Windows 2000 Compatible Access'
-  $m=Get-ADGroupMember $g -Recursive -ErrorAction SilentlyContinue
-  foreach($u in $m){ Write-Warning "[FAILURE] 'Pre-Windows 2000 Compatible Access' contains member: $($u.SamAccountName)" }
-  if(($m | Measure-Object).Count -eq 0){ Write-Warning "[PASS] 'Pre-Windows 2000 Compatible Access' group has no members" }
+  $groupName = 'Pre-Windows 2000 Compatible Access'
+  $operation = 'Get-ADGroup'
+  try {
+    $group = Get-ADGroup -Identity $groupName -ErrorAction Stop
+    if (-not $group) { throw 'The group lookup returned no group.' }
+
+    $operation = 'Get-ADGroupMember -Recursive'
+    $members = @(Get-ADGroupMember -Identity $group -Recursive -ErrorAction Stop)
+  } catch {
+    Write-Warning "[WARNING] Could not check '$groupName' membership`n$($operation): $($_.Exception.Message)"
+    return
+  }
+
+  foreach ($member in $members) {
+    Write-Warning "[FAILURE] '$groupName' contains member: $($member.SamAccountName)"
+  }
+  if ($members.Count -eq 0) {
+    Write-Warning "[PASS] '$groupName' group has no members"
+  }
 }
 
 if ($MyInvocation.InvocationName -ne '.') {
