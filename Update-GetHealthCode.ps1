@@ -43,6 +43,9 @@ Internal use only. Tracks the one-time self-rerun pass count.
 .PARAMETER PersistReleaseMarker
 Internal use only. Carries the resolved release marker across self-rerun.
 
+.PARAMETER StagedRelease
+Internal use only. Reuses the release prepared by the first pass.
+
 .PARAMETER GenerateConfigPsd1
 Creates a template PowerShell data file named GetComputerHealth.install.psd1 in the current
 working directory, then exits. Customize that file and pass its path to -Config.
@@ -75,7 +78,8 @@ param(
   [switch]$GenerateConfigPsd1,
   [ValidatePattern('^\d{2}:\d{2}$')][string]$ScheduleDailyInvokationAt,
   [Parameter(DontShow=$true)][int]$SelfRerunCount = 0,
-  [Parameter(DontShow=$true)][string]$PersistReleaseMarker
+  [Parameter(DontShow=$true)][string]$PersistReleaseMarker,
+  [Parameter(DontShow=$true)][hashtable]$StagedRelease
 )
 
 
@@ -173,6 +177,12 @@ function Write-UpdateEvent {
 
   if ([string]::IsNullOrWhiteSpace($Message)) { return }
   Write-Host $Message
+}
+
+function Write-UpdateTiming {
+  param([string]$Phase, [System.Diagnostics.Stopwatch]$Timer)
+
+  Write-UpdateEvent ('Timing: {0} took {1:F3} s' -f $Phase, $Timer.Elapsed.TotalSeconds)
 }
 
 function Quote-Win32Arg {
@@ -1390,7 +1400,7 @@ Moves a completed updater transcript from temp storage into the log folder.
       $null = New-Item -ItemType Directory -Path $LOG_DIR -Force
     }
 
-    $timestampText = $script:UpdateTranscriptTimestamp.ToString('yyyy-MM-dd_HH.mm.ss')
+    $timestampText = $script:UpdateTranscriptTimestamp.ToString('yyyy-MM-dd_HH.mm.ss.fff')
     $script:UpdateTranscriptFinalPath = Join-Path $LOG_DIR ("Update-GetHealthCode-{0}.log" -f $timestampText)
     Move-Item -LiteralPath $script:UpdateTranscriptTempPath -Destination $script:UpdateTranscriptFinalPath -Force -ErrorAction Stop
   } catch {
@@ -1400,69 +1410,26 @@ Moves a completed updater transcript from temp storage into the log folder.
   }
 }
 
-function New-RandomTempDirectoryPath {
+function New-UpdateStagingDirectory {
 <#
 .SYNOPSIS
-Returns an unused "$TempRoot\<Name>.<N>" path where N is between 0 and 9999.
-.OUTPUTS
-System.String. A currently unused temporary directory path.
-#>
-  [CmdletBinding()]
-  param(
-    [Parameter(Mandatory)][string]$TempRoot,
-    [Parameter(Mandatory)][string]$Name
-  )
-
-  for ($attempt = 0; $attempt -lt 100; $attempt++) {
-    $suffix = Get-Random -Minimum 0 -Maximum 10000
-    $candidate = Join-Path $TempRoot ("{0}.{1}" -f $Name, $suffix)
-    if (-not (Test-Path -LiteralPath $candidate -ErrorAction SilentlyContinue)) {
-      return $candidate
-    }
-  }
-
-  throw "Could not find an available temporary directory matching '$Name.<N>' under '$TempRoot' after 100 attempts."
-}
-
-function New-EmptyTempDirectory {
-<#
-.SYNOPSIS
-Creates a reusable temporary directory and returns its full path.
+Creates a temporary directory owned by this update and returns its full path.
 .OUTPUTS
 System.String. The full path of the created directory under $env:TEMP.
 #>
   [CmdletBinding()]
-  param([string]$Name)
+  param()
 
   $tempRoot = $env:TEMP
   if ([string]::IsNullOrWhiteSpace($tempRoot)) {
     $tempRoot = [System.IO.Path]::GetTempPath()
   }
 
-  $tmdDir = Join-Path $tempRoot $Name
-  Write-Verbose "Preparing temporary directory '$tmdDir'"
-
-  if (Test-Path -LiteralPath $tmdDir) {
-    if (Test-Path -LiteralPath $tmdDir -PathType Container) {
-      Write-Verbose "Temporary directory already exists; clearing its contents: '$tmdDir'"
-      try {
-        Get-ChildItem -LiteralPath $tmdDir -Recurse -Force -ErrorAction Stop |
-          Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
-      } catch {
-        Write-Warning ("Could not clear temporary directory '{0}': {1}" -f $tmdDir, $_.Exception.Message)
-        $tmdDir = New-RandomTempDirectoryPath -TempRoot $tempRoot -Name $Name
-        Write-Verbose "Using alternate temporary directory '$tmdDir'"
-      }
-    } else {
-      Write-Verbose "A file already exists at '$tmdDir'; generating a unique directory name"
-      $tmdDir = New-RandomTempDirectoryPath -TempRoot $tempRoot -Name $Name
-      Write-Verbose "Using alternate temporary directory '$tmdDir'"
-    }
-  }
-
-  $null = New-Item -ItemType Directory -Path $tmdDir -Force
-  Write-Verbose "Temporary directory ready: '$tmdDir'"
-  return $tmdDir
+  # Windows PowerShell's .NET ZIP APIs can hit MAX_PATH with long temporary paths.
+  $path = Join-Path $tempRoot ('gch-' + [System.IO.Path]::GetRandomFileName())
+  $directory = New-Item -ItemType Directory -Path $path -ErrorAction Stop
+  Write-Verbose "Temporary directory ready: '$($directory.FullName)'"
+  return $directory.FullName
 }
 
 function Convert-GitHubRepoUrlToSlug {
@@ -1855,14 +1822,10 @@ System.Collections.Hashtable with keys RootPath and ZipPath.
   if ([string]::IsNullOrWhiteSpace($zipNameSafeTag)) { $zipNameSafeTag = 'untagged' }
 
   $zipPath = Join-Path $ZipCacheDir ("GetComputerHealth-release-{0}-{1}.zip" -f $zipNameSafeTag, $release.id)
-  $extractPath = Join-Path $TempPath 'latest-release'
+  $extractPath = Join-Path $TempPath 'zip'
 
   Write-Verbose "Release zip will be cached at '$zipPath'"
   Write-Verbose "Release zip will be extracted to '$extractPath'"
-
-  if (-not (Test-Path -LiteralPath $extractPath -PathType Container)) {
-    $null = New-Item -ItemType Directory -Path $extractPath -Force
-  }
 
   $headers = @{
     'User-Agent' = 'PowerShell'
@@ -1883,7 +1846,12 @@ System.Collections.Hashtable with keys RootPath and ZipPath.
 
     Write-Verbose "Downloading release zip from GitHub"
     Write-UpdateEvent "Downloading release zip from GitHub"
-    Invoke-WebRequest -Uri $Uri -OutFile $OutFile -Headers $Headers -UseBasicParsing -ErrorAction Stop
+    $timer = [System.Diagnostics.Stopwatch]::StartNew()
+    try {
+      Invoke-WebRequest -Uri $Uri -OutFile $OutFile -Headers $Headers -UseBasicParsing -ErrorAction Stop
+    } finally {
+      Write-UpdateTiming -Phase 'Release ZIP download' -Timer $timer
+    }
   }
 
   function Invoke-ExpandReleaseZip {
@@ -1893,54 +1861,40 @@ System.Collections.Hashtable with keys RootPath and ZipPath.
     )
 
     if (Test-Path -LiteralPath $DestinationPath -PathType Container) {
-      Get-ChildItem -LiteralPath $DestinationPath -Force -ErrorAction SilentlyContinue |
-        Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
-    } else {
-      $null = New-Item -ItemType Directory -Path $DestinationPath -Force
+      Remove-Item -LiteralPath $DestinationPath -Recurse -Force -ErrorAction Stop
     }
 
     Write-Verbose "Expanding release zip '$LiteralZipPath'"
     Write-UpdateEvent "Expanding release zip '$LiteralZipPath'"
-    Expand-Archive -LiteralPath $LiteralZipPath -DestinationPath $DestinationPath -Force -ErrorAction Stop
+    $timer = [System.Diagnostics.Stopwatch]::StartNew()
+    try {
+      [System.IO.Compression.ZipFile]::ExtractToDirectory($LiteralZipPath, $DestinationPath)
+    } finally {
+      Write-UpdateTiming -Phase 'Release ZIP extraction' -Timer $timer
+    }
+
+    $root = Get-ChildItem -LiteralPath $DestinationPath -Directory -ErrorAction Stop | Select-Object -First 1
+    if (-not $root) {
+      throw 'Release zip extracted but no top-level folder was found.'
+    }
+    return $root
   }
 
   if ($ForceDownload -or (-not (Test-Path -LiteralPath $zipPath -PathType Leaf))) {
     Invoke-DownloadReleaseZip -Uri $release.zipball_url -OutFile $zipPath -Headers $headers
   } else {
     Write-Verbose "Reusing cached release zip '$zipPath'"
+    Write-UpdateEvent 'Release ZIP download skipped (cached ZIP)'
   }
 
-  $expanded = $false
-  $firstExpandError = $null
-
+  Add-Type -AssemblyName System.IO.Compression.FileSystem -ErrorAction Stop
   try {
-    Invoke-ExpandReleaseZip -LiteralZipPath $zipPath -DestinationPath $extractPath
-    $expanded = $true
+    $root = Invoke-ExpandReleaseZip -LiteralZipPath $zipPath -DestinationPath $extractPath
   } catch {
-    $firstExpandError = $_
     Write-Warning ("Cached or downloaded zip appears invalid: {0}" -f $_.Exception.Message)
-
-    try {
-      if (Test-Path -LiteralPath $zipPath -PathType Leaf) {
-        Write-Warning "Deleting bad cached zip '$zipPath' and retrying download once"
-        Remove-Item -LiteralPath $zipPath -Force -ErrorAction Stop
-      }
-    } catch {
-      Write-Warning ("Failed to delete bad zip '{0}': {1}" -f $zipPath, $_.Exception.Message)
-    }
-
+    Write-Warning "Replacing bad cached zip '$zipPath' and retrying extraction once"
     Invoke-DownloadReleaseZip -Uri $release.zipball_url -OutFile $zipPath -Headers $headers
-    Invoke-ExpandReleaseZip -LiteralZipPath $zipPath -DestinationPath $extractPath
-    $expanded = $true
-  }
-
-  if (-not $expanded) {
-    throw $firstExpandError
-  }
-
-  $root = Get-ChildItem -LiteralPath $extractPath -Directory | Select-Object -First 1
-  if (-not $root) {
-    throw "Release zip extracted but no top-level folder was found."
+    $root = Invoke-ExpandReleaseZip -LiteralZipPath $zipPath -DestinationPath $extractPath
   }
 
   Write-Verbose "Extracted release root is '$($root.FullName)'"
@@ -1965,7 +1919,7 @@ Extracts a provided release zip into a temporary folder and returns extracted ro
     throw "Zip file not found: $ZipPath"
   }
 
-  $extractPath = Join-Path $TempPath 'provided-release'
+  $extractPath = Join-Path $TempPath 'zip'
   Write-Verbose "Provided zip will be extracted to '$extractPath'"
 
   if (-not (Test-Path $extractPath)) {
@@ -1974,7 +1928,12 @@ Extracts a provided release zip into a temporary folder and returns extracted ro
 
   Write-Verbose "Expanding provided zip '$ZipPath'"
   Write-UpdateEvent "Expanding release zip '$ZipPath'"
-  Expand-Archive -LiteralPath $ZipPath -DestinationPath $extractPath -Force
+  $timer = [System.Diagnostics.Stopwatch]::StartNew()
+  try {
+    Expand-Archive -LiteralPath $ZipPath -DestinationPath $extractPath -Force -ErrorAction Stop
+  } finally {
+    Write-UpdateTiming -Phase 'Release ZIP extraction' -Timer $timer
+  }
 
   $root = Get-ChildItem -LiteralPath $extractPath -Directory | Select-Object -First 1
   if (-not $root) {
@@ -2027,6 +1986,22 @@ Keeps only the latest N cached release zips.
   }
 }
 
+function Get-UpdateFileSha256 {
+  param([string]$Path)
+
+  $sha256 = [System.Security.Cryptography.SHA256]::Create()
+  try {
+    $stream = [System.IO.File]::OpenRead($Path)
+    try {
+      return [Convert]::ToBase64String($sha256.ComputeHash($stream))
+    } finally {
+      $stream.Dispose()
+    }
+  } finally {
+    $sha256.Dispose()
+  }
+}
+
 function Replace-FileFromSource {
 <#
 .SYNOPSIS
@@ -2061,73 +2036,54 @@ $false - No change occurred or the operation failed.
     [Parameter(Mandatory=$true)][string]$BackupPath
   )
 
-  $releaseFilePath = Join-Path $SourcePath $FileName
-  $finalPath       = Join-Path $DestinationPath $FileName
-  $finalDir        = Split-Path -Path $finalPath -Parent
-  $updated         = $false
-
   try {
-    if (-not (Test-Path -LiteralPath $releaseFilePath -PathType Leaf)) {
+    $releaseFile = [System.IO.FileInfo]::new([System.IO.Path]::Combine($SourcePath, $FileName))
+    $finalFile = [System.IO.FileInfo]::new([System.IO.Path]::Combine($DestinationPath, $FileName))
+    if (-not $releaseFile.Exists) {
       throw "Expected file not found in release zip: $FileName"
     }
 
-    $isDifferent = $true
-
-    if (Test-Path -LiteralPath $finalPath -PathType Leaf) {
-      $sourceSize = (Get-Item -LiteralPath $releaseFilePath -ErrorAction Stop).Length
-      $destSize = (Get-Item -LiteralPath $finalPath -ErrorAction Stop).Length
-
-      if ($sourceSize -eq $destSize) {
-        $newHash = (Get-FileHash -Path $releaseFilePath -Algorithm SHA256).Hash
-        $existingHash = $null
-
-        try {
-          $existingHash = (Get-FileHash -Path $finalPath -Algorithm SHA256).Hash
-        } catch {
-          Write-Warning "Failed computing existing hash for '$finalPath'; proceeding as different"
-          $existingHash = $null
-        }
-
-        if ($existingHash -ne $null -and $existingHash -eq $newHash) {
-          $isDifferent = $false
-        }
-      }
-    }
-
-    if ($isDifferent) {
-      if (Test-Path -LiteralPath $finalPath -PathType Leaf) {
-        $leaf       = Split-Path $finalPath -Leaf
-        $dateStr    = Get-Date -Format 'yyyyMMdd.hhmmss'
-        $backupFile = Join-Path $BackupPath ("{0}.{1}.bak" -f $leaf, $dateStr)
-
-        try {
-          Copy-Item -LiteralPath $finalPath -Destination $backupFile -Force -ErrorAction Stop
-          Write-Verbose "Per-file backup created: '$backupFile'"
-        } catch {
-          Write-Warning ("Failed to create per-file backup for {0}: {1}" -f $leaf, $_.Exception.Message)
-        }
-      }
-
+    $destinationExists = $finalFile.Exists
+    if ($destinationExists -and $releaseFile.Length -eq $finalFile.Length) {
+      $newHash = Get-UpdateFileSha256 -Path $releaseFile.FullName
+      $existingHash = $null
       try {
-        if (-not (Test-Path -LiteralPath $finalDir -PathType Container)) {
-          $null = New-Item -ItemType Directory -Path $finalDir -Force
-        }
-        Copy-Item -LiteralPath $releaseFilePath -Destination $finalPath -Force -ErrorAction Stop
-        Write-Verbose "Updated '$finalPath'"
-        $updated = $true
+        $existingHash = Get-UpdateFileSha256 -Path $finalFile.FullName
       } catch {
-        Write-Warning ("Failed to update {0}: {1}" -f $finalPath, $_.Exception.Message)
+        Write-Warning "Failed computing existing hash for '$($finalFile.FullName)'; proceeding as different"
       }
-    } else {
-      Write-Verbose "No content change detected for '$FileName'"
-      $updated = $false
+
+      if ($newHash -ceq $existingHash) {
+        Write-Verbose "No content change detected for '$FileName'"
+        return $false
+      }
     }
   } catch {
     Write-Warning ("Failed to stage {0} from extracted release: {1}" -f $FileName, $_.Exception.Message)
-    $updated = $false
+    return $false
   }
 
-  return $updated
+  if ([System.IO.File]::Exists($finalFile.FullName)) {
+    $dateStr = Get-Date -Format 'yyyyMMdd.hhmmss'
+    $backupFile = Join-Path $BackupPath ("{0}.{1}.bak" -f $finalFile.Name, $dateStr)
+
+    try {
+      Copy-Item -LiteralPath $finalFile.FullName -Destination $backupFile -Force -ErrorAction Stop
+      Write-Verbose "Per-file backup created: '$backupFile'"
+    } catch {
+      Write-Warning ("Failed to create per-file backup for {0}: {1}" -f $finalFile.Name, $_.Exception.Message)
+    }
+  }
+
+  try {
+    $null = [System.IO.Directory]::CreateDirectory($finalFile.DirectoryName)
+    Copy-Item -LiteralPath $releaseFile.FullName -Destination $finalFile.FullName -Force -ErrorAction Stop
+    Write-Verbose "Updated '$($finalFile.FullName)'"
+    return $true
+  } catch {
+    Write-Warning ("Failed to update {0}: {1}" -f $finalFile.FullName, $_.Exception.Message)
+    return $false
+  }
 }
 
 function Install-ReleaseFilesFromSource {
@@ -2253,6 +2209,7 @@ if ($ScheduleDailyInvokationAt) {
 }
 
 Start-UpdateTranscript
+$ownedTempPath = $null
 try {
   $passNumber = $SelfRerunCount + 1
   $passLabel = "[pass $passNumber/2]"
@@ -2324,7 +2281,18 @@ try {
   $manualUpdateMarker = $null
   $manualUpdateFetchedAt = $null
   $versionToInstall = $null
-  if (-not $UpdateFromZip) {
+  if ($StagedRelease) {
+    if ($SelfRerunCount -ne 1 -or -not (Test-Path -LiteralPath $StagedRelease.RootPath -PathType Container)) {
+      throw 'The staged release is only available during the second update pass and must still exist.'
+    }
+    if ($UpdateFromZip) {
+      $manualUpdateMarker = [string]$StagedRelease.Marker
+      $manualUpdateFetchedAt = [string]$StagedRelease.ManualFetchedAt
+    } else {
+      $latestReleaseMarker = [string]$StagedRelease.Marker
+    }
+    $versionToInstall = Get-GetComputerHealthVersionFromMarker -Marker $StagedRelease.Marker
+  } elseif (-not $UpdateFromZip) {
     Write-Verbose "$passLabel Resolving latest release metadata (cache TTL $RELEASE_METADATA_CACHE_TTL_MINUTES minutes)"
     try {
       $latestRelease = Get-GetComputerHealthLatestRelease -RepositoryUrl $REPO_URL -CachePath $LATEST_RELEASE_METADATA_CACHE_PATH -CacheTtlMinutes $RELEASE_METADATA_CACHE_TTL_MINUTES -ForceRefresh:$ForceRefreshReleaseMetadata
@@ -2371,7 +2339,7 @@ try {
       return
     }
 
-    if ($Reinstall -and $storedReleaseMarker -and (Test-GetComputerHealthMarkerEquivalent -LeftMarker $storedReleaseMarker -RightMarker $latestReleaseMarker)) {
+    if (($SelfRerunCount -eq 0) -and $Reinstall -and $storedReleaseMarker -and (Test-GetComputerHealthMarkerEquivalent -LeftMarker $storedReleaseMarker -RightMarker $latestReleaseMarker)) {
       Write-Verbose "-Reinstall was specified; re-downloading current latest release"
     }
   } elseif ($manualUpdateMarker) {
@@ -2404,24 +2372,23 @@ try {
   }
 
   Write-Verbose "$passLabel Checking for code updates; local files will be backed up before replacement if needed"
-  $tmdDir = New-EmptyTempDirectory -Name "Update-GetHealthCode"
-  $releaseRoot = $null
-  $preparedZipPath = $null
-
   try {
-    if ($UpdateFromZip) {
-      Write-Verbose "$passLabel Updating from provided zip '$UpdateFromZip'"
-      Write-UpdateEvent "$passLabel Updating from provided zip '$UpdateFromZip'"
-      $preparedRelease = Expand-ReleaseFromZipFile -ZipPath $UpdateFromZip -TempPath $tmdDir
-      Keep-OnlyLatestReleaseZips -CacheDir $BAK_DIR -Pattern $MANUAL_ZIP_CACHE_PATTERN -KeepCount 4
+    if ($StagedRelease) {
+      $preparedRelease = $StagedRelease
+      Write-UpdateEvent "$passLabel Reusing staged release files (download and extraction skipped)"
     } else {
-      Write-Verbose "$passLabel Updating from latest GitHub release"
-      Write-UpdateEvent "$passLabel Updating from latest GitHub release"
-      if (-not $latestRelease) {
-        $latestRelease = Get-GetComputerHealthLatestRelease -RepositoryUrl $REPO_URL -CachePath $LATEST_RELEASE_METADATA_CACHE_PATH -CacheTtlMinutes $RELEASE_METADATA_CACHE_TTL_MINUTES -ForceRefresh:$ForceRefreshReleaseMetadata
+      $ownedTempPath = New-UpdateStagingDirectory
+      if ($UpdateFromZip) {
+        Write-Verbose "$passLabel Updating from provided zip '$UpdateFromZip'"
+        Write-UpdateEvent "$passLabel Updating from provided zip '$UpdateFromZip'"
+        $preparedRelease = Expand-ReleaseFromZipFile -ZipPath $UpdateFromZip -TempPath $ownedTempPath
+        Keep-OnlyLatestReleaseZips -CacheDir $BAK_DIR -Pattern $MANUAL_ZIP_CACHE_PATTERN -KeepCount 4
+      } else {
+        Write-Verbose "$passLabel Updating from latest GitHub release"
+        Write-UpdateEvent "$passLabel Updating from latest GitHub release"
+        $preparedRelease = Expand-GetComputerHealthLatestRelease -TempPath $ownedTempPath -ZipCacheDir $BAK_DIR -Release $latestRelease -ForceDownload:$Reinstall
+        Keep-OnlyLatestReleaseZips -CacheDir $BAK_DIR -Pattern $ZIP_CACHE_PATTERN -KeepCount 4
       }
-      $preparedRelease = Expand-GetComputerHealthLatestRelease -TempPath $tmdDir -ZipCacheDir $BAK_DIR -Release $latestRelease -ForceDownload:$Reinstall
-      Keep-OnlyLatestReleaseZips -CacheDir $BAK_DIR -Pattern $ZIP_CACHE_PATTERN -KeepCount 4
     }
     $releaseRoot = $preparedRelease.RootPath
     $preparedZipPath = $preparedRelease.ZipPath
@@ -2447,27 +2414,23 @@ try {
       } else {
         Write-Verbose "$passLabel Running updater returned by disk format migration: '$migrationUpdaterPath'"
         Stop-UpdateTranscript
-        & $migrationUpdaterPath @PSBoundParameters
+        $migrationParameters = @{} + $PSBoundParameters
+        $migrationParameters.Remove('StagedRelease')
+        & $migrationUpdaterPath @migrationParameters
         return
       }
     }
   }
 
+  $fileReplacementTimer = [System.Diagnostics.Stopwatch]::StartNew()
   $updated = Replace-FileFromSource -FileName 'Update-GetHealthCode.ps1' -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
   if ($updated) { $appliedUpdate = $true }
 
   if ($updated) {
+    Write-UpdateTiming -Phase "$passLabel File replacement" -Timer $fileReplacementTimer
     Write-Verbose "$passLabel This script updated itself"
     $zipName = if ($preparedZipPath) { Split-Path -Path $preparedZipPath -Leaf } else { '<unknown zip>' }
     Write-UpdateEvent "Applied GetComputerHealth update from zip '$zipName'"
-
-    if ($latestReleaseMarker) {
-      Write-Verbose "$passLabel Persisting installed release marker before self-rerun"
-      Set-GetComputerHealthInstalledReleaseMarker -CachePath $LATEST_RELEASE_METADATA_CACHE_PATH -Marker $latestReleaseMarker
-    } elseif ($manualUpdateMarker) {
-      Write-Verbose "$passLabel Persisting manual update marker before self-rerun"
-      Set-GetComputerHealthInstalledReleaseMarker -CachePath $LATEST_RELEASE_METADATA_CACHE_PATH -Marker $manualUpdateMarker -FetchedAt $manualUpdateFetchedAt
-    }
 
     if ($SelfRerunCount -ge 1) {
       Write-Verbose "$passLabel Self-rerun already performed once; skipping additional rerun"
@@ -2483,6 +2446,12 @@ try {
     if ($latestReleaseMarker) {
       $rerunParameters['PersistReleaseMarker'] = $latestReleaseMarker
     }
+    # Published releases may still ship an updater that only accepts the ZIP path.
+    if ((Get-Command -Name $rerunPath -CommandType ExternalScript).Parameters.ContainsKey('StagedRelease')) {
+      $preparedRelease['Marker'] = if ($UpdateFromZip) { $manualUpdateMarker } else { $latestReleaseMarker }
+      $preparedRelease['ManualFetchedAt'] = $manualUpdateFetchedAt
+      $rerunParameters['StagedRelease'] = $preparedRelease
+    }
 
     Write-Verbose "$passLabel Rerunning updated copy '$rerunPath' with one-time self-rerun guard"
     Stop-UpdateTranscript
@@ -2491,6 +2460,7 @@ try {
   }
 
   if (Install-ReleaseFilesFromSource -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR -ExcludeRelativePaths @('Update-GetHealthCode.ps1')) { $appliedUpdate = $true }
+  Write-UpdateTiming -Phase "$passLabel File replacement" -Timer $fileReplacementTimer
 
   if ($appliedUpdate) {
     $zipName = if ($preparedZipPath) { Split-Path -Path $preparedZipPath -Leaf } else { '<unknown zip>' }
@@ -2523,6 +2493,13 @@ try {
 
   Write-Verbose "Update-GetHealthCode completed"
 } finally {
+  if ($ownedTempPath) {
+    try {
+      Remove-Item -LiteralPath $ownedTempPath -Recurse -Force -ErrorAction Stop
+    } catch {
+      Write-Warning ("Failed to remove update staging directory '{0}': {1}" -f $ownedTempPath, $_.Exception.Message)
+    }
+  }
   Stop-UpdateTranscript
   Finalize-UpdateTranscript
 }

@@ -20,8 +20,7 @@
       'ConvertTo-GchPsd1Literal',
       'ConvertTo-GchPsd1Text',
       'Write-GchConfigFilesFromInstallConfig',
-      'New-RandomTempDirectoryPath',
-      'New-EmptyTempDirectory',
+      'New-UpdateStagingDirectory',
       'Get-GchDefaultConfigText',
       'Ensure-GchConfigFile',
       'Read-GchConfigFile',
@@ -60,51 +59,77 @@
     }
   }
 
-  It 'uses a random suffixed temp directory when the default directory cannot be enumerated' {
+  It 'creates a fresh staging directory for each update' {
     $savedTemp = $env:TEMP
-    $tempRoot = Join-Path $env:TEMP ('gch-update-temp-test-' + [guid]::NewGuid().ToString())
-    $defaultPath = Join-Path $tempRoot 'Update-GetHealthCode'
-    $expectedPath = Join-Path $tempRoot 'Update-GetHealthCode.42'
-
+    $tempRoot = Join-Path $TestDrive 'separate-stages'
     try {
-      New-Item -ItemType Directory -Path $defaultPath -Force | Out-Null
+      New-Item -ItemType Directory -Path $tempRoot | Out-Null
       $env:TEMP = $tempRoot
+      $first = New-UpdateStagingDirectory
+      $firstFile = Join-Path $first 'payload.txt'
+      Set-Content -LiteralPath $firstFile -Value 'first update'
 
-      Mock Get-Random { 42 }
-      Mock Get-ChildItem { throw [System.UnauthorizedAccessException]::new('Access denied for test') } -ParameterFilter {
-        $LiteralPath -eq $defaultPath
-      }
+      $second = New-UpdateStagingDirectory
 
-      $result = New-EmptyTempDirectory -Name 'Update-GetHealthCode'
-
-      $result | Should -Be $expectedPath
-      Test-Path -LiteralPath $expectedPath -PathType Container | Should -BeTrue
+      $second | Should -Not -Be $first
+      Split-Path -Parent $second | Should -Be $tempRoot
+      Test-Path -LiteralPath $second -PathType Container | Should -BeTrue
+      Get-Content -LiteralPath $firstFile | Should -Be 'first update'
     } finally {
       $env:TEMP = $savedTemp
-      Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
     }
   }
 
-  It 'uses a random suffixed temp directory when the default path is a file' {
+  It 'installs a cached GitHub release across a self-rerun and backs up changed files' {
     $savedTemp = $env:TEMP
-    $tempRoot = Join-Path $env:TEMP ('gch-update-temp-test-' + [guid]::NewGuid().ToString())
-    $defaultPath = Join-Path $tempRoot 'Update-GetHealthCode'
-    $expectedPath = Join-Path $tempRoot 'Update-GetHealthCode.123'
-
+    $tempRoot = Join-Path $TestDrive 'staging'
+    $installRoot = Join-Path $TestDrive 'installed'
+    $packageRoot = Join-Path $TestDrive 'package'
+    $packageContent = Join-Path $packageRoot 'GetComputerHealth-fixture'
+    $installedUpdater = Join-Path $installRoot 'bin\Update-GetHealthCode.ps1'
+    $packageUpdater = Join-Path $packageContent 'Update-GetHealthCode.ps1'
+    $installedPayload = Join-Path $installRoot 'bin\payload[1].txt'
+    $unchangedFile = Join-Path $installRoot 'bin\unchanged[1].txt'
+    $unchangedTime = [datetime]::new(2020, 1, 1, 0, 0, 0, [DateTimeKind]::Utc)
+    $cachePath = Join-Path $installRoot 'config\Get-ComputerHealth-latest-release-meta.json'
+    $zipPath = Join-Path $installRoot 'temp\GetComputerHealth-release-v8.0.0-1.zip'
     try {
-      New-Item -ItemType Directory -Path $tempRoot -Force | Out-Null
-      Set-Content -LiteralPath $defaultPath -Value 'occupied' -NoNewline
+      $directories = @($tempRoot, $packageContent)
+      $directories += 'bin', 'config', 'data', 'temp' | ForEach-Object { Join-Path $installRoot $_ }
+      New-Item -ItemType Directory -Path $directories -Force | Out-Null
       $env:TEMP = $tempRoot
+      Copy-Item -LiteralPath $scriptPath -Destination $installedUpdater
+      Copy-Item -LiteralPath $scriptPath -Destination $packageUpdater
+      Add-Content -LiteralPath $packageUpdater -Value '# Self-rerun fixture'
+      Set-Content -LiteralPath $installedPayload -Value 'old payload' -Encoding ASCII
+      Set-Content -LiteralPath (Join-Path $packageContent 'payload[1].txt') -Value 'new payload' -Encoding ASCII
+      Set-Content -LiteralPath $unchangedFile -Value 'same payload' -Encoding ASCII
+      Copy-Item -LiteralPath $unchangedFile -Destination $packageContent
+      [System.IO.File]::SetLastWriteTimeUtc($unchangedFile, $unchangedTime)
+      Set-Content -LiteralPath (Join-Path $installRoot 'data\disk-format.psd1') -Value '@{ CurrentDiskFormat = 7; LatestCompatibleCodeVersion = 8 }'
+      @{
+        fetchedAt = (Get-Date).ToString('o')
+        release = @{ id = 1; tag_name = 'v8.0.0'; zipball_url = 'https://example.invalid/unexpected-download' }
+      } | ConvertTo-Json | Set-Content -LiteralPath $cachePath
+      Add-Type -AssemblyName System.IO.Compression.FileSystem
+      [System.IO.Compression.ZipFile]::CreateFromDirectory($packageRoot, $zipPath)
 
-      Mock Get-Random { 123 }
+      $messages = & $installedUpdater 6>&1 | ForEach-Object { [string]$_ }
 
-      $result = New-EmptyTempDirectory -Name 'Update-GetHealthCode'
-
-      $result | Should -Be $expectedPath
-      Test-Path -LiteralPath $expectedPath -PathType Container | Should -BeTrue
+      @($messages -like 'Timing: Release ZIP extraction*').Count | Should -Be 1
+      @($messages -like '*Reusing staged release files*').Count | Should -Be 1
+      @($messages -like 'Timing: * File replacement*').Count | Should -Be 2
+      Get-Content -LiteralPath $installedPayload | Should -Be 'new payload'
+      (Get-Item -LiteralPath $unchangedFile).LastWriteTimeUtc | Should -Be $unchangedTime
+      $payloadBackup = Get-ChildItem -LiteralPath (Join-Path $installRoot 'temp') -Filter '*.bak' |
+        Where-Object { $_.Name.StartsWith('payload[1].txt.') }
+      @($payloadBackup).Count | Should -Be 1
+      Get-Content -LiteralPath $payloadBackup.FullName | Should -Be 'old payload'
+      (Get-Content -LiteralPath $cachePath -Raw | ConvertFrom-Json).installedReleaseMarker | Should -Be 'ndemou/GetComputerHealth|v8.0.0|1'
+      @(Get-ChildItem -LiteralPath $tempRoot -Force).Count | Should -Be 0
+      @(Get-ChildItem -LiteralPath (Join-Path $installRoot 'log') -Filter 'Update-GetHealthCode-*.log').Count | Should -Be 2
     } finally {
       $env:TEMP = $savedTemp
-      Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
     }
   }
 
