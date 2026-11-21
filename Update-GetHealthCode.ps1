@@ -2002,6 +2002,17 @@ function Get-UpdateFileSha256 {
   }
 }
 
+function Copy-UpdateFile {
+  param([string]$Source, [string]$Destination, [System.Diagnostics.Stopwatch]$Timer)
+
+  $Timer.Start()
+  try {
+    Copy-Item -LiteralPath $Source -Destination $Destination -Force -ErrorAction Stop
+  } finally {
+    $Timer.Stop()
+  }
+}
+
 function Replace-FileFromSource {
 <#
 .SYNOPSIS
@@ -2033,7 +2044,8 @@ $false - No change occurred or the operation failed.
     [Parameter(Mandatory=$true)][string]$FileName,
     [Parameter(Mandatory=$true)][string]$SourcePath,
     [Parameter(Mandatory=$true)][string]$DestinationPath,
-    [Parameter(Mandatory=$true)][string]$BackupPath
+    [Parameter(Mandatory=$true)][string]$BackupPath,
+    [Parameter(Mandatory=$true)][hashtable]$FileTimings
   )
 
   try {
@@ -2045,12 +2057,17 @@ $false - No change occurred or the operation failed.
 
     $destinationExists = $finalFile.Exists
     if ($destinationExists -and $releaseFile.Length -eq $finalFile.Length) {
-      $newHash = Get-UpdateFileSha256 -Path $releaseFile.FullName
-      $existingHash = $null
+      $FileTimings.Sha256.Start()
       try {
-        $existingHash = Get-UpdateFileSha256 -Path $finalFile.FullName
-      } catch {
-        Write-Warning "Failed computing existing hash for '$($finalFile.FullName)'; proceeding as different"
+        $newHash = Get-UpdateFileSha256 -Path $releaseFile.FullName
+        $existingHash = $null
+        try {
+          $existingHash = Get-UpdateFileSha256 -Path $finalFile.FullName
+        } catch {
+          Write-Warning "Failed computing existing hash for '$($finalFile.FullName)'; proceeding as different"
+        }
+      } finally {
+        $FileTimings.Sha256.Stop()
       }
 
       if ($newHash -ceq $existingHash) {
@@ -2068,7 +2085,7 @@ $false - No change occurred or the operation failed.
     $backupFile = Join-Path $BackupPath ("{0}.{1}.bak" -f $finalFile.Name, $dateStr)
 
     try {
-      Copy-Item -LiteralPath $finalFile.FullName -Destination $backupFile -Force -ErrorAction Stop
+      Copy-UpdateFile -Source $finalFile.FullName -Destination $backupFile -Timer $FileTimings.Backup
       Write-Verbose "Per-file backup created: '$backupFile'"
     } catch {
       Write-Warning ("Failed to create per-file backup for {0}: {1}" -f $finalFile.Name, $_.Exception.Message)
@@ -2077,7 +2094,7 @@ $false - No change occurred or the operation failed.
 
   try {
     $null = [System.IO.Directory]::CreateDirectory($finalFile.DirectoryName)
-    Copy-Item -LiteralPath $releaseFile.FullName -Destination $finalFile.FullName -Force -ErrorAction Stop
+    Copy-UpdateFile -Source $releaseFile.FullName -Destination $finalFile.FullName -Timer $FileTimings.Copy
     Write-Verbose "Updated '$($finalFile.FullName)'"
     return $true
   } catch {
@@ -2106,6 +2123,7 @@ $false - No files changed.
     [Parameter(Mandatory=$true)][string]$SourcePath,
     [Parameter(Mandatory=$true)][string]$DestinationPath,
     [Parameter(Mandatory=$true)][string]$BackupPath,
+    [Parameter(Mandatory=$true)][hashtable]$FileTimings,
     [string[]]$ExcludeRelativePaths = @()
   )
 
@@ -2132,7 +2150,7 @@ $false - No files changed.
       return
     }
 
-    if (Replace-FileFromSource -FileName $relativePath -SourcePath $sourceRootFullPath -DestinationPath $DestinationPath -BackupPath $BackupPath) {
+    if (Replace-FileFromSource -FileName $relativePath -SourcePath $sourceRootFullPath -DestinationPath $DestinationPath -BackupPath $BackupPath -FileTimings $FileTimings) {
       $changed = $true
     }
   }
@@ -2398,7 +2416,6 @@ try {
     throw "Unable to prepare release zip: $($_.Exception.Message)"
   }
 
-  $appliedUpdate = $false
   $diskFormatMigration = Invoke-DiskFormatMigrations -RootDir $ROOT_DIR -ReleaseRoot $releaseRoot -TargetCodeVersion $versionToInstall
   if ($diskFormatMigration.RanMigrations -and (-not [string]::IsNullOrWhiteSpace($diskFormatMigration.UpdaterPath))) {
     $currentUpdaterPath = Get-NormalizedFileSystemPath -Path $PSCommandPath
@@ -2422,12 +2439,24 @@ try {
     }
   }
 
+  $fileTimings = @{
+    Sha256 = [System.Diagnostics.Stopwatch]::new()
+    Copy   = [System.Diagnostics.Stopwatch]::new()
+    Backup = [System.Diagnostics.Stopwatch]::new()
+  }
   $fileReplacementTimer = [System.Diagnostics.Stopwatch]::StartNew()
-  $updated = Replace-FileFromSource -FileName 'Update-GetHealthCode.ps1' -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR
-  if ($updated) { $appliedUpdate = $true }
+  $updated = Replace-FileFromSource -FileName 'Update-GetHealthCode.ps1' -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR -FileTimings $fileTimings
+  $appliedUpdate = $updated
+  if (-not $updated) {
+    $appliedUpdate = Install-ReleaseFilesFromSource -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR -FileTimings $fileTimings -ExcludeRelativePaths @('Update-GetHealthCode.ps1')
+  }
+  $fileReplacementTimer.Stop()
+  Write-UpdateTiming -Phase "$passLabel File replacement" -Timer $fileReplacementTimer
+  Write-UpdateTiming -Phase "$passLabel SHA-256" -Timer $fileTimings.Sha256
+  Write-UpdateTiming -Phase "$passLabel File copies" -Timer $fileTimings.Copy
+  Write-UpdateTiming -Phase "$passLabel Backups" -Timer $fileTimings.Backup
 
   if ($updated) {
-    Write-UpdateTiming -Phase "$passLabel File replacement" -Timer $fileReplacementTimer
     Write-Verbose "$passLabel This script updated itself"
     $zipName = if ($preparedZipPath) { Split-Path -Path $preparedZipPath -Leaf } else { '<unknown zip>' }
     Write-UpdateEvent "Applied GetComputerHealth update from zip '$zipName'"
@@ -2458,9 +2487,6 @@ try {
     & $rerunPath @rerunParameters
     return
   }
-
-  if (Install-ReleaseFilesFromSource -SourcePath $releaseRoot -DestinationPath $DEST_DIR -BackupPath $BAK_DIR -ExcludeRelativePaths @('Update-GetHealthCode.ps1')) { $appliedUpdate = $true }
-  Write-UpdateTiming -Phase "$passLabel File replacement" -Timer $fileReplacementTimer
 
   if ($appliedUpdate) {
     $zipName = if ($preparedZipPath) { Split-Path -Path $preparedZipPath -Leaf } else { '<unknown zip>' }
