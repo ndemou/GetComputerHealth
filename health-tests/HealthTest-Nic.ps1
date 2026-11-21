@@ -23,10 +23,18 @@ Uses: Get-NetAdapter, Get-NetAdapterStatistics.
     $pass = $true
     $minPackets = 100000
 
-   foreach ($n in $nics) {
-        $stat = Get-NetAdapterStatistics -Name $n.Name -ErrorAction SilentlyContinue
+    foreach ($n in $nics) {
+        try {
+            $stat = Get-NetAdapterStatistics -Name $n.Name -ErrorAction Stop
+        } catch {
+            Write-Warning "[WARNING] Could not read network interface statistics ($($n.Name))`n$($_.Exception.Message)"
+            $pass = $false
+            continue
+        }
+
         if (-not $stat) {
-            Write-Output "Network interface skipped due to missing stats ($($n.Name))"
+            Write-Warning "[WARNING] Missing network interface statistics ($($n.Name))"
+            $pass = $false
             continue
         }
 
