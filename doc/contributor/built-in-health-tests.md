@@ -209,7 +209,7 @@ Use a shared normalized fact collector only when it pays for itself: when enumer
 
 Scheduled tasks are the full version of this pattern:
 
-- `HealthTest-ListScheduledTasks` is a `Policy` test that reports task definitions outside its built-in exclusions. Recognized transient one-shot tasks are informational and do not get a definition fingerprint.
+- `HealthTest-ListScheduledTasks` is a `Policy` test that reports task definitions outside its built-in exclusions. Recognized transient one-shot tasks and tasks covered by a signed executable exception are informational and omit the definition fingerprint.
 - The stable object key is task path plus task name.
 - The policy fingerprint includes review-worthy definition fields: actions, triggers, run account, run level, logon type, hidden state, and enabled state.
 - Runtime fields such as last run time, missed runs, and last result are deliberately excluded from that fingerprint.

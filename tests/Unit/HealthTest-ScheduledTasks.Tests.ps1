@@ -874,15 +874,10 @@ Describe 'HealthTest-ListScheduledTasks' {
     $script:warnings[0] | Should -Match '^\[WARNING\] Found scheduled task: \\Vendor\\Task fingerprint=one-hour'
   }
 
-  It 'suppresses known noisy scheduled task definitions' {
+  It 'excludes Windows and SoftLanding scheduled task definitions' {
     $script:TestScheduledTaskFacts = @(
-      New-TestScheduledTaskFact -TaskPath '\' -TaskName 'OneDrive Reporting Task-S-1-5-21-1000'
-      New-TestScheduledTaskFact -TaskPath '\' -TaskName 'OneDrive Startup Task-S-1-5-21-1000'
-      New-TestScheduledTaskFact -TaskPath '\' -TaskName 'MicrosoftEdgeUpdateTaskMachineCore{BE4EBA8B-9338-4B05-8A78-77E79CAA88B2}'
-      New-TestScheduledTaskFact -TaskPath '\' -TaskName 'MicrosoftEdgeUpdateTaskMachineUA{FB1D6D56-FF84-4FA9-A689-8A3A308ED04B}'
       New-TestScheduledTaskFact -TaskPath '\SoftLanding\S-1-5-21-1000\' -TaskName 'SoftLandingDeferralTask'
       New-TestScheduledTaskFact -TaskPath '\Microsoft\Windows\UpdateOrchestrator\' -TaskName 'Schedule Scan'
-      New-TestScheduledTaskFact -TaskPath '\Microsoft\Office\' -TaskName 'Office Serviceability Manager'
     )
 
     HealthTest-ListScheduledTasks
@@ -901,6 +896,67 @@ Describe 'HealthTest-ListScheduledTasks' {
 
     @($script:warnings | Where-Object { $_ -match 'Found scheduled task: \\Microsoft\\Other\\Task' }).Count | Should -Be 1
     @($script:warnings | Where-Object { $_ -match 'Found scheduled task: \\Vendor\\Task' }).Count | Should -Be 1
+  }
+
+  It 'reports <TaskPath><Name> as INFO with the signer and task definition' -TestCases @(
+    @{ TaskPath = '\COMODO\'; Name = 'COMODO Scan 1'; Exe = '"%ProgramFiles%\COMODO\COMODO Internet Security\cfpconfg.exe"'; Signer = 'Comodo Security Solutions, Inc.' }
+    @{ TaskPath = '\'; Name = 'OneDrive Reporting Task-123'; Exe = '%ProgramFiles%\Microsoft OneDrive\OneDriveStandaloneUpdater.exe'; Signer = 'Microsoft Corporation' }
+    @{ TaskPath = '\'; Name = 'OneDrive Startup Task-123'; Exe = '%ProgramFiles%\Microsoft OneDrive\26.204.1\OneDriveLauncher.exe'; Signer = 'Microsoft Corporation' }
+    @{ TaskPath = '\'; Name = 'MicrosoftEdgeUpdateTaskMachineUA'; Exe = '%ProgramFiles%\Microsoft\EdgeUpdate\MicrosoftEdgeUpdate.exe'; Signer = 'Microsoft Corporation' }
+    @{ TaskPath = '\Microsoft\Office\'; Name = 'Office Feature Updates C2R Client'; Exe = '%CommonProgramFiles%\Microsoft Shared\ClickToRun\OfficeC2RClient.exe'; Signer = 'Microsoft Corporation' }
+  ) {
+    param($TaskPath, $Name, $Exe, $Signer)
+
+    $certificate = [pscustomobject]@{ Publisher = $Signer }
+    Add-Member -InputObject $certificate -MemberType ScriptMethod -Name GetNameInfo -Value { $this.Publisher }
+    $signaturePath = [Environment]::ExpandEnvironmentVariables($Exe.Trim('"'))
+    Mock Get-AuthenticodeSignature {
+      [pscustomobject]@{ Status = 'Valid'; SignerCertificate = $certificate }
+    }
+    # Only the Office case leaves the variable in the action to exercise production path expansion.
+    if ($Exe -like '*%ProgramFiles%*') { $Exe = [Environment]::ExpandEnvironmentVariables($Exe) }
+    $action = ConvertTo-ScheduledTaskActionFact -Action ([pscustomobject]@{
+        ActionType = 'ExecAction'
+        Execute = $Exe
+      })
+    $script:TestScheduledTaskFacts = @(
+      New-TestScheduledTaskFact -TaskPath $TaskPath -TaskName $Name -IsPrivileged $true -Actions @($action)
+    )
+
+    HealthTest-ListScheduledTasks
+
+    $script:warnings | Should -HaveCount 1
+    $script:warnings[0] | Should -Match ('^\[INFO\] Found scheduled task covered by signed exception: ' + [regex]::Escape("$TaskPath$Name"))
+    $script:warnings[0] | Should -Match ('(?m)^Signer: ' + [regex]::Escape($Signer) + '$')
+    $script:warnings[0] | Should -Match '(?m)^Action: ExecAction '
+    $script:warnings[0] | Should -Not -Match '(?i)fingerprint'
+    Should -Invoke Get-AuthenticodeSignature -Times 1 -Exactly -ParameterFilter { $LiteralPath -eq $signaturePath }
+  }
+
+  It 'retains a warning for <Reason>' -TestCases @(
+    @{ Reason = 'an invalid signature'; Name = 'Office Serviceability Manager'; RelativeExe = 'Common Files\Microsoft Shared\ClickToRun\officesvcmgr.exe'; Status = 'HashMismatch'; Signer = 'Microsoft Corporation'; ActionCount = 1 }
+    @{ Reason = 'a different signer'; Name = 'Office Serviceability Manager'; RelativeExe = 'Common Files\Microsoft Shared\ClickToRun\officesvcmgr.exe'; Status = 'Valid'; Signer = 'Different Publisher'; ActionCount = 1 }
+    @{ Reason = 'extra actions'; Name = 'Office Serviceability Manager'; RelativeExe = 'Common Files\Microsoft Shared\ClickToRun\officesvcmgr.exe'; Status = 'Valid'; Signer = 'Microsoft Corporation'; ActionCount = 2 }
+    @{ Reason = 'an unfamiliar Office task'; Name = 'New Office Task'; RelativeExe = 'Common Files\Microsoft Shared\ClickToRun\officesvcmgr.exe'; Status = 'Valid'; Signer = 'Microsoft Corporation'; ActionCount = 1 }
+    @{ Reason = 'the expected executable name in a different directory'; Name = 'Office Serviceability Manager'; RelativeExe = 'Other\officesvcmgr.exe'; Status = 'Valid'; Signer = 'Microsoft Corporation'; ActionCount = 1 }
+  ) {
+    param($Reason, $Name, $RelativeExe, $Status, $Signer, $ActionCount)
+
+    $certificate = [pscustomobject]@{ Publisher = $Signer }
+    Add-Member -InputObject $certificate -MemberType ScriptMethod -Name GetNameInfo -Value { $this.Publisher }
+    Mock Get-AuthenticodeSignature { [pscustomobject]@{ Status = $Status; SignerCertificate = $certificate } }
+    $action = ConvertTo-ScheduledTaskActionFact -Action ([pscustomobject]@{
+        ActionType = 'ExecAction'
+        Execute = Join-Path $env:ProgramFiles $RelativeExe
+      })
+    $script:TestScheduledTaskFacts = @(
+      New-TestScheduledTaskFact -TaskPath '\Microsoft\Office\' -TaskName $Name -IsPrivileged $true -Actions (@($action) * $ActionCount)
+    )
+
+    HealthTest-ListScheduledTasks
+
+    $script:warnings | Should -HaveCount 1
+    $script:warnings[0] | Should -Match '^\[WARNING\] Found scheduled task: .+ fingerprint='
   }
 
   It 'emits a different policy finding when the same task key has a changed action fingerprint' {
