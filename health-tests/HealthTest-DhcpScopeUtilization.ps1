@@ -36,7 +36,7 @@ Uses: Get-DhcpServerv4ScopeStatistics.
         }
     }
 
-    if ($over.Count -gt 0) {
+    if ($over.Count -eq 0) {
         Write-Warning "[PASS] DHCP scope utilization OK (<80% in use)"}
 
 }
