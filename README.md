@@ -465,7 +465,7 @@ If you only want to add a few custom tests, you do not need to modify the core c
 | UnconstrainedDelegationAccounts  | Checks for accounts that are configured for unconstrained delegation |
 | UnsignedDrivers                  | Checks for installed PnP driver packages that appear unsigned |
 | UnusedEnabledAdapters            | Checks for enabled network adapters that are disconnected and likely unused |
-| VssWriters                       | Checks whether all VSS writers report healthy stable states |
+| VssWriters                       | Checks whether all VSS writers report stable or waiting states |
 | WinRMListening                   | Checks whether the WinRM service is running and responds to WSMan requests |
 | WindowsUpdates                   | Checks pending security updates, cached scan freshness, the online OS security baseline, and installation age |
 | WmiRepository                    | Checks whether the WMI repository is consistent |

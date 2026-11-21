@@ -43,16 +43,30 @@ Writer name: '$Name'
         $findings[0].Message | Should -Match '^\[PASS\]'
     }
 
-    It 'reports <Level> for state <Code> even when other writers are stable' -ForEach @(
-        @{ Code = 2; Level = 'WARNING'; Detail = 'busy' }
-        @{ Code = 5; Level = 'WARNING'; Detail = 'busy' }
+    It 'passes when another writer is in waiting state <Code>' -ForEach @(
+        @{ Code = 2 }
+        @{ Code = 3 }
+        @{ Code = 4 }
+        @{ Code = 5 }
+    ) {
+        $waiting = (New-WriterBlock 'Waiting Writer' $Code ([guid]::NewGuid())) -replace 'Details', 'No error'
+        $script:nativeOutput = $script:stable + "`n`n" + $waiting
+
+        $findings = @(HealthTest-VssWriters 3>&1)
+
+        $findings | Should -HaveCount 1
+        $findings[0].Message | Should -Be '[PASS] All VSS writers report stable or waiting states'
+    }
+
+    It 'reports <Level> for state <Code> even when other writers are stable or waiting' -ForEach @(
         @{ Code = 6; Level = 'FAILURE'; Detail = 'failed' }
         @{ Code = 15; Level = 'FAILURE'; Detail = 'failed' }
         @{ Code = 0; Level = 'WARNING'; Detail = 'Unknown VSS writer state' }
         @{ Code = 16; Level = 'WARNING'; Detail = 'Unknown VSS writer state' }
     ) {
         $other = New-WriterBlock 'Second Writer' $Code ([guid]::NewGuid())
-        $script:nativeOutput = $script:stable + "`n`n" + $other
+        $waiting = (New-WriterBlock 'Waiting Writer' 5 ([guid]::NewGuid())) -replace 'Details', 'No error'
+        $script:nativeOutput = $script:stable + "`n`n" + $waiting + "`n`n" + $other
 
         $findings = @(HealthTest-VssWriters 3>&1)
 

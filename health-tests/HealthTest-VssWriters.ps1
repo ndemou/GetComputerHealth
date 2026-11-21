@@ -2,7 +2,7 @@
 
 function HealthTest-VssWriters{
 <#
-Description: Checks whether all VSS writers report healthy stable states.
+Description: Checks whether all VSS writers report stable or waiting states.
 AppliesTo: All
 Scope: Computer
 Category: Configuration Hygiene & Best Practices
@@ -35,7 +35,7 @@ Uses: vssadmin.exe.
   $guidField = '^\s*[^:]+:\s*(?<id>\{[^{}]+\})\s*$'
   $seenInstances = [System.Collections.Generic.HashSet[guid]]::new()
   $incomplete = [System.Collections.Generic.List[string]]::new()
-  $allStable = $true
+  $hasFailedWriter = $false
   foreach ($block in $blocks) {
     $lines = @($block -split '\r?\n')
     if ($lines.Count -ne 5) {
@@ -63,11 +63,8 @@ Uses: vssadmin.exe.
     # VSS_WRITER_STATE: 1 is stable, 2-5 are waiting, and 6-15 failed.
     if ($code -ge 6 -and $code -le 15) {
       Write-Warning "[FAILURE] VSS writer '$writer' failed`n$block"
-      $allStable = $false
-    } elseif ($code -ge 2 -and $code -le 5) {
-      Write-Warning "[WARNING] VSS writer '$writer' is busy`n$block"
-      $allStable = $false
-    } elseif ($code -ne 1) {
+      $hasFailedWriter = $true
+    } elseif ($code -lt 1 -or $code -gt 5) {
       $incomplete.Add("Unknown VSS writer state $code.`n$block")
     }
   }
@@ -75,8 +72,8 @@ Uses: vssadmin.exe.
   if ($seenInstances.Count -eq 0 -or $incomplete.Count -gt 0) {
     $details = if ($incomplete.Count -gt 0) { $incomplete -join "`n`n" } else { 'No writer records were returned.' }
     Write-Warning "[WARNING] VSS writer inspection was incomplete`n$details"
-  } elseif ($allStable) {
-    Write-Warning '[PASS] All VSS writers report stable states'
+  } elseif (-not $hasFailedWriter) {
+    Write-Warning '[PASS] All VSS writers report stable or waiting states'
   }
 }
 
