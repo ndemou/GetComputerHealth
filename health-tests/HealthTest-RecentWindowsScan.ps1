@@ -1,132 +1,101 @@
 # HostRequirement: All
 
-Function Get-WindowsOriginalInstallDate {
-    <#
-    .SYNOPSIS
-        Robustly determines the Windows Installation date.
-    .DESCRIPTION
-        Aggregates dates from Registry History (for original install),
-        Current Registry, and WMI. Returns the oldest valid date found.
-        If history is missing, it gracefully falls back to the latest
-        feature update date.
-    #>
+function Get-WindowsOriginalInstallDate {
     [CmdletBinding()]
     param()
 
-    process {
-        # List to hold all potential dates found
-        $candidateDates = New-Object System.Collections.Generic.List[DateTime]
+    $now = Get-Date
+    $dates = @()
+    $readErrors = @()
+    $registryPaths = @('HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion')
 
-        # Unix Epoch for converting Registry timestamps
-        $unixEpoch = (Get-Date -Date "01/01/1970").ToLocalTime()
+    # Feature updates archive previous installation dates under Setup.
+    try {
+        $registryPaths += @(Get-ChildItem -Path 'HKLM:\SYSTEM\Setup' -ErrorAction Stop |
+            Where-Object { $_.Name -like '*Source OS*' } |
+            ForEach-Object { $_.PSPath })
+    } catch {
+        $readErrors += "Registry history: $($_.Exception.Message)"
+    }
 
-        # --- LAYER 1: The "Source OS" History (The Real Original Date) ---
-        # Windows archives old install dates here during feature updates.
+    foreach ($path in $registryPaths) {
         try {
-            $setupKey = "HKLM:\SYSTEM\Setup"
-            if (Test-Path $setupKey) {
-                # Find keys like "Source OS (Updated on...)"
-                $sourceKeys = Get-ChildItem -Path $setupKey -ErrorAction SilentlyContinue |
-                              Where-Object { $_.Name -like "*Source OS*" }
-
-                foreach ($key in $sourceKeys) {
-                    $prop = Get-ItemProperty -Path $key.PSPath -Name "InstallDate" -ErrorAction SilentlyContinue
-                    if ($prop -and $prop.InstallDate -is [Int32] -or $prop.InstallDate -is [Int64]) {
-                        # Add to candidates
-                        $candidateDates.Add($unixEpoch.AddSeconds($prop.InstallDate))
-                    }
-                }
+            $value = Get-ItemProperty -Path $path -Name 'InstallDate' -ErrorAction Stop
+            $seconds = 0L
+            if ($value -and $value.PSObject.Properties['InstallDate'] -and
+                [long]::TryParse([string]$value.InstallDate, [ref]$seconds) -and
+                $seconds -gt 0 -and $seconds -le ([DateTimeOffset]$now).ToUnixTimeSeconds()) {
+                $dates += [DateTimeOffset]::FromUnixTimeSeconds($seconds).LocalDateTime
             }
+        } catch {
+            $readErrors += "$($path): $($_.Exception.Message)"
         }
-        catch {
-            Write-Verbose "Could not access Registry History: $_"
-        }
+    }
 
-        # --- LAYER 2: The Current Registry (The Feature Update Date) ---
-        # Usually represents the last major update (e.g., 22H2).
-        try {
-            $currentPath = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion"
-            $currentProp = Get-ItemProperty -Path $currentPath -Name "InstallDate" -ErrorAction SilentlyContinue
-
-            if ($currentProp -and $currentProp.InstallDate) {
-                $candidateDates.Add($unixEpoch.AddSeconds($currentProp.InstallDate))
-            }
+    try {
+        $os = Get-CimInstance -ClassName Win32_OperatingSystem -ErrorAction Stop
+        if ($os -and $os.PSObject.Properties['InstallDate'] -and $os.InstallDate -is [datetime] -and
+            $os.InstallDate.Year -gt 1970 -and $os.InstallDate -le $now) {
+            $dates += $os.InstallDate
         }
-        catch {
-            Write-Verbose "Could not access Current Registry: $_"
-        }
+    } catch {
+        $readErrors += "Win32_OperatingSystem: $($_.Exception.Message)"
+    }
 
-        # --- LAYER 3: WMI Fallback (The Safety Net) ---
-        # If Registry is totally unreadable, WMI usually works.
-        # This usually matches Layer 2, but serves as a backup.
-        try {
-            $wmiOS = Get-CimInstance -ClassName Win32_OperatingSystem -ErrorAction SilentlyContinue
-            if ($wmiOS -and $wmiOS.InstallDate) {
-                $candidateDates.Add($wmiOS.InstallDate)
-            }
+    if ($dates.Count -eq 0) {
+        return [pscustomobject]@{
+            InstallDate = $null
+            AgeDays = $null
+            Confidence = 'Error - Date Not Found'
+            Details = (@('No valid Windows installation date found in Registry or WMI.') + $readErrors) -join [Environment]::NewLine
         }
-        catch {
-            Write-Verbose "Could not access WMI: $_"
-        }
+    }
 
-        # --- FINAL DECISION ---
-        # 1. Remove duplicates and Sort
-        # 2. Pick the FIRST one (The Oldest)
-
-        if ($candidateDates.Count -gt 0) {
-            $finalDate = ($candidateDates | Sort-Object)[0]
-
-            # Determine confidence level for the output
-            $methodUsed = if ($candidateDates.Count -gt 1) { "Historical Analysis" } else { "Current Feature Update (Fallback)" }
-
-            return [PSCustomObject]@{
-                InstallDate = $finalDate
-                Confidence  = $methodUsed
-                AgeDays     = (New-TimeSpan -Start $finalDate -End (Get-Date)).Days
-            }
-        }
-        else {
-            # Absolute worst case: return current time (should theoretically never happen on a working OS)
-            Write-Warning "Critical Failure: No install date found in Registry or WMI."
-            return [PSCustomObject]@{
-                InstallDate = (Get-Date)
-                Confidence  = "Error - Date Not Found"
-                AgeDays     = 0
-            }
-        }
+    $installDate = $dates | Sort-Object | Select-Object -First 1
+    return [pscustomobject]@{
+        InstallDate = $installDate
+        AgeDays = ($now - $installDate).Days
+        Confidence = if ($dates.Count -gt 1) { 'Historical Analysis' } else { 'Current Feature Update (Fallback)' }
     }
 }
 
 function Get-DaysSinceLastVirusScan {
-  [CmdletBinding()] param()
-  try { $mp = Get-MpComputerStatus -ErrorAction Stop } catch {
-    return [pscustomobject]@{DaysSinceScan=$null;Details="Get-MpComputerStatus failed with error $_.Exception.Message"}
-  }
+    [CmdletBinding()]
+    param()
 
-  $ts = @()
-  foreach($p in 'FullScanEndTime','QuickScanEndTime','FullScanStartTime','QuickScanStartTime'){
-    $v = $mp.$p
-    if ($v) { try { $ts += [datetime]$v } catch {} }
-  }
-  $last = $null
-  if ($ts.Count -gt 0) { $last = ($ts | Sort-Object -Descending)[0] }
+    try {
+        $status = Get-MpComputerStatus -ErrorAction Stop
+    } catch {
+        return [pscustomobject]@{ DaysSinceScan = $null; Details = "Get-MpComputerStatus: $($_.Exception.Message)" }
+    }
 
-  if ($last) {
-    $ageDays = ((Get-Date) - $last).TotalDays
-    return [pscustomobject]@{DaysSinceScan=[math]::Round($ageDays,1);Details='Source: Time'}
-  }
+    $now = Get-Date
+    $times = foreach ($name in 'FullScanEndTime', 'QuickScanEndTime', 'FullScanStartTime', 'QuickScanStartTime') {
+        if ($status -and $status.PSObject.Properties[$name]) {
+            $time = $status.$name -as [datetime]
+            if ($time -and $time.Year -gt 1970 -and $time -le $now) {
+                $time
+            }
+        }
+    }
+    $last = $times | Sort-Object -Descending | Select-Object -First 1
+    if ($last) {
+        $age = [math]::Round(($now - $last).TotalDays, 1)
+        return [pscustomobject]@{ DaysSinceScan = $age; Details = 'Source: Time' }
+    }
 
-  $ages = @()
-  foreach($ap in 'FullScanAge','QuickScanAge'){
-    $av = $mp.$ap
-    if ($null -ne $av) { $ages += [int64]$av }
-  }
-  if ($ages.Count -gt 0) {
-    $minAge = ($ages | Measure-Object -Minimum).Minimum
-    return [pscustomobject]@{DaysSinceScan=$minAge;Details='Source: Age'}
-  }
+    $ages = foreach ($name in 'FullScanAge', 'QuickScanAge') {
+        $age = 0L
+        if ($status -and $status.PSObject.Properties[$name] -and
+            [long]::TryParse([string]$status.$name, [ref]$age) -and $age -ge 0 -and $age -lt 1MB) {
+            $age
+        }
+    }
+    if ($null -ne $ages) {
+        return [pscustomobject]@{ DaysSinceScan = ($ages | Measure-Object -Minimum).Minimum; Details = 'Source: Age' }
+    }
 
-  return [pscustomobject]@{DaysSinceScan=$null;Details='No scan timestamps or ages'}
+    return [pscustomobject]@{ DaysSinceScan = $null; Details = 'No valid Defender scan timestamps or ages.' }
 }
 
 function HealthTest-RecentWindowsScan {
@@ -139,43 +108,29 @@ Impact: Medium(Time)
 Tags: Essential
 Uses: Get-DaysSinceLastVirusScan, Get-WindowsOriginalInstallDate.
 
-Checks the Microsoft Defender scan-history subsystem for recent quick-scan activity.
-It collects the number of days since the last virus scan from Defender status data
-when available, and falls back to the Windows original installation age when no scan
-timestamp or age can be determined. It detects machines that have not scanned recently,
-warning after several days and failing when scan history is absent or older than the
-failure threshold.
+Uses the Windows installation age as a grace period when Defender scan history
+is unavailable. Warns after four days and reports a failure after eight.
 #>
-    $MAX_WARN_DAYS = 4
-    $MAX_FAILURE_DAYS = 8
-
-    $installationAge = $null
-    $o = Get-DaysSinceLastVirusScan
-
-    if ($null -ne $o.DaysSinceScan -and $o.DaysSinceScan -lt 1024*1024) {
-        $days = [int]$o.DaysSinceScan
-        $installationAge = "n/a"
+    $scan = Get-DaysSinceLastVirusScan
+    if ($null -ne $scan.DaysSinceScan) {
+        $days = [int]$scan.DaysSinceScan
+        $title = 'Did windows defender perform a quick scan recently?'
+        $details = "Last scan, $days days ago."
     } else {
-        try {
-            $installationAge = (Get-WindowsOriginalInstallDate).agedays
-            $days = [int]$installationAge
-        } catch {
-            $installationAge = "UNKNOWN"
-            $days = 99999
+        $install = Get-WindowsOriginalInstallDate
+        if ($null -eq $install.InstallDate -or $null -eq $install.AgeDays) {
+            Write-Warning "[WARNING] Could not determine Defender scan recency`n$($scan.Details)`n$($install.Details)"
+            return
         }
+        $days = $install.AgeDays
+        $title = 'Defender scan history is unavailable'
+        $details = "Windows installation age is $days days (installation-age fallback).`n$($scan.Details)"
     }
 
-    $comment = "Last scan, $days days ago. Windows installation age is $installationAge days."
-
-    if ($days -lt $MAX_WARN_DAYS) {
-        Write-Warning "[PASS] Did windows defender perform a quick scan recently?`n$comment"
-    } elseif ($days -lt $MAX_FAILURE_DAYS) {
-        Write-Warning "[WARNING] Did windows defender perform a quick scan recently?`n$comment"
-    } else {
-        Write-Warning "[FAILURE] Did windows defender perform a quick scan recently?`n$comment"
-    }
+    $level = if ($days -lt 4) { 'PASS' } elseif ($days -lt 8) { 'WARNING' } else { 'FAILURE' }
+    Write-Warning "[$level] $title`n$details"
 }
 
 if ($MyInvocation.InvocationName -ne '.') {
-  HealthTest-RecentWindowsScan
+    HealthTest-RecentWindowsScan
 }
