@@ -1,35 +1,5 @@
 # HostRequirement: All
 
-function Get-FreeGB {
-    param([Parameter(Mandatory)][string]$PathOrDrive)
-
-    # Resolve to a drive root like 'C:\'
-    $root = $null
-    if ($PathOrDrive -match '^[A-Za-z]:\\?$' -or $PathOrDrive -match '^[A-Za-z]:$') {
-        $root = ($PathOrDrive.Substring(0,2) + '\')
-    } else {
-        try {
-            $resolved = Resolve-Path -LiteralPath $PathOrDrive -ErrorAction Stop
-            $root = [System.IO.Path]::GetPathRoot($resolved.Path)
-        } catch { return $null }
-    }
-
-    # Try PSDrive first
-    try {
-        $name = $root.TrimEnd('\').TrimEnd(':')
-        $psd  = Get-PSDrive -Name $name -PSProvider FileSystem -ErrorAction Stop
-        if ($null -ne $psd.Free) { return [math]::Round(([double]$psd.Free)/1GB,2) }
-    } catch {}
-
-    # Fallback to .NET DriveInfo
-    try {
-        $di = [System.IO.DriveInfo]::new($root)
-        if ($di.IsReady) { return [math]::Round($di.AvailableFreeSpace/1GB,2) }
-    } catch {}
-
-    return $null
-}
-
 function Test-DiskHasFreeSpace {
     param(
         [Parameter(Mandatory)][string]$PathOrDrive,
@@ -38,26 +8,21 @@ function Test-DiskHasFreeSpace {
     )
 
     $root = $null
-    if ($PathOrDrive -match '^[A-Za-z]:\\?$' -or $PathOrDrive -match '^[A-Za-z]:$') {
-        $root = ($PathOrDrive.Substring(0,2) + '\')
+    if ($PathOrDrive -match '^[A-Za-z]:\\?$') {
+        $root = $PathOrDrive.Substring(0, 2) + '\'
     } else {
-        try {
-            $resolved = Resolve-Path -LiteralPath $PathOrDrive -ErrorAction Stop
-            $root = [System.IO.Path]::GetPathRoot($resolved.Path)
-        } catch { return }
+        $resolved = Resolve-Path -LiteralPath $PathOrDrive -ErrorAction Stop
+        $root = [System.IO.Path]::GetPathRoot($resolved.Path)
     }
 
-    try {
-        $di = [System.IO.DriveInfo]::new($root)
-    } catch { return }
-
+    $di = [System.IO.DriveInfo]::new($root)
     if (-not $di.IsReady) { return }
 
-    $freeGB  = Get-FreeGB -PathOrDrive $root
-    $totalGB = [math]::Round($di.TotalSize/1GB, 2)
-    if ($di.TotalSize -le 0) { return }
+    $total = $di.TotalSize
+    $free = $di.AvailableFreeSpace
+    if ($total -le 0 -or $free -lt 0 -or $free -gt $total) { return }
 
-    $pctFree = [math]::Round(($di.AvailableFreeSpace / $di.TotalSize) * 100, 2)
+    $pctFree = [math]::Round(($free / $total) * 100, 2)
     if ($pctFree -lt $ErrorPct) {
         $level = 'Error'
     } elseif ($pctFree -lt $WarnPct) {
@@ -69,8 +34,8 @@ function Test-DiskHasFreeSpace {
     [pscustomobject]@{
         Drive        = $di.Name
         DriveType    = $di.DriveType.ToString()
-        FreeGB       = $freeGB
-        TotalGB      = $totalGB
+        FreeGB       = [math]::Round($free / 1GB, 2)
+        TotalGB      = [math]::Round($total / 1GB, 2)
         PercentFree  = $pctFree
         Level        = $level
     }
@@ -86,18 +51,25 @@ Impact: Medium(Disk)
 Tags: Essential
 Uses: Test-DiskHasFreeSpace.
 #>
-    foreach ($d in [System.IO.DriveInfo]::GetDrives()) {
+    param([object[]]$Drives = [System.IO.DriveInfo]::GetDrives())
+
+    foreach ($d in $Drives) {
         if (-not $d.IsReady) { continue }
         $t = $d.DriveType.ToString()
         if (@('Fixed','Removable','Network') -notcontains $t) { continue }
-        # emmits Log-failure/warning/pass
-        $out = Test-DiskHasFreeSpace -PathOrDrive $d.Name
-        if ($out.level -eq 'Error') {
-            Write-Warning "[FAILURE] Disk is critically low on free space`n$out"
-        } elseif ($out.level -eq 'Warning') {
-            Write-Warning "[WARNING] Disk is low on free space`n$out"
-        } else {
-            Write-Warning "[PASS] Disk has enough free space`n$out"
+        try {
+            $result = Test-DiskHasFreeSpace -PathOrDrive $d.Name
+        } catch {
+            Write-Warning "[WARNING] Could not determine disk free space`nDrive: $($d.Name)`n$($_.Exception.Message)"
+            continue
+        }
+
+        $level = if ($result -and $result.PSObject.Properties['Level']) { $result.Level }
+        switch ([string]$level) {
+            'Error'   { Write-Warning "[FAILURE] Disk is critically low on free space`n$result" }
+            'Warning' { Write-Warning "[WARNING] Disk is low on free space`n$result" }
+            'OK'      { Write-Warning "[PASS] Disk has enough free space`n$result" }
+            default   { Write-Warning "[WARNING] Could not determine disk free space`nDrive: $($d.Name)" }
         }
     }
 }
