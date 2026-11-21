@@ -8,7 +8,7 @@ Describe 'HealthTest-DfsReplicationState' {
       [pscustomobject]@{
         ReplicatedFolderName = 'Test folder'
         ReplicationGroupName = 'Test group'
-        State = 5
+        State = [byte]5
       }
     }
 

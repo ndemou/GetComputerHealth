@@ -22,7 +22,8 @@ Uses: None.
   $notNormal = $repl | Where-Object { $_.state -ne 4 }
 
   foreach ($r in $notNormal) {
-    $name = $stateNames[$r.state]; if (-not $name) { $name = 'Unknown' }
+    $name = $stateNames[[int]$r.state]
+    if (-not $name) { $name = 'Unknown' }
     if ($r.state -in 1,2,3) {
       Write-Warning "[WARNING] DFSR replication for '$($r.ReplicatedFolderName)' is at state $($r.state) ($name) instead of 4 (Normal)"
     } else {
