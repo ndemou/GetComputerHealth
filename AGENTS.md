@@ -64,6 +64,7 @@ Run tests from the repository root in Windows PowerShell (v5).
 
 ## Releases
 
+- When the user requests a release, ask whether they want to run `$gch-compare-findings-live` as a final live regression check, unless they have already made that choice for this release. Wait for their answer before running the release script or pushing release commits. If they opt in, complete the check before those steps.
 - Use `.\scripts\release\New-GetComputerHealthRelease.ps1` from the repo root to create a release. It defaults to a minor bump; use `-Part Patch` or `-Part Major` to change the semantic-version part being incremented.
 - Use `.\scripts\release\New-GetComputerHealthRelease.ps1 -SkipTests` only when the relevant tests have already passed in the current work session and you want to avoid rerunning the unit and smoke wrappers during release. The release script still validates installation from the release zip.
 - A full release can take several minutes because it runs the unit suite, smoke and installer scenarios, and release-zip installation validation. Do not interrupt it merely because output pauses; allow at least 15 minutes unless the script reports a concrete failure.
