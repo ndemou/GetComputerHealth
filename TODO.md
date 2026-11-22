@@ -48,7 +48,7 @@ Besides the scope I also need the health test to define the host type from which
 
 I also need to store a flag that proves a test was run (in NETLOGON\GCH\temp). Also an identifier for each run (e.g. the timestamp when the domain wide tests started) must be passed to all targets.
 
-Custom tests that test the AD health and the network health should also use this functionality: custom AD tests need to run from a DC, network health ones from *almost* any computer (almost because e.g. I don't want the DMZed web server to be checking the servers VLAN health). So custom tests can have tags to indicate either "run only from these computers" or "run from any computer except these".
+Custom AD and network health tests should also use this functionality. Run AD tests from a DC and network tests from hosts with access to the network segment being checked. Custom tests can have tags to allow or exclude specific hosts.
 
 (BTW a directory under NETLOGON is probably the ideal place to publish the updates zip)
 
@@ -63,7 +63,7 @@ Example `gch.psd1`:
     AutomaticUpdates = $false
     SendReports = "Auto" # "Never", "Always", "Auto"
     ShowAsPostponedWindowDays = 15
-    IpsOfAllDCs = @('10.1.2.3', '10.1.2.4')
+    IpsOfAllDCs = @('192.0.2.10', '192.0.2.11')
 }
 ```
 
@@ -115,13 +115,13 @@ Review /doc/contributor/test-suite.md and improve our test suite if needed.
 
 ## Enhance -AddWhitelisting with reason
 
-Current interface:
-```powershelll
-Get-ComputerHealth.ps1 -AddWhitelisting -until 2026-06-15 -ComputerName WEB1 -sig '50636e99' -Comment "failure - TCP port 636(LDAPS) unreachable on dc02.mazars-gr.local"
+Current interface, using an example finding.
+```powershell
+Get-ComputerHealth.ps1 -AddWhitelisting -until 2030-06-15 -ComputerName WEB-EXAMPLE -sig 'a1b2c3d4' -Comment "failure - TCP port 636 (LDAPS) unreachable on dc02.example.test"
 ```
 New interface (note the change of -Comment to -Message and the extra `-Reason` which is an optional parameter)
-```powershelll
-Get-ComputerHealth.ps1 -AddWhitelisting -until 2026-06-15 -ComputerName WEB1 -sig '50636e99' -Message "failure - TCP port 636(LDAPS) unreachable on dc02.mazars-gr.local" -Reason "Networking team will open the traffic soon"
+```powershell
+Get-ComputerHealth.ps1 -AddWhitelisting -until 2030-06-15 -ComputerName WEB-EXAMPLE -sig 'a1b2c3d4' -Message "failure - TCP port 636 (LDAPS) unreachable on dc02.example.test" -Reason "Approved exception for the test environment"
 ```
 
 Fix the code that generates the `CommandToSuppressMsg` Excel column. Excel should contain a `-Reason "NO_REASON_ENTERED"` placeholder so that the operator can easily enter a reason.
@@ -135,8 +135,8 @@ It would be useful to include the suppression reason in the findings that are re
 This is an example for `.\state\policy_test_was_run.psd1`:
 ```powershelll
 @{
-    ListInstalledPrograms = @{ Ts = [datetime]'2025-11-01 12:42'; User = 'ndemou-admin' }
-    ListListeningPorts = @{Ts = [datetime]'2025-11-01 12:45'; User = 'ndemou-admin' }
+    ListInstalledPrograms = @{ Ts = [datetime]'2030-01-15 12:42'; User = 'example-operator' }
+    ListListeningPorts = @{Ts = [datetime]'2030-01-15 12:45'; User = 'example-operator' }
 }
 ```
 
@@ -159,22 +159,22 @@ This is an example for `.\config\suppressed_findings.psd1`:
 
 ```powershelll
 @{
-    'bfc162fa' = [pscustomobject]@{
+    'b2c3d4e5' = [pscustomobject]@{
         TestName    = 'ListListeningPorts'
         Description = 'Computer is listening to port 443'
         Reason      = 'business need'
-        Ts          = [datetime]'2025-11-01 12:42'
-        Until       = [datetime]'2026-05-06'
-        User        = 'ndemou-admin'
+        Ts          = [datetime]'2030-01-15 12:42'
+        Until       = [datetime]'2030-05-06'
+        User        = 'example-operator'
     }
 
-    'a7d91c03' = [pscustomobject]@{
+    'c3d4e5f6' = [pscustomobject]@{
         TestName    = 'ListInstalledPrograms'
-        Description = 'Legacy software 7zip is installed'
+        Description = 'A legacy application is installed'
         Reason      = 'business need'
-        Ts          = [datetime]'2025-11-01 12:44'
-        Until       = [datetime]'2026-06-15'
-        User        = 'ndemou-admin'
+        Ts          = [datetime]'2030-01-15 12:44'
+        Until       = [datetime]'2030-06-15'
+        User        = 'example-operator'
     }
 }
 ```
@@ -189,16 +189,16 @@ The migration will initialize `.\config\suppressed_findings.psd1` with any  exis
 Interactive reports: Instead of including the findings in this fat "fieldname:value" format:
 ```
 [
-  {"Computer":"AUDIT2","Suppressed":true,"Level":"warning","EffectiveLevel":"postponed","Message":"SMB signing is not required","Comment":"...","Hash":"cdf936f1"},
-  {"Computer":"AUDIT2","Suppressed":true,"Level":"warning","EffectiveLevel":"postponed","Message":"NTLM is not fully hardened ...","Comment":"...","Hash":"1b752537"}
+  {"Computer":"TEST-SERVER","Suppressed":true,"Level":"warning","EffectiveLevel":"postponed","Message":"Disk free space is below the threshold","Comment":"...","Hash":"d4e5f6a7"},
+  {"Computer":"TEST-SERVER","Suppressed":true,"Level":"warning","EffectiveLevel":"postponed","Message":"Certificate expires soon","Comment":"...","Hash":"e5f6a7b8"}
 ]
 ```
 
 Prefer this lighter csv-like format:
 ```
 [
-  ["AUDIT2",true,"warning","postponed","SMB signing is not required","...","cdf936f1"],
-  ["AUDIT2",true,"warning","postponed","NTLM is not fully hardened ...","...","1b752537"]
+  ["TEST-SERVER",true,"warning","postponed","Disk free space is below the threshold","...","d4e5f6a7"],
+  ["TEST-SERVER",true,"warning","postponed","Certificate expires soon","...","e5f6a7b8"]
 ]
 ```
 So every finding is represented by a list of ordered values and all these lists are also bundled in a list (so a list of lists).
@@ -274,7 +274,7 @@ Then check each cluster by asking: “Which tests are merely different views of 
 5. SRV-record portion of `HealthTest-ConnectivityToDCs` + `HealthTest-RequiredSrvRecords`
 
 
-## Use the new installer (~\dev\TI)
+## Use the new installer (TI)
 
 
 ## Review the hundreds of warnings from Invoke-ScriptAnalyzer (and 3 errors)
@@ -311,7 +311,7 @@ See also : .\tests\script-analysis.ps1
 
   If I do not expect the values to contain spaces or commas, I could fix the last two cases manually.
 
-  - `Start-HealthTestVeeamRecentBackupsExist` expects to read clear-text data from a file. Maybe use Credential Manager. Note that Credential Manager stores passwords per user, which complicates things: it may work from your account but not from SYSTEM.
+  - Evaluate secure credential storage for `Start-HealthTestVeeamRecentBackupsExist`. If using Credential Manager, verify access from the account that runs the check, including SYSTEM for scheduled runs.
 
 
 ## MAYBE change any files with JSON content to `.psd1`
@@ -886,7 +886,7 @@ The check `$currentTimeSource -eq 'Local CMOS Clock'` fails on non-English Windo
 
 ##  Consider if the following health tests are useful (GPT inspired)
 ```
-# Run it and in about half the servers it complained it found "no backup signals"
+# Some backup products may log events outside the providers checked here.
 # .SYNOPSIS Looks for recent backup-related events and highlights failures or missing success signals.
 function HealthTest-BackupSignals {
     param(
@@ -951,11 +951,11 @@ function Test-BitLockerRecoveryInAD($computerName){
 
 ## New test: Evaluate secure communication configurations
 
-Most of the servers will emit these failures:
-    > FAILURE: [337007c8] .NET 4.x (64-bit) expected Enabled; got SchUseStrongCrypto=1; SystemDefaultTlsVersions=<missing>
+Example failures when SystemDefaultTlsVersions is missing.
+    > FAILURE: [f6a7b8c9] .NET 4.x (64-bit) expected Enabled; got SchUseStrongCrypto=1; SystemDefaultTlsVersions=<missing>
     >        Applies to: Client+Server.
     >        Key: HKLM:\SOFTWARE\Microsoft\.NETFramework\v4.0.30319.
-    > FAILURE: [9045cbcf] .NET 4.x (32-bit) expected Enabled; got SchUseStrongCrypto=1; SystemDefaultTlsVersions=<missing>
+    > FAILURE: [a7b8c9d0] .NET 4.x (32-bit) expected Enabled; got SchUseStrongCrypto=1; SystemDefaultTlsVersions=<missing>
     >        Applies to: Client+Server.
     >        Key: HKLM:\SOFTWARE\WOW6432Node\Microsoft\.NETFramework\v4.0.30319.
 
