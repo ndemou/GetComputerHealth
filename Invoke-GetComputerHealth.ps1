@@ -961,10 +961,18 @@ foreach ($target in $targets) {
     }
 
     try {
+      if (-not $childHealthParams.ContainsKey('DfsrBacklogDomain') -and
+          (Get-Command -Name $getHealthScriptPath -ErrorAction Stop).Parameters.ContainsKey('DeferDfsrBacklog')) {
+        $childHealthParams['DeferDfsrBacklog'] = $true
+      }
       $healthOutput = & $getHealthScriptPath @childHealthParams 2>&1
       $suppressionExpiryMap = Get-HealthSuppressionExpiryMapLocal -Path $suppressionFilePath
 
       foreach ($item in @($healthOutput)) {
+        if ($item -and $item.PSObject.Properties['DfsrBacklogDomain']) {
+          $records.Add($item)
+          continue
+        }
         if ($item -is [System.Management.Automation.ErrorRecord]) {
           $records.Add((Log-Failure "PowerShell error while running Get-ComputerHealth.ps1" -Comment (($item | Out-String).Trim()))) | Out-Null
           continue
@@ -1168,6 +1176,24 @@ foreach ($target in $targets) {
 
   $all_messages += $output
   Write-Progress -Activity "Checking $target" -Completed
+}
+
+$dfsrDomains = @($all_messages | Where-Object { $_ -and $_.PSObject.Properties['DfsrBacklogDomain'] } |
+  Select-Object -ExpandProperty DfsrBacklogDomain | Sort-Object -Unique)
+if ($dfsrDomains) {
+  $all_messages = @($all_messages | Where-Object { $_ -and -not $_.PSObject.Properties['DfsrBacklogDomain'] })
+  $collectorHealthParams = Get-ChildHealthInvocationParameters -Hide $Hide -WhitelistSigs $WhitelistSigs -RunWithoutElevation:$RunWithoutElevation
+  foreach ($domain in $dfsrDomains) {
+    $collectorHealthParams['DfsrBacklogDomain'] = $domain
+    $all_messages += & $healthCheckBlock -Payload @{
+      RootDir = $ROOT_DIR
+      WrapperState = @{
+        NoUpdate = $true
+        ShowAsPostponedWindowDays = $SHOW_AS_POSTPONED_WINDOW_DAYS
+      }
+      ChildHealthParams = $collectorHealthParams
+    }
+  }
 }
 
 Invoke-GetComputerHealthReporting `

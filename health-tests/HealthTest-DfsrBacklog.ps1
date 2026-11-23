@@ -7,43 +7,63 @@ AppliesTo: DC
 Scope: Domain
 Category: Configuration Hygiene & Best Practices
 Impact: Medium(Time)
-Uses: Get-DfsrConnection, Get-ADDomainController, DFS Replication CIM provider.
+Uses: DFS Replication CIM provider, Get-DfsrConnection, Get-ADDomainController or DNS.
 #>
-    param([string]$RGName = 'Domain System Volume')
+    param(
+        [string]$RGName = 'Domain System Volume',
+        [string]$Domain
+    )
 
-    if (-not (Get-Service DFSR -ErrorAction SilentlyContinue)) {
+    $isSysvol = $RGName -eq 'Domain System Volume'
+    $runFromCollector = $isSysvol -and $Domain
+    if (-not $runFromCollector -and -not (Get-Service DFSR -ErrorAction SilentlyContinue)) {
         Write-Output 'No DFSR service; skipping HealthTest-DfsrBacklog.'
         return
     }
 
-    $isSysvol = $RGName -eq 'Domain System Volume'
     $discoveryCommand = if ($isSysvol) { 'Get-ADDomainController' } else { 'Get-DfsrConnection' }
-    if (-not (Get-Command $discoveryCommand -ErrorAction SilentlyContinue)) {
+    if (-not $runFromCollector -and -not (Get-Command $discoveryCommand -ErrorAction SilentlyContinue)) {
         Write-Warning "[WARNING] DFS-R backlog discovery is unavailable for '$RGName'`nRequired cmdlet: $discoveryCommand."
         return
     }
 
     $namespace = 'root\MicrosoftDfs'
     $localDomain = [System.Net.NetworkInformation.IPGlobalProperties]::GetIPGlobalProperties().DomainName
-    $sessions = @{}
-    $foldersByComputer = @{}
+    $members = @{}
     $incomplete = $false
+    $measuredBacklogs = [System.Collections.Generic.List[string]]::new()
     $highBacklogs = [System.Collections.Generic.List[string]]::new()
 
-    function Get-DfsrFolders([string]$ComputerName) {
-        if (-not $sessions.ContainsKey($ComputerName)) {
-            if ($ComputerName -in $env:COMPUTERNAME, "$env:COMPUTERNAME.$localDomain") {
-                $sessions[$ComputerName] = New-CimSession -ErrorAction Stop
-            } else {
-                $dcom = New-CimSessionOption -Protocol Dcom
-                $sessions[$ComputerName] = New-CimSession -ComputerName $ComputerName -SessionOption $dcom -OperationTimeoutSec 15 -ErrorAction Stop
+    function Get-DfsrMember([string]$ComputerName) {
+        $member = $members[$ComputerName]
+        if (-not $member) {
+            $member = [pscustomobject]@{ Session = $null; Folders = $null; QueryError = $null }
+            $members[$ComputerName] = $member
+        }
+        if ($member.QueryError) { throw $member.QueryError }
+        if ($null -ne $member.Folders) { return $member }
+
+        try {
+            if (-not $member.Session) {
+                $member.Session = if ($runFromCollector) {
+                    # New-CimSession uses WSMan when a computer name is supplied.
+                    New-CimSession -ComputerName $ComputerName -OperationTimeoutSec 15 -ErrorAction Stop
+                } elseif ($ComputerName -in $env:COMPUTERNAME, "$env:COMPUTERNAME.$localDomain") {
+                    New-CimSession -ErrorAction Stop
+                } else {
+                    $dcom = New-CimSessionOption -Protocol Dcom
+                    New-CimSession -ComputerName $ComputerName -SessionOption $dcom -OperationTimeoutSec 15 -ErrorAction Stop
+                }
             }
-        }
-        if (-not $foldersByComputer.ContainsKey($ComputerName)) {
-            $foldersByComputer[$ComputerName] = @(Get-CimInstance -CimSession $sessions[$ComputerName] -Namespace $namespace -ClassName DfsrReplicatedFolderInfo -OperationTimeoutSec 15 -ErrorAction Stop |
+            $folders = @(Get-CimInstance -CimSession $member.Session -Namespace $namespace -ClassName DfsrReplicatedFolderInfo -OperationTimeoutSec 15 -ErrorAction Stop |
                 Where-Object { $_.ReplicationGroupName -eq $RGName -and (-not $isSysvol -or $_.ReplicatedFolderName -eq 'SYSVOL Share') })
+            if ($isSysvol -and $folders.Count -ne 1) { throw 'The provider did not return exactly one SYSVOL Share folder.' }
+            $member.Folders = $folders
+            return $member
+        } catch {
+            if ($runFromCollector) { $member.QueryError = $_.Exception }
+            throw
         }
-        return $foldersByComputer[$ComputerName]
     }
 
     try {
@@ -51,31 +71,50 @@ Uses: Get-DfsrConnection, Get-ADDomainController, DFS Replication CIM provider.
             $connections = if ($isSysvol) {
                 # Get-DfsrConnection does not enumerate the built-in SYSVOL group's
                 # topology. The provider exposes each member's direct connections.
-                $controllers = @(Get-ADDomainController -Filter * -ErrorAction Stop)
+                $controllers = if ($runFromCollector) {
+                    Resolve-DnsName -Name "_ldap._tcp.dc._msdcs.$Domain" -Type SRV -DnsOnly -ErrorAction Stop |
+                        Where-Object Type -eq SRV |
+                        ForEach-Object { $_.NameTarget.TrimEnd('.') } |
+                        Sort-Object -Unique
+                } else {
+                    (Get-ADDomainController -Filter * -ErrorAction Stop).HostName
+                }
                 if (-not $controllers) { throw 'The domain controller lookup returned no hosts.' }
 
-                foreach ($controller in $controllers) {
-                    $memberName = $controller.HostName
+                # Either endpoint can describe a direction when its peer cannot be queried.
+                $connectionsByRoute = [ordered]@{}
+                foreach ($memberName in $controllers) {
                     try {
-                        $folders = @(Get-DfsrFolders $memberName)
-                        if ($folders.Count -ne 1) { throw 'The provider did not return exactly one SYSVOL Share folder.' }
-                        $groupId = [guid]::Parse($folders[0].ReplicationGroupGuid)
-                        $configs = Get-CimInstance -CimSession $sessions[$memberName] -Namespace $namespace -ClassName DfsrConnectionConfig -OperationTimeoutSec 15 -ErrorAction Stop
+                        $member = Get-DfsrMember $memberName
+                        $groupId = [guid]::Parse($member.Folders[0].ReplicationGroupGuid)
+                        $configs = Get-CimInstance -CimSession $member.Session -Namespace $namespace -ClassName DfsrConnectionConfig -OperationTimeoutSec 15 -ErrorAction Stop
                         foreach ($config in $configs) {
-                            if ([guid]::Parse($config.ReplicationGroupGuid) -ne $groupId -or $config.Inbound) { continue }
-                            $partner = if ($config.PartnerDns) { $config.PartnerDns } else { $config.PartnerName }
-                            [pscustomobject]@{ SourceComputerName = $memberName; DestinationComputerName = $partner }
+                            if ([guid]::Parse($config.ReplicationGroupGuid) -ne $groupId) { continue }
+                            $partner = if ($config.PartnerDns) { $config.PartnerDns.TrimEnd('.') } else { $config.PartnerName }
+                            if ($runFromCollector -and $partner -and $partner -notlike '*.*') { $partner = "$partner.$Domain" }
+                            $source = $memberName
+                            $destination = $partner
+                            if ($config.Inbound) {
+                                $source = $partner
+                                $destination = $memberName
+                            }
+                            $connectionsByRoute["$source -> $destination"] = [pscustomobject]@{
+                                SourceComputerName = $source
+                                DestinationComputerName = $destination
+                            }
                         }
                     } catch {
                         $incomplete = $true
                         Write-Warning "[WARNING] Could not discover SYSVOL replication connections`n$($memberName): $($_.Exception.Message)"
                     }
                 }
+                $connectionsByRoute.Values
             } else {
                 Get-DfsrConnection -GroupName $RGName -ErrorAction Stop
             }
         } catch {
-            Write-Warning "[WARNING] Could not discover DFS-R connections for '$RGName'`n$($_.Exception.Message)"
+            $groupLabel = if ($runFromCollector) { "'$RGName' in '$Domain'" } else { "'$RGName'" }
+            Write-Warning "[WARNING] Could not discover DFS-R connections for $groupLabel`n$($_.Exception.Message)"
             return
         }
 
@@ -85,13 +124,13 @@ Uses: Get-DfsrConnection, Get-ADDomainController, DFS Replication CIM provider.
             $route = "$source -> $destination"
             try {
                 if (-not $source -or -not $destination) { throw 'The connection is missing an endpoint.' }
-                $sourceFolders = @(Get-DfsrFolders $source)
-                $destinationFolders = @(Get-DfsrFolders $destination)
+                $sourceMember = Get-DfsrMember $source
+                $destinationMember = Get-DfsrMember $destination
                 $matched = $false
 
-                foreach ($sourceFolder in $sourceFolders) {
+                foreach ($sourceFolder in $sourceMember.Folders) {
                     $folderName = $sourceFolder.ReplicatedFolderName
-                    $matchingFolders = @($destinationFolders | Where-Object { $_.ReplicatedFolderName -eq $folderName })
+                    $matchingFolders = @($destinationMember.Folders | Where-Object { $_.ReplicatedFolderName -eq $folderName })
                     if (-not $matchingFolders) { continue }
                     $matched = $true
 
@@ -103,16 +142,24 @@ Uses: Get-DfsrConnection, Get-ADDomainController, DFS Replication CIM provider.
                             throw 'The source and destination returned different folder identities.'
                         }
 
-                        $vector = Invoke-CimMethod -CimSession $sessions[$destination] -InputObject $destinationFolder -MethodName GetVersionVector -OperationTimeoutSec 15 -ErrorAction Stop
+                        $vector = Invoke-CimMethod -CimSession $destinationMember.Session -InputObject $destinationFolder -MethodName GetVersionVector -OperationTimeoutSec 15 -ErrorAction Stop
                         if ($vector.ReturnValue -ne 0 -or [string]::IsNullOrWhiteSpace($vector.VersionVector)) {
                             throw "GetVersionVector returned status '$($vector.ReturnValue)' or no vector."
                         }
-                        $total = Invoke-CimMethod -CimSession $sessions[$source] -InputObject $sourceFolder -MethodName GetOutboundBacklogFileCount -Arguments @{ VersionVector = $vector.VersionVector } -OperationTimeoutSec 15 -ErrorAction Stop
+                        $total = Invoke-CimMethod -CimSession $sourceMember.Session -InputObject $sourceFolder -MethodName GetOutboundBacklogFileCount -Arguments @{ VersionVector = $vector.VersionVector } -OperationTimeoutSec 15 -ErrorAction Stop
                         $count = [uint32]0
                         if ($total.ReturnValue -ne 0 -or -not [uint32]::TryParse([string]$total.BacklogFileCount, [ref]$count)) {
                             throw "GetOutboundBacklogFileCount returned status '$($total.ReturnValue)' or no valid count."
                         }
-                        if ($count -gt 1000) { $highBacklogs.Add("$route ($folderName): $count") }
+                        if ($count -gt 1000) {
+                            if ($isSysvol) {
+                                Write-Warning "[WARNING] DFS-R backlog high`n$route ($folderName): $count queued files"
+                            } else {
+                                $highBacklogs.Add("$route ($folderName): $count")
+                            }
+                        } elseif ($isSysvol) {
+                            $measuredBacklogs.Add("$route ($folderName): $count queued files")
+                        }
                     } catch {
                         $incomplete = $true
                         Write-Warning "[WARNING] Could not read DFS-R backlog`n$route ($folderName): $($_.Exception.Message)"
@@ -126,12 +173,17 @@ Uses: Get-DfsrConnection, Get-ADDomainController, DFS Replication CIM provider.
             }
         }
     } finally {
-        foreach ($session in $sessions.Values) {
-            Remove-CimSession -CimSession $session -ErrorAction SilentlyContinue
+        foreach ($member in $members.Values) {
+            if ($member.Session) { Remove-CimSession -CimSession $member.Session -ErrorAction SilentlyContinue }
         }
     }
 
-    if ($highBacklogs.Count -gt 0) {
+    if ($isSysvol -and $connections) {
+        $result = if ($incomplete) { '[INFO] DFS-R backlog measured' } else { '[PASS] DFS-R backlog OK' }
+        foreach ($backlog in $measuredBacklogs) {
+            Write-Warning "$result`n$backlog"
+        }
+    } elseif ($highBacklogs.Count -gt 0) {
         Write-Warning "[WARNING] DFS-R backlog high`n$($highBacklogs -join ' | ')"
     } elseif (-not $incomplete) {
         if ($connections) {
