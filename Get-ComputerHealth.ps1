@@ -193,6 +193,12 @@ param(
   [Parameter(ParameterSetName = 'Run')]
   [string[]]$ExcludeTests = @(),
 
+  [Parameter(ParameterSetName = 'Run', DontShow = $true)]
+  [switch]$DeferDfsrBacklog,
+
+  [Parameter(ParameterSetName = 'Run', DontShow = $true)]
+  [string]$DfsrBacklogDomain,
+
   [Parameter(ParameterSetName = 'Run')]
   [switch]$IReallyWantToRunTestsThatChangeState,
 
@@ -690,6 +696,15 @@ FunctionName, Time, ElapsedMilliseconds, Output, Success, Error, Category, Reaso
     return
   }
 
+  if ($FunctionName -eq 'HealthTest-DfsrBacklog' -and $DeferDfsrBacklog) {
+    if ($computerSystem.Domain) {
+      [pscustomobject]@{ DfsrBacklogDomain = [string]$computerSystem.Domain }
+    } else {
+      Log-Warning 'Could not identify the domain for the SYSVOL backlog check.' -Emitter $FunctionName
+    }
+    return
+  }
+
   Write-Progress -Activity "Starting test $FunctionName"
   Log-debug "Starting test $FunctionName"
   $cmd = Get-Command -Name $FunctionName -CommandType Function -ErrorAction SilentlyContinue
@@ -711,7 +726,11 @@ FunctionName, Time, ElapsedMilliseconds, Output, Success, Error, Category, Reaso
 
     $result = & {
       $WarningPreference = 'Continue'
-      & $target 3>&1
+      if ($FunctionName -eq 'HealthTest-DfsrBacklog' -and $DfsrBacklogDomain) {
+        & $target -Domain $DfsrBacklogDomain 3>&1
+      } else {
+        & $target 3>&1
+      }
     }
 
     foreach ($item in $result) {
@@ -1436,6 +1455,9 @@ function Invoke-HealthTestWithPolicyAutoset {
   (-not (Test-PolicyAutosetAlreadyPerformed -PolicyTestName $policyTestName -PolicyBaselineVersion $policyBaselineVersion -SuppressionFilePath $script:Config.SuppressSignaturesPath))
 
   $records = @(Invoke-HealthTest $FunctionName)
+  if ($FunctionName -eq 'HealthTest-DfsrBacklog' -and $DeferDfsrBacklog) {
+    return $records
+  }
 
   if ($shouldAutoset) {
     $policyFindings = @(
@@ -1596,7 +1618,7 @@ if ($ListAllBuiltInTests) {
 $script:RequiredFindings = Read-RequiredFindingsConfig -Path $script:Config.RequiredFindingsPath
 
 # if we were called with -AddWhitelisting or -SetAsRequired we skip some uneeded work to save time
-if ((-not $AddWhitelisting) -and (-not $SetAsRequired)) {
+if ((-not $AddWhitelisting) -and (-not $SetAsRequired) -and (-not $DfsrBacklogDomain)) {
     #+-----------------------------------------------------------
     #| Collect system information
     #|
@@ -1825,6 +1847,13 @@ Initialize-LogSystem `
   -HideStr $Hide `
   -SuppressionFilePath $script:Config.SuppressSignaturesPath `
   -AdditionalSuppressedSignatures $WhitelistSigs
+
+if ($DfsrBacklogDomain) {
+  . (Join-Path $PSScriptRoot 'health-tests\HealthTest-DfsrBacklog.ps1')
+  Invoke-HealthTestWithPolicyAutoset 'HealthTest-DfsrBacklog'
+  return
+}
+
 #|
 #|
 #+-----------------------------------------------------------

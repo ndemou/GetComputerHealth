@@ -40,12 +40,17 @@ Describe 'HealthTest-DfsrBacklog' {
             if ($ClassName -eq 'DfsrConnectionConfig' -and $CimSession.ComputerName -eq 'NODEA') {
                 [pscustomobject]@{ ReplicationGroupGuid = $groupGuid; Inbound = $false; PartnerDns = 'NODEB' }
             }
+            if ($ClassName -eq 'DfsrConnectionConfig' -and $CimSession.ComputerName -like '*.example.test') {
+                $partner = if ($CimSession.ComputerName -like 'NODEA.*') { 'NODEB' } else { 'NODEA' }
+                [pscustomobject]@{ ReplicationGroupGuid = $groupGuid; Inbound = $false; PartnerName = $partner; PartnerDns = $null }
+                [pscustomobject]@{ ReplicationGroupGuid = $groupGuid; Inbound = $true; PartnerName = $partner; PartnerDns = "$partner.example.test." }
+            }
         }
         Mock Invoke-CimMethod {
             if ($MethodName -eq 'GetVersionVector') {
                 $status = if ($CimSession.ComputerName -eq $script:vectorFailure) { 5 } else { 0 }
-                [pscustomobject]@{ ReturnValue = $status; VersionVector = 'vector-B' }
-            } elseif ($MethodName -eq 'GetOutboundBacklogFileCount' -and $Arguments.VersionVector -eq 'vector-B') {
+                [pscustomobject]@{ ReturnValue = $status; VersionVector = "vector-$($CimSession.ComputerName)" }
+            } elseif ($MethodName -eq 'GetOutboundBacklogFileCount' -and $Arguments.VersionVector -ne "vector-$($CimSession.ComputerName)") {
                 [pscustomobject]@{ ReturnValue = 0; BacklogFileCount = $script:total }
             }
         }
@@ -111,5 +116,56 @@ Describe 'HealthTest-DfsrBacklog' {
 
         $findings | Should -HaveCount 1
         $findings[0].Message | Should -Match '^\[WARNING\] Could not discover SYSVOL'
+    }
+
+    Context 'running on the collector' {
+        BeforeEach {
+            $script:group = 'Domain System Volume'
+            $script:folder = 'SYSVOL Share'
+            Mock Get-Service {}
+            Mock Resolve-DnsName {
+                [pscustomobject]@{ Type = 'SRV'; NameTarget = 'NODEA.example.test.' }
+                [pscustomobject]@{ Type = 'SRV'; NameTarget = 'NODEB.example.test.' }
+            }
+        }
+
+        It 'reports one count per direction using two direct WSMan sessions' {
+            $findings = @(HealthTest-DfsrBacklog -Domain 'example.test' 3>&1)
+
+            $findings | Should -HaveCount 2
+            $findings[0].Message | Should -Match '^\[PASS\][\s\S]*NODEA.example.test -> NODEB.example.test.*0 queued files'
+            $findings[1].Message | Should -Match '^\[PASS\][\s\S]*NODEB.example.test -> NODEA.example.test.*0 queued files'
+            Should -Invoke New-CimSession -Exactly -Times 2
+            Should -Invoke New-CimSession -Exactly -Times 2 -ParameterFilter { $ComputerName -like '*.example.test' -and -not $SessionOption }
+            Should -Invoke Invoke-CimMethod -Exactly -Times 1 -ParameterFilter {
+                $MethodName -eq 'GetOutboundBacklogFileCount' -and $CimSession.ComputerName -eq 'NODEA.example.test' -and $Arguments.VersionVector -eq 'vector-NODEB.example.test'
+            }
+            Should -Invoke Remove-CimSession -Exactly -Times 2
+        }
+
+        It 'reports the measured count and the failed direction without a pass' {
+            Mock Invoke-CimMethod { throw 'Access is denied.' } -ParameterFilter {
+                $MethodName -eq 'GetVersionVector' -and $CimSession.ComputerName -eq 'NODEB.example.test'
+            }
+
+            $findings = @(HealthTest-DfsrBacklog -Domain 'example.test' 3>&1)
+
+            $findings | Should -HaveCount 2
+            $findings[0].Message | Should -Match '^\[WARNING\][\s\S]*NODEA.example.test -> NODEB.example.test.*Access is denied'
+            $findings[1].Message | Should -Match '^\[INFO\][\s\S]*NODEB.example.test -> NODEA.example.test.*0 queued files'
+            Should -Invoke Remove-CimSession -Exactly -Times 2
+        }
+
+        It 'identifies both directions from the surviving peer when the other peer is inaccessible' {
+            Mock New-CimSession { throw 'Access is denied.' } -ParameterFilter { $ComputerName -eq 'NODEB.example.test' }
+
+            $findings = @(HealthTest-DfsrBacklog -Domain 'example.test' 3>&1)
+
+            $findings | Should -HaveCount 3
+            $findings[0].Message | Should -Match '^\[WARNING\] Could not discover SYSVOL[\s\S]*NODEB.example.test.*Access is denied'
+            $findings[1].Message | Should -Match '^\[WARNING\][\s\S]*NODEA.example.test -> NODEB.example.test.*Access is denied'
+            $findings[2].Message | Should -Match '^\[WARNING\][\s\S]*NODEB.example.test -> NODEA.example.test.*Access is denied'
+            Should -Invoke Remove-CimSession -Exactly -Times 1
+        }
     }
 }
