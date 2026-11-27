@@ -74,16 +74,16 @@ Uses: Win32_Service, Get-ServiceVendors.
 
     if ($not_started_services) {
         $not_started_services | %{
-            # TODO: consider exitcode 1077 practicly equivalent to 0 (no problem)
-            # 1077 = No attempts to start the service have been made since the last boot.
             $exitCodeMeaning = Get-ServiceExitCodeMessage $_.ExitCode
             $serviceInListOfOftenStoped = (
                 ($_.name -in $SERVICES_THAT_ARE_OFTEN_STOPPED) -or
                 ($_.name -match $SERVICES_THAT_ARE_OFTEN_STOPPED_REGEX)
             )
-            if ($serviceInListOfOftenStoped -and ($_.ExitCode -in (0,1077))) {
-                    $hadIssue = $true
-                    Write-Warning "[info] This service is stoped but its last execution terminated NORMALY and it's one of the services that are often stopped: Service '$($_.Name)', StartMode=$($_.StartMode), DelayedAutoStart=$($_.DelayedAutoStart), last ExitCode=$($_.ExitCode)($exitCodeMeaning)."} else {
+            # Often-stopped services remain informational regardless of their last exit code.
+            if ($serviceInListOfOftenStoped) {
+                $hadIssue = $true
+                Write-Warning "[info] This service is stopped and is one of the services that are often stopped: Service '$($_.Name)', StartMode=$($_.StartMode), DelayedAutoStart=$($_.DelayedAutoStart), last ExitCode=$($_.ExitCode)($exitCodeMeaning)."
+            } else {
                 if ($_.ExitCode  -in (0,1077)) {
                     # Use NOTICE here, even though it is noisier than INFO, because a service
                     # that stays stopped after restart should remain visible instead of being suppressed.
